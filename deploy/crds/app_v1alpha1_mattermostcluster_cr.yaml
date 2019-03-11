@@ -1,0 +1,7 @@
+apiVersion: app.mattermost.com/v1alpha1
+kind: MattermostCluster
+metadata:
+  name: example-mattermostcluster
+spec:
+  # Add fields here
+  size: 3
