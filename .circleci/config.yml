@@ -1,0 +1,28 @@
+version: 2.1
+executors:
+  default:
+    working_directory: /go/src/github.com/mattermost/mattermost-operator
+    docker:
+      - image: circleci/golang:1.12
+
+jobs:
+  lint:
+    executor:
+      name: default
+    steps:
+      - checkout
+      - run: make check-style
+
+  test:
+    executor:
+      name: default
+    steps:
+      - checkout
+      - run: make test
+
+workflows:
+  version: 2
+  untagged-build:
+    jobs:
+      - lint
+      - test
