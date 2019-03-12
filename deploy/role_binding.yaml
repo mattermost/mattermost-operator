@@ -1,11 +1,13 @@
-kind: RoleBinding
+kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: mattermost-operator
 subjects:
 - kind: ServiceAccount
   name: mattermost-operator
+  # Replace this with the namespace the operator is deployed in.
+  namespace: REPLACE_NAMESPACE
 roleRef:
-  kind: Role
+  kind: ClusterRole
   name: mattermost-operator
   apiGroup: rbac.authorization.k8s.io
