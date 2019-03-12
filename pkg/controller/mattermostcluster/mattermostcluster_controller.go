@@ -104,8 +104,8 @@ func (r *ReconcileMattermostCluster) Reconcile(request reconcile.Request) (recon
 	pod := newPodForCR(instance)
 
 	// Set MattermostCluster instance as the owner and controller
-	if err := controllerutil.SetControllerReference(instance, pod, r.scheme); err != nil {
-		return reconcile.Result{}, err
+	if errSetController := controllerutil.SetControllerReference(instance, pod, r.scheme); errSetController != nil {
+		return reconcile.Result{}, errSetController
 	}
 
 	// Check if this Pod already exists

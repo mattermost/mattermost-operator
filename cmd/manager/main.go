@@ -7,8 +7,8 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/mattermost/mattermost-operator/mattermost-operator/pkg/apis"
-	"github.com/mattermost/mattermost-operator/mattermost-operator/pkg/controller"
+	"github.com/mattermost/mattermost-operator/pkg/apis"
+	"github.com/mattermost/mattermost-operator/pkg/controller"
 
 	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
 	"github.com/operator-framework/operator-sdk/pkg/leader"
@@ -94,14 +94,14 @@ func main() {
 	log.Info("Registering Components.")
 
 	// Setup Scheme for all resources
-	if err := apis.AddToScheme(mgr.GetScheme()); err != nil {
-		log.Error(err, "")
+	if errAddToScheme := apis.AddToScheme(mgr.GetScheme()); errAddToScheme != nil {
+		log.Error(errAddToScheme, "")
 		os.Exit(1)
 	}
 
 	// Setup all Controllers
-	if err := controller.AddToManager(mgr); err != nil {
-		log.Error(err, "")
+	if errAddToManager := controller.AddToManager(mgr); errAddToManager != nil {
+		log.Error(errAddToManager, "")
 		os.Exit(1)
 	}
 
