@@ -13,13 +13,13 @@ import (
 
 func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
 	return map[string]common.OpenAPIDefinition{
-		"github.com/mattermost/mattermost-operator/pkg/apis/app/v1alpha1.MattermostCluster":       schema_pkg_apis_app_v1alpha1_MattermostCluster(ref),
-		"github.com/mattermost/mattermost-operator/pkg/apis/app/v1alpha1.MattermostClusterSpec":   schema_pkg_apis_app_v1alpha1_MattermostClusterSpec(ref),
-		"github.com/mattermost/mattermost-operator/pkg/apis/app/v1alpha1.MattermostClusterStatus": schema_pkg_apis_app_v1alpha1_MattermostClusterStatus(ref),
+		"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.MattermostCluster":       schema_pkg_apis_mattermost_v1alpha1_MattermostCluster(ref),
+		"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.MattermostClusterSpec":   schema_pkg_apis_mattermost_v1alpha1_MattermostClusterSpec(ref),
+		"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.MattermostClusterStatus": schema_pkg_apis_mattermost_v1alpha1_MattermostClusterStatus(ref),
 	}
 }
 
-func schema_pkg_apis_app_v1alpha1_MattermostCluster(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_mattermost_v1alpha1_MattermostCluster(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -46,23 +46,23 @@ func schema_pkg_apis_app_v1alpha1_MattermostCluster(ref common.ReferenceCallback
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/mattermost/mattermost-operator/pkg/apis/app/v1alpha1.MattermostClusterSpec"),
+							Ref: ref("github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.MattermostClusterSpec"),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/mattermost/mattermost-operator/pkg/apis/app/v1alpha1.MattermostClusterStatus"),
+							Ref: ref("github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.MattermostClusterStatus"),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/mattermost/mattermost-operator/pkg/apis/app/v1alpha1.MattermostClusterSpec", "github.com/mattermost/mattermost-operator/pkg/apis/app/v1alpha1.MattermostClusterStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.MattermostClusterSpec", "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.MattermostClusterStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
 	}
 }
 
-func schema_pkg_apis_app_v1alpha1_MattermostClusterSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_mattermost_v1alpha1_MattermostClusterSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -74,7 +74,7 @@ func schema_pkg_apis_app_v1alpha1_MattermostClusterSpec(ref common.ReferenceCall
 	}
 }
 
-func schema_pkg_apis_app_v1alpha1_MattermostClusterStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_mattermost_v1alpha1_MattermostClusterStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{

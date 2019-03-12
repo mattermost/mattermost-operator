@@ -1,7 +1,7 @@
 package apis
 
 import (
-	"github.com/mattermost/mattermost-operator/pkg/apis/app/v1alpha1"
+	"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
 )
 
 func init() {

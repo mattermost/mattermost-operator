@@ -50,5 +50,6 @@ rules:
   - mattermost.com
   resources:
   - '*'
+  - mattermostclusters
   verbs:
   - '*'
