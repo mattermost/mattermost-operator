@@ -3,7 +3,7 @@ package mattermostcluster
 import (
 	"context"
 
-	appv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/app/v1alpha1"
+	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -47,7 +47,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to primary resource MattermostCluster
-	err = c.Watch(&source.Kind{Type: &appv1alpha1.MattermostCluster{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &mattermostv1alpha1.MattermostCluster{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
@@ -56,7 +56,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Watch for changes to secondary resource Pods and requeue the owner MattermostCluster
 	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
-		OwnerType:    &appv1alpha1.MattermostCluster{},
+		OwnerType:    &mattermostv1alpha1.MattermostCluster{},
 	})
 	if err != nil {
 		return err
@@ -87,7 +87,7 @@ func (r *ReconcileMattermostCluster) Reconcile(request reconcile.Request) (recon
 	reqLogger.Info("Reconciling MattermostCluster")
 
 	// Fetch the MattermostCluster instance
-	instance := &appv1alpha1.MattermostCluster{}
+	instance := &mattermostv1alpha1.MattermostCluster{}
 	err := r.client.Get(context.TODO(), request.NamespacedName, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -130,7 +130,7 @@ func (r *ReconcileMattermostCluster) Reconcile(request reconcile.Request) (recon
 }
 
 // newPodForCR returns a busybox pod with the same name/namespace as the cr
-func newPodForCR(cr *appv1alpha1.MattermostCluster) *corev1.Pod {
+func newPodForCR(cr *mattermostv1alpha1.MattermostCluster) *corev1.Pod {
 	labels := map[string]string{
 		"app": cr.Name,
 	}
