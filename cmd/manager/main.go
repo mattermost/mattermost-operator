@@ -9,6 +9,7 @@ import (
 
 	"github.com/mattermost/mattermost-operator/pkg/apis"
 	"github.com/mattermost/mattermost-operator/pkg/controller"
+	"github.com/mattermost/mattermost-operator/version"
 
 	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
 	"github.com/operator-framework/operator-sdk/pkg/leader"
@@ -34,6 +35,7 @@ func printVersion() {
 	log.Info(fmt.Sprintf("Go Version: %s", runtime.Version()))
 	log.Info(fmt.Sprintf("Go OS/Arch: %s/%s", runtime.GOOS, runtime.GOARCH))
 	log.Info(fmt.Sprintf("Version of operator-sdk: %v", sdkVersion.Version))
+	log.Info(version.GetVersionString())
 }
 
 func main() {

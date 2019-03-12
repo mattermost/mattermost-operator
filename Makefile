@@ -1,17 +1,26 @@
+.PHONY: all check-style test build clean
 
 GOPATH ?= $(shell go env GOPATH)
 GOFLAGS ?= $(GOFLAGS:)
 GO=go
 
 BUILDTIME := $(shell date -u +%Y%m%d.%H%M%S)
-LDFLAGS ?= -ldflags '-X ${PKG_PATH}/pkg/version.version=${VERSION} -X ${PKG_PATH}/pkg/version.buildtime=${BUILDTIME}'
+BUILD_HASH = $(shell git rev-parse HEAD)
+GO_LINKER_FLAGS ?= -ldflags \
+				   "-X 'github.com/mattermost/mattermost-operator/version.buildTime=$(BUILDTIME)'\
+					  -X 'github.com/mattermost/mattermost-operator/version.buildHash=$(BUILD_HASH)'"
+
 PACKAGES=$(shell go list ./...)
 
-all: test
+all: check-style test build
 
 # Run tests
-test: dep
-	go test $(LDFLAGS) $(PACKAGES) -coverprofile cover.out
+test:
+	go test $(GO_LINKER_FLAGS) $(PACKAGES) -coverprofile cover.out
+
+build:
+	@echo Building Mattermost-operator
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 $(GO) build -gcflags all=-trimpath=$(GOPATH) -asmflags all=-trimpath=$(GOPATH) -a -installsuffix cgo -o build/_output/bin/mattermost-operator $(GO_LINKER_FLAGS) --ldflags '-w' ./cmd/manager/main.go
 
 check-style: gofmt govet
 
@@ -42,3 +51,9 @@ govet: ## Runs govet against all packages.
 # Get dependencies
 dep:
 	dep ensure -v
+
+clean:
+	rm -Rf build/_output
+	go clean $(GOFLAGS) -i ./...
+	rm -f *.out
+	rm -f *.test
