@@ -1,4 +1,4 @@
-apiVersion: app.mattermost.com/v1alpha1
+apiVersion: mattermost.com/v1alpha1
 kind: MattermostCluster
 metadata:
   name: example-mattermostcluster

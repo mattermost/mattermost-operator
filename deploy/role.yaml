@@ -47,7 +47,7 @@ rules:
   verbs:
   - update
 - apiGroups:
-  - app.mattermost.com
+  - mattermost.com
   resources:
   - '*'
   verbs:
