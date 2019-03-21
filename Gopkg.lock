@@ -42,6 +42,13 @@
   revision = "3a771d992973f24aa725d07868b467d1ddfceafb"
 
 [[projects]]
+  digest = "1:e29f05b742d9ccbfb65faca82ec43da7742cb7b039469640823c64b639b91b92"
+  name = "github.com/coreos/go-semver"
+  packages = ["semver"]
+  pruneopts = "NT"
+  revision = "e214231b295a8ea9479f11b70b35d5acf3556d9b"
+
+[[projects]]
   digest = "1:c61f4f97321a37adcb5b4fd4fd61209cd553e46c99ee606c465553541b12a229"
   name = "github.com/coreos/prometheus-operator"
   packages = [
@@ -128,6 +135,14 @@
   pruneopts = "NT"
   revision = "1d29f06aebd59ccdf11ae04aa0334ded96e2d909"
   version = "v0.18.0"
+
+[[projects]]
+  digest = "1:13e9a236e56e18fecb73f5b2f2eb7f60060a1a9bc27e5a7328ab22e275ecb63e"
+  name = "github.com/go-sql-driver/mysql"
+  packages = ["."]
+  pruneopts = "NT"
+  revision = "72cd26f257d44c1114970e19afddcd812016007e"
+  version = "v1.4.1"
 
 [[projects]]
   digest = "1:9059915429f7f3a5f18cfa6b7cab9a28721d7ac6db4079a62044aa229eb7f2a8"
@@ -317,6 +332,18 @@
   ]
   pruneopts = "NT"
   revision = "153a59c0a501dc17198e3e769c0103c78eb206c6"
+
+[[projects]]
+  digest = "1:6768d18767971e38080b81a85ab4cac3b0d2ca5b8005352a6ab2d19b7b1bad62"
+  name = "github.com/oracle/mysql-operator"
+  packages = [
+    "pkg/apis/mysql/v1alpha1",
+    "pkg/constants",
+    "pkg/version",
+  ]
+  pruneopts = "NT"
+  revision = "e3e319777091c8b0c76493cb1e974902fd4161e1"
+  version = "0.3.0"
 
 [[projects]]
   digest = "1:93b1d84c5fa6d1ea52f4114c37714cddd84d5b78f151b62bb101128dd51399bf"
@@ -564,6 +591,7 @@
   name = "google.golang.org/appengine"
   packages = [
     ".",
+    "cloudsql",
     "internal",
     "internal/app_identity",
     "internal/base",
@@ -852,7 +880,6 @@
     "pkg/client/apiutil",
     "pkg/client/config",
     "pkg/controller",
-    "pkg/controller/controllerutil",
     "pkg/event",
     "pkg/handler",
     "pkg/internal/controller",
@@ -907,13 +934,16 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
+    "github.com/go-logr/logr",
     "github.com/go-openapi/spec",
-    "github.com/operator-framework/operator-sdk/pkg/k8sutil",
+    "github.com/go-sql-driver/mysql",
     "github.com/operator-framework/operator-sdk/pkg/leader",
     "github.com/operator-framework/operator-sdk/pkg/log/zap",
     "github.com/operator-framework/operator-sdk/pkg/metrics",
     "github.com/operator-framework/operator-sdk/version",
+    "github.com/oracle/mysql-operator/pkg/apis/mysql/v1alpha1",
     "github.com/spf13/pflag",
+    "k8s.io/api/apps/v1",
     "k8s.io/api/core/v1",
     "k8s.io/apimachinery/pkg/api/errors",
     "k8s.io/apimachinery/pkg/apis/meta/v1",
@@ -933,7 +963,6 @@
     "sigs.k8s.io/controller-runtime/pkg/client",
     "sigs.k8s.io/controller-runtime/pkg/client/config",
     "sigs.k8s.io/controller-runtime/pkg/controller",
-    "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil",
     "sigs.k8s.io/controller-runtime/pkg/handler",
     "sigs.k8s.io/controller-runtime/pkg/manager",
     "sigs.k8s.io/controller-runtime/pkg/reconcile",
