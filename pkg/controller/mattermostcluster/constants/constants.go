@@ -8,4 +8,6 @@ const (
 	// DefaultMattermostImage is the default Mattermost docker image
 	DefaultMattermostImage        = "mattermost/mattermost-enterprise-edition:5.8.0"
 	DefaultMattermostDatabaseType = "mysql"
+
+	ClusterLabel = "v1alpha1.mattermost.com/cluster"
 )
