@@ -201,9 +201,9 @@ func (r *ReconcileMattermostCluster) checkDBServiceAccount(mattermost *mattermos
 	}
 
 	foundServiceAccount := &corev1.ServiceAccount{}
-	err := r.client.Get(context.TODO(), types.NamespacedName{Name: serviceAccountName, Namespace: mattermost.Namespace}, foundServiceAccount)
-	if err != nil && errors.IsNotFound(err) {
-		reqLogger.Info("MattermostCluster Database Service account not found, will deploy one.", "Err", err.Error())
+	errGet := r.client.Get(context.TODO(), types.NamespacedName{Name: serviceAccountName, Namespace: mattermost.Namespace}, foundServiceAccount)
+	if errGet != nil && errors.IsNotFound(errGet) {
+		reqLogger.Info("MattermostCluster Database Service account not found, will deploy one.", "Err", errGet.Error())
 		reqLogger.Info("Creating Service Account")
 		if err := r.client.Create(context.TODO(), serviceAccount); err != nil {
 			reqLogger.Info("Error creating Service Account", "Error", err.Error())
@@ -214,9 +214,9 @@ func (r *ReconcileMattermostCluster) checkDBServiceAccount(mattermost *mattermos
 		if err := controllerutil.SetControllerReference(mattermost, serviceAccount, r.scheme); err != nil {
 			return err
 		}
-	} else if err != nil {
-		reqLogger.Error(err, "MattermostCluster Database Service Account")
-		return err
+	} else if errGet != nil {
+		reqLogger.Error(errGet, "MattermostCluster Database Service Account")
+		return errGet
 	}
 
 	// TODO check how to update without creating new tokens
@@ -252,7 +252,7 @@ func (r *ReconcileMattermostCluster) checkDBRoleBinding(mattermost *mattermostv1
 			},
 		},
 		Subjects: []rbacv1beta1.Subject{
-			rbacv1beta1.Subject{
+			{
 				Kind:      "ServiceAccount",
 				Name:      serviceAccountName,
 				Namespace: mattermost.Namespace,
@@ -266,9 +266,9 @@ func (r *ReconcileMattermostCluster) checkDBRoleBinding(mattermost *mattermostv1
 	}
 
 	foundRoleBinding := &rbacv1beta1.RoleBinding{}
-	err := r.client.Get(context.TODO(), types.NamespacedName{Name: serviceAccountName, Namespace: mattermost.Namespace}, foundRoleBinding)
-	if err != nil && errors.IsNotFound(err) {
-		reqLogger.Info("MattermostCluster Database Role Binding not found, will deploy one.", "Err", err.Error())
+	errGet := r.client.Get(context.TODO(), types.NamespacedName{Name: serviceAccountName, Namespace: mattermost.Namespace}, foundRoleBinding)
+	if errGet != nil && errors.IsNotFound(errGet) {
+		reqLogger.Info("MattermostCluster Database Role Binding not found, will deploy one.", "Err", errGet.Error())
 		reqLogger.Info("Creating Role Binding")
 		if err := r.client.Create(context.TODO(), roleBinding); err != nil {
 			reqLogger.Info("Error Role Binding", "Error", err.Error())
@@ -279,9 +279,9 @@ func (r *ReconcileMattermostCluster) checkDBRoleBinding(mattermost *mattermostv1
 		if err := controllerutil.SetControllerReference(mattermost, roleBinding, r.scheme); err != nil {
 			return err
 		}
-	} else if err != nil {
-		reqLogger.Error(err, "MattermostCluster Database Role Binding")
-		return err
+	} else if errGet != nil {
+		reqLogger.Error(errGet, "MattermostCluster Database Role Binding")
+		return errGet
 	}
 
 	// TODO check how to update
@@ -315,9 +315,9 @@ func (r *ReconcileMattermostCluster) checkDBMySQLDeployment(mattermost *mattermo
 		}),
 	}
 	foundDB := &mysqlOperator.Cluster{}
-	err := r.client.Get(context.TODO(), types.NamespacedName{Name: dbName, Namespace: mattermost.Namespace}, foundDB)
-	if err != nil && errors.IsNotFound(err) {
-		reqLogger.Info("MattermostCluster Database not found, will deploy one.", "Err", err.Error())
+	errGet := r.client.Get(context.TODO(), types.NamespacedName{Name: dbName, Namespace: mattermost.Namespace}, foundDB)
+	if errGet != nil && errors.IsNotFound(errGet) {
+		reqLogger.Info("MattermostCluster Database not found, will deploy one.", "Err", errGet.Error())
 		reqLogger.Info("Creating Database", "Members", deployDB.Spec.Members)
 		if err := r.client.Create(context.TODO(), deployDB); err != nil {
 			reqLogger.Info("Error creating Database", "Error", err.Error())
@@ -328,16 +328,16 @@ func (r *ReconcileMattermostCluster) checkDBMySQLDeployment(mattermost *mattermo
 		if err := controllerutil.SetControllerReference(mattermost, deployDB, r.scheme); err != nil {
 			return err
 		}
-	} else if err != nil {
-		reqLogger.Error(err, "MattermostCluster Database")
-		return err
+	} else if errGet != nil {
+		reqLogger.Error(errGet, "MattermostCluster Database")
+		return errGet
 	}
 
 	// Set MattermostService instance as the owner and controller
 	if !reflect.DeepEqual(deployDB.Spec, foundDB.Spec) {
 		foundDB.Spec = deployDB.Spec
 		reqLogger.Info("Updating DB", deployDB.Namespace, deployDB.Name)
-		err = r.client.Update(context.TODO(), foundDB)
+		err := r.client.Update(context.TODO(), foundDB)
 		if err != nil {
 			return err
 		}
@@ -424,9 +424,9 @@ func (r *ReconcileMattermostCluster) serviceForMM(mattermost *mattermostv1alpha1
 	}
 
 	foundService := &corev1.Service{}
-	err := r.client.Get(context.TODO(), types.NamespacedName{Name: mattermost.Name, Namespace: mattermost.Namespace}, foundService)
-	if err != nil && errors.IsNotFound(err) {
-		reqLogger.Info("MattermostCluster Service not found, will deploy one.", "Err", err.Error())
+	errGet := r.client.Get(context.TODO(), types.NamespacedName{Name: mattermost.Name, Namespace: mattermost.Namespace}, foundService)
+	if errGet != nil && errors.IsNotFound(errGet) {
+		reqLogger.Info("MattermostCluster Service not found, will deploy one.", "Err", errGet.Error())
 		reqLogger.Info("Creating Mattermost Service")
 		if err := r.client.Create(context.TODO(), svc); err != nil {
 			reqLogger.Info("Error creating Service", "Error", err.Error())
@@ -436,9 +436,9 @@ func (r *ReconcileMattermostCluster) serviceForMM(mattermost *mattermostv1alpha1
 		if err := controllerutil.SetControllerReference(mattermost, svc, r.scheme); err != nil {
 			return err
 		}
-	} else if err != nil {
-		reqLogger.Error(err, "MattermostCluster Service")
-		return err
+	} else if errGet != nil {
+		reqLogger.Error(errGet, "MattermostCluster Service")
+		return errGet
 	}
 
 	// TODO check how to do the update
@@ -499,9 +499,9 @@ func (r *ReconcileMattermostCluster) ingressForMM(mattermost *mattermostv1alpha1
 	}
 
 	foundIngress := &v1beta1.Ingress{}
-	err := r.client.Get(context.TODO(), types.NamespacedName{Name: ingressName, Namespace: mattermost.Namespace}, foundIngress)
-	if err != nil && errors.IsNotFound(err) {
-		reqLogger.Info("MattermostCluster Ingress not found, will deploy one.", "Err", err.Error())
+	errGet := r.client.Get(context.TODO(), types.NamespacedName{Name: ingressName, Namespace: mattermost.Namespace}, foundIngress)
+	if errGet != nil && errors.IsNotFound(errGet) {
+		reqLogger.Info("MattermostCluster Ingress not found, will deploy one.", "Err", errGet.Error())
 		reqLogger.Info("Creating Mattermost Ingress")
 		if err := r.client.Create(context.TODO(), ingressMM); err != nil {
 			reqLogger.Info("Error creating Ingress", "Error", err.Error())
@@ -511,9 +511,9 @@ func (r *ReconcileMattermostCluster) ingressForMM(mattermost *mattermostv1alpha1
 		if err := controllerutil.SetControllerReference(mattermost, ingressMM, r.scheme); err != nil {
 			return err
 		}
-	} else if err != nil {
-		reqLogger.Error(err, "MattermostCluster Ingress")
-		return err
+	} else if errGet != nil {
+		reqLogger.Error(errGet, "MattermostCluster Ingress")
+		return errGet
 	}
 
 	// TODO check how to do the update
@@ -602,11 +602,10 @@ func (r *ReconcileMattermostCluster) deploymentForMM(mattermost *mattermostv1alp
 	}
 
 	foundMM := &appsv1.Deployment{}
-	err = r.client.Get(context.TODO(), types.NamespacedName{Name: mattermost.Name, Namespace: mattermost.Namespace}, foundMM)
-	if err != nil && errors.IsNotFound(err) {
-		reqLogger.Info("MattermostCluster App not found, will deploy one.", "Err", err.Error())
+	errGet := r.client.Get(context.TODO(), types.NamespacedName{Name: mattermost.Name, Namespace: mattermost.Namespace}, foundMM)
+	if errGet != nil && errors.IsNotFound(errGet) {
+		reqLogger.Info("MattermostCluster App not found, will deploy one.", "Err", errGet.Error())
 		reqLogger.Info("Creating Mattermost Ingress")
-		r.client.Create(context.TODO(), deployMM)
 		if err := r.client.Create(context.TODO(), deployMM); err != nil {
 			reqLogger.Info("Error creating Mattermost Application", "Error", err.Error())
 			return err
@@ -615,9 +614,9 @@ func (r *ReconcileMattermostCluster) deploymentForMM(mattermost *mattermostv1alp
 		if err := controllerutil.SetControllerReference(mattermost, deployMM, r.scheme); err != nil {
 			return err
 		}
-	} else if err != nil {
-		reqLogger.Error(err, "MattermostCluster Application")
-		return err
+	} else if errGet != nil {
+		reqLogger.Error(errGet, "MattermostCluster Application")
+		return errGet
 	}
 
 	// TODO check how to do the update
