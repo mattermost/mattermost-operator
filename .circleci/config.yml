@@ -26,8 +26,8 @@ jobs:
             tar -zxvf kubebuilder_${version}_linux_amd64.tar.gz
             sudo mv kubebuilder_${version}_linux_amd64 /usr/local/kubebuilder
       - run: |
-        export PATH=$PATH:/usr/local/kubebuilder/bin
-        make test
+          export PATH=$PATH:/usr/local/kubebuilder/bin
+          make test
 
 workflows:
   version: 2
