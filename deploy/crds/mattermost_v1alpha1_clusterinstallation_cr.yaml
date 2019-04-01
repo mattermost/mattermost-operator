@@ -1,0 +1,6 @@
+apiVersion: mattermost.com/v1alpha1
+kind: ClusterInstallation
+metadata:
+  name: example-clusterinstallation
+spec:
+  ingressName: example.mattermost-example.dev

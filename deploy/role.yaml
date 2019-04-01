@@ -68,7 +68,7 @@ rules:
   - mattermost.com
   resources:
   - '*'
-  - mattermostclusters
+  - clusterinstallations
   verbs:
   - '*'
 - apiGroups:
