@@ -22,9 +22,43 @@ spec:
         metadata:
           type: object
         spec:
+          properties:
+            affinity:
+              type: object
+            databaseType:
+              properties:
+                type:
+                  type: string
+              type: object
+            image:
+              type: string
+            ingressName:
+              type: string
+            nodeSelector:
+              additionalProperties:
+                type: string
+              type: object
+            replicas:
+              format: int32
+              type: integer
+            version:
+              type: string
+          required:
+          - ingressName
           type: object
         status:
+          properties:
+            paused:
+              type: boolean
+            replicas:
+              format: int32
+              type: integer
+          required:
+          - paused
+          - replicas
           type: object
+      required:
+      - spec
   version: v1alpha1
   versions:
   - name: v1alpha1

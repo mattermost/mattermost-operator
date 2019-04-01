@@ -13,17 +13,17 @@ import (
 
 func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
 	return map[string]common.OpenAPIDefinition{
-		"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.MattermostCluster":       schema_pkg_apis_mattermost_v1alpha1_MattermostCluster(ref),
-		"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.MattermostClusterSpec":   schema_pkg_apis_mattermost_v1alpha1_MattermostClusterSpec(ref),
-		"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.MattermostClusterStatus": schema_pkg_apis_mattermost_v1alpha1_MattermostClusterStatus(ref),
+		"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.ClusterInstallation":       schema_pkg_apis_mattermost_v1alpha1_ClusterInstallation(ref),
+		"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.ClusterInstallationSpec":   schema_pkg_apis_mattermost_v1alpha1_ClusterInstallationSpec(ref),
+		"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.ClusterInstallationStatus": schema_pkg_apis_mattermost_v1alpha1_ClusterInstallationStatus(ref),
 	}
 }
 
-func schema_pkg_apis_mattermost_v1alpha1_MattermostCluster(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_mattermost_v1alpha1_ClusterInstallation(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "MattermostCluster is the Schema for the mattermostclusters API",
+				Description: "ClusterInstallation is the Schema for the clusterinstallations API",
 				Properties: map[string]spec.Schema{
 					"kind": {
 						SchemaProps: spec.SchemaProps{
@@ -39,47 +39,117 @@ func schema_pkg_apis_mattermost_v1alpha1_MattermostCluster(ref common.ReferenceC
 							Format:      "",
 						},
 					},
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
-						},
-					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.MattermostClusterSpec"),
+							Description: "Specification of the desired behavior of the Mattermost cluster. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status",
+							Ref:         ref("github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.ClusterInstallationSpec"),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.MattermostClusterStatus"),
+							Description: "Most recent observed status of the Mattermost cluster. Read-only. Not included when requesting from the apiserver, only from the Mattermost Operator API itself. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status",
+							Ref:         ref("github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.ClusterInstallationStatus"),
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
-			"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.MattermostClusterSpec", "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.MattermostClusterStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.ClusterInstallationSpec", "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.ClusterInstallationStatus"},
 	}
 }
 
-func schema_pkg_apis_mattermost_v1alpha1_MattermostClusterSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_mattermost_v1alpha1_ClusterInstallationSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "MattermostClusterSpec defines the desired state of MattermostCluster",
-				Properties:  map[string]spec.Schema{},
+				Description: "ClusterInstallationSpec defines the desired state of ClusterInstallation",
+				Properties: map[string]spec.Schema{
+					"image": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Image defines the ClusterInstallation Docker image.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"version": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Version defines the ClusterInstallation Docker image version.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"replicas": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Replicas defines the number of Mattermost instances in a ClusterInstallation resource",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"ingressName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "IngressName defines the name to be used when creating the ingress rules",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"nodeSelector": {
+						SchemaProps: spec.SchemaProps{
+							Description: "NodeSelector is a selector which must be true for the pod to fit on a node. Selector which must match a node's labels for the pod to be scheduled on that node. More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
+					"affinity": {
+						SchemaProps: spec.SchemaProps{
+							Description: "If specified, affinity will define the pod's scheduling constraints",
+							Ref:         ref("k8s.io/api/core/v1.Affinity"),
+						},
+					},
+					"databaseType": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.DatabaseType"),
+						},
+					},
+				},
+				Required: []string{"ingressName"},
 			},
 		},
-		Dependencies: []string{},
+		Dependencies: []string{
+			"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.DatabaseType", "k8s.io/api/core/v1.Affinity"},
 	}
 }
 
-func schema_pkg_apis_mattermost_v1alpha1_MattermostClusterStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_mattermost_v1alpha1_ClusterInstallationStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "MattermostClusterStatus defines the observed state of MattermostCluster",
-				Properties:  map[string]spec.Schema{},
+				Description: "ClusterInstallationStatus defines the observed state of ClusterInstallation",
+				Properties: map[string]spec.Schema{
+					"paused": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Represents whether any actions on the underlying managed objects are being performed. Only delete actions will be performed.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"replicas": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Total number of non-terminated pods targeted by this Mattermost deployment (their labels match the selector).",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+				Required: []string{"paused", "replicas"},
 			},
 		},
 		Dependencies: []string{},
