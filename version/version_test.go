@@ -16,10 +16,10 @@ func TestVersion(t *testing.T) {
 		t.Errorf("Version did not match repo, got: %s, want: %s.", progVersion, repoVersion)
 	}
 
-	expectedVersionStr := fmt.Sprintf("Mattermost Operator: version %v, built %v, hash %v", progVersion, progBuildTime, progBuildHash)
+	expectedVersionStr := fmt.Sprintf("Mattermost Operator: version %v, build time %v, hash %v", progVersion, progBuildTime, progBuildHash)
 	getVersionStr := GetVersionString()
 	if getVersionStr != expectedVersionStr {
-		t.Errorf("Version did not match got: %s, want: %s.", getVersionStr, expectedVersionStr)
+		t.Errorf("Version did not match got: %s, want: %s", getVersionStr, expectedVersionStr)
 	}
 
 	// YYYYmmdd.HHMMSS

@@ -91,7 +91,7 @@ type CompanyClient struct {
 
 // NewCompanyClient creates a new company service client.
 //
-// A service handles company management, including CRUD and job enumeration.
+// A service that handles company management, including CRUD and enumeration.
 func NewCompanyClient(ctx context.Context, opts ...option.ClientOption) (*CompanyClient, error) {
 	conn, err := transport.DialGRPC(ctx, append(defaultCompanyClientOptions(), opts...)...)
 	if err != nil {
@@ -159,9 +159,7 @@ func (c *CompanyClient) GetCompany(ctx context.Context, req *talentpb.GetCompany
 	return resp, nil
 }
 
-// UpdateCompany updates specified company. Company names can't be updated. To update a
-// company name, delete the company and all jobs associated with it, and only
-// then re-create them.
+// UpdateCompany updates specified company.
 func (c *CompanyClient) UpdateCompany(ctx context.Context, req *talentpb.UpdateCompanyRequest, opts ...gax.CallOption) (*talentpb.Company, error) {
 	ctx = insertMetadata(ctx, c.xGoogMetadata)
 	opts = append(c.CallOptions.UpdateCompany[0:len(c.CallOptions.UpdateCompany):len(c.CallOptions.UpdateCompany)], opts...)
@@ -190,7 +188,7 @@ func (c *CompanyClient) DeleteCompany(ctx context.Context, req *talentpb.DeleteC
 	return err
 }
 
-// ListCompanies lists all companies associated with the service account.
+// ListCompanies lists all companies associated with the project.
 func (c *CompanyClient) ListCompanies(ctx context.Context, req *talentpb.ListCompaniesRequest, opts ...gax.CallOption) *CompanyIterator {
 	ctx = insertMetadata(ctx, c.xGoogMetadata)
 	opts = append(c.CallOptions.ListCompanies[0:len(c.CallOptions.ListCompanies):len(c.CallOptions.ListCompanies)], opts...)

@@ -14,6 +14,7 @@ rules:
   - events
   - configmaps
   - secrets
+  - serviceaccounts
   verbs:
   - '*'
 - apiGroups:
@@ -31,6 +32,23 @@ rules:
   - statefulsets
   verbs:
   - '*'
+- apiGroups:
+  - extensions
+  resources:
+  - '*'
+  verbs:
+  - '*'
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - rolebindings
+  verbs:
+  - get
+  - create
+  - list
+  - delete
+  - watch
+  - update
 - apiGroups:
   - monitoring.coreos.com
   resources:
@@ -50,6 +68,22 @@ rules:
   - mattermost.com
   resources:
   - '*'
-  - mattermostclusters
+  - clusterinstallations
   verbs:
   - '*'
+- apiGroups:
+  - mysql.oracle.com
+  resources:
+  - mysqlbackups
+  - mysqlbackupschedules
+  - mysqlclusters
+  - mysqlclusters/finalizers
+  - mysqlrestores
+  verbs:
+  - '*'
+- apiGroups:
+  - mysql.oracle.com
+  resources:
+  - mysqlbackups
+  verbs:
+  - create

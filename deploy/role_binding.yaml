@@ -6,7 +6,7 @@ subjects:
 - kind: ServiceAccount
   name: mattermost-operator
   # Replace this with the namespace the operator is deployed in.
-  namespace: REPLACE_NAMESPACE
+  namespace: mattermost-operator
 roleRef:
   kind: ClusterRole
   name: mattermost-operator

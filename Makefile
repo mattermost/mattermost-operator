@@ -1,14 +1,14 @@
-.PHONY: all check-style test build clean
+.PHONY: all check-style test build clean docker
 
 GOPATH ?= $(shell go env GOPATH)
 GOFLAGS ?= $(GOFLAGS:)
 GO=go
 
-BUILDTIME := $(shell date -u +%Y%m%d.%H%M%S)
-BUILD_HASH = $(shell git rev-parse HEAD)
-GO_LINKER_FLAGS ?= -ldflags \
-				   "-X 'github.com/mattermost/mattermost-operator/version.buildTime=$(BUILDTIME)'\
-					  -X 'github.com/mattermost/mattermost-operator/version.buildHash=$(BUILD_HASH)'"
+BUILD_TIME := $(shell date -u +%Y%m%d.%H%M%S)
+BUILD_HASH := $(shell git rev-parse HEAD)
+GO_LINKER_FLAGS ?= -ldflags\
+				   "-X 'github.com/mattermost/mattermost-operator/version.buildTime=$(BUILD_TIME)'\
+					  -X 'github.com/mattermost/mattermost-operator/version.buildHash=$(BUILD_HASH)'"\
 
 PACKAGES=$(shell go list ./...)
 
@@ -20,7 +20,11 @@ test:
 
 build:
 	@echo Building Mattermost-operator
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 $(GO) build -gcflags all=-trimpath=$(GOPATH) -asmflags all=-trimpath=$(GOPATH) -a -installsuffix cgo -o build/_output/bin/mattermost-operator $(GO_LINKER_FLAGS) --ldflags '-w' ./cmd/manager/main.go
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 $(GO) build -gcflags all=-trimpath=$(GOPATH) -asmflags all=-trimpath=$(GOPATH) -a -installsuffix cgo -o build/_output/bin/mattermost-operator $(GO_LINKER_FLAGS) ./cmd/manager/main.go
+
+docker:
+	@echo Building Mattermost-operator Docker Image
+	docker build . -f build/Dockerfile -t ctadeu/test:latest --no-cache
 
 check-style: gofmt govet
 

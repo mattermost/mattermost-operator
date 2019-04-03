@@ -4,15 +4,13 @@ import (
 	"fmt"
 )
 
-var (
-	version   = "0.0.1"
-	buildTime string
-	buildHash string
-)
+var version = "0.0.1"
+var buildTime string
+var buildHash string
 
 // GetVersionString returns a standard version header
 func GetVersionString() string {
-	return fmt.Sprintf("Mattermost Operator: version %v, built %v, hash %v", version, buildTime, buildHash)
+	return fmt.Sprintf("Mattermost Operator: version %v, build time %v, hash %v", version, buildTime, buildHash)
 }
 
 // GetVersion returns the semver compatible version number
