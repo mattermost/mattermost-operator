@@ -163,7 +163,7 @@ type Object interface {
 	v1.Object
 }
 
-// createResource creates the provider resource and sets the owner
+// createResource creates the provided resource and sets the owner
 func (r *ReconcileClusterInstallation) createResource(owner v1.Object, resource Object, reqLogger logr.Logger) error {
 	if err := r.client.Create(context.TODO(), resource); err != nil {
 		reqLogger.Info("Error creating resource:", err.Error())
