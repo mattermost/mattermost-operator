@@ -117,25 +117,25 @@ func (r *ReconcileClusterInstallation) Reconcile(request reconcile.Request) (rec
 	}
 
 	if mattermost.Spec.DatabaseType.Type == "mysql" {
-		reqLogger.Info("Reconciling ClusterInstallation Database MySQL service account")
+		reqLogger.Info("Reconciling ClusterInstallation MySQL service account")
 		err = r.checkMySQLServiceAccount(mattermost, reqLogger)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
 
-		reqLogger.Info("Reconciling ClusterInstallation Database MySQL role binding")
+		reqLogger.Info("Reconciling ClusterInstallation MySQL role binding")
 		err = r.checkMySQLRoleBinding(mattermost, reqLogger)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
 
-		reqLogger.Info("Reconciling ClusterInstallation Database MySQL")
+		reqLogger.Info("Reconciling ClusterInstallation MySQL")
 		err = r.checkMySQLDeployment(mattermost, reqLogger)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
 	} else {
-		reqLogger.Info("Reconciling ClusterInstallation Database Postgres")
+		reqLogger.Info("Reconciling ClusterInstallation Postgres")
 		err = r.checkDBPostgresDeployment(mattermost, reqLogger)
 		if err != nil {
 			return reconcile.Result{}, err
@@ -157,28 +157,31 @@ func (r *ReconcileClusterInstallation) Reconcile(request reconcile.Request) (rec
 	return reconcile.Result{}, nil
 }
 
-// createServiceAccount creates the provided service account. It does not check if the service account already exists.
-func (r *ReconcileClusterInstallation) createServiceAccount(owner v1.Object, serviceAccount *corev1.ServiceAccount, reqLogger logr.Logger) error {
-	reqLogger.Info("Creating service account")
-	if err := r.client.Create(context.TODO(), serviceAccount); err != nil {
-		reqLogger.Info("Error creating service account", "Error", err.Error())
-		return err
-	}
-	reqLogger.Info("Completed creating service account")
-	if err := controllerutil.SetControllerReference(owner, serviceAccount, r.scheme); err != nil {
-		return err
-	}
+// Object combines the interfaces that all Kubernetes objects must implement.
+type Object interface {
+	runtime.Object
+	v1.Object
+}
 
+// createResource creates the provider resource and sets the owner
+func (r *ReconcileClusterInstallation) createResource(owner v1.Object, resource Object, reqLogger logr.Logger) error {
+	if err := r.client.Create(context.TODO(), resource); err != nil {
+		reqLogger.Info("Error creating resource:", err.Error())
+		return err
+	}
+	if err := controllerutil.SetControllerReference(owner, resource, r.scheme); err != nil {
+		return err
+	}
 	return nil
 }
 
-// createServiceAccountIfNotExists checks the provided service account exists and creates it if it does not.
 func (r *ReconcileClusterInstallation) createServiceAccountIfNotExists(owner v1.Object, serviceAccount *corev1.ServiceAccount, reqLogger logr.Logger) error {
 	foundServiceAccount := &corev1.ServiceAccount{}
 
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: serviceAccount.Name, Namespace: serviceAccount.Namespace}, foundServiceAccount)
 	if err != nil && errors.IsNotFound(err) {
-		return r.createServiceAccount(owner, serviceAccount, reqLogger)
+		reqLogger.Info("Creating service account", serviceAccount.Name)
+		return r.createResource(owner, serviceAccount, reqLogger)
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to check if service account exists")
 		return err
@@ -186,22 +189,7 @@ func (r *ReconcileClusterInstallation) createServiceAccountIfNotExists(owner v1.
 
 	// TODO compare found service account versus expected
 
-	return nil
-}
-
-func (r *ReconcileClusterInstallation) createRoleBinding(owner v1.Object, roleBinding *rbacv1beta1.RoleBinding, reqLogger logr.Logger) error {
-	reqLogger.Info("Creating role binding")
-	if err := r.client.Create(context.TODO(), roleBinding); err != nil {
-		reqLogger.Info("Error creating role binding", "Error", err.Error())
-		return err
-	}
-
-	// TODO add logic to wait for the completion
-	reqLogger.Info("Completed creating role binding")
-	if err := controllerutil.SetControllerReference(owner, roleBinding, r.scheme); err != nil {
-		return err
-	}
-
+	reqLogger.Info("Service account reconcicled")
 	return nil
 }
 
@@ -209,7 +197,8 @@ func (r *ReconcileClusterInstallation) createRoleBindingIfNotExists(owner v1.Obj
 	foundRoleBinding := &rbacv1beta1.RoleBinding{}
 	errGet := r.client.Get(context.TODO(), types.NamespacedName{Name: roleBinding.Name, Namespace: roleBinding.Namespace}, foundRoleBinding)
 	if errGet != nil && errors.IsNotFound(errGet) {
-		return r.createRoleBinding(owner, roleBinding, reqLogger)
+		reqLogger.Info("Creating role binding", roleBinding.Name)
+		return r.createResource(owner, roleBinding, reqLogger)
 	} else if errGet != nil {
 		reqLogger.Error(errGet, "Failed to check if role binding exists")
 		return errGet
@@ -217,21 +206,7 @@ func (r *ReconcileClusterInstallation) createRoleBindingIfNotExists(owner v1.Obj
 
 	// TODO compare found role binding versus expected
 
-	return nil
-}
-
-func (r *ReconcileClusterInstallation) createService(owner v1.Object, service *corev1.Service, reqLogger logr.Logger) error {
-	reqLogger.Info("Creating service")
-	if err := r.client.Create(context.TODO(), service); err != nil {
-		reqLogger.Info("Error creating service", "Error", err.Error())
-		return err
-	}
-
-	reqLogger.Info("Completed creating service")
-	if err := controllerutil.SetControllerReference(owner, service, r.scheme); err != nil {
-		return err
-	}
-
+	reqLogger.Info("Role binding reconciled")
 	return nil
 }
 
@@ -240,38 +215,16 @@ func (r *ReconcileClusterInstallation) createServiceIfNotExists(owner v1.Object,
 	foundService := &corev1.Service{}
 	errGet := r.client.Get(context.TODO(), types.NamespacedName{Name: service.Name, Namespace: service.Namespace}, foundService)
 	if errGet != nil && errors.IsNotFound(errGet) {
-		return r.createService(owner, service, reqLogger)
+		reqLogger.Info("Creating service", service.Name)
+		return r.createResource(owner, service, reqLogger)
 	} else if errGet != nil {
 		reqLogger.Error(errGet, "Failed to check if service exists")
 		return errGet
 	}
 
 	// TODO check how to do the update
-	// if !reflect.DeepEqual(serviceMM, foundService) {
-	// 	clusterIP := foundService.Spec.ClusterIP
-	// 	foundService = serviceMM
-	// 	foundService.Spec.ClusterIP = clusterIP
-	// 	reqLogger.Info("Updating Mattermost Service")
-	// 	err = r.client.Update(context.TODO(), foundService)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// _ = controllerutil.SetControllerReference(mattermost, foundService, r.scheme)
-	// }
-	return nil
-}
 
-func (r *ReconcileClusterInstallation) createIngress(owner v1.Object, ingress *v1beta1.Ingress, reqLogger logr.Logger) error {
-	reqLogger.Info("Creating ingress")
-	if err := r.client.Create(context.TODO(), ingress); err != nil {
-		reqLogger.Info("Error creating ingress", "Error", err.Error())
-		return err
-	}
-	reqLogger.Info("Completed creating ingress")
-	if err := controllerutil.SetControllerReference(owner, ingress, r.scheme); err != nil {
-		return err
-	}
-
+	reqLogger.Info("Service reconciled")
 	return nil
 }
 
@@ -280,37 +233,16 @@ func (r *ReconcileClusterInstallation) createIngressIfNotExists(owner v1.Object,
 	foundIngress := &v1beta1.Ingress{}
 	errGet := r.client.Get(context.TODO(), types.NamespacedName{Name: ingress.Name, Namespace: ingress.Namespace}, foundIngress)
 	if errGet != nil && errors.IsNotFound(errGet) {
-		return r.createIngress(owner, ingress, reqLogger)
+		reqLogger.Info("Creating ingress", ingress.Name)
+		return r.createResource(owner, ingress, reqLogger)
 	} else if errGet != nil {
 		reqLogger.Error(errGet, "Failed to check if ingress exists")
 		return errGet
 	}
 
 	// TODO check how to do the update
-	// if !reflect.DeepEqual(ingressMM, foundIngress) {
-	// 	foundIngress = ingressMM
-	// 	reqLogger.Info("Updating Mattermost Ingress")
-	// 	err = r.client.Update(context.TODO(), foundIngress)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// _ = controllerutil.SetControllerReference(mattermost, foundIngress, r.scheme)
-	// }
-	return nil
-}
 
-func (r *ReconcileClusterInstallation) createDeployment(owner v1.Object, deployment *appsv1.Deployment, reqLogger logr.Logger) error {
-	reqLogger.Info("Creating deployment")
-	if err := r.client.Create(context.TODO(), deployment); err != nil {
-		reqLogger.Info("Error creating Mattermost Application", "Error", err.Error())
-		return err
-	}
-
-	reqLogger.Info("Completed creating deployment")
-	if err := controllerutil.SetControllerReference(owner, deployment, r.scheme); err != nil {
-		return err
-	}
-
+	reqLogger.Info("Ingress reconciled")
 	return nil
 }
 
@@ -318,21 +250,15 @@ func (r *ReconcileClusterInstallation) createDeploymentIfNotExists(owner v1.Obje
 	foundMM := &appsv1.Deployment{}
 	errGet := r.client.Get(context.TODO(), types.NamespacedName{Name: deployment.Name, Namespace: deployment.Namespace}, foundMM)
 	if errGet != nil && errors.IsNotFound(errGet) {
-		return r.createDeployment(owner, deployment, reqLogger)
+		reqLogger.Info("Creating deployment", deployment.Name)
+		return r.createResource(owner, deployment, reqLogger)
 	} else if errGet != nil {
 		reqLogger.Error(errGet, "ClusterInstallation Application")
 		return errGet
 	}
 
 	// TODO check how to do the update
-	// if !reflect.DeepEqual(ingressMM, foundIngress) {
-	// 	foundIngress = ingressMM
-	// 	reqLogger.Info("Updating Mattermost Ingress")
-	// 	err = r.client.Update(context.TODO(), foundIngress)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// _ = controllerutil.SetControllerReference(mattermost, foundIngress, r.scheme)
-	// }
+
+	reqLogger.Info("Deployment reconciled")
 	return nil
 }
