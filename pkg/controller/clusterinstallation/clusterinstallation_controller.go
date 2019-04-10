@@ -2,13 +2,8 @@ package clusterinstallation
 
 import (
 	"context"
-	"fmt"
-	"reflect"
 
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
-	mattermostmysql "github.com/mattermost/mattermost-operator/pkg/components/mysql"
-
-	mysqlOperator "github.com/oracle/mysql-operator/pkg/apis/mysql/v1alpha1"
 
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
@@ -16,6 +11,7 @@ import (
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -122,19 +118,19 @@ func (r *ReconcileClusterInstallation) Reconcile(request reconcile.Request) (rec
 
 	if mattermost.Spec.DatabaseType.Type == "mysql" {
 		reqLogger.Info("Reconciling ClusterInstallation Database MySQL service account")
-		err = r.checkDBServiceAccount(mattermost, reqLogger)
+		err = r.checkMySQLServiceAccount(mattermost, reqLogger)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
 
 		reqLogger.Info("Reconciling ClusterInstallation Database MySQL role binding")
-		err = r.checkDBRoleBinding(mattermost, reqLogger)
+		err = r.checkMySQLRoleBinding(mattermost, reqLogger)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
 
 		reqLogger.Info("Reconciling ClusterInstallation Database MySQL")
-		err = r.checkDBMySQLDeployment(mattermost, reqLogger)
+		err = r.checkMySQLDeployment(mattermost, reqLogger)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
@@ -152,7 +148,7 @@ func (r *ReconcileClusterInstallation) Reconcile(request reconcile.Request) (rec
 		return reconcile.Result{}, err
 	}
 
-	err = r.checkMattermostDeployment(mattermost, reqLogger)
+	err = r.checkMattermost(mattermost, reqLogger)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -161,173 +157,92 @@ func (r *ReconcileClusterInstallation) Reconcile(request reconcile.Request) (rec
 	return reconcile.Result{}, nil
 }
 
-// createServiceAccount creates the mysql service account for the mysql operator
-func (r *ReconcileClusterInstallation) createServiceAccount(mattermost *mattermostv1alpha1.ClusterInstallation, serviceAccount *corev1.ServiceAccount, reqLogger logr.Logger) error {
-	foundServiceAccount := &corev1.ServiceAccount{}
-
-	errGet := r.client.Get(context.TODO(), types.NamespacedName{Name: serviceAccount.Name, Namespace: serviceAccount.Namespace}, foundServiceAccount)
-	if errGet != nil && errors.IsNotFound(errGet) {
-		reqLogger.Info("ClusterInstallation Database Service account not found, will deploy one.", "Err", errGet.Error())
-		reqLogger.Info("Creating Service Account")
-		if err := r.client.Create(context.TODO(), serviceAccount); err != nil {
-			reqLogger.Info("Error creating Service Account", "Error", err.Error())
-			return err
-		}
-		reqLogger.Info("Creating Database Service Account completed")
-		if err := controllerutil.SetControllerReference(mattermost, serviceAccount, r.scheme); err != nil {
-			return err
-		}
-	} else if errGet != nil {
-		reqLogger.Error(errGet, "ClusterInstallation Database Service Account")
-		return errGet
+// createServiceAccount creates the provided service account. It does not check if the service account already exists.
+func (r *ReconcileClusterInstallation) createServiceAccount(owner v1.Object, serviceAccount *corev1.ServiceAccount, reqLogger logr.Logger) error {
+	reqLogger.Info("Creating service account")
+	if err := r.client.Create(context.TODO(), serviceAccount); err != nil {
+		reqLogger.Info("Error creating service account", "Error", err.Error())
+		return err
+	}
+	reqLogger.Info("Completed creating service account")
+	if err := controllerutil.SetControllerReference(owner, serviceAccount, r.scheme); err != nil {
+		return err
 	}
 
 	return nil
 }
 
-func (r *ReconcileClusterInstallation) checkDBServiceAccount(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
-	mysqlServiceAccount := mattermostmysql.ServiceAccount(mattermost)
-
+// createServiceAccountIfNotExists checks the provided service account exists and creates it if it does not.
+func (r *ReconcileClusterInstallation) createServiceAccountIfNotExists(owner v1.Object, serviceAccount *corev1.ServiceAccount, reqLogger logr.Logger) error {
 	foundServiceAccount := &corev1.ServiceAccount{}
 
-	errGet := r.client.Get(context.TODO(), types.NamespacedName{Name: mysqlServiceAccount.Name, Namespace: mysqlServiceAccount.Namespace}, foundServiceAccount)
-	if errGet != nil && errors.IsNotFound(errGet) {
-		return r.createServiceAccount(mattermost, mysqlServiceAccount, reqLogger)
-	} else if errGet != nil {
-		reqLogger.Error(errGet, "ClusterInstallation Database Service Account")
-		return errGet
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: serviceAccount.Name, Namespace: serviceAccount.Namespace}, foundServiceAccount)
+	if err != nil && errors.IsNotFound(err) {
+		return r.createServiceAccount(owner, serviceAccount, reqLogger)
+	} else if err != nil {
+		reqLogger.Error(err, "Failed to check if service account exists")
+		return err
+	}
+
+	// TODO compare found service account versus expected
+
+	return nil
+}
+
+func (r *ReconcileClusterInstallation) createRoleBinding(owner v1.Object, roleBinding *rbacv1beta1.RoleBinding, reqLogger logr.Logger) error {
+	reqLogger.Info("Creating role binding")
+	if err := r.client.Create(context.TODO(), roleBinding); err != nil {
+		reqLogger.Info("Error creating role binding", "Error", err.Error())
+		return err
+	}
+
+	// TODO add logic to wait for the completion
+	reqLogger.Info("Completed creating role binding")
+	if err := controllerutil.SetControllerReference(owner, roleBinding, r.scheme); err != nil {
+		return err
 	}
 
 	return nil
 }
 
-func (r *ReconcileClusterInstallation) checkDBRoleBinding(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
-	roleBinding := mattermostmysql.RoleBinding(mattermost)
-
+func (r *ReconcileClusterInstallation) createRoleBindingIfNotExists(owner v1.Object, roleBinding *rbacv1beta1.RoleBinding, reqLogger logr.Logger) error {
 	foundRoleBinding := &rbacv1beta1.RoleBinding{}
 	errGet := r.client.Get(context.TODO(), types.NamespacedName{Name: roleBinding.Name, Namespace: roleBinding.Namespace}, foundRoleBinding)
 	if errGet != nil && errors.IsNotFound(errGet) {
-		reqLogger.Info("ClusterInstallation Database Role Binding not found, will deploy one.", "Err", errGet.Error())
-		reqLogger.Info("Creating Role Binding")
-		if err := r.client.Create(context.TODO(), roleBinding); err != nil {
-			reqLogger.Info("Error Role Binding", "Error", err.Error())
-			return err
-		}
-		// TODO add logic to wait for the completion
-		reqLogger.Info("Creating Database Role Binding completed")
-		if err := controllerutil.SetControllerReference(mattermost, roleBinding, r.scheme); err != nil {
-			return err
-		}
+		return r.createRoleBinding(owner, roleBinding, reqLogger)
 	} else if errGet != nil {
-		reqLogger.Error(errGet, "ClusterInstallation Database Role Binding")
+		reqLogger.Error(errGet, "Failed to check if role binding exists")
 		return errGet
 	}
 
-	return nil
-}
-
-func (r *ReconcileClusterInstallation) checkDBMySQLDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
-	reqLogger.Info("ClusterInstallation Database using Oracle Mysql Operator")
-	deployDB := mattermostmysql.Cluster(mattermost)
-
-	foundDB := &mysqlOperator.Cluster{}
-	errGet := r.client.Get(context.TODO(), types.NamespacedName{Name: deployDB.Name, Namespace: deployDB.Namespace}, foundDB)
-	if errGet != nil && errors.IsNotFound(errGet) {
-		reqLogger.Info("ClusterInstallation Database not found, will deploy one.", "Err", errGet.Error())
-		reqLogger.Info("Creating Database", "Members", deployDB.Spec.Members)
-		if err := r.client.Create(context.TODO(), deployDB); err != nil {
-			reqLogger.Info("Error creating Database", "Error", err.Error())
-			return err
-		}
-		reqLogger.Info("Creating Database completed")
-		if err := controllerutil.SetControllerReference(mattermost, deployDB, r.scheme); err != nil {
-			return err
-		}
-	} else if errGet != nil {
-		reqLogger.Error(errGet, "ClusterInstallation Database")
-		return errGet
-	}
-
-	// Set MattermostService instance as the owner and controller
-	if !reflect.DeepEqual(deployDB.Spec, foundDB.Spec) {
-		foundDB.Spec = deployDB.Spec
-		reqLogger.Info("Updating DB", deployDB.Namespace, deployDB.Name)
-		err := r.client.Update(context.TODO(), foundDB)
-		if err != nil {
-			return err
-		}
-		_ = controllerutil.SetControllerReference(mattermost, foundDB, r.scheme)
-	}
+	// TODO compare found role binding versus expected
 
 	return nil
 }
 
-func (r *ReconcileClusterInstallation) checkDBPostgresDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
-	dbExist := false
-
-	//TODO: Create the logic to check if the DB Postgres already exist or changed otherwise create
-	if dbExist {
-		return r.client.Update(context.TODO(), mattermost)
-	}
-	return nil
-}
-
-func (r *ReconcileClusterInstallation) checkMinioDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
-	minioExist := false
-
-	//TODO: Create the logic to check if the Minio already exist or changed otherwise create
-	if minioExist {
-		return r.client.Update(context.TODO(), mattermost)
-	}
-	return nil
-}
-
-func (r *ReconcileClusterInstallation) getMySQLSecrets(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) (string, error) {
-	dbSecretName := fmt.Sprintf("%s-mysql-root-password", mattermost.Name)
-	dbSecret := &corev1.Secret{}
-	err := r.client.Get(context.TODO(), types.NamespacedName{Name: dbSecretName, Namespace: mattermost.Namespace}, dbSecret)
-	if err != nil {
-		return "", err
-	}
-	return string(dbSecret.Data["password"]), nil
-}
-
-func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
-	err := r.checkService(mattermost, reqLogger)
-	if err != nil {
+func (r *ReconcileClusterInstallation) createService(owner v1.Object, service *corev1.Service, reqLogger logr.Logger) error {
+	reqLogger.Info("Creating service")
+	if err := r.client.Create(context.TODO(), service); err != nil {
+		reqLogger.Info("Error creating service", "Error", err.Error())
 		return err
 	}
 
-	err = r.checkIngress(mattermost, reqLogger)
-	if err != nil {
+	reqLogger.Info("Completed creating service")
+	if err := controllerutil.SetControllerReference(owner, service, r.scheme); err != nil {
 		return err
 	}
 
-	err = r.checkDeployment(mattermost, reqLogger)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
-func (r *ReconcileClusterInstallation) checkService(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
-	svc := mattermost.GenerateService()
+func (r *ReconcileClusterInstallation) createServiceIfNotExists(owner v1.Object, service *corev1.Service, reqLogger logr.Logger) error {
 
 	foundService := &corev1.Service{}
-	errGet := r.client.Get(context.TODO(), types.NamespacedName{Name: svc.Name, Namespace: svc.Namespace}, foundService)
+	errGet := r.client.Get(context.TODO(), types.NamespacedName{Name: service.Name, Namespace: service.Namespace}, foundService)
 	if errGet != nil && errors.IsNotFound(errGet) {
-		reqLogger.Info("ClusterInstallation Service not found, will deploy one.", "Err", errGet.Error())
-		reqLogger.Info("Creating Mattermost Service")
-		if err := r.client.Create(context.TODO(), svc); err != nil {
-			reqLogger.Info("Error creating Service", "Error", err.Error())
-			return err
-		}
-		reqLogger.Info("Creating Mattermost Service completed")
-		if err := controllerutil.SetControllerReference(mattermost, svc, r.scheme); err != nil {
-			return err
-		}
+		return r.createService(owner, service, reqLogger)
 	} else if errGet != nil {
-		reqLogger.Error(errGet, "ClusterInstallation Service")
+		reqLogger.Error(errGet, "Failed to check if service exists")
 		return errGet
 	}
 
@@ -346,24 +261,28 @@ func (r *ReconcileClusterInstallation) checkService(mattermost *mattermostv1alph
 	return nil
 }
 
-func (r *ReconcileClusterInstallation) checkIngress(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
-	ingressMM := mattermost.GenerateIngress()
+func (r *ReconcileClusterInstallation) createIngress(owner v1.Object, ingress *v1beta1.Ingress, reqLogger logr.Logger) error {
+	reqLogger.Info("Creating ingress")
+	if err := r.client.Create(context.TODO(), ingress); err != nil {
+		reqLogger.Info("Error creating ingress", "Error", err.Error())
+		return err
+	}
+	reqLogger.Info("Completed creating ingress")
+	if err := controllerutil.SetControllerReference(owner, ingress, r.scheme); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *ReconcileClusterInstallation) createIngressIfNotExists(owner v1.Object, ingress *v1beta1.Ingress, reqLogger logr.Logger) error {
 
 	foundIngress := &v1beta1.Ingress{}
-	errGet := r.client.Get(context.TODO(), types.NamespacedName{Name: ingressMM.Name, Namespace: ingressMM.Namespace}, foundIngress)
+	errGet := r.client.Get(context.TODO(), types.NamespacedName{Name: ingress.Name, Namespace: ingress.Namespace}, foundIngress)
 	if errGet != nil && errors.IsNotFound(errGet) {
-		reqLogger.Info("ClusterInstallation Ingress not found, will deploy one.", "Err", errGet.Error())
-		reqLogger.Info("Creating Mattermost Ingress")
-		if err := r.client.Create(context.TODO(), ingressMM); err != nil {
-			reqLogger.Info("Error creating Ingress", "Error", err.Error())
-			return err
-		}
-		reqLogger.Info("Creating Mattermost Ingress completed")
-		if err := controllerutil.SetControllerReference(mattermost, ingressMM, r.scheme); err != nil {
-			return err
-		}
+		return r.createIngress(owner, ingress, reqLogger)
 	} else if errGet != nil {
-		reqLogger.Error(errGet, "ClusterInstallation Ingress")
+		reqLogger.Error(errGet, "Failed to check if ingress exists")
 		return errGet
 	}
 
@@ -380,27 +299,26 @@ func (r *ReconcileClusterInstallation) checkIngress(mattermost *mattermostv1alph
 	return nil
 }
 
-func (r *ReconcileClusterInstallation) checkDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
-	dbPassword, err := r.getMySQLSecrets(mattermost, reqLogger)
-	if err != nil {
-		return fmt.Errorf("Error getting the database password. Err=%s", err.Error())
+func (r *ReconcileClusterInstallation) createDeployment(owner v1.Object, deployment *appsv1.Deployment, reqLogger logr.Logger) error {
+	reqLogger.Info("Creating deployment")
+	if err := r.client.Create(context.TODO(), deployment); err != nil {
+		reqLogger.Info("Error creating Mattermost Application", "Error", err.Error())
+		return err
 	}
 
-	deployMM := mattermost.GenerateDeployment("", dbPassword)
+	reqLogger.Info("Completed creating deployment")
+	if err := controllerutil.SetControllerReference(owner, deployment, r.scheme); err != nil {
+		return err
+	}
 
+	return nil
+}
+
+func (r *ReconcileClusterInstallation) createDeploymentIfNotExists(owner v1.Object, deployment *appsv1.Deployment, reqLogger logr.Logger) error {
 	foundMM := &appsv1.Deployment{}
-	errGet := r.client.Get(context.TODO(), types.NamespacedName{Name: mattermost.Name, Namespace: mattermost.Namespace}, foundMM)
+	errGet := r.client.Get(context.TODO(), types.NamespacedName{Name: deployment.Name, Namespace: deployment.Namespace}, foundMM)
 	if errGet != nil && errors.IsNotFound(errGet) {
-		reqLogger.Info("ClusterInstallation App not found, will deploy one.", "Err", errGet.Error())
-		reqLogger.Info("Creating Mattermost Ingress")
-		if err := r.client.Create(context.TODO(), deployMM); err != nil {
-			reqLogger.Info("Error creating Mattermost Application", "Error", err.Error())
-			return err
-		}
-		reqLogger.Info("Creating Mattermost Application completed")
-		if err := controllerutil.SetControllerReference(mattermost, deployMM, r.scheme); err != nil {
-			return err
-		}
+		return r.createDeployment(owner, deployment, reqLogger)
 	} else if errGet != nil {
 		reqLogger.Error(errGet, "ClusterInstallation Application")
 		return errGet
