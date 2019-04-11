@@ -63,3 +63,4 @@ workflows:
       - e2e:
           requires:
             - lint
+            - unittest
