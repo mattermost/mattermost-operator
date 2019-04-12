@@ -79,7 +79,7 @@ func mattermostScaleTest(t *testing.T, f *framework.Framework, ctx *framework.Te
 	if err != nil {
 		return err
 	}
-	// wait for test-mm to reach 2 replicas
+	// wait for test-mm to reach 1 replicas
 	err = e2eutil.WaitForDeployment(t, f.KubeClient, namespace, "test-mm", 1, retryInterval, timeout)
 	if err != nil {
 		return err
@@ -89,6 +89,7 @@ func mattermostScaleTest(t *testing.T, f *framework.Framework, ctx *framework.Te
 	if err != nil {
 		return err
 	}
+
 	// exampleMattermost.Spec.Replicas = 3
 	// err = f.Client.Update(goctx.TODO(), exampleMattermost)
 	// if err != nil {

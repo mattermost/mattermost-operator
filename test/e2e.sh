@@ -95,7 +95,7 @@ main() {
 
     # Move the operator container inside Kind container so that the image is
     # available to the docker in docker environment.
-    # copy the image to the cluster to make a bit more fast to start
+    # Copy the image to the cluster to make a bit more fast to start
     docker pull iad.ocir.io/oracle/mysql-operator:0.3.0
     kind load docker-image iad.ocir.io/oracle/mysql-operator:0.3.0
     kind load docker-image mattermost/mattermost-operator:test
