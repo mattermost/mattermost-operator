@@ -17,11 +17,11 @@ LABEL name="Mattermost Operator" \
   distribution-scope="public" \
   architecture="x86_64" \
   url="https://mattermost.dev" \
-  io.k8s.description="Mattermost Operator creates, configures and helps manage Mattermost cluster on Kubernetes" \
+  io.k8s.description="Mattermost Operator creates, configures and helps manage Mattermost installations on Kubernetes" \
   io.k8s.display-name="Mattermost Operator" \
   io.openshift.tags="mattermost,collaboration,operator" \
   summary="Quick and easy Mattermost setup" \
-  description="Mattermost operator deploys and configures Mattermost cluster, and assist with maintenance/upgrade operations."
+  description="Mattermost operator deploys and configures Mattermost installations, and assists with maintenance/upgrade operations."
 
 ENV OPERATOR=/usr/local/bin/mattermost-operator \
     USER_UID=1001 \
