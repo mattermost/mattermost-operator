@@ -33,7 +33,7 @@ func TestMattermost(t *testing.T) {
 		},
 	}
 	err := framework.AddToFrameworkScheme(mysqlOperator.AddToScheme, mysqlList)
-	assert.NotNil(t, err)
+	assert.Nil(t, err)
 
 	mattermostList := &operator.ClusterInstallationList{
 		TypeMeta: metav1.TypeMeta{
