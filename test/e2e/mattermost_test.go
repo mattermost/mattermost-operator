@@ -42,7 +42,7 @@ func TestMattermost(t *testing.T) {
 		},
 	}
 	err = framework.AddToFrameworkScheme(apis.AddToScheme, mattermostList)
-	assert.NotNil(t, err)
+	assert.Nil(t, err)
 
 	// run subtests
 	t.Run("mattermost-group", func(t *testing.T) {
@@ -52,7 +52,7 @@ func TestMattermost(t *testing.T) {
 
 func mattermostScaleTest(t *testing.T, f *framework.Framework, ctx *framework.TestCtx) error {
 	namespace, err := ctx.GetNamespace()
-	assert.NotNil(t, err)
+	assert.Nil(t, err)
 
 	// create memcached custom resource
 	exampleMattermost := &operator.ClusterInstallation{
@@ -72,14 +72,14 @@ func mattermostScaleTest(t *testing.T, f *framework.Framework, ctx *framework.Te
 
 	// use TestCtx's create helper to create the object and add a cleanup function for the new object
 	err = f.Client.Create(goctx.TODO(), exampleMattermost, &framework.CleanupOptions{TestContext: ctx, Timeout: cleanupTimeout, RetryInterval: cleanupRetryInterval})
-	assert.NotNil(t, err)
+	assert.Nil(t, err)
 
 	// wait for test-mm to reach 1 replicas
 	err = e2eutil.WaitForDeployment(t, f.KubeClient, namespace, "test-mm", 1, retryInterval, timeout)
-	assert.NotNil(t, err)
+	assert.Nil(t, err)
 
 	err = f.Client.Get(goctx.TODO(), types.NamespacedName{Name: "test-mm", Namespace: namespace}, exampleMattermost)
-	assert.NotNil(t, err)
+	assert.Nil(t, err)
 
 	// exampleMattermost.Spec.Replicas = 3
 	// err = f.Client.Update(goctx.TODO(), exampleMattermost)
@@ -97,23 +97,23 @@ func MattermostCluster(t *testing.T) {
 	defer ctx.Cleanup()
 
 	err := ctx.InitializeClusterResources(&framework.CleanupOptions{TestContext: ctx, Timeout: cleanupTimeout, RetryInterval: cleanupRetryInterval})
-	assert.NotNil(t, err)
+	assert.Nil(t, err)
 
 	t.Log("Initialized cluster resources")
 	namespace, err := ctx.GetNamespace()
-	assert.NotNil(t, err)
+	assert.Nil(t, err)
 
 	// get global framework variables
 	f := framework.Global
 
 	// wait for mysql-operator to be ready
 	err = e2eutil.WaitForDeployment(t, f.KubeClient, "mysql-operator", "mysql-operator", 1, retryInterval, timeout)
-	assert.NotNil(t, err)
+	assert.Nil(t, err)
 
 	// wait for mattermost-operator to be ready
 	err = e2eutil.WaitForDeployment(t, f.KubeClient, namespace, "mattermost-operator", 1, retryInterval, timeout)
-	assert.NotNil(t, err)
+	assert.Nil(t, err)
 
 	err = mattermostScaleTest(t, f, ctx)
-	assert.NotNil(t, err)
+	assert.Nil(t, err)
 }
