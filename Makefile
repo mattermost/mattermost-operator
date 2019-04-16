@@ -1,9 +1,14 @@
-.PHONY: all check-style test build clean docker
+.PHONY: all check-style unittest generate build clean build-image operator-sdk
 
+OPERATOR_IMAGE ?= mattermost/mattermost-operator:test
+SDK_VERSION = v0.7.0
+MACHINE = $(shell uname -m)
+BUILD_IMAGE = golang:1.12.2
+BASE_IMAGE = alpine:3.9
 GOPATH ?= $(shell go env GOPATH)
 GOFLAGS ?= $(GOFLAGS:)
 GO=go
-
+IMAGE_TAG=
 BUILD_TIME := $(shell date -u +%Y%m%d.%H%M%S)
 BUILD_HASH := $(shell git rev-parse HEAD)
 GO_LINKER_FLAGS ?= -ldflags\
@@ -11,20 +16,25 @@ GO_LINKER_FLAGS ?= -ldflags\
 					  -X 'github.com/mattermost/mattermost-operator/version.buildHash=$(BUILD_HASH)'"\
 
 PACKAGES=$(shell go list ./...)
+TEST_PACKAGES=$(shell go list ./...| grep -v test/e2e)
 
-all: check-style test build
+all: check-style unittest build
 
 # Run tests
-test:
-	go test $(GO_LINKER_FLAGS) $(PACKAGES) -coverprofile cover.out
+unittest:
+	go test $(GO_LINKER_FLAGS) $(TEST_PACKAGES) -coverprofile cover.out
 
 build:
 	@echo Building Mattermost-operator
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 $(GO) build -gcflags all=-trimpath=$(GOPATH) -asmflags all=-trimpath=$(GOPATH) -a -installsuffix cgo -o build/_output/bin/mattermost-operator $(GO_LINKER_FLAGS) ./cmd/manager/main.go
 
-docker:
+build-image: operator-sdk
 	@echo Building Mattermost-operator Docker Image
-	docker build . -f build/Dockerfile -t ctadeu/test:latest --no-cache
+	docker build \
+	--build-arg BUILD_IMAGE=$(BUILD_IMAGE) \
+	--build-arg BASE_IMAGE=$(BASE_IMAGE) \
+	. -f build/Dockerfile -t $(OPERATOR_IMAGE) \
+	--no-cache
 
 check-style: gofmt govet
 
@@ -52,9 +62,20 @@ govet: ## Runs govet against all packages.
 	$(GO) vet -vettool=$(GOPATH)/bin/shadow $(PACKAGES)
 	@echo "govet success";
 
+generate:
+	operator-sdk generate k8s
+	operator-sdk generate openapi
+
 # Get dependencies
 dep:
 	dep ensure -v
+
+operator-sdk:
+	# Download sdk only if it's not available.
+	@if [ ! -f build/operator-sdk ]; then \
+		curl -Lo build/operator-sdk https://github.com/operator-framework/operator-sdk/releases/download/$(SDK_VERSION)/operator-sdk-$(SDK_VERSION)-$(MACHINE)-linux-gnu && \
+		chmod +x build/operator-sdk; \
+	fi
 
 clean:
 	rm -Rf build/_output

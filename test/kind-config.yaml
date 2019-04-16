@@ -1,0 +1,7 @@
+kind: Config
+apiVersion: kind.sigs.k8s.io/v1alpha2
+image: kindest/node:v1.13.4
+nodes:
+  - role: control-plane
+  - role: worker
+    replicas: 3
