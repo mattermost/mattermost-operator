@@ -15,11 +15,10 @@ spec:
       serviceAccountName: mattermost-operator
       containers:
         - name: mattermost-operator
-          # Replace this with the built image name
-          image: REPLACE_IMAGE
+          image: mattermost/mattermost-operator:test
           command:
           - mattermost-operator
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           env:
             - name: WATCH_NAMESPACE
               value: ""

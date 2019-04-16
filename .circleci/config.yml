@@ -1,4 +1,8 @@
 version: 2.1
+
+orbs:
+  shellcheck: circleci/shellcheck@1.3.4
+
 executors:
   default:
     working_directory: /go/src/github.com/mattermost/mattermost-operator
@@ -13,7 +17,7 @@ jobs:
       - checkout
       - run: make check-style
 
-  test:
+  unittest:
     executor:
       name: default
     steps:
@@ -27,11 +31,36 @@ jobs:
             sudo mv kubebuilder_${version}_linux_amd64 /usr/local/kubebuilder
       - run: |
           export PATH=$PATH:/usr/local/kubebuilder/bin
-          make test
+          make unittest
+
+  e2e:
+    environment:
+      - CHANGE_MINIKUBE_NONE_USER=true
+      - K8S_VERSION=v1.13.2
+      - MINIKUBE_VERSION=v0.28.2
+      - IMAGE_NAME=mattermost/mattermost-operator
+      - IMAGE_TAG=test
+      - KIND_VERSION=0.2.1
+      - SDK_VERSION=v0.3.0
+    machine: true
+    working_directory: /home/circleci/.go_workspace/src/github.com/mattermost/mattermost-operator
+    steps:
+      - checkout
+      - run:
+          name: Kind
+          command: ./test/e2e.sh
 
 workflows:
   version: 2
   untagged-build:
     jobs:
+      - shellcheck/check:
+          exclude: ./vendor/*
       - lint
-      - test
+      - unittest:
+          requires:
+            - lint
+      - e2e:
+          requires:
+            - lint
+            - unittest

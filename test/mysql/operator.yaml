@@ -1,0 +1,26 @@
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: mysql-operator
+  labels:
+    app: mysql-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql-operator
+  template:
+    metadata:
+      labels:
+        app: mysql-operator
+    spec:
+      serviceAccountName: mysql-operator
+      containers:
+      - name: mysql-operator-controller
+        imagePullPolicy: IfNotPresent
+        image: iad.ocir.io/oracle/mysql-operator:0.3.0
+        ports:
+        - containerPort: 10254
+        args:
+          - --v=4
+          - --mysql-agent-image=iad.ocir.io/oracle/mysql-agent

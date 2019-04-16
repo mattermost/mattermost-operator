@@ -4,6 +4,14 @@ metadata:
   creationTimestamp: null
   name: mattermost-operator
 rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
 - apiGroups:
   - ""
   resources:

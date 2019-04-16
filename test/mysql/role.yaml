@@ -1,0 +1,101 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  name: mysql-operator
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs:
+    - get
+    - list
+    - patch
+    - update
+    - watch
+
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create"]
+
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs:
+    - create
+    - get
+    - list
+    - watch
+
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs:
+    - create
+    - update
+    - patch
+
+  - apiGroups: ["apps"]
+    resources: ["statefulsets"]
+    verbs:
+    - create
+    - get
+    - list
+    - patch
+    - update
+    - watch
+
+  - apiGroups: ["mysql.oracle.com"]
+    resources:
+    - mysqlbackups
+    - mysqlbackupschedules
+    - mysqlclusters
+    - mysqlclusters/finalizers
+    - mysqlrestores
+    verbs:
+    - get
+    - list
+    - patch
+    - update
+    - watch
+
+  - apiGroups: ["mysql.oracle.com"]
+    resources: ["mysqlbackups"]
+    verbs: ["create"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  name: mysql-agent
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs:
+    - get
+    - list
+    - patch
+    - update
+    - watch
+
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get"]
+
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs:
+    - create
+    - update
+    - patch
+
+  - apiGroups: ["mysql.oracle.com"]
+    resources:
+    - mysqlbackups
+    - mysqlbackupschedules
+    - mysqlclusters
+    - mysqlclusters/finalizers
+    - mysqlrestores
+    verbs:
+    - get
+    - list
+    - patch
+    - update
+    - watch
