@@ -190,7 +190,6 @@ func (r *ReconcileClusterInstallation) createServiceAccountIfNotExists(owner v1.
 
 	// TODO compare found service account versus expected
 
-	reqLogger.Info("Service account reconciled")
 	return nil
 }
 
@@ -207,7 +206,6 @@ func (r *ReconcileClusterInstallation) createRoleBindingIfNotExists(owner v1.Obj
 
 	// TODO compare found role binding versus expected
 
-	reqLogger.Info("Role binding reconciled")
 	return nil
 }
 
@@ -224,7 +222,6 @@ func (r *ReconcileClusterInstallation) createServiceIfNotExists(owner v1.Object,
 
 	// TODO check how to do the update
 
-	reqLogger.Info("Service reconciled")
 	return nil
 }
 
@@ -241,7 +238,6 @@ func (r *ReconcileClusterInstallation) createIngressIfNotExists(owner v1.Object,
 
 	// TODO check how to do the update
 
-	reqLogger.Info("Ingress reconciled")
 	return nil
 }
 
@@ -258,6 +254,5 @@ func (r *ReconcileClusterInstallation) createDeploymentIfNotExists(owner v1.Obje
 
 	// TODO check how to do the update
 
-	reqLogger.Info("Deployment reconciled")
 	return nil
 }
