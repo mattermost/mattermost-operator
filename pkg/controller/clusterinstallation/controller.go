@@ -3,8 +3,6 @@ package clusterinstallation
 import (
 	"context"
 
-	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
-
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -22,6 +20,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
 )
 
 var log = logf.Log.WithName("controller_clusterinstallation")
@@ -100,13 +100,12 @@ func (r *ReconcileClusterInstallation) Reconcile(request reconcile.Request) (rec
 	// Fetch the ClusterInstallation instance
 	mattermost := &mattermostv1alpha1.ClusterInstallation{}
 	err := r.client.Get(context.TODO(), request.NamespacedName, mattermost)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			// Request object not found, could have been deleted after reconcile request.
-			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
-			// Return and don't requeue
-			return reconcile.Result{}, nil
-		}
+	if err != nil && errors.IsNotFound(err) {
+		// Request object not found, could have been deleted after reconcile request.
+		// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
+		// Return and don't requeue
+		return reconcile.Result{}, nil
+	} else if err != nil {
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
 	}
@@ -142,7 +141,6 @@ func (r *ReconcileClusterInstallation) Reconcile(request reconcile.Request) (rec
 		}
 	}
 
-	// TODO
 	err = r.checkMinioDeployment(mattermost, reqLogger)
 	if err != nil {
 		return reconcile.Result{}, err
@@ -153,7 +151,6 @@ func (r *ReconcileClusterInstallation) Reconcile(request reconcile.Request) (rec
 		return reconcile.Result{}, err
 	}
 
-	// Already exists - don't requeue
 	return reconcile.Result{}, nil
 }
 
@@ -165,13 +162,17 @@ type Object interface {
 
 // createResource creates the provided resource and sets the owner
 func (r *ReconcileClusterInstallation) createResource(owner v1.Object, resource Object, reqLogger logr.Logger) error {
-	if err := r.client.Create(context.TODO(), resource); err != nil {
-		reqLogger.Info("Error creating resource:", err.Error())
+	err := r.client.Create(context.TODO(), resource)
+	if err != nil {
+		reqLogger.Error(err, "Error creating resource")
 		return err
 	}
-	if err := controllerutil.SetControllerReference(owner, resource, r.scheme); err != nil {
+
+	err = controllerutil.SetControllerReference(owner, resource, r.scheme)
+	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -189,19 +190,19 @@ func (r *ReconcileClusterInstallation) createServiceAccountIfNotExists(owner v1.
 
 	// TODO compare found service account versus expected
 
-	reqLogger.Info("Service account reconcicled")
+	reqLogger.Info("Service account reconciled")
 	return nil
 }
 
 func (r *ReconcileClusterInstallation) createRoleBindingIfNotExists(owner v1.Object, roleBinding *rbacv1beta1.RoleBinding, reqLogger logr.Logger) error {
 	foundRoleBinding := &rbacv1beta1.RoleBinding{}
-	errGet := r.client.Get(context.TODO(), types.NamespacedName{Name: roleBinding.Name, Namespace: roleBinding.Namespace}, foundRoleBinding)
-	if errGet != nil && errors.IsNotFound(errGet) {
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: roleBinding.Name, Namespace: roleBinding.Namespace}, foundRoleBinding)
+	if err != nil && errors.IsNotFound(err) {
 		reqLogger.Info("Creating role binding", roleBinding.Name)
 		return r.createResource(owner, roleBinding, reqLogger)
-	} else if errGet != nil {
-		reqLogger.Error(errGet, "Failed to check if role binding exists")
-		return errGet
+	} else if err != nil {
+		reqLogger.Error(err, "Failed to check if role binding exists")
+		return err
 	}
 
 	// TODO compare found role binding versus expected
@@ -211,15 +212,14 @@ func (r *ReconcileClusterInstallation) createRoleBindingIfNotExists(owner v1.Obj
 }
 
 func (r *ReconcileClusterInstallation) createServiceIfNotExists(owner v1.Object, service *corev1.Service, reqLogger logr.Logger) error {
-
 	foundService := &corev1.Service{}
-	errGet := r.client.Get(context.TODO(), types.NamespacedName{Name: service.Name, Namespace: service.Namespace}, foundService)
-	if errGet != nil && errors.IsNotFound(errGet) {
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: service.Name, Namespace: service.Namespace}, foundService)
+	if err != nil && errors.IsNotFound(err) {
 		reqLogger.Info("Creating service", service.Name)
 		return r.createResource(owner, service, reqLogger)
-	} else if errGet != nil {
-		reqLogger.Error(errGet, "Failed to check if service exists")
-		return errGet
+	} else if err != nil {
+		reqLogger.Error(err, "Failed to check if service exists")
+		return err
 	}
 
 	// TODO check how to do the update
@@ -229,15 +229,14 @@ func (r *ReconcileClusterInstallation) createServiceIfNotExists(owner v1.Object,
 }
 
 func (r *ReconcileClusterInstallation) createIngressIfNotExists(owner v1.Object, ingress *v1beta1.Ingress, reqLogger logr.Logger) error {
-
 	foundIngress := &v1beta1.Ingress{}
-	errGet := r.client.Get(context.TODO(), types.NamespacedName{Name: ingress.Name, Namespace: ingress.Namespace}, foundIngress)
-	if errGet != nil && errors.IsNotFound(errGet) {
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: ingress.Name, Namespace: ingress.Namespace}, foundIngress)
+	if err != nil && errors.IsNotFound(err) {
 		reqLogger.Info("Creating ingress", ingress.Name)
 		return r.createResource(owner, ingress, reqLogger)
-	} else if errGet != nil {
-		reqLogger.Error(errGet, "Failed to check if ingress exists")
-		return errGet
+	} else if err != nil {
+		reqLogger.Error(err, "Failed to check if ingress exists")
+		return err
 	}
 
 	// TODO check how to do the update
@@ -248,13 +247,13 @@ func (r *ReconcileClusterInstallation) createIngressIfNotExists(owner v1.Object,
 
 func (r *ReconcileClusterInstallation) createDeploymentIfNotExists(owner v1.Object, deployment *appsv1.Deployment, reqLogger logr.Logger) error {
 	foundMM := &appsv1.Deployment{}
-	errGet := r.client.Get(context.TODO(), types.NamespacedName{Name: deployment.Name, Namespace: deployment.Namespace}, foundMM)
-	if errGet != nil && errors.IsNotFound(errGet) {
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: deployment.Name, Namespace: deployment.Namespace}, foundMM)
+	if err != nil && errors.IsNotFound(err) {
 		reqLogger.Info("Creating deployment", deployment.Name)
 		return r.createResource(owner, deployment, reqLogger)
-	} else if errGet != nil {
-		reqLogger.Error(errGet, "ClusterInstallation Application")
-		return errGet
+	} else if err != nil {
+		reqLogger.Error(err, "ClusterInstallation Application")
+		return err
 	}
 
 	// TODO check how to do the update

@@ -1,11 +1,10 @@
 package clusterinstallation
 
 import (
-	"fmt"
+	"github.com/go-logr/logr"
+	"github.com/pkg/errors"
 
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
-
-	"github.com/go-logr/logr"
 )
 
 func (r *ReconcileClusterInstallation) checkMattermost(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
@@ -37,9 +36,8 @@ func (r *ReconcileClusterInstallation) checkMattermostIngress(mattermost *matter
 func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
 	dbPassword, err := r.getMySQLSecrets(mattermost, reqLogger)
 	if err != nil {
-		return fmt.Errorf("Error getting the database password. Err=%s", err.Error())
+		return errors.Wrap(err, "Error getting the database password.")
 	}
 
 	return r.createDeploymentIfNotExists(mattermost, mattermost.GenerateDeployment("", dbPassword), reqLogger)
-
 }
