@@ -22,6 +22,9 @@ jobs:
       name: default
     steps:
       - checkout
+      - run: |
+          go get golang.org/x/tools/cmd/cover
+          go get github.com/mattn/goveralls
       - run:
           name: kubebuilder
           command: |
@@ -32,6 +35,9 @@ jobs:
       - run: |
           export PATH=$PATH:/usr/local/kubebuilder/bin
           make unittest
+      - run:
+          name: coveralls
+          command: $HOME/gopath/bin/goveralls -coverprofile=coverage.out -service=circle-ci -repotoken $COVERALLS_REPO_TOKEN
 
   e2e:
     environment:
@@ -49,6 +55,20 @@ jobs:
       - run:
           name: Kind
           command: ./test/e2e.sh
+
+  coverage:
+    executor:
+      name: default
+    steps:
+      - checkout
+      - run:
+          name: coveralls
+          command: |
+            go get golang.org/x/tools/cmd/cover
+            go get github.com/mattn/goveralls
+      - run: |
+          export PATH=$PATH:/usr/local/kubebuilder/bin
+          make unittest
 
 workflows:
   version: 2

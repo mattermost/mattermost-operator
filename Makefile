@@ -22,7 +22,7 @@ all: check-style unittest build
 
 # Run tests
 unittest:
-	go test $(GO_LINKER_FLAGS) $(TEST_PACKAGES) -coverprofile cover.out
+	go test $(GO_LINKER_FLAGS) $(TEST_PACKAGES) -v -covermode=count -coverprofile=coverage.out
 
 build:
 	@echo Building Mattermost-operator
