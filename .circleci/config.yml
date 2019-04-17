@@ -37,7 +37,7 @@ jobs:
           make unittest
       - run:
           name: coveralls
-          command: $HOME/gopath/bin/goveralls -coverprofile=coverage.out -service=circle-ci -repotoken $COVERALLS_REPO_TOKEN
+          command: goveralls -coverprofile=coverage.out -service=circle-ci -repotoken $COVERALLS_REPO_TOKEN
 
   e2e:
     environment:
