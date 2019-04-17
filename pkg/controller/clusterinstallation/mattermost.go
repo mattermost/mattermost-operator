@@ -34,10 +34,21 @@ func (r *ReconcileClusterInstallation) checkMattermostIngress(mattermost *matter
 }
 
 func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
-	dbPassword, err := r.getMySQLSecrets(mattermost, reqLogger)
-	if err != nil {
-		return errors.Wrap(err, "Error getting the database password.")
+	externalDB := false
+	var dbPassword string
+	var dbUser string
+	var err error
+	if mattermost.Spec.DatabaseType.ExternalDatabase != "" {
+		externalDB = true
+		dbPassword = ""
+		dbUser = ""
+	} else {
+		dbPassword, err = r.getMySQLSecrets(mattermost, reqLogger)
+		if err != nil {
+			return errors.Wrap(err, "Error getting the database password.")
+		}
+		dbUser = "root"
 	}
 
-	return r.createDeploymentIfNotExists(mattermost, mattermost.GenerateDeployment("", dbPassword), reqLogger)
+	return r.createDeploymentIfNotExists(mattermost, mattermost.GenerateDeployment(dbUser, dbPassword, externalDB), reqLogger)
 }
