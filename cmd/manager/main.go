@@ -9,6 +9,7 @@ import (
 
 	"github.com/mattermost/mattermost-operator/pkg/apis"
 	"github.com/mattermost/mattermost-operator/pkg/controller"
+	"github.com/mattermost/mattermost-operator/pkg/log"
 	"github.com/mattermost/mattermost-operator/version"
 
 	"github.com/operator-framework/operator-sdk/pkg/leader"
@@ -28,14 +29,6 @@ var (
 	metricsHost       = "0.0.0.0"
 	metricsPort int32 = 8383
 )
-var log = logf.Log.WithName("cmd")
-
-func printVersion() {
-	log.Info(fmt.Sprintf("Go Version: %s", runtime.Version()))
-	log.Info(fmt.Sprintf("Go OS/Arch: %s/%s", runtime.GOOS, runtime.GOARCH))
-	log.Info(fmt.Sprintf("Version of operator-sdk: %v", sdkVersion.Version))
-	log.Info(version.GetVersionString())
-}
 
 func main() {
 	// Add the zap logger flag set to the CLI. The flag set must
@@ -48,22 +41,22 @@ func main() {
 
 	pflag.Parse()
 
-	// Use a zap logr.Logger implementation. If none of the zap
-	// flags are configured (or if the zap flag set is not being
-	// used), this defaults to a production zap logger.
-	//
-	// The logger instantiated here can be changed to any logger
-	// implementing the logr.Logger interface. This logger will
-	// be propagated through the whole operator, generating
-	// uniform and structured logs.
-	logf.SetLogger(zap.Logger())
+	// Setup logging.
+	// This logger wraps logrus in a 'logr.Logger' interface. This is required
+	// for the deferred logging required by the various operator packages.
+	logger := log.InitLogger()
+	logger = logger.WithName("opr")
+	logf.SetLogger(logger)
 
-	printVersion()
+	logger.Info(fmt.Sprintf("Go Version: %s", runtime.Version()))
+	logger.Info(fmt.Sprintf("Go OS/Arch: %s/%s", runtime.GOOS, runtime.GOARCH))
+	logger.Info(fmt.Sprintf("operator-sdk Version: %v", sdkVersion.Version))
+	logger.Info(version.GetVersionString())
 
 	// Get a config to talk to the apiserver
 	cfg, err := config.GetConfig()
 	if err != nil {
-		log.Error(err, "")
+		logger.Error(err, "Unable to get config")
 		os.Exit(1)
 	}
 
@@ -72,7 +65,7 @@ func main() {
 	// Become the leader before proceeding
 	err = leader.Become(ctx, "mattermost-operator-lock")
 	if err != nil {
-		log.Error(err, "")
+		logger.Error(err, "Unable to become leader")
 		os.Exit(1)
 	}
 
@@ -82,35 +75,35 @@ func main() {
 		MetricsBindAddress: fmt.Sprintf("%s:%d", metricsHost, metricsPort),
 	})
 	if err != nil {
-		log.Error(err, "")
+		logger.Error(err, "Unable to create manager")
 		os.Exit(1)
 	}
 
-	log.Info("Registering Components.")
+	logger.Info("Registering Components.")
 
 	// Setup Scheme for all resources
 	if errAddToScheme := apis.AddToScheme(mgr.GetScheme()); errAddToScheme != nil {
-		log.Error(errAddToScheme, "")
+		logger.Error(errAddToScheme, "Unable to setup scheme")
 		os.Exit(1)
 	}
 
 	// Setup all Controllers
 	if errAddToManager := controller.AddToManager(mgr); errAddToManager != nil {
-		log.Error(errAddToManager, "")
+		logger.Error(errAddToManager, "Unable to setup controllers")
 		os.Exit(1)
 	}
 
 	// Create Service object to expose the metrics port.
 	_, err = metrics.ExposeMetricsPort(ctx, metricsPort)
 	if err != nil {
-		log.Info(err.Error())
+		logger.Info(err.Error())
 	}
 
-	log.Info("Starting the Cmd.")
+	logger.Info("Starting the Cmd.")
 
 	// Start the Cmd
 	if err := mgr.Start(signals.SetupSignalHandler()); err != nil {
-		log.Error(err, "Manager exited non-zero")
+		logger.Error(err, "Manager exited non-zero")
 		os.Exit(1)
 	}
 }
