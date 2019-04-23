@@ -51,13 +51,9 @@ run_kind() {
     docker_exec kubectl cluster-info
     echo
 
-    echo -n 'Waiting for cluster to be ready...'
-    until ! grep --quiet 'NotReady' <(kubectl get nodes --no-headers); do
-        printf '.'
-        sleep 5
-    done
-
     kubectl get all --all-namespaces
+
+    echo 'Cluster ready!...'
 }
 
 install_operator-sdk() {
