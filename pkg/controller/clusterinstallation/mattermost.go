@@ -35,13 +35,11 @@ func (r *ReconcileClusterInstallation) checkMattermostIngress(mattermost *matter
 
 func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
 	externalDB := false
-	var dbPassword string
-	var dbUser string
+	dbPassword := ""
+	dbUser := ""
 	var err error
 	if mattermost.Spec.DatabaseType.ExternalDatabase != "" {
 		externalDB = true
-		dbPassword = ""
-		dbUser = ""
 	} else {
 		dbPassword, err = r.getMySQLSecrets(mattermost, reqLogger)
 		if err != nil {

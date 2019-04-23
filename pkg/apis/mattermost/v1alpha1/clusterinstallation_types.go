@@ -31,8 +31,8 @@ type ClusterInstallationSpec struct {
 // DatabaseType defines the Database configuration for a ClusterInstallation
 type DatabaseType struct {
 	Type string `json:"type,omitempty"`
-	// If the user want to use an external DB
-	// Can be inside the same k8s cluster or outside like AWS RDS.
+	// If the user want to use an external DB.
+	// This can be inside the same k8s cluster or outside like AWS RDS.
 	ExternalDatabase string `json:"externalDatabase,omitempty"`
 }
 

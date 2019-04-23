@@ -141,7 +141,7 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 		datasourceMM := fmt.Sprintf("mysql://%s:%s@tcp(%s-mysql.%s:3306)/mattermost?charset=utf8mb4,utf8&readTimeout=30s&writeTimeout=30s", dbUser, dbPassword, mattermost.Name, mattermost.Namespace)
 		envVarDB.Value = datasourceMM
 
-		// Create the init container to check with the DB is up and running
+		// Create the init container to check that the DB is up and running
 		initContainerCMD := fmt.Sprintf("until curl --max-time 5 http://%s-mysql.%s:3306; do echo waiting for mysql; sleep 5; done;", mattermost.Name, mattermost.Namespace)
 		cmdInit := []string{"sh", "-c"}
 		cmdInit = append(cmdInit, initContainerCMD)
