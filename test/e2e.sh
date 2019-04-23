@@ -53,7 +53,7 @@ run_kind() {
 
     kubectl get all --all-namespaces
 
-    echo 'Cluster ready!...'
+    echo 'Cluster ready!'
 }
 
 install_operator-sdk() {
