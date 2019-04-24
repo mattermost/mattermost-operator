@@ -18,7 +18,9 @@ const (
 	// DefaultAmountOfPods is the default amount of Mattermost pods
 	DefaultAmountOfPods = 2
 	// DefaultMattermostImage is the default Mattermost docker image
-	DefaultMattermostImage = "mattermost/mattermost-enterprise-edition:5.8.0"
+	DefaultMattermostImage = "mattermost/mattermost-enterprise-edition"
+	// DefaultMattermostVersion is the default Mattermost docker tag
+	DefaultMattermostVersion = "5.10.0"
 	// DefaultMattermostDatabaseType is the default Mattermost database
 	DefaultMattermostDatabaseType = "mysql"
 
@@ -32,8 +34,12 @@ func (mattermost *ClusterInstallation) SetDefaults() error {
 		return fmt.Errorf("need to set the IngressName")
 	}
 
-	if len(mattermost.Spec.Image) == 0 {
+	if mattermost.Spec.Image == "" {
 		mattermost.Spec.Image = DefaultMattermostImage
+	}
+
+	if mattermost.Spec.Version == "" {
+		mattermost.Spec.Version = DefaultMattermostVersion
 	}
 
 	if mattermost.Spec.Replicas == 0 {
@@ -121,6 +127,7 @@ func (mattermost *ClusterInstallation) GenerateIngress() *v1beta1.Ingress {
 
 // GenerateDeployment returns the deployment spec for Mattermost
 func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword string, externalDB bool) *appsv1.Deployment {
+	mattermostImage := fmt.Sprintf("%s:%s", mattermost.Spec.Image, mattermost.Spec.Version)
 	initCheckDB := corev1.Container{}
 	initDB := corev1.Container{}
 	envVarDB := corev1.EnvVar{
@@ -188,7 +195,7 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 					},
 					Containers: []corev1.Container{
 						{
-							Image:   "mattermost/mattermost-enterprise-edition:latest",
+							Image:   mattermostImage,
 							Name:    mattermost.Name,
 							Command: cmdStartMM,
 							Env: []corev1.EnvVar{
