@@ -120,16 +120,45 @@ func (mattermost *ClusterInstallation) GenerateIngress() *v1beta1.Ingress {
 }
 
 // GenerateDeployment returns the deployment spec for Mattermost
-func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword string) *appsv1.Deployment {
-	datasourceMM := fmt.Sprintf("mysql://root:%s@tcp(%s-mysql.%s:3306)/mattermost?charset=utf8mb4,utf8&readTimeout=30s&writeTimeout=30s", dbPassword, mattermost.Name, mattermost.Namespace)
+func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword string, externalDB bool) *appsv1.Deployment {
+	initCheckDB := corev1.Container{}
+	initDB := corev1.Container{}
+	envVarDB := corev1.EnvVar{
+		Name: "MM_CONFIG",
+	}
 
-	initContainerCMD := fmt.Sprintf("until curl --max-time 5 http://%s-mysql.%s:3306; do echo waiting for mysql; sleep 5; done;", mattermost.Name, mattermost.Namespace)
-	cmdInit := []string{"sh", "-c"}
-	cmdInit = append(cmdInit, initContainerCMD)
+	if externalDB {
+		secretName := fmt.Sprintf("%s-externalDB", mattermost.Name)
+		envVarDB.ValueFrom = &corev1.EnvVarSource{
+			SecretKeyRef: &corev1.SecretKeySelector{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: secretName,
+				},
+				Key: "externalDB",
+			},
+		}
+	} else {
+		datasourceMM := fmt.Sprintf("mysql://%s:%s@tcp(%s-mysql.%s:3306)/mattermost?charset=utf8mb4,utf8&readTimeout=30s&writeTimeout=30s", dbUser, dbPassword, mattermost.Name, mattermost.Namespace)
+		envVarDB.Value = datasourceMM
+
+		// Create the init container to check that the DB is up and running
+		initContainerCMD := fmt.Sprintf("until curl --max-time 5 http://%s-mysql.%s:3306; do echo waiting for mysql; sleep 5; done;", mattermost.Name, mattermost.Namespace)
+		cmdInit := []string{"sh", "-c"}
+		cmdInit = append(cmdInit, initContainerCMD)
+		initCheckDB.Image = "appropriate/curl:latest"
+		initCheckDB.Name = "init-mysql"
+		initCheckDB.Command = cmdInit
+
+		// Create the init container to create the database.
+		// Mysql Operator does not create by default
+		cmdInitDB := []string{"sh", "-c"}
+		cmdInitDB = append(cmdInitDB, fmt.Sprintf("mysql -h %s-mysql.%s -u %s -p%s -e 'CREATE DATABASE IF NOT EXISTS mattermost'", mattermost.Name, mattermost.Namespace, dbUser, dbPassword))
+		initDB.Image = "mysql:8.0.11"
+		initDB.Name = "init-mysql-database"
+		initDB.Command = cmdInitDB
+	}
+
 	cmdStartMM := []string{"mattermost"}
-
-	cmdInitDB := []string{"sh", "-c"}
-	cmdInitDB = append(cmdInitDB, fmt.Sprintf("mysql -h %s-mysql.%s -u root -p%s -e 'CREATE DATABASE IF NOT EXISTS mattermost'", mattermost.Name, mattermost.Namespace, dbPassword))
 
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -154,16 +183,8 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 				},
 				Spec: corev1.PodSpec{
 					InitContainers: []corev1.Container{
-						{
-							Image:   "appropriate/curl:latest",
-							Name:    "init-mysql",
-							Command: cmdInit,
-						},
-						{
-							Image:   "mysql:8.0.11",
-							Name:    "init-mysql-database",
-							Command: cmdInitDB,
-						},
+						initCheckDB,
+						initDB,
 					},
 					Containers: []corev1.Container{
 						{
@@ -171,10 +192,7 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 							Name:    mattermost.Name,
 							Command: cmdStartMM,
 							Env: []corev1.EnvVar{
-								{
-									Name:  "MM_CONFIG",
-									Value: datasourceMM,
-								},
+								envVarDB,
 							},
 							Ports: []corev1.ContainerPort{
 								{
@@ -186,6 +204,27 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 					},
 				},
 			},
+		},
+	}
+}
+
+// GenerateSecret returns the service for Mattermost
+func (mattermost *ClusterInstallation) GenerateSecret(secretName, key, data string) *corev1.Secret {
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels:    map[string]string{ClusterLabel: mattermost.Name},
+			Name:      secretName,
+			Namespace: mattermost.Namespace,
+			OwnerReferences: []metav1.OwnerReference{
+				*metav1.NewControllerRef(mattermost, schema.GroupVersionKind{
+					Group:   SchemeGroupVersion.Group,
+					Version: SchemeGroupVersion.Version,
+					Kind:    "ClusterInstallation",
+				}),
+			},
+		},
+		Data: map[string][]byte{
+			key: []byte(data),
 		},
 	}
 }

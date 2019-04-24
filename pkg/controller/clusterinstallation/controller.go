@@ -2,6 +2,7 @@ package clusterinstallation
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
@@ -52,6 +53,14 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	err = c.Watch(&source.Kind{Type: &corev1.Service{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &mattermostv1alpha1.ClusterInstallation{},
+	})
+	if err != nil {
+		return err
+	}
+
+	err = c.Watch(&source.Kind{Type: &corev1.Secret{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &mattermostv1alpha1.ClusterInstallation{},
 	})
@@ -115,29 +124,42 @@ func (r *ReconcileClusterInstallation) Reconcile(request reconcile.Request) (rec
 		return reconcile.Result{}, err
 	}
 
-	if mattermost.Spec.DatabaseType.Type == "mysql" {
-		reqLogger.Info("Reconciling ClusterInstallation MySQL service account")
-		err = r.checkMySQLServiceAccount(mattermost, reqLogger)
-		if err != nil {
-			return reconcile.Result{}, err
-		}
-
-		reqLogger.Info("Reconciling ClusterInstallation MySQL role binding")
-		err = r.checkMySQLRoleBinding(mattermost, reqLogger)
-		if err != nil {
-			return reconcile.Result{}, err
-		}
-
-		reqLogger.Info("Reconciling ClusterInstallation MySQL")
-		err = r.checkMySQLDeployment(mattermost, reqLogger)
+	if mattermost.Spec.DatabaseType.ExternalDatabase != "" {
+		reqLogger.Info("Reconciling ClusterInstallation External Database secret")
+		secretName := fmt.Sprintf("%s-externalDB", mattermost.Name)
+		err = r.checkMattermostSecret(secretName, "externalDB", mattermost.Spec.DatabaseType.ExternalDatabase, mattermost, reqLogger)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
 	} else {
-		reqLogger.Info("Reconciling ClusterInstallation Postgres")
-		err = r.checkDBPostgresDeployment(mattermost, reqLogger)
-		if err != nil {
-			return reconcile.Result{}, err
+		switch mattermost.Spec.DatabaseType.Type {
+		case "mysql":
+			reqLogger.Info("Reconciling ClusterInstallation MySQL service account")
+			err = r.checkMySQLServiceAccount(mattermost, reqLogger)
+			if err != nil {
+				return reconcile.Result{}, err
+			}
+
+			reqLogger.Info("Reconciling ClusterInstallation MySQL role binding")
+			err = r.checkMySQLRoleBinding(mattermost, reqLogger)
+			if err != nil {
+				return reconcile.Result{}, err
+			}
+
+			reqLogger.Info("Reconciling ClusterInstallation MySQL")
+			err = r.checkMySQLDeployment(mattermost, reqLogger)
+			if err != nil {
+				return reconcile.Result{}, err
+			}
+		case "postgres":
+			reqLogger.Info("Reconciling ClusterInstallation Postgres")
+			err = r.checkDBPostgresDeployment(mattermost, reqLogger)
+			if err != nil {
+				return reconcile.Result{}, err
+			}
+		case "default":
+			errInvalid := errors.NewInvalid(mattermostv1alpha1.SchemeGroupVersion.WithKind("ClusterInstallation").GroupKind(), "Database type invalid", nil)
+			return reconcile.Result{}, errInvalid
 		}
 	}
 
@@ -249,6 +271,22 @@ func (r *ReconcileClusterInstallation) createDeploymentIfNotExists(owner v1.Obje
 		return r.createResource(owner, deployment, reqLogger)
 	} else if err != nil {
 		reqLogger.Error(err, "ClusterInstallation Application")
+		return err
+	}
+
+	// TODO check how to do the update
+
+	return nil
+}
+
+func (r *ReconcileClusterInstallation) createSecretIfNotExists(owner v1.Object, secret *corev1.Secret, reqLogger logr.Logger) error {
+	foundSecret := &corev1.Secret{}
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: secret.Name, Namespace: secret.Namespace}, foundSecret)
+	if err != nil && errors.IsNotFound(err) {
+		reqLogger.Info("Creating secret", secret.Name)
+		return r.createResource(owner, secret, reqLogger)
+	} else if err != nil {
+		reqLogger.Error(err, "Failed to check if secret exists")
 		return err
 	}
 
