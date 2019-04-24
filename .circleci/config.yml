@@ -56,19 +56,26 @@ jobs:
           name: Kind
           command: ./test/e2e.sh
 
-  coverage:
+  push-docker:
     executor:
       name: default
     steps:
       - checkout
-      - run:
-          name: coveralls
-          command: |
-            go get golang.org/x/tools/cmd/cover
-            go get github.com/mattn/goveralls
+      - setup_remote_docker
+      - run: make build-image
       - run: |
-          export PATH=$PATH:/usr/local/kubebuilder/bin
-          make unittest
+          set -e
+          set -u
+          if [[ -z "${CIRCLE_TAG:-}" ]]; then
+            echo "Pushing lastest for $CIRCLE_BRANCH..."
+            TAG=latest
+          else
+            echo "Pushing release $CIRCLE_TAG..."
+            TAG="$CIRCLE_TAG"
+          fi
+          echo $DOCKER_PASSWORD | docker login --username $DOCKER_USERNAME --password-stdin
+          docker tag mattermost/mattermost-operator:test mattermost/mattermost-operator:$TAG
+          docker push mattermost/mattermost-operator:$TAG
 
 workflows:
   version: 2
@@ -84,3 +91,63 @@ workflows:
           requires:
             - lint
             - unittest
+  master-build:
+    jobs:
+      - lint:
+          filters:
+            branches:
+              only:
+                - master
+      - unittest:
+          filters:
+            branches:
+              only:
+                - master
+      - e2e:
+          requires:
+            - lint
+            - unittest
+          filters:
+            branches:
+              only:
+                - master
+      - push-docker:
+          context: matterbuild-docker
+          requires:
+            - e2e
+          filters:
+            branches:
+              only:
+                - master
+  tag-builds:
+    jobs:
+      - lint:
+          filters:
+            tags:
+              only: /^v.*/
+            branches:
+              ignore: /.*/
+      - unittest:
+          filters:
+            tags:
+              only: /^v.*/
+            branches:
+              ignore: /.*/
+      - e2e:
+          requires:
+            - lint
+            - unittest
+          filters:
+            tags:
+              only: /^v.*/
+            branches:
+              ignore: /.*/
+      - push-docker:
+          context: matterbuild-docker
+          requires:
+            - e2e
+          filters:
+            tags:
+              only: /^v.*/
+            branches:
+              ignore: /.*/
