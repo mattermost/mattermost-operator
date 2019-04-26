@@ -19,7 +19,7 @@ This project offers a Kubernetes Operator for Mattermost to simplify deploying a
 - Kubernetes cluster 1.8.0+.
 - `kubectl` configured for the relevant Kubernetes cluster. (https://kubernetes.io/docs/reference/kubectl/overview/)
 
-### Create Operator and related resources
+### Install Operators
 
 To start Mattermost-Operator, we need to install the dependencies first.
 
