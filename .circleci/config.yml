@@ -102,6 +102,7 @@ workflows:
       - microscanner/scan-image:
           requires:
             - docker-build
+          context: aquasecurity-microscanner
           image: 'mattermost/mattermost-operator:test'
   master-build:
     jobs:
