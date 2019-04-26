@@ -135,11 +135,10 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 	}
 
 	if externalDB {
-		secretName := fmt.Sprintf("%s-externalDB", mattermost.Name)
 		envVarDB.ValueFrom = &corev1.EnvVarSource{
 			SecretKeyRef: &corev1.SecretKeySelector{
 				LocalObjectReference: corev1.LocalObjectReference{
-					Name: secretName,
+					Name: mattermost.Spec.DatabaseType.ExternalDatabaseSecret,
 				},
 				Key: "externalDB",
 			},
