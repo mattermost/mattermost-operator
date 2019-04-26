@@ -40,7 +40,7 @@ $ kubectl create ns mattermost-operator
 $ kubectl apply -n mattermost-operator -f https://github.com/mattertmost/mattermost-operator/blob/master/docs/mattermost-operator/mattermost-operator.yaml?raw=true
 ```
 
-### Create a Mattermost Cluster installation
+### Install Mattermost
 
 Once Mattermost-Operator deployment is running, you can create a Mattermost cluster installation using the below command
 
