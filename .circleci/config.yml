@@ -2,6 +2,7 @@ version: 2.1
 
 orbs:
   shellcheck: circleci/shellcheck@1.3.4
+  microscanner: aquasecurity/microscanner@0.1.6
 
 executors:
   default:
@@ -55,6 +56,7 @@ jobs:
       - run:
           name: Kind
           command: ./test/e2e.sh
+      - run: docker tag mattermost/mattermost-operator:test mattermost/mattermost-operator:scan
 
   push-docker:
     executor:
@@ -91,6 +93,10 @@ workflows:
           requires:
             - lint
             - unittest
+      - microscanner/scan-image:
+          requires:
+            - e2e
+          image: 'mattermost/mattermost-operator:scan'
   master-build:
     jobs:
       - lint:
