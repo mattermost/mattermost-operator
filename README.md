@@ -67,7 +67,7 @@ If you want to contribute you can build and test the operator locally. We are us
 
 ### Testing locally
 
-While developing will be easy to test the changes locally in a local running cluster. For that you can deploy Kind and then apply the manifests to deploy the dependecies and to deploy Mattermost operator as well.
+Developing and testing local changes to the `mattermost-operator` is fairly simple. For that you can deploy Kind and then apply the manifests to deploy the dependencies and to deploy Mattermost operator as well.
 
 You dont need to push the mattermost-operator image to the Docker Hub or any other Registry you can load the image you built using `make build-image` directly to the Kind cluster.
 
