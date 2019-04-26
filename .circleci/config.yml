@@ -56,7 +56,6 @@ jobs:
       - run:
           name: Kind
           command: ./test/e2e.sh
-      - run: docker tag mattermost/mattermost-operator:test mattermost/mattermost-operator:scan
 
   push-docker:
     executor:
@@ -79,6 +78,12 @@ jobs:
           docker tag mattermost/mattermost-operator:test mattermost/mattermost-operator:$TAG
           docker push mattermost/mattermost-operator:$TAG
 
+  docker-build:
+    executor: microscanner/default
+    steps:
+      - checkout
+      - run: make build-image
+
 workflows:
   version: 2
   untagged-build:
@@ -93,10 +98,11 @@ workflows:
           requires:
             - lint
             - unittest
+      - docker-build
       - microscanner/scan-image:
           requires:
-            - e2e
-          image: 'mattermost/mattermost-operator:scan'
+            - docker-build
+          image: 'mattermost/mattermost-operator:test'
   master-build:
     jobs:
       - lint:
