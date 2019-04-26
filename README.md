@@ -9,7 +9,7 @@ The Mattermost operator is in alpha, data loss might occur.
 
 Mattermost is a scalale, open source collaboration tool. It's written in Golang and React.
 
-The idea of this project is to build the Kubernetes Operator for Mattermost to mak more easy for Kubernetes users deploy and manage your Mattermost instance.
+This project offers a Kubernetes Operator for Mattermost to simplify deploying and managing your Mattermost instance.
 
 
 ## Getting Started
