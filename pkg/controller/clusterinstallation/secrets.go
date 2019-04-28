@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/go-logr/logr"
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -18,7 +19,7 @@ func (r *ReconcileClusterInstallation) checkSecret(secretName, namespace string)
 	foundSecret := &corev1.Secret{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: secretName, Namespace: namespace}, foundSecret)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Error getting secret")
 	}
 
 	return nil

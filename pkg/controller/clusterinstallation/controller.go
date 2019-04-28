@@ -123,34 +123,41 @@ func (r *ReconcileClusterInstallation) Reconcile(request reconcile.Request) (rec
 		return reconcile.Result{}, err
 	}
 
-	switch mattermost.Spec.DatabaseType.Type {
-	case "mysql":
-		reqLogger.Info("Reconciling ClusterInstallation MySQL service account")
-		err = r.checkMySQLServiceAccount(mattermost, reqLogger)
-		if err != nil {
-			return reconcile.Result{}, err
+	if mattermost.Spec.DatabaseType.ExternalDatabaseSecret != "" {
+		errSecret := r.checkSecret(mattermost.Spec.DatabaseType.ExternalDatabaseSecret, mattermost.Namespace)
+		if errSecret != nil {
+			return reconcile.Result{}, errSecret
 		}
+	} else {
+		switch mattermost.Spec.DatabaseType.Type {
+		case "mysql":
+			reqLogger.Info("Reconciling ClusterInstallation MySQL service account")
+			err = r.checkMySQLServiceAccount(mattermost, reqLogger)
+			if err != nil {
+				return reconcile.Result{}, err
+			}
 
-		reqLogger.Info("Reconciling ClusterInstallation MySQL role binding")
-		err = r.checkMySQLRoleBinding(mattermost, reqLogger)
-		if err != nil {
-			return reconcile.Result{}, err
-		}
+			reqLogger.Info("Reconciling ClusterInstallation MySQL role binding")
+			err = r.checkMySQLRoleBinding(mattermost, reqLogger)
+			if err != nil {
+				return reconcile.Result{}, err
+			}
 
-		reqLogger.Info("Reconciling ClusterInstallation MySQL")
-		err = r.checkMySQLDeployment(mattermost, reqLogger)
-		if err != nil {
-			return reconcile.Result{}, err
+			reqLogger.Info("Reconciling ClusterInstallation MySQL")
+			err = r.checkMySQLDeployment(mattermost, reqLogger)
+			if err != nil {
+				return reconcile.Result{}, err
+			}
+		case "postgres":
+			reqLogger.Info("Reconciling ClusterInstallation Postgres")
+			err = r.checkDBPostgresDeployment(mattermost, reqLogger)
+			if err != nil {
+				return reconcile.Result{}, err
+			}
+		case "default":
+			errInvalid := errors.NewInvalid(mattermostv1alpha1.SchemeGroupVersion.WithKind("ClusterInstallation").GroupKind(), "Database type invalid", nil)
+			return reconcile.Result{}, errInvalid
 		}
-	case "postgres":
-		reqLogger.Info("Reconciling ClusterInstallation Postgres")
-		err = r.checkDBPostgresDeployment(mattermost, reqLogger)
-		if err != nil {
-			return reconcile.Result{}, err
-		}
-	case "default":
-		errInvalid := errors.NewInvalid(mattermostv1alpha1.SchemeGroupVersion.WithKind("ClusterInstallation").GroupKind(), "Database type invalid", nil)
-		return reconcile.Result{}, errInvalid
 	}
 
 	err = r.checkMinioDeployment(mattermost, reqLogger)
