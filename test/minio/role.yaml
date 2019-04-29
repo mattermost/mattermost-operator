@@ -1,0 +1,41 @@
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  name: minio-operator-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  - secrets
+  - pods
+  - services
+  - events
+  verbs:
+  - get
+  - watch
+  - create
+  - list
+  - patch
+- apiGroups:
+  - apps
+  resources:
+  - statefulsets
+  verbs:
+  - get
+  - create
+  - list
+  - patch
+  - watch
+- apiGroups:
+  - miniocontroller.minio.io
+  resources:
+  - "*"
+  verbs:
+  - "*"
+- apiGroups:
+  - minio.io
+  resources:
+  - "*"
+  verbs:
+  - "*"
