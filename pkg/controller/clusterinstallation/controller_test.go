@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	minioOperator "github.com/minio/minio-operator/pkg/apis/miniocontroller/v1beta1"
 	"github.com/onsi/gomega"
 	mysqlOperator "github.com/oracle/mysql-operator/pkg/apis/mysql/v1alpha1"
 	"golang.org/x/net/context"
@@ -27,6 +28,7 @@ var expectedRequest = reconcile.Request{NamespacedName: types.NamespacedName{Nam
 var depKey = types.NamespacedName{Name: "foo", Namespace: "default"}
 var depIngressKey = types.NamespacedName{Name: "foo-ingress", Namespace: "default"}
 var depMysqlKey = types.NamespacedName{Name: "foo-mysql", Namespace: "default"}
+var statefulMinioKey = types.NamespacedName{Name: "foo-minio", Namespace: "default"}
 var depSvcAccountKey = types.NamespacedName{Name: "mysql-agent", Namespace: "default"}
 
 const timeout = time.Second * 60
@@ -79,6 +81,11 @@ func TestReconcile(t *testing.T) {
 	g.Eventually(func() error { return c.Get(context.TODO(), depSvcAccountKey, roleBinding) }, timeout).
 		Should(gomega.Succeed())
 
+	// Minio test section
+	minio := &minioOperator.MinioInstance{}
+	g.Eventually(func() error { return c.Get(context.TODO(), statefulMinioKey, minio) }, timeout).
+		Should(gomega.Succeed())
+
 	// Mattermost test section
 	service := &corev1.Service{}
 	g.Eventually(func() error { return c.Get(context.TODO(), depKey, service) }, timeout).
@@ -104,6 +111,43 @@ func TestReconcile(t *testing.T) {
 		return
 	}
 	defer c.Delete(context.TODO(), dbSecret)
+
+	// Create the minio secret
+	MinioSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      instance.Name + "-minio",
+			Namespace: instance.Namespace,
+		},
+		Data: map[string][]byte{
+			"accesskey": []byte("mysupersecure"),
+			"secretkey": []byte("mysupersecurekey"),
+		},
+	}
+	err = c.Create(context.TODO(), dbSecret)
+	if apierrors.IsInvalid(err) {
+		t.Logf("failed to create object, got an invalid object error: %v", err)
+		return
+	}
+	defer c.Delete(context.TODO(), MinioSecret)
+
+	// Create the minio service
+	minioPort := corev1.ServicePort{Port: 9000}
+	minioService := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      instance.Name + "-minio",
+			Namespace: instance.Namespace,
+		},
+		Spec: corev1.ServiceSpec{
+			Ports:     []corev1.ServicePort{minioPort},
+			ClusterIP: corev1.ClusterIPNone,
+		},
+	}
+	err = c.Create(context.TODO(), minioService)
+	if apierrors.IsInvalid(err) {
+		t.Logf("failed to create object, got an invalid object error: %v", err)
+		return
+	}
+	defer c.Delete(context.TODO(), minioService)
 
 	deploy := &appsv1.Deployment{}
 	g.Eventually(func() error { return c.Get(context.TODO(), depKey, deploy) }, timeout).

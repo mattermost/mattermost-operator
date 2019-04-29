@@ -23,6 +23,8 @@ const (
 	DefaultMattermostVersion = "5.10.0"
 	// DefaultMattermostDatabaseType is the default Mattermost database
 	DefaultMattermostDatabaseType = "mysql"
+	// DefaultMinioStorageSize is the default Storage size for Minio
+	DefaultMinioStorageSize = "50Gi"
 
 	// ClusterLabel is the label applied across all compoments
 	ClusterLabel = "v1alpha1.mattermost.com/installation"
@@ -44,6 +46,10 @@ func (mattermost *ClusterInstallation) SetDefaults() error {
 
 	if mattermost.Spec.Replicas == 0 {
 		mattermost.Spec.Replicas = DefaultAmountOfPods
+	}
+
+	if mattermost.Spec.MinioStorageSize == "" {
+		mattermost.Spec.MinioStorageSize = DefaultMinioStorageSize
 	}
 
 	if len(mattermost.Spec.DatabaseType.Type) == 0 {
@@ -126,8 +132,9 @@ func (mattermost *ClusterInstallation) GenerateIngress() *v1beta1.Ingress {
 }
 
 // GenerateDeployment returns the deployment spec for Mattermost
-func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword string, externalDB bool) *appsv1.Deployment {
+func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword string, externalDB bool, minioService string) *appsv1.Deployment {
 	mattermostImage := fmt.Sprintf("%s:%s", mattermost.Spec.Image, mattermost.Spec.Version)
+	// DB Section
 	initCheckDB := corev1.Container{}
 	initDB := corev1.Container{}
 	envVarDB := corev1.EnvVar{
@@ -166,6 +173,48 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 
 	cmdStartMM := []string{"mattermost"}
 
+	// Minio Section vars
+	minioName := fmt.Sprintf("%s-minio", mattermost.Name)
+	envVarMinio := []corev1.EnvVar{
+		{
+			Name:  "MM_FILESETTINGS_DRIVERNAME",
+			Value: "amazons3",
+		},
+		{
+			Name: "MM_FILESETTINGS_AMAZONS3ACCESSKEYID",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: minioName,
+					},
+					Key: "accesskey",
+				},
+			},
+		},
+		{
+			Name: "MM_FILESETTINGS_AMAZONS3SECRETACCESSKEY",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: minioName,
+					},
+					Key: "secretkey",
+				},
+			},
+		},
+		{
+			Name:  "MM_FILESETTINGS_AMAZONS3BUCKET",
+			Value: mattermost.Name,
+		},
+		{
+			Name:  "MM_FILESETTINGS_AMAZONS3ENDPOINT",
+			Value: minioService,
+		},
+	}
+
+	envVars := []corev1.EnvVar{}
+	envVars = append(envVars, envVarDB)
+	envVars = append(envVars, envVarMinio...)
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      mattermost.Name,
@@ -197,9 +246,7 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 							Image:   mattermostImage,
 							Name:    mattermost.Name,
 							Command: cmdStartMM,
-							Env: []corev1.EnvVar{
-								envVarDB,
-							},
+							Env:     envVars,
 							Ports: []corev1.ContainerPort{
 								{
 									ContainerPort: 8065,
@@ -215,7 +262,7 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 }
 
 // GenerateSecret returns the service for Mattermost
-func (mattermost *ClusterInstallation) GenerateSecret(secretName, key, data string) *corev1.Secret {
+func (mattermost *ClusterInstallation) GenerateSecret(secretName string, values map[string][]byte) *corev1.Secret {
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:    map[string]string{ClusterLabel: mattermost.Name},
@@ -229,8 +276,6 @@ func (mattermost *ClusterInstallation) GenerateSecret(secretName, key, data stri
 				}),
 			},
 		},
-		Data: map[string][]byte{
-			key: []byte(data),
-		},
+		Data: values,
 	}
 }

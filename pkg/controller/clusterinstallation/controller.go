@@ -160,6 +160,12 @@ func (r *ReconcileClusterInstallation) Reconcile(request reconcile.Request) (rec
 		}
 	}
 
+	reqLogger.Info("Reconciling ClusterInstallation Minio Secret")
+	err = r.checkMinioSecret(mattermost, reqLogger)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+	reqLogger.Info("Reconciling ClusterInstallation Minio deployment")
 	err = r.checkMinioDeployment(mattermost, reqLogger)
 	if err != nil {
 		return reconcile.Result{}, err

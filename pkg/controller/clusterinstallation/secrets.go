@@ -11,8 +11,8 @@ import (
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
 )
 
-func (r *ReconcileClusterInstallation) checkMattermostSecret(secretName, keyName, data string, mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
-	return r.createSecretIfNotExists(mattermost, mattermost.GenerateSecret(secretName, keyName, data), reqLogger)
+func (r *ReconcileClusterInstallation) checkMattermostSecret(secretName string, values map[string][]byte, mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
+	return r.createSecretIfNotExists(mattermost, mattermost.GenerateSecret(secretName, values), reqLogger)
 }
 
 func (r *ReconcileClusterInstallation) checkSecret(secretName, namespace string) error {
