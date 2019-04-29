@@ -39,7 +39,7 @@ spec:
               type: object
             databaseType:
               properties:
-                externalDatabase:
+                externalDatabaseSecret:
                   description: If the user want to use an external DB. This can be
                     inside the same k8s cluster or outside like AWS RDS.
                   type: string

@@ -33,7 +33,7 @@ type DatabaseType struct {
 	Type string `json:"type,omitempty"`
 	// If the user want to use an external DB.
 	// This can be inside the same k8s cluster or outside like AWS RDS.
-	ExternalDatabase string `json:"externalDatabase,omitempty"`
+	ExternalDatabaseSecret string `json:"externalDatabaseSecret,omitempty"`
 }
 
 // ClusterInstallationStatus defines the observed state of ClusterInstallation
