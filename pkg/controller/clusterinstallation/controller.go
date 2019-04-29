@@ -2,7 +2,6 @@ package clusterinstallation
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
@@ -124,12 +123,10 @@ func (r *ReconcileClusterInstallation) Reconcile(request reconcile.Request) (rec
 		return reconcile.Result{}, err
 	}
 
-	if mattermost.Spec.DatabaseType.ExternalDatabase != "" {
-		reqLogger.Info("Reconciling ClusterInstallation External Database secret")
-		secretName := fmt.Sprintf("%s-externalDB", mattermost.Name)
-		err = r.checkMattermostSecret(secretName, "externalDB", mattermost.Spec.DatabaseType.ExternalDatabase, mattermost, reqLogger)
-		if err != nil {
-			return reconcile.Result{}, err
+	if mattermost.Spec.DatabaseType.ExternalDatabaseSecret != "" {
+		errSecret := r.checkSecret(mattermost.Spec.DatabaseType.ExternalDatabaseSecret, mattermost.Namespace)
+		if errSecret != nil {
+			return reconcile.Result{}, errSecret
 		}
 	} else {
 		switch mattermost.Spec.DatabaseType.Type {

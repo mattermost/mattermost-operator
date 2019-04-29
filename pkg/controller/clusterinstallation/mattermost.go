@@ -37,10 +37,14 @@ func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mat
 	externalDB := false
 	dbPassword := ""
 	dbUser := ""
-	var err error
-	if mattermost.Spec.DatabaseType.ExternalDatabase != "" {
+	if mattermost.Spec.DatabaseType.ExternalDatabaseSecret != "" {
+		err := r.checkSecret(mattermost.Spec.DatabaseType.ExternalDatabaseSecret, mattermost.Namespace)
+		if err != nil {
+			return errors.Wrap(err, "Error getting the external database secret.")
+		}
 		externalDB = true
 	} else {
+		var err error
 		dbPassword, err = r.getMySQLSecrets(mattermost, reqLogger)
 		if err != nil {
 			return errors.Wrap(err, "Error getting the database password.")
