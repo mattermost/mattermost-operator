@@ -26,16 +26,24 @@ To start Mattermost-Operator, we need to install the dependencies first.
 #### MySQL-Operator
 To install MySQL-Operator apply the manifests that you can find in the `docs` folder
 
-```
+```bash
 $ kubectl create ns mysql-operator
 $ kubectl apply -n mysql-operator -f https://github.com/mattertmost/mattermost-operator/blob/master/docs/mysql-operator/mysql-operator.yaml?raw=true
+```
+
+#### Minio-Operator
+To install Minio-Operator apply the manifests that you can find in the `docs` folder
+
+```bash
+$ kubectl create ns minio-operator-ns
+$ kubectl apply -n minio-operator-ns -f https://github.com/mattertmost/mattermost-operator/blob/master/docs/minio-operator/minio-operator.yaml?raw=true
 ```
 
 #### Mattermost-Operator
 After the dependencies installed we need to deploy Mattermost-operator
 Apply the manifests in the `docs` folder as well
 
-```
+```bash
 $ kubectl create ns mattermost-operator
 $ kubectl apply -n mattermost-operator -f https://github.com/mattermost/mattermost-operator/blob/master/docs/mattermost-operator/mattermost-operator.yaml?raw=true
 ```
@@ -44,7 +52,7 @@ $ kubectl apply -n mattermost-operator -f https://github.com/mattermost/mattermo
 
 With the above operators installed, install Mattermost using the mattermost-operator:
 
-```
+```bash
 $ kubectl create -f https://github.com/minio/mattermost-operator/blob/master/docs/examples/simple.yaml?raw=true
 ```
 
@@ -65,7 +73,7 @@ To test the operator locally. We are recommend [Kind](https://kind.sigs.k8s.io/)
 
 First, checkout and install the operator-sdk CLI:
 
-```
+```bash
   $ mkdir -p $GOPATH/src/github.com/operator-framework
   $ cd $GOPATH/src/github.com/operator-framework
   $ git clone https://github.com/operator-framework/operator-sdk
@@ -81,6 +89,6 @@ Developing and testing local changes to the `mattermost-operator` is fairly simp
 
 You dont need to push the mattermost-operator image to the Docker Hub or any other Registry you can load the image you built using `make build-image` directly to the Kind cluster.
 
-```
+```bash
 $ kind load docker-image mattermost/mattermost-operator:test
 ```

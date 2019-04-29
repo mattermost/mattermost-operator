@@ -210,6 +210,10 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 			Name:  "MM_FILESETTINGS_AMAZONS3ENDPOINT",
 			Value: minioService,
 		},
+		{
+			Name:  "MM_FILESETTINGS_AMAZONS3SSL",
+			Value: "false",
+		},
 	}
 
 	envVars := []corev1.EnvVar{}

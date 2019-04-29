@@ -110,11 +110,7 @@ main() {
 
     # Create the minio operator
     kubectl create ns minio-operator-ns
-    kubectl apply -n minio-operator-ns -f test/minio/crds/minio_crd.yaml
-    kubectl apply -n minio-operator-ns -f test/minio/service_account.yaml
-    kubectl apply -n minio-operator-ns -f test/minio/role.yaml
-    kubectl apply -n minio-operator-ns -f test/minio/role_binding.yaml
-    kubectl apply -n minio-operator-ns -f test/minio/operator.yaml
+    kubectl apply -n minio-operator-ns -f docs/minio-operator/minio-operator.yaml
 
     kubectl get pods --all-namespaces
     # NOTE: Append this test command with `|| true` to debug by inspecting the
