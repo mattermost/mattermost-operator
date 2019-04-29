@@ -28,7 +28,7 @@ var expectedRequest = reconcile.Request{NamespacedName: types.NamespacedName{Nam
 var depKey = types.NamespacedName{Name: "foo", Namespace: "default"}
 var depIngressKey = types.NamespacedName{Name: "foo-ingress", Namespace: "default"}
 var depMysqlKey = types.NamespacedName{Name: "foo-mysql", Namespace: "default"}
-var statefulMinioKey = types.NamespacedName{Name: "foo-minio", Namespace: "default"}
+var depMinioKey = types.NamespacedName{Name: "foo-minio", Namespace: "default"}
 var depSvcAccountKey = types.NamespacedName{Name: "mysql-agent", Namespace: "default"}
 
 const timeout = time.Second * 60
@@ -83,7 +83,7 @@ func TestReconcile(t *testing.T) {
 
 	// Minio test section
 	minio := &minioOperator.MinioInstance{}
-	g.Eventually(func() error { return c.Get(context.TODO(), statefulMinioKey, minio) }, timeout).
+	g.Eventually(func() error { return c.Get(context.TODO(), depMinioKey, minio) }, timeout).
 		Should(gomega.Succeed())
 
 	// Mattermost test section
