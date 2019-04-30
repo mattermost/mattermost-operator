@@ -24,8 +24,8 @@ jobs:
       - checkout
       - run: |
           make operator-sdk
-          chmod +x build/operator-sdk
-          mv build/operator-sdk /usr/local/bin/
+          sudo chmod +x build/operator-sdk
+          sudo mv build/operator-sdk /usr/local/bin/
       - run: |
           mkdir -p /tmp/pkg/apis/mattermost/v1alpha1
           cp -R pkg/apis/mattermost/v1alpha1/* /tmp/pkg/apis/mattermost/v1alpha1
