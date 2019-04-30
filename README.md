@@ -37,7 +37,7 @@ Apply the manifests in the `docs` folder as well
 
 ```
 $ kubectl create ns mattermost-operator
-$ kubectl apply -n mattermost-operator -f https://github.com/mattertmost/mattermost-operator/blob/master/docs/mattermost-operator/mattermost-operator.yaml?raw=true
+$ kubectl apply -n mattermost-operator -f https://github.com/mattermost/mattermost-operator/blob/master/docs/mattermost-operator/mattermost-operator.yaml?raw=true
 ```
 
 ### Install Mattermost
