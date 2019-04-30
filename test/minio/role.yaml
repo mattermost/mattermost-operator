@@ -17,6 +17,7 @@ rules:
   - create
   - list
   - patch
+  - update
 - apiGroups:
   - apps
   resources:
@@ -27,6 +28,7 @@ rules:
   - list
   - patch
   - watch
+  - update
 - apiGroups:
   - miniocontroller.minio.io
   resources:

@@ -82,16 +82,6 @@ func (r *ReconcileClusterInstallation) createMinioSecretIfNotExists(mattermost *
 		return errGet
 	}
 
-	if !reflect.DeepEqual(foundSecret.Data, secret.Data) {
-		foundSecret.Data = secret.Data
-		reqLogger.Info("Updating Minio Secret", foundSecret.Namespace, foundSecret.Name)
-		err := r.client.Update(context.TODO(), foundSecret)
-		if err != nil {
-			return err
-		}
-		_ = controllerutil.SetControllerReference(mattermost, foundSecret, r.scheme)
-	}
-
 	return nil
 }
 

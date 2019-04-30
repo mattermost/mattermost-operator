@@ -33,7 +33,7 @@ func MinioInstance(mattermost *mattermostv1alpha1.ClusterInstallation) *minioOpe
 	minioInstance.SetOwnerReferences(ownerRef)
 
 	// Spec Section
-	minioInstance.Spec.Replicas = 2
+	minioInstance.Spec.Replicas = 4
 	minioInstance.Spec.CredsSecret = &corev1.LocalObjectReference{Name: minioName}
 	minioVolumentClaimTemplate := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{

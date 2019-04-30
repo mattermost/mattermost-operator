@@ -116,7 +116,7 @@ main() {
     kubectl apply -n minio-operator-ns -f test/minio/role_binding.yaml
     kubectl apply -n minio-operator-ns -f test/minio/operator.yaml
 
-    docker_exec kubectl get pods --all-namespaces
+    kubectl get pods --all-namespaces
     # NOTE: Append this test command with `|| true` to debug by inspecting the
     # resource details. Also comment `defer ctx.Cleanup()` in the cluster to
     # avoid resouce cleanup.
