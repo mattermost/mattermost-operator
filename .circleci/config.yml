@@ -17,6 +17,21 @@ jobs:
       - checkout
       - run: make check-style
 
+  generate:
+    executor:
+      name: default
+    steps:
+      - checkout
+      - run: |
+          make operator-sdk
+          chmod +x build/operator-sdk
+          mv build/operator-sdk /usr/local/bin/
+      - run: |
+          mkdir -p /tmp/pkg/apis/mattermost/v1alpha1
+          cp -R pkg/apis/mattermost/v1alpha1/* /tmp/pkg/apis/mattermost/v1alpha1
+      - run: make generate
+      - run: diff /tmp/pkg/apis/mattermost/v1alpha1 pkg/apis/mattermost/v1alpha1
+
   unittest:
     executor:
       name: default
@@ -84,9 +99,11 @@ workflows:
       - shellcheck/check:
           exclude: ./vendor/*
       - lint
+      - generate
       - unittest:
           requires:
             - lint
+            - generate
       - e2e:
           requires:
             - lint
