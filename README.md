@@ -1,4 +1,4 @@
-# Mattermost Operator for Kubernetes ![CircleCI branch](https://img.shields.io/circleci/project/github/mattermost/mattermost-operator/master.svg) ![Alpha](https://img.shields.io/badge/alfa-in%20progress-yellow.svg) [![Community Server](https://img.shields.io/badge/Mattermost_Community-cloud_channel-blue.svg)](https://community.mattermost.com/core/channels/cloud)
+# Mattermost Operator for Kubernetes ![CircleCI branch](https://img.shields.io/circleci/project/github/mattermost/mattermost-operator/master.svg) [![Community Server](https://img.shields.io/badge/Mattermost_Community-cloud_channel-blue.svg)](https://community.mattermost.com/core/channels/cloud)
 Mattermost Operator for Kubernetes is under construction.
 
 ## Status
@@ -42,11 +42,17 @@ $ kubectl apply -n mattermost-operator -f https://github.com/mattermost/mattermo
 
 ### Install Mattermost
 
-Once Mattermost-Operator deployment is running, you can create a Mattermost cluster installation using the below command
+With the above operators installed, install Mattermost using the mattermost-operator:
 
 ```
 $ kubectl create -f https://github.com/minio/mattermost-operator/blob/master/docs/examples/simple.yaml?raw=true
 ```
+
+The [simple.yml](https://github.com/minio/mattermost-operator/blob/master/docs/examples/simple.yaml?raw=true) configures the options available for installing Mattermost.
+
+They are documented as follows:
+ - `name`: Name of the Mattermost deployment
+ - `ingressName`: The ingress name for your Mattermost deployment.
 
 
 ## Developer flow
@@ -57,13 +63,17 @@ If you want to contribute you can build and test the operator locally. We are us
 
 - [Operator SDK](https://github.com/operator-framework/operator-sdk)
 
-### Makefile commands
+First, checkout and install the operator-sdk CLI:
 
-- `make build` - compile the operator
-- `make build-image` - generate the Docker image. The default image is `mattermost/mattermost-operator:test`
-- `make generate` - runs the kubernetes [code-generators](https://github.com/kubernetes/code-generator) for all Custom Resource Definitions (CRD) apis under `pkg/apis/...`. Also runs the [kube-openapi](https://github.com/kubernetes/kube-openapi) OpenAPIv3 code generator for all Custom Resource Definition (CRD) API tagged fields under `pkg/apis/...`
-- `make check-style` - runs govet/gofmt
-- `make unitest` - run the unit tests
+```
+  $ mkdir -p $GOPATH/src/github.com/operator-framework
+  $ cd $GOPATH/src/github.com/operator-framework
+  $ git clone https://github.com/operator-framework/operator-sdk
+  $ cd operator-sdk
+  $ git checkout master
+  $ make dep
+  $ make install
+```
 
 ### Testing locally
 

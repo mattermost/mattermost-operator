@@ -18,17 +18,16 @@ GO_LINKER_FLAGS ?= -ldflags\
 PACKAGES=$(shell go list ./...)
 TEST_PACKAGES=$(shell go list ./...| grep -v test/e2e)
 
-all: check-style unittest build
+all: check-style unittest build ## Run all the things
 
-# Run tests
-unittest:
+unittest: ## Runs unit tests
 	go test $(GO_LINKER_FLAGS) $(TEST_PACKAGES) -v -covermode=count -coverprofile=coverage.out
 
-build:
+build: ## Build the mattermost-operator
 	@echo Building Mattermost-operator
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 $(GO) build -gcflags all=-trimpath=$(GOPATH) -asmflags all=-trimpath=$(GOPATH) -a -installsuffix cgo -o build/_output/bin/mattermost-operator $(GO_LINKER_FLAGS) ./cmd/manager/main.go
 
-build-image: operator-sdk
+build-image: operator-sdk ## Build the docker image for mattermost-operator
 	@echo Building Mattermost-operator Docker Image
 	docker build \
 	--build-arg BUILD_IMAGE=$(BUILD_IMAGE) \
@@ -36,7 +35,7 @@ build-image: operator-sdk
 	. -f build/Dockerfile -t $(OPERATOR_IMAGE) \
 	--no-cache
 
-check-style: gofmt govet
+check-style: gofmt govet ## Runs govet/gofmt
 
 gofmt: ## Runs gofmt against all packages.
 	@echo Running GOFMT
@@ -62,23 +61,27 @@ govet: ## Runs govet against all packages.
 	$(GO) vet -vettool=$(GOPATH)/bin/shadow $(PACKAGES)
 	@echo "govet success";
 
-generate:
+generate: ## Runs the kubernetes code-generators and openapi
 	operator-sdk generate k8s
 	operator-sdk generate openapi
 
-# Get dependencies
-dep:
+
+dep: ## Get dependencies
 	dep ensure -v
 
-operator-sdk:
-	# Download sdk only if it's not available.
+operator-sdk: ## Download sdk only if it's not available. Used in the docker build
 	@if [ ! -f build/operator-sdk ]; then \
 		curl -Lo build/operator-sdk https://github.com/operator-framework/operator-sdk/releases/download/$(SDK_VERSION)/operator-sdk-$(SDK_VERSION)-$(MACHINE)-linux-gnu && \
 		chmod +x build/operator-sdk; \
 	fi
 
-clean:
+clean: ## Clean up everything
 	rm -Rf build/_output
 	go clean $(GOFLAGS) -i ./...
 	rm -f *.out
 	rm -f *.test
+
+
+## Help documentatin à la https://marmelab.com/blog/2016/02/29/auto-documented-makefile.html
+help:
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' ./Makefile | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
