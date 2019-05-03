@@ -57,7 +57,7 @@ They are documented as follows:
 
 ## Developer flow
 
-If you want to contribute you can build and test the operator locally. We are using [Kind](https://kind.sigs.k8s.io/), but you can use Minikube or Minishift as well.
+To test the operator locally. We are recommend [Kind](https://kind.sigs.k8s.io/), however, you can use Minikube or Minishift as well.
 
 ### Prerequisites
 
