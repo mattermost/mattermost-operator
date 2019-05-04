@@ -5,7 +5,6 @@ metadata:
 subjects:
 - kind: ServiceAccount
   name: mattermost-operator
-  # Replace this with the namespace the operator is deployed in.
   namespace: mattermost-operator
 roleRef:
   kind: ClusterRole

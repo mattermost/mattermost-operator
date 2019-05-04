@@ -21,7 +21,7 @@ func TestMain(m *testing.M) {
 	t := &envtest.Environment{
 		CRDDirectoryPaths: []string{
 			filepath.Join("..", "..", "..", "deploy", "crds"),
-			filepath.Join("..", "..", "..", "test", "mysql", "crds"),
+			filepath.Join("..", "..", "..", "test", "crds"),
 		},
 	}
 	apis.AddToScheme(scheme.Scheme)

@@ -104,11 +104,7 @@ main() {
 
     # Create the mysql operator
     kubectl create ns mysql-operator
-    kubectl apply -n mysql-operator -f test/mysql/crds/mysql_crd.yaml
-    kubectl apply -n mysql-operator -f test/mysql/service_account.yaml
-    kubectl apply -n mysql-operator -f test/mysql/role.yaml
-    kubectl apply -n mysql-operator -f test/mysql/role_binding.yaml
-    kubectl apply -n mysql-operator -f test/mysql/operator.yaml
+    kubectl apply -n mysql-operator -f docs/mysql-operator/mysql-operator.yaml
 
     # NOTE: Append this test command with `|| true` to debug by inspecting the
     # resource details. Also comment `defer ctx.Cleanup()` in the cluster to
