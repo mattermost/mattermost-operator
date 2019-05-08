@@ -33,6 +33,7 @@ func MinioInstance(mattermost *mattermostv1alpha1.ClusterInstallation) *minioOpe
 	minioInstance.SetOwnerReferences(ownerRef)
 
 	// Spec Section
+	// Minimum replicas the Minio require. Can add more in pair like 6, 8...
 	minioInstance.Spec.Replicas = 4
 	minioInstance.Spec.CredsSecret = &corev1.LocalObjectReference{Name: minioName}
 	minioVolumentClaimTemplate := &corev1.PersistentVolumeClaim{

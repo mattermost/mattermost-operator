@@ -116,7 +116,7 @@ func schema_pkg_apis_mattermost_v1alpha1_ClusterInstallationSpec(ref common.Refe
 					},
 					"minioStorageSize": {
 						SchemaProps: spec.SchemaProps{
-							Description: "MinioStorageSize defines the storage size for minio",
+							Description: "MinioStorageSize defines the storage size for minio. ie 50Gi",
 							Type:        []string{"string"},
 							Format:      "",
 						},

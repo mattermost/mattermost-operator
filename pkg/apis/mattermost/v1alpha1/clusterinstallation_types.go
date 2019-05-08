@@ -25,7 +25,7 @@ type ClusterInstallationSpec struct {
 	// +optional
 	Affinity *corev1.Affinity `json:"affinity,omitempty"`
 
-	// MinioStorageSize defines the storage size for minio
+	// MinioStorageSize defines the storage size for minio. ie 50Gi
 	MinioStorageSize string `json:"minioStorageSize,omitempty"`
 
 	DatabaseType DatabaseType `json:"databaseType,omitempty"`

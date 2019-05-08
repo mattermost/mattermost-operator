@@ -54,7 +54,8 @@ spec:
                 ingress rules
               type: string
             minioStorageSize:
-              description: MinioStorageSize defines the storage size for minio
+              description: MinioStorageSize defines the storage size for minio. ie
+                50Gi
               type: string
             nodeSelector:
               additionalProperties:

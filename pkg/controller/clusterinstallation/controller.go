@@ -160,7 +160,7 @@ func (r *ReconcileClusterInstallation) Reconcile(request reconcile.Request) (rec
 		}
 	}
 
-	reqLogger.Info("Reconciling ClusterInstallation Minio Secret")
+	reqLogger.Info("Reconciling ClusterInstallation Minio secret")
 	err = r.checkMinioSecret(mattermost, reqLogger)
 	if err != nil {
 		return reconcile.Result{}, err
@@ -292,8 +292,6 @@ func (r *ReconcileClusterInstallation) createSecretIfNotExists(owner v1.Object, 
 		reqLogger.Error(err, "Failed to check if secret exists")
 		return err
 	}
-
-	// TODO check how to do the update
 
 	return nil
 }
