@@ -456,6 +456,18 @@
   version = "v1.0.1"
 
 [[projects]]
+  branch = "master"
+  digest = "1:a304f5c3bdb350d550cd087723ed90b5dfbf93a8f55fa69c72fd4fb2a683f3f8"
+  name = "github.com/minio/minio-operator"
+  packages = [
+    "pkg/apis/miniocontroller",
+    "pkg/apis/miniocontroller/v1beta1",
+    "pkg/constants",
+  ]
+  pruneopts = "NT"
+  revision = "0345cda9227f201a2599bee4fb78be0b9fb88e7f"
+
+[[projects]]
   digest = "1:2f42fa12d6911c7b7659738758631bec870b7e9b4c6be5444f963cdcfccc191f"
   name = "github.com/modern-go/concurrent"
   packages = ["."]
@@ -1359,6 +1371,7 @@
   input-imports = [
     "github.com/go-logr/logr",
     "github.com/go-openapi/spec",
+    "github.com/minio/minio-operator/pkg/apis/miniocontroller/v1beta1",
     "github.com/onsi/gomega",
     "github.com/operator-framework/operator-sdk/pkg/leader",
     "github.com/operator-framework/operator-sdk/pkg/log/zap",
@@ -1369,6 +1382,7 @@
     "github.com/oracle/mysql-operator/pkg/apis/mysql/v1alpha1",
     "github.com/pkg/errors",
     "github.com/sirupsen/logrus",
+    "github.com/pborman/uuid",
     "github.com/spf13/pflag",
     "github.com/stretchr/testify/assert",
     "golang.org/x/net/context",
@@ -1377,6 +1391,7 @@
     "k8s.io/api/extensions/v1beta1",
     "k8s.io/api/rbac/v1beta1",
     "k8s.io/apimachinery/pkg/api/errors",
+    "k8s.io/apimachinery/pkg/api/resource",
     "k8s.io/apimachinery/pkg/apis/meta/v1",
     "k8s.io/apimachinery/pkg/runtime",
     "k8s.io/apimachinery/pkg/runtime/schema",

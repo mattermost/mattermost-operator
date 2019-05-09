@@ -17,6 +17,21 @@ jobs:
       - checkout
       - run: make check-style
 
+  generate:
+    executor:
+      name: default
+    steps:
+      - checkout
+      - run: |
+          make operator-sdk
+          sudo chmod +x build/operator-sdk
+          sudo mv build/operator-sdk /usr/local/bin/
+      - run: |
+          mkdir -p /tmp/pkg/apis/mattermost/v1alpha1
+          cp -R pkg/apis/mattermost/v1alpha1/* /tmp/pkg/apis/mattermost/v1alpha1
+      - run: make generate
+      - run: diff /tmp/pkg/apis/mattermost/v1alpha1 pkg/apis/mattermost/v1alpha1
+
   unittest:
     executor:
       name: default
@@ -47,7 +62,7 @@ jobs:
       - IMAGE_NAME=mattermost/mattermost-operator
       - IMAGE_TAG=test
       - KIND_VERSION=0.2.1
-      - SDK_VERSION=v0.3.0
+      - SDK_VERSION=v0.7.0
     machine: true
     working_directory: /home/circleci/.go_workspace/src/github.com/mattermost/mattermost-operator
     steps:
@@ -84,9 +99,11 @@ workflows:
       - shellcheck/check:
           exclude: ./vendor/*
       - lint
+      - generate
       - unittest:
           requires:
             - lint
+            - generate
       - e2e:
           requires:
             - lint

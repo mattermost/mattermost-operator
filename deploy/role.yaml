@@ -95,3 +95,15 @@ rules:
   - mysqlbackups
   verbs:
   - create
+- apiGroups:
+  - miniocontroller.minio.io
+  resources:
+  - "*"
+  verbs:
+  - "*"
+- apiGroups:
+  - minio.io
+  resources:
+  - "*"
+  verbs:
+  - "*"

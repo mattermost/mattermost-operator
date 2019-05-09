@@ -65,8 +65,9 @@ func mattermostScaleTest(t *testing.T, f *framework.Framework, ctx *framework.Te
 			Namespace: namespace,
 		},
 		Spec: operator.ClusterInstallationSpec{
-			IngressName: "test-example.mattermost.dev",
-			Replicas:    1,
+			IngressName:      "test-example.mattermost.dev",
+			Replicas:         1,
+			MinioStorageSize: "1Gi",
 		},
 	}
 
@@ -108,6 +109,10 @@ func MattermostCluster(t *testing.T) {
 
 	// wait for mysql-operator to be ready
 	err = e2eutil.WaitForDeployment(t, f.KubeClient, "mysql-operator", "mysql-operator", 1, retryInterval, timeout)
+	assert.Nil(t, err)
+
+	// wait for minio-operator to be ready
+	err = e2eutil.WaitForDeployment(t, f.KubeClient, "minio-operator-ns", "minio-operator", 1, retryInterval, timeout)
 	assert.Nil(t, err)
 
 	// wait for mattermost-operator to be ready

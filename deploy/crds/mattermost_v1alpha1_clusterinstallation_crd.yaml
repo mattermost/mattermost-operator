@@ -53,6 +53,10 @@ spec:
               description: IngressName defines the name to be used when creating the
                 ingress rules
               type: string
+            minioStorageSize:
+              description: MinioStorageSize defines the storage size for minio. ie
+                50Gi
+              type: string
             nodeSelector:
               additionalProperties:
                 type: string

@@ -19,6 +19,9 @@ func TestClusterInstallation(t *testing.T) {
 			Name:      "foo",
 			Namespace: "default",
 		},
+		Spec: ClusterInstallationSpec{
+			IngressName: "foo.mattermost.dev",
+		},
 	}
 
 	g := gomega.NewGomegaWithT(t)

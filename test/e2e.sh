@@ -93,8 +93,10 @@ main() {
     # available to the docker in docker environment.
     # Copy the image to the cluster to make a bit more fast to start
     docker pull iad.ocir.io/oracle/mysql-operator:0.3.0
+    docker pull minio/k8s-operator:latest
     kind load docker-image iad.ocir.io/oracle/mysql-operator:0.3.0
     kind load docker-image mattermost/mattermost-operator:test
+    kind load docker-image minio/k8s-operator:latest
 
     # Create a namespace for testing operator.
     # This is needed because the service account created using
@@ -106,6 +108,11 @@ main() {
     kubectl create ns mysql-operator
     kubectl apply -n mysql-operator -f docs/mysql-operator/mysql-operator.yaml
 
+    # Create the minio operator
+    kubectl create ns minio-operator-ns
+    kubectl apply -n minio-operator-ns -f docs/minio-operator/minio-operator.yaml
+
+    kubectl get pods --all-namespaces
     # NOTE: Append this test command with `|| true` to debug by inspecting the
     # resource details. Also comment `defer ctx.Cleanup()` in the cluster to
     # avoid resouce cleanup.
