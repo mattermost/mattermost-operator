@@ -6,7 +6,6 @@ FROM ${BUILD_IMAGE} AS build
 WORKDIR /go/src/github.com/mattermost/mattermost-operator/
 COPY . /go/src/github.com/mattermost/mattermost-operator/
 RUN cp build/operator-sdk /usr/local/bin/
-RUN make generate
 RUN make build
 
 # Final Image

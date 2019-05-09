@@ -151,6 +151,14 @@
   version = "v2.9.3"
 
 [[projects]]
+  digest = "1:4322fcb2f4d508898c3d9b0390a2e58211b53e6d9c25230b225df9a032fe26d6"
+  name = "github.com/evanphx/json-patch"
+  packages = ["."]
+  pruneopts = "NT"
+  revision = "5858425f75500d40c52783dce87d085a483ce135"
+  version = "v4.2.0"
+
+[[projects]]
   digest = "1:81466b4218bf6adddac2572a30ac733a9255919bc2f470b4827a317bd4ee1756"
   name = "github.com/ghodss/yaml"
   packages = ["."]
@@ -1120,6 +1128,7 @@
   packages = [
     "discovery",
     "discovery/cached",
+    "discovery/fake",
     "dynamic",
     "kubernetes",
     "kubernetes/scheme",
@@ -1168,6 +1177,7 @@
     "rest",
     "rest/watch",
     "restmapper",
+    "testing",
     "third_party/forked/golang/template",
     "tools/auth",
     "tools/cache",
@@ -1380,9 +1390,9 @@
     "github.com/operator-framework/operator-sdk/pkg/test/e2eutil",
     "github.com/operator-framework/operator-sdk/version",
     "github.com/oracle/mysql-operator/pkg/apis/mysql/v1alpha1",
+    "github.com/pborman/uuid",
     "github.com/pkg/errors",
     "github.com/sirupsen/logrus",
-    "github.com/pborman/uuid",
     "github.com/spf13/pflag",
     "github.com/stretchr/testify/assert",
     "golang.org/x/net/context",
@@ -1393,13 +1403,22 @@
     "k8s.io/apimachinery/pkg/api/errors",
     "k8s.io/apimachinery/pkg/api/resource",
     "k8s.io/apimachinery/pkg/apis/meta/v1",
+    "k8s.io/apimachinery/pkg/labels",
     "k8s.io/apimachinery/pkg/runtime",
     "k8s.io/apimachinery/pkg/runtime/schema",
+    "k8s.io/apimachinery/pkg/runtime/serializer",
     "k8s.io/apimachinery/pkg/types",
     "k8s.io/apimachinery/pkg/util/intstr",
+    "k8s.io/apimachinery/pkg/util/runtime",
+    "k8s.io/apimachinery/pkg/watch",
+    "k8s.io/client-go/discovery",
+    "k8s.io/client-go/discovery/fake",
     "k8s.io/client-go/kubernetes/scheme",
     "k8s.io/client-go/plugin/pkg/client/auth/gcp",
     "k8s.io/client-go/rest",
+    "k8s.io/client-go/testing",
+    "k8s.io/client-go/tools/cache",
+    "k8s.io/client-go/util/flowcontrol",
     "k8s.io/code-generator/cmd/client-gen",
     "k8s.io/code-generator/cmd/conversion-gen",
     "k8s.io/code-generator/cmd/deepcopy-gen",

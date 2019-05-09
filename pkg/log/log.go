@@ -81,7 +81,11 @@ func (l *logrusLogger) WithValues(keysAndValues ...interface{}) logr.Logger {
 
 func (l *logrusLogger) WithName(name string) logr.Logger {
 	newLogger := newLogger(l)
-	newLogger.name = fmt.Sprintf("%s.%s", l.name, name)
+	if l.name == "" {
+		newLogger.name = name
+	} else {
+		newLogger.name = fmt.Sprintf("%s.%s", l.name, name)
+	}
 
 	return newLogger
 }

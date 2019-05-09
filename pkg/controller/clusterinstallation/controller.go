@@ -2,6 +2,8 @@ package clusterinstallation
 
 import (
 	"context"
+	"fmt"
+	"reflect"
 
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
@@ -24,7 +26,7 @@ import (
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
 )
 
-var log = logf.Log.WithName("controller_clusterinstallation")
+var log = logf.Log.WithName("clusterinstallation.controller")
 
 // Add creates a new ClusterInstallation Controller and adds it to the Manager. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -40,7 +42,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
-	c, err := controller.New("clusterinstallation-controller", mgr, controller.Options{Reconciler: r})
+	c, err := controller.New("clusterinstallation", mgr, controller.Options{Reconciler: r})
 	if err != nil {
 		return err
 	}
@@ -118,55 +120,35 @@ func (r *ReconcileClusterInstallation) Reconcile(request reconcile.Request) (rec
 		return reconcile.Result{}, err
 	}
 
+	// Set defaults and update the resource with said defaults if anything is
+	// different.
+	originalMattermost := mattermost.DeepCopy()
 	err = mattermost.SetDefaults()
 	if err != nil {
 		return reconcile.Result{}, err
 	}
-
-	if mattermost.Spec.DatabaseType.ExternalDatabaseSecret != "" {
-		errSecret := r.checkSecret(mattermost.Spec.DatabaseType.ExternalDatabaseSecret, mattermost.Namespace)
-		if errSecret != nil {
-			return reconcile.Result{}, errSecret
-		}
-	} else {
-		switch mattermost.Spec.DatabaseType.Type {
-		case "mysql":
-			reqLogger.Info("Reconciling ClusterInstallation MySQL service account")
-			err = r.checkMySQLServiceAccount(mattermost, reqLogger)
-			if err != nil {
-				return reconcile.Result{}, err
-			}
-
-			reqLogger.Info("Reconciling ClusterInstallation MySQL role binding")
-			err = r.checkMySQLRoleBinding(mattermost, reqLogger)
-			if err != nil {
-				return reconcile.Result{}, err
-			}
-
-			reqLogger.Info("Reconciling ClusterInstallation MySQL")
-			err = r.checkMySQLDeployment(mattermost, reqLogger)
-			if err != nil {
-				return reconcile.Result{}, err
-			}
-		case "postgres":
-			reqLogger.Info("Reconciling ClusterInstallation Postgres")
-			err = r.checkDBPostgresDeployment(mattermost, reqLogger)
-			if err != nil {
-				return reconcile.Result{}, err
-			}
-		case "default":
-			errInvalid := errors.NewInvalid(mattermostv1alpha1.SchemeGroupVersion.WithKind("ClusterInstallation").GroupKind(), "Database type invalid", nil)
-			return reconcile.Result{}, errInvalid
+	if !reflect.DeepEqual(originalMattermost.Spec, mattermost.Spec) {
+		reqLogger.Info(fmt.Sprintf("Updating spec"),
+			"Old", fmt.Sprintf("%+v", originalMattermost.Spec),
+			"New", fmt.Sprintf("%+v", mattermost.Spec),
+		)
+		err = r.client.Update(context.TODO(), mattermost)
+		if err != nil {
+			reqLogger.Error(err, "failed to update the clusterinstallation spec")
+			return reconcile.Result{}, err
 		}
 	}
 
-	reqLogger.Info("Reconciling ClusterInstallation Minio secret")
-	err = r.checkMinioSecret(mattermost, reqLogger)
+	err = r.checkDatabase(mattermost, reqLogger)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
-	reqLogger.Info("Reconciling ClusterInstallation Minio deployment")
-	err = r.checkMinioDeployment(mattermost, reqLogger)
+
+	err = r.checkMinioSecret(mattermost, reqLogger.WithValues("Reconcile.Minio", "secret"))
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+	err = r.checkMinioDeployment(mattermost, reqLogger.WithValues("Reconcile.Minio", "deployment"))
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -176,6 +158,23 @@ func (r *ReconcileClusterInstallation) Reconcile(request reconcile.Request) (rec
 		return reconcile.Result{}, err
 	}
 
+	status := mattermostv1alpha1.ClusterInstallationStatus{
+		State:   mattermostv1alpha1.Running,
+		Version: mattermost.Spec.Version,
+	}
+	if !reflect.DeepEqual(mattermost.Status, status) {
+		reqLogger.Info(fmt.Sprintf("Updating status"),
+			"Old", fmt.Sprintf("%+v", mattermost.Status),
+			"New", fmt.Sprintf("%+v", status),
+		)
+		mattermost.Status = status
+		err = r.client.Status().Update(context.TODO(), mattermost)
+		if err != nil {
+			reqLogger.Error(err, "failed to update the clusterinstallation status")
+			return reconcile.Result{}, err
+		}
+	}
+
 	return reconcile.Result{}, nil
 }
 
@@ -183,6 +182,47 @@ func (r *ReconcileClusterInstallation) Reconcile(request reconcile.Request) (rec
 type Object interface {
 	runtime.Object
 	v1.Object
+}
+
+func (r *ReconcileClusterInstallation) checkDatabase(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
+	if mattermost.Spec.DatabaseType.ExternalDatabaseSecret != "" {
+		errSecret := r.checkSecret(mattermost.Spec.DatabaseType.ExternalDatabaseSecret, mattermost.Namespace)
+		if errSecret != nil {
+			return errSecret
+		}
+	} else {
+		switch mattermost.Spec.DatabaseType.Type {
+		case "mysql":
+			dbLogger := reqLogger.WithValues("Reconcile.Database", "mysql")
+
+			err := r.checkMySQLServiceAccount(mattermost, dbLogger)
+			if err != nil {
+				return err
+			}
+
+			err = r.checkMySQLRoleBinding(mattermost, dbLogger)
+			if err != nil {
+				return err
+			}
+
+			err = r.checkMySQLDeployment(mattermost, dbLogger)
+			if err != nil {
+				return err
+			}
+		case "postgres":
+			dbLogger := reqLogger.WithValues("Reconcile.Database", "postgres")
+
+			err := r.checkDBPostgresDeployment(mattermost, dbLogger)
+			if err != nil {
+				return err
+			}
+		case "default":
+			errInvalid := errors.NewInvalid(mattermostv1alpha1.SchemeGroupVersion.WithKind("ClusterInstallation").GroupKind(), "Database type invalid", nil)
+			return errInvalid
+		}
+	}
+
+	return nil
 }
 
 // createResource creates the provided resource and sets the owner

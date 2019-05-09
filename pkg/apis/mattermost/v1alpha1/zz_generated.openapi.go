@@ -13,9 +13,8 @@ import (
 
 func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
 	return map[string]common.OpenAPIDefinition{
-		"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.ClusterInstallation":       schema_pkg_apis_mattermost_v1alpha1_ClusterInstallation(ref),
-		"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.ClusterInstallationSpec":   schema_pkg_apis_mattermost_v1alpha1_ClusterInstallationSpec(ref),
-		"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.ClusterInstallationStatus": schema_pkg_apis_mattermost_v1alpha1_ClusterInstallationStatus(ref),
+		"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.ClusterInstallation":     schema_pkg_apis_mattermost_v1alpha1_ClusterInstallation(ref),
+		"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.ClusterInstallationSpec": schema_pkg_apis_mattermost_v1alpha1_ClusterInstallationSpec(ref),
 	}
 }
 
@@ -132,33 +131,5 @@ func schema_pkg_apis_mattermost_v1alpha1_ClusterInstallationSpec(ref common.Refe
 		},
 		Dependencies: []string{
 			"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.DatabaseType", "k8s.io/api/core/v1.Affinity"},
-	}
-}
-
-func schema_pkg_apis_mattermost_v1alpha1_ClusterInstallationStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ClusterInstallationStatus defines the observed state of ClusterInstallation",
-				Properties: map[string]spec.Schema{
-					"paused": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Represents whether any actions on the underlying managed objects are being performed. Only delete actions will be performed.",
-							Type:        []string{"boolean"},
-							Format:      "",
-						},
-					},
-					"replicas": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Total number of non-terminated pods targeted by this Mattermost deployment (their labels match the selector).",
-							Type:        []string{"integer"},
-							Format:      "int32",
-						},
-					},
-				},
-				Required: []string{"paused", "replicas"},
-			},
-		},
-		Dependencies: []string{},
 	}
 }

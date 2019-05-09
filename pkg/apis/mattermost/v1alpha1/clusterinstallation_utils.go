@@ -1,6 +1,7 @@
 package v1alpha1
 
 import (
+	"errors"
 	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -33,28 +34,24 @@ const (
 // SetDefaults set the missing values in the manifest to the default ones
 func (mattermost *ClusterInstallation) SetDefaults() error {
 	if mattermost.Spec.IngressName == "" {
-		return fmt.Errorf("need to set the IngressName")
+		return errors.New("IngressName required, but not set")
 	}
-
 	if mattermost.Spec.Image == "" {
 		mattermost.Spec.Image = DefaultMattermostImage
 	}
-
 	if mattermost.Spec.Version == "" {
 		mattermost.Spec.Version = DefaultMattermostVersion
 	}
-
 	if mattermost.Spec.Replicas == 0 {
 		mattermost.Spec.Replicas = DefaultAmountOfPods
 	}
-
 	if mattermost.Spec.MinioStorageSize == "" {
 		mattermost.Spec.MinioStorageSize = DefaultMinioStorageSize
 	}
-
 	if len(mattermost.Spec.DatabaseType.Type) == 0 {
 		mattermost.Spec.DatabaseType.Type = DefaultMattermostDatabaseType
 	}
+
 	return nil
 }
 
