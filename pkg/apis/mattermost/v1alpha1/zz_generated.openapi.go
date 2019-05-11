@@ -126,6 +126,13 @@ func schema_pkg_apis_mattermost_v1alpha1_ClusterInstallationSpec(ref common.Refe
 							Ref: ref("github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.DatabaseType"),
 						},
 					},
+					"enableElasticSearch": {
+						SchemaProps: spec.SchemaProps{
+							Description: "EnableElasticSearch enable ES in the Mattermost installation",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 				},
 				Required: []string{"ingressName"},
 			},

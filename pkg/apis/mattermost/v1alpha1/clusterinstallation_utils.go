@@ -55,6 +55,12 @@ func (mattermost *ClusterInstallation) SetDefaults() error {
 	if len(mattermost.Spec.DatabaseType.Type) == 0 {
 		mattermost.Spec.DatabaseType.Type = DefaultMattermostDatabaseType
 	}
+
+	// just make sure if the user did not set this value we force set as false
+	if !mattermost.Spec.EnableElasticSearch {
+		mattermost.Spec.EnableElasticSearch = false
+	}
+
 	return nil
 }
 
@@ -132,7 +138,7 @@ func (mattermost *ClusterInstallation) GenerateIngress() *v1beta1.Ingress {
 }
 
 // GenerateDeployment returns the deployment spec for Mattermost
-func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword string, externalDB bool, minioService string) *appsv1.Deployment {
+func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword string, externalDB bool, minioService, esService string) *appsv1.Deployment {
 	mattermostImage := fmt.Sprintf("%s:%s", mattermost.Spec.Image, mattermost.Spec.Version)
 	// DB Section
 	initCheckDB := corev1.Container{}
@@ -216,9 +222,33 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 		},
 	}
 
+	// ES section vars
+	envVarES := []corev1.EnvVar{}
+	if esService != "" {
+		envVarES = []corev1.EnvVar{
+			{
+				Name:  "MM_ELASTICSEARCHSETTINGS_ENABLEINDEXING",
+				Value: "true",
+			},
+			{
+				Name:  "MM_ELASTICSEARCHSETTINGS_ENABLESEARCHING",
+				Value: "true",
+			},
+			{
+				Name:  "MM_ELASTICSEARCHSETTINGS_ENABLEAUTOCOMPLETE",
+				Value: "true",
+			},
+			{
+				Name:  "MM_ELASTICSEARCHSETTINGS_CONNECTIONURL",
+				Value: esService,
+			},
+		}
+	}
+
 	envVars := []corev1.EnvVar{}
 	envVars = append(envVars, envVarDB)
 	envVars = append(envVars, envVarMinio...)
+	envVars = append(envVars, envVarES...)
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      mattermost.Name,

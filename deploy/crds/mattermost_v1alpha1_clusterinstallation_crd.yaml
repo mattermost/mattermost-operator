@@ -46,6 +46,9 @@ spec:
                 type:
                   type: string
               type: object
+            enableElasticSearch:
+              description: EnableElasticSearch enable ES in the Mattermost installation
+              type: boolean
             image:
               description: Image defines the ClusterInstallation Docker image.
               type: string

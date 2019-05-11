@@ -57,5 +57,14 @@ func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mat
 		return errors.Wrap(err, "Error getting the minio service.")
 	}
 
-	return r.createDeploymentIfNotExists(mattermost, mattermost.GenerateDeployment(dbUser, dbPassword, externalDB, minioService), reqLogger)
+	esService := ""
+	if mattermost.Spec.EnableElasticSearch {
+		var err error
+		esService, err = r.getESService(mattermost, reqLogger)
+		if err != nil {
+			return errors.Wrap(err, "Error getting the elasticSearch service.")
+		}
+	}
+
+	return r.createDeploymentIfNotExists(mattermost, mattermost.GenerateDeployment(dbUser, dbPassword, externalDB, minioService, esService), reqLogger)
 }

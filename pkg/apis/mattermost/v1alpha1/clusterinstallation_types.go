@@ -29,6 +29,9 @@ type ClusterInstallationSpec struct {
 	MinioStorageSize string `json:"minioStorageSize,omitempty"`
 
 	DatabaseType DatabaseType `json:"databaseType,omitempty"`
+
+	// EnableElasticSearch enable ES in the Mattermost installation
+	EnableElasticSearch bool `json:"enableElasticSearch,omitempty"`
 }
 
 // DatabaseType defines the Database configuration for a ClusterInstallation

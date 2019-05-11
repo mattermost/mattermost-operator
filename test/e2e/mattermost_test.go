@@ -115,6 +115,10 @@ func MattermostCluster(t *testing.T) {
 	err = e2eutil.WaitForDeployment(t, f.KubeClient, "minio-operator-ns", "minio-operator", 1, retryInterval, timeout)
 	assert.Nil(t, err)
 
+	// wait for es-operator to be ready
+	err = e2eutil.WaitForDeployment(t, f.KubeClient, "elasticsearch-operator", "elasticsearch-operator", 1, retryInterval, timeout)
+	assert.Nil(t, err)
+
 	// wait for mattermost-operator to be ready
 	err = e2eutil.WaitForDeployment(t, f.KubeClient, namespace, "mattermost-operator", 1, retryInterval, timeout)
 	assert.Nil(t, err)

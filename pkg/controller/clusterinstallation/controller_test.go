@@ -4,9 +4,12 @@ import (
 	"testing"
 	"time"
 
+	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
 	minioOperator "github.com/minio/minio-operator/pkg/apis/miniocontroller/v1beta1"
 	"github.com/onsi/gomega"
 	mysqlOperator "github.com/oracle/mysql-operator/pkg/apis/mysql/v1alpha1"
+	esOperator "github.com/upmc-enterprises/elasticsearch-operator/pkg/apis/elasticsearchoperator/v1"
+
 	"golang.org/x/net/context"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -18,8 +21,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
-	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
 )
 
 var c client.Client
@@ -29,6 +30,7 @@ var depKey = types.NamespacedName{Name: "foo", Namespace: "default"}
 var depIngressKey = types.NamespacedName{Name: "foo-ingress", Namespace: "default"}
 var depMysqlKey = types.NamespacedName{Name: "foo-mysql", Namespace: "default"}
 var depMinioKey = types.NamespacedName{Name: "foo-minio", Namespace: "default"}
+var depESKey = types.NamespacedName{Name: "foo-es", Namespace: "default"}
 var depSvcAccountKey = types.NamespacedName{Name: "mysql-agent", Namespace: "default"}
 
 const timeout = time.Second * 60
@@ -42,7 +44,8 @@ func TestReconcile(t *testing.T) {
 			Namespace: "default",
 		},
 		Spec: mattermostv1alpha1.ClusterInstallationSpec{
-			IngressName: "foo.mattermost.dev",
+			IngressName:         "foo.mattermost.dev",
+			EnableElasticSearch: true,
 		},
 	}
 
@@ -84,6 +87,11 @@ func TestReconcile(t *testing.T) {
 	// Minio test section
 	minio := &minioOperator.MinioInstance{}
 	g.Eventually(func() error { return c.Get(context.TODO(), depMinioKey, minio) }, timeout).
+		Should(gomega.Succeed())
+
+	// ES test section
+	es := &esOperator.ElasticsearchCluster{}
+	g.Eventually(func() error { return c.Get(context.TODO(), depESKey, es) }, timeout).
 		Should(gomega.Succeed())
 
 	// Mattermost test section
@@ -148,6 +156,25 @@ func TestReconcile(t *testing.T) {
 		return
 	}
 	defer c.Delete(context.TODO(), minioService)
+
+	// Create the es service
+	esPort := corev1.ServicePort{Port: 9200}
+	esService := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      instance.Name + "-es",
+			Namespace: instance.Namespace,
+		},
+		Spec: corev1.ServiceSpec{
+			Ports:     []corev1.ServicePort{esPort},
+			ClusterIP: corev1.ClusterIPNone,
+		},
+	}
+	err = c.Create(context.TODO(), esService)
+	if apierrors.IsInvalid(err) {
+		t.Logf("failed to create object, got an invalid object error: %v", err)
+		return
+	}
+	defer c.Delete(context.TODO(), esService)
 
 	deploy := &appsv1.Deployment{}
 	g.Eventually(func() error { return c.Get(context.TODO(), depKey, deploy) }, timeout).
