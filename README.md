@@ -24,6 +24,8 @@ This project offers a Kubernetes Operator for Mattermost to simplify deploying a
 To start Mattermost-Operator, we need to install the dependencies first.
 
 #### MySQL-Operator
+We are using the MySQL Operator developed by Oracle, you can check the project repository [here](https://github.com/oracle/mysql-operator)
+
 To install MySQL-Operator apply the manifests that you can find in the `docs` folder
 
 ```bash
@@ -32,11 +34,22 @@ $ kubectl apply -n mysql-operator -f https://github.com/mattertmost/mattermost-o
 ```
 
 #### Minio-Operator
+We are using the MySQL Operator developed by Minio, you can check the project repository [here](https://github.com/minio/minio-operator)
+
 To install Minio-Operator apply the manifests that you can find in the `docs` folder
 
 ```bash
 $ kubectl create ns minio-operator-ns
 $ kubectl apply -n minio-operator-ns -f https://github.com/mattertmost/mattermost-operator/blob/master/docs/minio-operator/minio-operator.yaml?raw=true
+```
+
+#### ElasticSearch-Operator
+We are using the MySQL Operator developed by UPMC Enterprises, you can check the project repository [here](https://github.com/upmc-enterprises/elasticsearch-operator)
+To install ElasticSearch-Operator apply the manifests that you can find in the `docs` folder
+
+```bash
+$ kubectl create ns elasticsearch-operator
+$ kubectl apply -n minio-operator-ns -f https://github.com/mattertmost/mattermost-operator/blob/master/docs/es-operator/es-operator.yaml?raw=true
 ```
 
 #### Mattermost-Operator
