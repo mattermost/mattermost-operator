@@ -705,6 +705,17 @@
   version = "v1.2.2"
 
 [[projects]]
+  digest = "1:b6ed9e5751a3221e904974dc06e1bb83d5f13593a21af7df5c3451ee94345237"
+  name = "github.com/upmc-enterprises/elasticsearch-operator"
+  packages = [
+    "pkg/apis/elasticsearchoperator",
+    "pkg/apis/elasticsearchoperator/v1",
+  ]
+  pruneopts = "NT"
+  revision = "a559882dda793aa7b3a01eaab7784d442b47c6df"
+  version = "v0.3.0"
+
+[[projects]]
   digest = "1:8bcb2616463bc981681c4b26f2aa817be8167682b76fb7884ec3fafdc9f82372"
   name = "go.opencensus.io"
   packages = [
@@ -1380,11 +1391,12 @@
     "github.com/operator-framework/operator-sdk/pkg/test/e2eutil",
     "github.com/operator-framework/operator-sdk/version",
     "github.com/oracle/mysql-operator/pkg/apis/mysql/v1alpha1",
+    "github.com/pborman/uuid",
     "github.com/pkg/errors",
     "github.com/sirupsen/logrus",
-    "github.com/pborman/uuid",
     "github.com/spf13/pflag",
     "github.com/stretchr/testify/assert",
+    "github.com/upmc-enterprises/elasticsearch-operator/pkg/apis/elasticsearchoperator/v1",
     "golang.org/x/net/context",
     "k8s.io/api/apps/v1",
     "k8s.io/api/core/v1",
