@@ -65,9 +65,10 @@ func mattermostScaleTest(t *testing.T, f *framework.Framework, ctx *framework.Te
 			Namespace: namespace,
 		},
 		Spec: operator.ClusterInstallationSpec{
-			IngressName:      "test-example.mattermost.dev",
-			Replicas:         1,
-			MinioStorageSize: "1Gi",
+			IngressName:         "test-example.mattermost.dev",
+			Replicas:            1,
+			MinioStorageSize:    "1Gi",
+			EnableElasticSearch: true,
 		},
 	}
 
