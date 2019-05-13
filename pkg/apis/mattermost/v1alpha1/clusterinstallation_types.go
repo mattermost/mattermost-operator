@@ -5,6 +5,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+////////////////////////////////////////////////////////////////////////////////
+//                                 IMPORTANT!                                 //
+////////////////////////////////////////////////////////////////////////////////
+// Run "make generate" in the root of this repository to regenerate code      //
+// after modifying this file.                                                 //
+// Add custom validation using kubebuilder tags:                              //
+// https://book.kubebuilder.io/beyond_basics/generating_crd.html              //
+////////////////////////////////////////////////////////////////////////////////
+
 // ClusterInstallationSpec defines the desired state of ClusterInstallation
 // +k8s:openapi-gen=true
 type ClusterInstallationSpec struct {
@@ -39,20 +48,33 @@ type DatabaseType struct {
 	ExternalDatabaseSecret string `json:"externalDatabaseSecret,omitempty"`
 }
 
-// ClusterInstallationStatus defines the observed state of ClusterInstallation
-// +k8s:openapi-gen=true
-type ClusterInstallationStatus struct {
-	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
-	// Add custom validation using kubebuilder tags: https://book.kubebuilder.io/beyond_basics/generating_crd.html
+// RunningState is the state of the Mattermost instance
+type RunningState string
 
-	// Represents whether any actions on the underlying managed objects are
-	// being performed. Only delete actions will be performed.
-	Paused bool `json:"paused"`
+const (
+	// Creating is the state when the Mattermost instance is being created
+	Creating RunningState = "creating"
+	// Upgrading is the state when the Mattermost instance is being upgraded
+	Upgrading RunningState = "upgrading"
+	// Running is the state when the Mattermost instance is fully running
+	Running RunningState = "running"
+)
+
+// ClusterInstallationStatus defines the observed state of ClusterInstallation
+type ClusterInstallationStatus struct {
+	// Represents the running state of the Mattermost instance
+	// +optional
+	State RunningState `json:"state,omitempty"`
 	// Total number of non-terminated pods targeted by this Mattermost deployment
 	// (their labels match the selector).
-	Replicas int32 `json:"replicas"`
+	// +optional
+	Replicas int32 `json:"replicas,omitempty"`
+	// The version currently running in the Mattermost instance
+	// +optional
+	Version string `json:"version,omitempty"`
 }
 
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ClusterInstallation is the Schema for the clusterinstallations API
@@ -70,7 +92,7 @@ type ClusterInstallation struct {
 	// included when requesting from the apiserver, only from the Mattermost
 	// Operator API itself. More info:
 	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
-	Status *ClusterInstallationStatus `json:"status,omitempty"`
+	Status ClusterInstallationStatus `json:"status,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -80,8 +102,4 @@ type ClusterInstallationList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []ClusterInstallation `json:"items"`
-}
-
-func init() {
-	SchemeBuilder.Register(&ClusterInstallation{}, &ClusterInstallationList{})
 }

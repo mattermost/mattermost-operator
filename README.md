@@ -7,7 +7,7 @@ The Mattermost operator is in alpha, data loss might occur.
 
 ## Summary
 
-Mattermost is a scalale, open source collaboration tool. It's written in Golang and React.
+Mattermost is a scalable, open source collaboration tool. It's written in Golang and React.
 
 This project offers a Kubernetes Operator for Mattermost to simplify deploying and managing your Mattermost instance.
 

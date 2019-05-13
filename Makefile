@@ -64,6 +64,7 @@ govet: ## Runs govet against all packages.
 generate: ## Runs the kubernetes code-generators and openapi
 	operator-sdk generate k8s
 	operator-sdk generate openapi
+	vendor/k8s.io/code-generator/generate-groups.sh all github.com/mattermost/mattermost-operator/pkg/client github.com/mattermost/mattermost-operator/pkg/apis mattermost:v1alpha1
 
 
 dep: ## Get dependencies
