@@ -36,7 +36,7 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileClusterInstallation{client: mgr.GetClient(), scheme: mgr.GetScheme()}
+	return &ReconcileClusterInstallation{client: mgr.GetClient(), scheme: mgr.GetScheme(), state: mattermostv1alpha1.Reconciling}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -93,16 +93,27 @@ var _ reconcile.Reconciler = &ReconcileClusterInstallation{}
 // ReconcileClusterInstallation reconciles a ClusterInstallation object
 type ReconcileClusterInstallation struct {
 	// This client, initialized using mgr.Client() above, is a split client
-	// that reads objects from the cache and writes to the apiserver
+	// that reads objects from the cache and writes to the apiserver.
 	client client.Client
 	scheme *runtime.Scheme
+	state  mattermostv1alpha1.RunningState
 }
 
-// Reconcile reads that state of the cluster for a ClusterInstallation object and makes changes based on the state read
-// and what is in the ClusterInstallation.Spec
+func (r *ReconcileClusterInstallation) setReconciling() {
+	r.state = mattermostv1alpha1.Reconciling
+}
+
+func (r *ReconcileClusterInstallation) setStable() {
+	r.state = mattermostv1alpha1.Stable
+}
+
+// Reconcile reads the state of the cluster for a ClusterInstallation object and
+// makes changes to obtain the exact state defined in `ClusterInstallation.Spec`.
+//
 // Note:
-// The Controller will requeue the Request to be processed again if the returned error is non-nil or
-// Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
+// The Controller will requeue the Request to be processed again if the returned
+// error is non-nil or Result.Requeue is true, otherwise upon completion it will
+// remove the work from the queue.
 func (r *ReconcileClusterInstallation) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	reqLogger.Info("Reconciling ClusterInstallation")
@@ -114,10 +125,22 @@ func (r *ReconcileClusterInstallation) Reconcile(request reconcile.Request) (rec
 		// Request object not found, could have been deleted after reconcile request.
 		// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
 		// Return and don't requeue
+		r.setReconciling()
 		return reconcile.Result{}, nil
 	} else if err != nil {
 		// Error reading the object - requeue the request.
+		r.setReconciling()
 		return reconcile.Result{}, err
+	}
+
+	if mattermost.Status.State != r.state {
+		status := mattermost.Status
+		status.State = r.state
+		err = r.updateStatus(mattermost, status, reqLogger)
+		if err != nil {
+			r.setReconciling()
+			return reconcile.Result{}, err
+		}
 	}
 
 	// Set defaults and update the resource with said defaults if anything is
@@ -125,6 +148,7 @@ func (r *ReconcileClusterInstallation) Reconcile(request reconcile.Request) (rec
 	originalMattermost := mattermost.DeepCopy()
 	err = mattermost.SetDefaults()
 	if err != nil {
+		r.setReconciling()
 		return reconcile.Result{}, err
 	}
 	if !reflect.DeepEqual(originalMattermost.Spec, mattermost.Spec) {
@@ -135,45 +159,45 @@ func (r *ReconcileClusterInstallation) Reconcile(request reconcile.Request) (rec
 		err = r.client.Update(context.TODO(), mattermost)
 		if err != nil {
 			reqLogger.Error(err, "failed to update the clusterinstallation spec")
+			r.setReconciling()
 			return reconcile.Result{}, err
 		}
 	}
 
 	err = r.checkDatabase(mattermost, reqLogger)
 	if err != nil {
+		r.setReconciling()
 		return reconcile.Result{}, err
 	}
 
 	err = r.checkMinioSecret(mattermost, reqLogger.WithValues("Reconcile.Minio", "secret"))
 	if err != nil {
+		r.setReconciling()
 		return reconcile.Result{}, err
 	}
 	err = r.checkMinioDeployment(mattermost, reqLogger.WithValues("Reconcile.Minio", "deployment"))
 	if err != nil {
+		r.setReconciling()
 		return reconcile.Result{}, err
 	}
 
 	err = r.checkMattermost(mattermost, reqLogger)
 	if err != nil {
+		r.setReconciling()
 		return reconcile.Result{}, err
 	}
 
-	status := mattermostv1alpha1.ClusterInstallationStatus{
-		State:   mattermostv1alpha1.Running,
-		Version: mattermost.Spec.Version,
+	status, err := r.checkClusterInstallation(mattermost)
+	if err != nil {
+		r.setReconciling()
+		return reconcile.Result{}, err
 	}
-	if !reflect.DeepEqual(mattermost.Status, status) {
-		reqLogger.Info(fmt.Sprintf("Updating status"),
-			"Old", fmt.Sprintf("%+v", mattermost.Status),
-			"New", fmt.Sprintf("%+v", status),
-		)
-		mattermost.Status = status
-		err = r.client.Status().Update(context.TODO(), mattermost)
-		if err != nil {
-			reqLogger.Error(err, "failed to update the clusterinstallation status")
-			return reconcile.Result{}, err
-		}
+	err = r.updateStatus(mattermost, *status, reqLogger)
+	if err != nil {
+		r.setReconciling()
+		return reconcile.Result{}, err
 	}
+	r.setStable()
 
 	return reconcile.Result{}, nil
 }
@@ -233,12 +257,7 @@ func (r *ReconcileClusterInstallation) createResource(owner v1.Object, resource 
 		return err
 	}
 
-	err = controllerutil.SetControllerReference(owner, resource, r.scheme)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return controllerutil.SetControllerReference(owner, resource, r.scheme)
 }
 
 func (r *ReconcileClusterInstallation) createServiceAccountIfNotExists(owner v1.Object, serviceAccount *corev1.ServiceAccount, reqLogger logr.Logger) error {
@@ -246,7 +265,7 @@ func (r *ReconcileClusterInstallation) createServiceAccountIfNotExists(owner v1.
 
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: serviceAccount.Name, Namespace: serviceAccount.Namespace}, foundServiceAccount)
 	if err != nil && errors.IsNotFound(err) {
-		reqLogger.Info("Creating service account", serviceAccount.Name)
+		reqLogger.Info("Creating service account", "name", serviceAccount.Name)
 		return r.createResource(owner, serviceAccount, reqLogger)
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to check if service account exists")
@@ -262,7 +281,7 @@ func (r *ReconcileClusterInstallation) createRoleBindingIfNotExists(owner v1.Obj
 	foundRoleBinding := &rbacv1beta1.RoleBinding{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: roleBinding.Name, Namespace: roleBinding.Namespace}, foundRoleBinding)
 	if err != nil && errors.IsNotFound(err) {
-		reqLogger.Info("Creating role binding", roleBinding.Name)
+		reqLogger.Info("Creating role binding", "name", roleBinding.Name)
 		return r.createResource(owner, roleBinding, reqLogger)
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to check if role binding exists")
@@ -278,7 +297,7 @@ func (r *ReconcileClusterInstallation) createServiceIfNotExists(owner v1.Object,
 	foundService := &corev1.Service{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: service.Name, Namespace: service.Namespace}, foundService)
 	if err != nil && errors.IsNotFound(err) {
-		reqLogger.Info("Creating service", service.Name)
+		reqLogger.Info("Creating service", "name", service.Name)
 		return r.createResource(owner, service, reqLogger)
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to check if service exists")
@@ -294,7 +313,7 @@ func (r *ReconcileClusterInstallation) createIngressIfNotExists(owner v1.Object,
 	foundIngress := &v1beta1.Ingress{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: ingress.Name, Namespace: ingress.Namespace}, foundIngress)
 	if err != nil && errors.IsNotFound(err) {
-		reqLogger.Info("Creating ingress", ingress.Name)
+		reqLogger.Info("Creating ingress", "name", ingress.Name)
 		return r.createResource(owner, ingress, reqLogger)
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to check if ingress exists")
@@ -307,17 +326,15 @@ func (r *ReconcileClusterInstallation) createIngressIfNotExists(owner v1.Object,
 }
 
 func (r *ReconcileClusterInstallation) createDeploymentIfNotExists(owner v1.Object, deployment *appsv1.Deployment, reqLogger logr.Logger) error {
-	foundMM := &appsv1.Deployment{}
-	err := r.client.Get(context.TODO(), types.NamespacedName{Name: deployment.Name, Namespace: deployment.Namespace}, foundMM)
+	foundDeployment := &appsv1.Deployment{}
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: deployment.Name, Namespace: deployment.Namespace}, foundDeployment)
 	if err != nil && errors.IsNotFound(err) {
-		reqLogger.Info("Creating deployment", deployment.Name)
+		reqLogger.Info("Creating deployment", "name", deployment.Name)
 		return r.createResource(owner, deployment, reqLogger)
 	} else if err != nil {
-		reqLogger.Error(err, "ClusterInstallation Application")
+		reqLogger.Error(err, "Failed to check if deployment exists")
 		return err
 	}
-
-	// TODO check how to do the update
 
 	return nil
 }
@@ -326,7 +343,7 @@ func (r *ReconcileClusterInstallation) createSecretIfNotExists(owner v1.Object, 
 	foundSecret := &corev1.Secret{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: secret.Name, Namespace: secret.Namespace}, foundSecret)
 	if err != nil && errors.IsNotFound(err) {
-		reqLogger.Info("Creating secret", secret.Name)
+		reqLogger.Info("Creating secret", "name", secret.Name)
 		return r.createResource(owner, secret, reqLogger)
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to check if secret exists")
