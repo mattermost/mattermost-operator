@@ -161,7 +161,7 @@ func TestReconcile(t *testing.T) {
 	esPort := corev1.ServicePort{Port: 9200}
 	esService := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      instance.Name + "-es",
+			Name:      "elasticsearch-" + instance.Name + "-es",
 			Namespace: instance.Namespace,
 		},
 		Spec: corev1.ServiceSpec{
