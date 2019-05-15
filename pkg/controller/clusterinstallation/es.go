@@ -45,7 +45,7 @@ func (r *ReconcileClusterInstallation) checkESDeployment(mattermost *mattermostv
 }
 
 func (r *ReconcileClusterInstallation) getESService(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) (string, error) {
-	esServiceName := fmt.Sprintf("%s-es", mattermost.Name)
+	esServiceName := fmt.Sprintf("elasticsearch-%s-es", mattermost.Name)
 	esService := &corev1.Service{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: esServiceName, Namespace: mattermost.Namespace}, esService)
 	if err != nil {
