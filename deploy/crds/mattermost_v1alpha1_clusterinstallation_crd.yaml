@@ -46,6 +46,55 @@ spec:
                 type:
                   type: string
               type: object
+            elasticSearchOption:
+              properties:
+                clientNodeReplicas:
+                  format: int32
+                  type: integer
+                dataNodeReplicas:
+                  format: int64
+                  type: integer
+                esStorageSize:
+                  description: EsStorageSize defines the storage size for elasticSerach.
+                    ie 50Gi
+                  type: string
+                masterNodeReplicas:
+                  format: int64
+                  type: integer
+                resources:
+                  description: Resources defines memory / cpu constraints
+                  properties:
+                    limits:
+                      properties:
+                        cpu:
+                          description: CPU defines max amount of CPU
+                          type: string
+                        memory:
+                          description: Memory defines max amount of memory
+                          type: string
+                      required:
+                      - memory
+                      - cpu
+                      type: object
+                    requests:
+                      properties:
+                        cpu:
+                          description: CPU defines max amount of CPU
+                          type: string
+                        memory:
+                          description: Memory defines max amount of memory
+                          type: string
+                      required:
+                      - memory
+                      - cpu
+                      type: object
+                  required:
+                  - requests
+                  - limits
+                  type: object
+              required:
+              - resources
+              type: object
             enableElasticSearch:
               description: EnableElasticSearch enable ES in the Mattermost installation
               type: boolean

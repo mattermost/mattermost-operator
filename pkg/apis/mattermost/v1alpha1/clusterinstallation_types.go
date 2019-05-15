@@ -31,7 +31,8 @@ type ClusterInstallationSpec struct {
 	DatabaseType DatabaseType `json:"databaseType,omitempty"`
 
 	// EnableElasticSearch enable ES in the Mattermost installation
-	EnableElasticSearch bool `json:"enableElasticSearch,omitempty"`
+	EnableElasticSearch  bool                `json:"enableElasticSearch,omitempty"`
+	ElasticSearchOptions ElasticSearchOption `json:"elasticSearchOption,omitempty"`
 }
 
 // DatabaseType defines the Database configuration for a ClusterInstallation
@@ -40,6 +41,34 @@ type DatabaseType struct {
 	// If the user want to use an external DB.
 	// This can be inside the same k8s cluster or outside like AWS RDS.
 	ExternalDatabaseSecret string `json:"externalDatabaseSecret,omitempty"`
+}
+
+// ElasticSearchOption defines the ElasticSearch configuration for a ClusterInstallation
+type ElasticSearchOption struct {
+	// Resources defines memory / cpu constraints
+	Resources Resources `json:"resources"`
+
+	// EsStorageSize defines the storage size for elasticSerach. ie 50Gi
+	EsStorageSize string `json:"esStorageSize,omitempty"`
+
+	ClientNodeReplicas int32 `json:"clientNodeReplicas,omitempty"`
+	MasterNodeReplicas int   `json:"masterNodeReplicas,omitempty"`
+	DataNodeReplicas   int   `json:"dataNodeReplicas,omitempty"`
+}
+
+// Resources defines CPU / Memory restrictions on pods
+type Resources struct {
+	Requests MemoryCPU `json:"requests"`
+	Limits   MemoryCPU `json:"limits"`
+}
+
+// MemoryCPU defines memory cpu options
+type MemoryCPU struct {
+	// Memory defines max amount of memory
+	Memory string `json:"memory"`
+
+	// CPU defines max amount of CPU
+	CPU string `json:"cpu"`
 }
 
 // ClusterInstallationStatus defines the observed state of ClusterInstallation

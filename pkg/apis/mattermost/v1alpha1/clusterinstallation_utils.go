@@ -25,6 +25,8 @@ const (
 	DefaultMattermostDatabaseType = "mysql"
 	// DefaultMinioStorageSize is the default Storage size for Minio
 	DefaultMinioStorageSize = "50Gi"
+	// DefaultEsStorageSize is the default Storage size for ElasticSearch
+	DefaultEsStorageSize = "50Gi"
 
 	// ClusterLabel is the label applied across all compoments
 	ClusterLabel = "v1alpha1.mattermost.com/installation"
@@ -60,6 +62,38 @@ func (mattermost *ClusterInstallation) SetDefaults() error {
 	if !mattermost.Spec.EnableElasticSearch {
 		mattermost.Spec.EnableElasticSearch = false
 	}
+
+	if mattermost.Spec.ElasticSearchOptions.ClientNodeReplicas == 0 {
+		mattermost.Spec.ElasticSearchOptions.ClientNodeReplicas = 1
+	}
+
+	if mattermost.Spec.ElasticSearchOptions.MasterNodeReplicas == 0 {
+		mattermost.Spec.ElasticSearchOptions.MasterNodeReplicas = 2
+	}
+
+	if mattermost.Spec.ElasticSearchOptions.DataNodeReplicas == 0 {
+		mattermost.Spec.ElasticSearchOptions.DataNodeReplicas = 2
+	}
+
+	if mattermost.Spec.ElasticSearchOptions.EsStorageSize == "" {
+		mattermost.Spec.ElasticSearchOptions.EsStorageSize = DefaultEsStorageSize
+	}
+
+	// if mattermost.Spec.ElasticSearchOptions.Resources.Limits.CPU == "" {
+	// 	mattermost.Spec.ElasticSearchOptions.Resources.Limits.CPU = "1"
+	// }
+
+	// if mattermost.Spec.ElasticSearchOptions.Resources.Limits.Memory == "" {
+	// 	mattermost.Spec.ElasticSearchOptions.Resources.Limits.Memory = "1024Mi"
+	// }
+
+	// if mattermost.Spec.ElasticSearchOptions.Resources.Requests.CPU == "" {
+	// 	mattermost.Spec.ElasticSearchOptions.Resources.Requests.CPU = "500m"
+	// }
+
+	// if mattermost.Spec.ElasticSearchOptions.Resources.Requests.Memory == "" {
+	// 	mattermost.Spec.ElasticSearchOptions.Resources.Requests.Memory = "512Mi"
+	// }
 
 	return nil
 }

@@ -69,6 +69,22 @@ func mattermostScaleTest(t *testing.T, f *framework.Framework, ctx *framework.Te
 			Replicas:            1,
 			MinioStorageSize:    "1Gi",
 			EnableElasticSearch: true,
+			ElasticSearchOptions: operator.ElasticSearchOption{
+				Resources: operator.Resources{
+					Requests: operator.MemoryCPU{
+						Memory: "",
+						CPU:    "",
+					},
+					Limits: operator.MemoryCPU{
+						Memory: "",
+						CPU:    "",
+					},
+				},
+				ClientNodeReplicas: 1,
+				MasterNodeReplicas: 1,
+				DataNodeReplicas:   1,
+				EsStorageSize:      "1Gi",
+			},
 		},
 	}
 

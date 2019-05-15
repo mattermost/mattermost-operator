@@ -30,12 +30,16 @@ func ESInstance(mattermost *mattermostv1alpha1.ClusterInstallation) *esOperator.
 
 	// Spec Section
 	esInstance.Spec.ElasticSearchImage = "upmcenterprises/docker-elasticsearch-kubernetes:6.1.3_0"
-	esInstance.Spec.ClientNodeReplicas = 2
-	esInstance.Spec.MasterNodeReplicas = 2
-	esInstance.Spec.DataNodeReplicas = 3
 	esInstance.Spec.NetworkHost = "0.0.0.0"
-	esInstance.Spec.DataDiskSize = "50Gi"
 	esInstance.Spec.JavaOptions = "-Xms1024m -Xmx1024m"
+	esInstance.Spec.ClientNodeReplicas = mattermost.Spec.ElasticSearchOptions.ClientNodeReplicas
+	esInstance.Spec.MasterNodeReplicas = mattermost.Spec.ElasticSearchOptions.MasterNodeReplicas
+	esInstance.Spec.DataNodeReplicas = mattermost.Spec.ElasticSearchOptions.DataNodeReplicas
+	esInstance.Spec.DataDiskSize = mattermost.Spec.ElasticSearchOptions.EsStorageSize
+	esInstance.Spec.Resources.Limits.CPU = mattermost.Spec.ElasticSearchOptions.Resources.Limits.CPU
+	esInstance.Spec.Resources.Limits.Memory = mattermost.Spec.ElasticSearchOptions.Resources.Limits.Memory
+	esInstance.Spec.Resources.Requests.CPU = mattermost.Spec.ElasticSearchOptions.Resources.Requests.CPU
+	esInstance.Spec.Resources.Requests.Memory = mattermost.Spec.ElasticSearchOptions.Resources.Requests.Memory
 
 	return esInstance
 }
