@@ -25,7 +25,7 @@ func Cluster(mattermost *mattermostv1alpha1.ClusterInstallation) *mysqlOperator.
 	mySQLCluster := &mysqlOperator.Cluster{}
 	mySQLCluster.SetName(mySQLName)
 	mySQLCluster.SetNamespace(mattermost.Namespace)
-	mySQLCluster.Spec.Members = 2
+	mySQLCluster.Spec.Members = 1
 	mySQLCluster.ObjectMeta.OwnerReferences = []metav1.OwnerReference{
 		*metav1.NewControllerRef(mattermost, schema.GroupVersionKind{
 			Group:   mattermostv1alpha1.SchemeGroupVersion.Group,
@@ -55,7 +55,7 @@ func ServiceAccount(mattermost *mattermostv1alpha1.ClusterInstallation) *corev1.
 	}
 }
 
-// RoleBinding returns the service account used by the MySQL Operator
+// RoleBinding returns the role binding used by the MySQL Operator
 func RoleBinding(mattermost *mattermostv1alpha1.ClusterInstallation) *rbacv1beta1.RoleBinding {
 	return &rbacv1beta1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{

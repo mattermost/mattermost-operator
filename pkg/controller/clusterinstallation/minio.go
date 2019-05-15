@@ -9,7 +9,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
 	mattermostMinio "github.com/mattermost/mattermost-operator/pkg/components/minio"
@@ -17,35 +16,56 @@ import (
 	minioOperator "github.com/minio/minio-operator/pkg/apis/miniocontroller/v1beta1"
 )
 
-func (r *ReconcileClusterInstallation) createMinioDeploymentIfNotExists(mattermost *mattermostv1alpha1.ClusterInstallation, deployment *minioOperator.MinioInstance, reqLogger logr.Logger) error {
-	foundDeployment := &minioOperator.MinioInstance{}
-	errGet := r.client.Get(context.TODO(), types.NamespacedName{Name: deployment.Name, Namespace: deployment.Namespace}, foundDeployment)
-	if errGet != nil && errors.IsNotFound(errGet) {
-		return r.createResource(mattermost, deployment, reqLogger)
-	} else if errGet != nil {
-		reqLogger.Error(errGet, "ClusterInstallation Minio")
-		return errGet
+func (r *ReconcileClusterInstallation) checkMinio(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
+	reqLogger = reqLogger.WithValues("Reconcile", "minio")
+
+	err := r.checkMinioSecret(mattermost, reqLogger)
+	if err != nil {
+		return err
 	}
 
-	if !reflect.DeepEqual(foundDeployment.Spec, deployment.Spec) {
-		foundDeployment.Spec = deployment.Spec
-		reqLogger.Info("Updating Minio deployment", deployment.Namespace, deployment.Name)
-		err := r.client.Update(context.TODO(), foundDeployment)
-		if err != nil {
-			return err
-		}
-		_ = controllerutil.SetControllerReference(mattermost, foundDeployment, r.scheme)
+	return r.checkMinioInstance(mattermost, reqLogger)
+}
+
+func (r *ReconcileClusterInstallation) checkMinioSecret(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
+	return r.createSecretIfNotExists(mattermost, mattermostMinio.MinioSecret(mattermost), reqLogger)
+}
+
+func (r *ReconcileClusterInstallation) checkMinioInstance(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
+	instance := mattermostMinio.MinioInstance(mattermost)
+
+	err := r.createMinioInstanceIfNotExists(mattermost, instance, reqLogger)
+	if err != nil {
+		return err
+	}
+
+	foundInstance := &minioOperator.MinioInstance{}
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: instance.Name, Namespace: instance.Namespace}, foundInstance)
+	if err != nil {
+		return err
+	}
+
+	if !reflect.DeepEqual(instance.Spec, foundInstance.Spec) {
+		reqLogger.Info("Updating Minio instance")
+		foundInstance.Spec = instance.Spec
+		return r.client.Update(context.TODO(), foundInstance)
 	}
 
 	return nil
 }
 
-func (r *ReconcileClusterInstallation) checkMinioDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
-	return r.createMinioDeploymentIfNotExists(mattermost, mattermostMinio.MinioInstance(mattermost), reqLogger)
-}
+func (r *ReconcileClusterInstallation) createMinioInstanceIfNotExists(mattermost *mattermostv1alpha1.ClusterInstallation, instance *minioOperator.MinioInstance, reqLogger logr.Logger) error {
+	foundInstance := &minioOperator.MinioInstance{}
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: instance.Name, Namespace: instance.Namespace}, foundInstance)
+	if err != nil && errors.IsNotFound(err) {
+		reqLogger.Info("Creating minio instance")
+		return r.createResource(mattermost, instance, reqLogger)
+	} else if err != nil {
+		reqLogger.Error(err, "ClusterInstallation Minio")
+		return err
+	}
 
-func (r *ReconcileClusterInstallation) checkMinioSecret(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
-	return r.createSecretIfNotExists(mattermost, mattermostMinio.MinioSecret(mattermost), reqLogger)
+	return nil
 }
 
 func (r *ReconcileClusterInstallation) getMinioService(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) (string, error) {

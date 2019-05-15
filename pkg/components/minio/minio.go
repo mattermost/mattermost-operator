@@ -19,7 +19,29 @@ import (
 func MinioInstance(mattermost *mattermostv1alpha1.ClusterInstallation) *minioOperator.MinioInstance {
 	minioName := fmt.Sprintf("%s-minio", mattermost.Name)
 
-	minioInstance := &minioOperator.MinioInstance{}
+	minioInstance := &minioOperator.MinioInstance{
+		Spec: minioOperator.MinioInstanceSpec{
+			Version:     "RELEASE.2018-11-22T02-51-56Z",
+			Replicas:    4,
+			Mountpath:   "/export",
+			CredsSecret: &corev1.LocalObjectReference{Name: minioName},
+			VolumeClaimTemplate: &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: minioName,
+				},
+				Spec: corev1.PersistentVolumeClaimSpec{
+					AccessModes: []corev1.PersistentVolumeAccessMode{
+						"ReadWriteOnce",
+					},
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceStorage: resource.MustParse(mattermost.Spec.MinioStorageSize),
+						},
+					},
+				},
+			},
+		},
+	}
 	minioInstance.SetName(minioName)
 	minioInstance.SetNamespace(mattermost.Namespace)
 
@@ -31,27 +53,6 @@ func MinioInstance(mattermost *mattermostv1alpha1.ClusterInstallation) *minioOpe
 		}),
 	}
 	minioInstance.SetOwnerReferences(ownerRef)
-
-	// Spec Section
-	// Minimum replicas the Minio require. Can add more in pair like 6, 8...
-	minioInstance.Spec.Replicas = 4
-	minioInstance.Spec.CredsSecret = &corev1.LocalObjectReference{Name: minioName}
-	minioVolumentClaimTemplate := &corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: minioName,
-		},
-		Spec: corev1.PersistentVolumeClaimSpec{
-			AccessModes: []corev1.PersistentVolumeAccessMode{
-				"ReadWriteOnce",
-			},
-			Resources: corev1.ResourceRequirements{
-				Requests: corev1.ResourceList{
-					corev1.ResourceStorage: resource.MustParse(mattermost.Spec.MinioStorageSize),
-				},
-			},
-		},
-	}
-	minioInstance.Spec.VolumeClaimTemplate = minioVolumentClaimTemplate
 
 	return minioInstance
 }
