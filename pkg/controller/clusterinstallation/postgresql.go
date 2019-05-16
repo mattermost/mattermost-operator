@@ -1,19 +1,16 @@
 package clusterinstallation
 
 import (
-	"context"
+	"errors"
 
 	"github.com/go-logr/logr"
 
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
 )
 
-func (r *ReconcileClusterInstallation) checkDBPostgresDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
-	dbExist := false
+// TODO: implement postgres
+func (r *ReconcileClusterInstallation) checkPostgres(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
+	// reqLogger := reqLogger.WithValues("Reconcile", "postgres")
 
-	// TODO implement
-	if dbExist {
-		return r.client.Update(context.TODO(), mattermost)
-	}
-	return nil
+	return errors.New("Database type 'postgres' not yet implemented")
 }

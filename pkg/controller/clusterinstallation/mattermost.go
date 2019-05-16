@@ -9,7 +9,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
 )
@@ -25,11 +24,7 @@ func (r *ReconcileClusterInstallation) checkMattermost(mattermost *mattermostv1a
 		return err
 	}
 
-	err = r.checkMattermostDeployment(mattermost, reqLogger)
-	if err != nil {
-		return err
-	}
-	return nil
+	return r.checkMattermostDeployment(mattermost, reqLogger)
 }
 
 func (r *ReconcileClusterInstallation) checkMattermostService(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
@@ -41,20 +36,19 @@ func (r *ReconcileClusterInstallation) checkMattermostIngress(mattermost *matter
 }
 
 func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
-	externalDB := false
-	dbPassword := ""
-	dbUser := ""
+	var externalDB bool
+	var dbUser, dbPassword string
+	var err error
 	if mattermost.Spec.DatabaseType.ExternalDatabaseSecret != "" {
-		err := r.checkSecret(mattermost.Spec.DatabaseType.ExternalDatabaseSecret, mattermost.Namespace)
+		err = r.checkSecret(mattermost.Spec.DatabaseType.ExternalDatabaseSecret, mattermost.Namespace)
 		if err != nil {
 			return errors.Wrap(err, "Error getting the external database secret.")
 		}
 		externalDB = true
 	} else {
-		var err error
-		dbPassword, err = r.getMySQLSecrets(mattermost, reqLogger)
+		dbPassword, err = r.getMySQLSecrets(mattermost)
 		if err != nil {
-			return errors.Wrap(err, "Error getting the database password.")
+			return errors.Wrap(err, "Error getting mysql database password.")
 		}
 		dbUser = "root"
 	}
@@ -65,8 +59,6 @@ func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mat
 	}
 
 	deployment := mattermost.GenerateDeployment(dbUser, dbPassword, externalDB, minioService)
-	// TODO: Figure out why it's common to ignore errors here
-	_ = controllerutil.SetControllerReference(mattermost, deployment, r.scheme)
 	err = r.createDeploymentIfNotExists(mattermost, deployment, reqLogger)
 	if err != nil {
 		return err
@@ -105,7 +97,7 @@ func (r *ReconcileClusterInstallation) updateMattermostDeployment(mi *mattermost
 	// needs to be updated.
 	for pos, container := range d.Spec.Template.Spec.Containers {
 		if container.Name == mi.Name {
-			image := fmt.Sprintf("%s:%s", mi.Spec.Image, mi.Spec.Version)
+			image := mi.GetImageName()
 			if container.Image != image {
 				container.Image = image
 				d.Spec.Template.Spec.Containers[pos] = container

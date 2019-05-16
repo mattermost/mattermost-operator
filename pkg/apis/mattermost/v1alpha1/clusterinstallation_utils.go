@@ -130,14 +130,12 @@ func (mattermost *ClusterInstallation) GenerateIngress() *v1beta1.Ingress {
 
 // GenerateDeployment returns the deployment spec for Mattermost
 func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword string, externalDB bool, minioService string) *appsv1.Deployment {
-	mattermostImage := fmt.Sprintf("%s:%s", mattermost.Spec.Image, mattermost.Spec.Version)
-	// DB Section
-	initCheckDB := corev1.Container{}
-	initDB := corev1.Container{}
+	// Generate database config
 	envVarDB := corev1.EnvVar{
 		Name: "MM_CONFIG",
 	}
 
+	var initContainers []corev1.Container
 	if externalDB {
 		envVarDB.ValueFrom = &corev1.EnvVarSource{
 			SecretKeyRef: &corev1.SecretKeySelector{
@@ -148,29 +146,34 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 			},
 		}
 	} else {
-		datasourceMM := fmt.Sprintf("mysql://%s:%s@tcp(%s-mysql.%s:3306)/mattermost?charset=utf8mb4,utf8&readTimeout=30s&writeTimeout=30s", dbUser, dbPassword, mattermost.Name, mattermost.Namespace)
-		envVarDB.Value = datasourceMM
+		envVarDB.Value = fmt.Sprintf(
+			"mysql://%s:%s@tcp(%s-mysql.%s:3306)/mattermost?charset=utf8mb4,utf8&readTimeout=30s&writeTimeout=30s",
+			dbUser, dbPassword, mattermost.Name, mattermost.Namespace,
+		)
 
 		// Create the init container to check that the DB is up and running
-		initContainerCMD := fmt.Sprintf("until curl --max-time 5 http://%s-mysql.%s:3306; do echo waiting for mysql; sleep 5; done;", mattermost.Name, mattermost.Namespace)
-		cmdInit := []string{"sh", "-c"}
-		cmdInit = append(cmdInit, initContainerCMD)
-		initCheckDB.Image = "appropriate/curl:latest"
-		initCheckDB.Name = "init-mysql"
-		initCheckDB.Command = cmdInit
+		initContainers = append(initContainers, corev1.Container{
+			Name:  "init-check-mysql",
+			Image: "appropriate/curl:latest",
+			Command: []string{
+				"sh", "-c",
+				fmt.Sprintf("until curl --max-time 5 http://%s-mysql.%s:3306; do echo waiting for mysql; sleep 5; done;", mattermost.Name, mattermost.Namespace),
+			},
+		})
 
 		// Create the init container to create the database.
-		// Mysql Operator does not create by default
-		cmdInitDB := []string{"sh", "-c"}
-		cmdInitDB = append(cmdInitDB, fmt.Sprintf("mysql -h %s-mysql.%s -u %s -p%s -e 'CREATE DATABASE IF NOT EXISTS mattermost'", mattermost.Name, mattermost.Namespace, dbUser, dbPassword))
-		initDB.Image = "mysql:8.0.11"
-		initDB.Name = "init-mysql-database"
-		initDB.Command = cmdInitDB
+		// Mysql Operator does not create it by default
+		initContainers = append(initContainers, corev1.Container{
+			Name:  "init-create-mysql",
+			Image: "mysql:8.0.12",
+			Command: []string{
+				"sh", "-c",
+				fmt.Sprintf("mysql -h %s-mysql.%s -u %s -p%s -e 'CREATE DATABASE IF NOT EXISTS mattermost'", mattermost.Name, mattermost.Namespace, dbUser, dbPassword),
+			},
+		})
 	}
 
-	cmdStartMM := []string{"mattermost"}
-
-	// Minio Section vars
+	// Generate Minio config
 	minioName := fmt.Sprintf("%s-minio", mattermost.Name)
 	envVarMinio := []corev1.EnvVar{
 		{
@@ -213,8 +216,7 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 		},
 	}
 
-	envVars := []corev1.EnvVar{}
-	envVars = append(envVars, envVarDB)
+	envVars := []corev1.EnvVar{envVarDB}
 	envVars = append(envVars, envVarMinio...)
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -238,15 +240,12 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 					Labels: LabelsForClusterInstallation(mattermost.Name),
 				},
 				Spec: corev1.PodSpec{
-					InitContainers: []corev1.Container{
-						initCheckDB,
-						initDB,
-					},
+					InitContainers: initContainers,
 					Containers: []corev1.Container{
 						{
-							Image:   mattermostImage,
+							Image:   mattermost.GetImageName(),
 							Name:    mattermost.Name,
-							Command: cmdStartMM,
+							Command: []string{"mattermost"},
 							Env:     envVars,
 							Ports: []corev1.ContainerPort{
 								{
@@ -279,6 +278,12 @@ func (mattermost *ClusterInstallation) GenerateSecret(secretName string, values 
 		},
 		Data: values,
 	}
+}
+
+// GetImageName returns the container image name that matches the spec of the
+// ClusterInstallation.
+func (mattermost *ClusterInstallation) GetImageName() string {
+	return fmt.Sprintf("%s:%s", mattermost.Spec.Image, mattermost.Spec.Version)
 }
 
 // LabelsForClusterInstallation returns the labels for selecting the resources

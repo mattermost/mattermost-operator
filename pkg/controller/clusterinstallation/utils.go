@@ -41,8 +41,7 @@ func (r *ReconcileClusterInstallation) checkClusterInstallation(mattermost *matt
 		if len(pod.Spec.Containers) == 0 {
 			return nil, fmt.Errorf("mattermost pod %q has no containers", pod.Name)
 		}
-		expectedImage := fmt.Sprintf("%s:%s", mattermost.Spec.Image, mattermost.Spec.Version)
-		if pod.Spec.Containers[0].Image != expectedImage {
+		if pod.Spec.Containers[0].Image != mattermost.GetImageName() {
 			return nil, fmt.Errorf("mattermost pod %q is running incorrect version", pod.Name)
 		}
 	}
