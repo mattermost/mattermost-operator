@@ -80,6 +80,9 @@ spec:
             Not included when requesting from the apiserver, only from the Mattermost
             Operator API itself. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status'
           properties:
+            image:
+              description: The image running on the pods in the Mattermost instance
+              type: string
             replicas:
               description: Total number of non-terminated pods targeted by this Mattermost
                 deployment (their labels match the selector).

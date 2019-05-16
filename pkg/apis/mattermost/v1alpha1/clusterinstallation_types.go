@@ -51,13 +51,16 @@ type DatabaseType struct {
 // RunningState is the state of the Mattermost instance
 type RunningState string
 
+// Running States:
+// Two types of instance running states are implemented: reconciling and stable.
+// If any changes are being made on the mattermost instance, the state will be
+// set to reconciling. If the reconcile loop reaches the end without requeuing
+// then the state will be set to stable.
 const (
-	// Creating is the state when the Mattermost instance is being created
-	Creating RunningState = "creating"
-	// Upgrading is the state when the Mattermost instance is being upgraded
-	Upgrading RunningState = "upgrading"
-	// Running is the state when the Mattermost instance is fully running
-	Running RunningState = "running"
+	// Reconciling is the state when the Mattermost instance is being updated
+	Reconciling RunningState = "reconciling"
+	// Stable is the state when the Mattermost instance is fully running
+	Stable RunningState = "stable"
 )
 
 // ClusterInstallationStatus defines the observed state of ClusterInstallation
@@ -72,6 +75,9 @@ type ClusterInstallationStatus struct {
 	// The version currently running in the Mattermost instance
 	// +optional
 	Version string `json:"version,omitempty"`
+	// The image running on the pods in the Mattermost instance
+	// +optional
+	Image string `json:"image,omitempty"`
 }
 
 // +genclient

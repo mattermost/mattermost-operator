@@ -231,11 +231,11 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &mattermost.Spec.Replicas,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{ClusterLabel: mattermost.Name},
+				MatchLabels: LabelsForClusterInstallation(mattermost.Name),
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{ClusterLabel: mattermost.Name},
+					Labels: LabelsForClusterInstallation(mattermost.Name),
 				},
 				Spec: corev1.PodSpec{
 					InitContainers: []corev1.Container{
@@ -279,4 +279,10 @@ func (mattermost *ClusterInstallation) GenerateSecret(secretName string, values 
 		},
 		Data: values,
 	}
+}
+
+// LabelsForClusterInstallation returns the labels for selecting the resources
+// belonging to the given mattermost clusterinstallation name.
+func LabelsForClusterInstallation(name string) map[string]string {
+	return map[string]string{"app": "mattermost", ClusterLabel: name}
 }
