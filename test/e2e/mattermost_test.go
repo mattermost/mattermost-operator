@@ -58,7 +58,7 @@ func mattermostScaleTest(t *testing.T, f *framework.Framework, ctx *framework.Te
 	namespace, err := ctx.GetNamespace()
 	assert.Nil(t, err)
 
-	// create memcached custom resource
+	// create ClusterInstallation custom resource
 	exampleMattermost := &operator.ClusterInstallation{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ClusterInstallation",
@@ -105,7 +105,7 @@ func mattermostUpgradeTest(t *testing.T, f *framework.Framework, ctx *framework.
 	namespace, err := ctx.GetNamespace()
 	assert.Nil(t, err)
 
-	// create memcached custom resource
+	// create ClusterInstallation custom resource
 	exampleMattermost := &operator.ClusterInstallation{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ClusterInstallation",
@@ -159,8 +159,6 @@ func mattermostUpgradeTest(t *testing.T, f *framework.Framework, ctx *framework.
 	// wait for deployment be completed
 	err = e2eutil.WaitForDeployment(t, f.KubeClient, namespace, "test-mm2", 1, retryInterval, timeout)
 	assert.Nil(t, err)
-
-	time.Sleep(time.Second * 5)
 
 	err = waitForReconcilicationComplete(t, f.Client.Client, namespace, "test-mm2", retryInterval, timeout)
 	assert.Nil(t, err)

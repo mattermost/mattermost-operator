@@ -17,7 +17,7 @@ func waitForReconcilicationComplete(t *testing.T, dynclient client.Client, names
 	err := wait.Poll(retryInterval, timeout, func() (done bool, err error) {
 		errClient := dynclient.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, newMattermost)
 		if errClient != nil {
-			return false, err
+			return false, errClient
 		}
 
 		if newMattermost.Status.State == "stable" {
@@ -31,5 +31,4 @@ func waitForReconcilicationComplete(t *testing.T, dynclient client.Client, names
 	}
 	t.Logf("Reconcilication completed (%s)\n", newMattermost.Status.State)
 	return nil
-
 }
