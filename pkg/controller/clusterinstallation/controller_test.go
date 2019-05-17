@@ -48,6 +48,7 @@ func TestReconcile(t *testing.T) {
 		},
 	}
 
+<<<<<<< HEAD
 	// Register operator types with the runtime scheme.
 	apis.AddToScheme(scheme.Scheme)
 	s := scheme.Scheme
@@ -63,6 +64,19 @@ func TestReconcile(t *testing.T) {
 
 	// Create the resources that would normally be created by other operators
 	// running on the kubernetes cluster.
+=======
+	// Setup the Manager and Controller.  Wrap the Controller Reconcile function so it writes each request to a
+	// channel when it is finished.
+	mgr, err := manager.New(cfg, manager.Options{})
+	g.Expect(err).NotTo(gomega.HaveOccurred())
+	c = mgr.GetClient()
+
+	recFn, requests := SetupTestReconcile(newReconciler(mgr))
+	g.Expect(add(mgr, recFn)).NotTo(gomega.HaveOccurred())
+	defer close(StartTestManager(mgr, g))
+
+	// Create the mysql secret
+>>>>>>> 5bc1d64... fix the order
 	dbSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      ci.Name + "-mysql-root-password",
