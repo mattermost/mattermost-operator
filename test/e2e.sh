@@ -94,9 +94,14 @@ main() {
     # Copy the image to the cluster to make a bit more fast to start
     docker pull iad.ocir.io/oracle/mysql-operator:0.3.0
     docker pull minio/k8s-operator:latest
+    docker pull mattermost/mattermost-enterprise-edition:5.10.0
+    docker pull mattermost/mattermost-enterprise-edition:5.11.0
+
     kind load docker-image iad.ocir.io/oracle/mysql-operator:0.3.0
     kind load docker-image mattermost/mattermost-operator:test
     kind load docker-image minio/k8s-operator:latest
+    kind load docker-image mattermost/mattermost-enterprise-edition:5.11.0
+    kind load docker-image mattermost/mattermost-enterprise-edition:5.10.0
 
     # Create a namespace for testing operator.
     # This is needed because the service account created using
