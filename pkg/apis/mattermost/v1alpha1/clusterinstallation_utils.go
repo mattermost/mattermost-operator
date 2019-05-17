@@ -216,8 +216,36 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 		},
 	}
 
+	// ES section vars
+	envVarES := []corev1.EnvVar{}
+	if mattermost.Spec.ElasticSearch.Host != "" {
+		envVarES = []corev1.EnvVar{
+			{
+				Name:  "MM_ELASTICSEARCHSETTINGS_ENABLEINDEXING",
+				Value: "true",
+			},
+			{
+				Name:  "MM_ELASTICSEARCHSETTINGS_ENABLESEARCHING",
+				Value: "true",
+			},
+			{
+				Name:  "MM_ELASTICSEARCHSETTINGS_CONNECTIONURL",
+				Value: mattermost.Spec.ElasticSearch.Host,
+			},
+			{
+				Name:  "MM_ELASTICSEARCHSETTINGS_USERNAME",
+				Value: mattermost.Spec.ElasticSearch.UserName,
+			},
+			{
+				Name:  "MM_ELASTICSEARCHSETTINGS_PASSWORD",
+				Value: mattermost.Spec.ElasticSearch.Password,
+			},
+		}
+	}
+
 	envVars := []corev1.EnvVar{envVarDB}
 	envVars = append(envVars, envVarMinio...)
+	envVars = append(envVars, envVarES...)
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      mattermost.Name,
