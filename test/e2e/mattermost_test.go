@@ -13,6 +13,7 @@ import (
 
 	framework "github.com/operator-framework/operator-sdk/pkg/test"
 	"github.com/operator-framework/operator-sdk/pkg/test/e2eutil"
+	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -93,6 +94,61 @@ func mattermostScaleTest(t *testing.T, f *framework.Framework, ctx *framework.Te
 	return nil
 }
 
+func mattermostUpgradeTest(t *testing.T, f *framework.Framework, ctx *framework.TestCtx) error {
+	namespace, err := ctx.GetNamespace()
+	assert.Nil(t, err)
+
+	// create memcached custom resource
+	exampleMattermost := &operator.ClusterInstallation{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ClusterInstallation",
+			APIVersion: "mattermost.com/v1alpha1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-mm",
+			Namespace: namespace,
+		},
+		Spec: operator.ClusterInstallationSpec{
+			Image:            "mattermost/mattermost-enterprise-edition",
+			Version:          "5.10.0",
+			IngressName:      "test-example.mattermost.dev",
+			Replicas:         1,
+			MinioStorageSize: "1Gi",
+		},
+	}
+
+	// use TestCtx's create helper to create the object and add a cleanup function for the new object
+	err = f.Client.Create(goctx.TODO(), exampleMattermost, &framework.CleanupOptions{TestContext: ctx, Timeout: cleanupTimeout, RetryInterval: cleanupRetryInterval})
+	assert.Nil(t, err)
+
+	// wait for test-mm to reach 1 replicas
+	err = e2eutil.WaitForDeployment(t, f.KubeClient, namespace, "test-mm", 1, retryInterval, timeout)
+	assert.Nil(t, err)
+
+	err = f.Client.Get(goctx.TODO(), types.NamespacedName{Name: "test-mm", Namespace: namespace}, exampleMattermost)
+	assert.Nil(t, err)
+
+	exampleMattermost.Spec.Version = "5.11.0"
+	err = f.Client.Update(goctx.TODO(), exampleMattermost)
+	assert.Nil(t, err)
+
+	err = e2eutil.WaitForDeployment(t, f.KubeClient, namespace, "test-mm", 1, retryInterval, timeout)
+	assert.Nil(t, err)
+
+	newMattermost := &operator.ClusterInstallation{}
+	err = f.Client.Get(goctx.TODO(), types.NamespacedName{Name: "test-mm", Namespace: namespace}, newMattermost)
+	assert.Nil(t, err)
+	assert.Equal(t, "mattermost/mattermost-enterprise-edition", newMattermost.Status.Image)
+	assert.Equal(t, "5.11.0", newMattermost.Status.Version)
+
+	mmDeployment := &appsv1.Deployment{}
+	err = f.Client.Get(goctx.TODO(), types.NamespacedName{Name: "test-mm", Namespace: namespace}, mmDeployment)
+	assert.Nil(t, err)
+	assert.Equal(t, "mattermost/mattermost-enterprise-edition:5.11.0", mmDeployment.Spec.Template.Spec.Containers[0].Image)
+
+	return err
+}
+
 func MattermostCluster(t *testing.T) {
 	ctx := framework.NewTestCtx(t)
 	defer ctx.Cleanup()
@@ -120,5 +176,8 @@ func MattermostCluster(t *testing.T) {
 	assert.Nil(t, err)
 
 	err = mattermostScaleTest(t, f, ctx)
+	assert.Nil(t, err)
+
+	err = mattermostUpgradeTest(t, f, ctx)
 	assert.Nil(t, err)
 }
