@@ -120,10 +120,20 @@ func mattermostScaleTest(t *testing.T, f *framework.Framework, ctx *framework.Te
 
 	// wait for test-mm to reach 2 replicas
 	err = e2eutil.WaitForDeployment(t, f.KubeClient, namespace, "test-mm", 2, retryInterval, timeout)
-	require.NoError(t, err)
+	assert.Nil(t, err)
 
-	err = f.Client.Delete(context.TODO(), exampleMattermost)
-	require.NoError(t, err)
+	err = waitForReconcilicationComplete(t, f.Client.Client, namespace, "test-mm", retryInterval, timeout)
+	assert.Nil(t, err)
+
+	// scale down again
+	exampleMattermost.Spec.Replicas = 1
+	err = f.Client.Update(goctx.TODO(), exampleMattermost)
+	assert.Nil(t, err)
+
+	err = f.Client.Delete(goctx.TODO(), exampleMattermost)
+	assert.Nil(t, err)
+
+	return err
 }
 
 func mattermostUpgradeTest(t *testing.T, f *framework.Framework, ctx *framework.TestCtx) {
