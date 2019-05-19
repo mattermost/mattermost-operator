@@ -126,6 +126,9 @@ func mattermostScaleTest(t *testing.T, f *framework.Framework, ctx *framework.Te
 	assert.Nil(t, err)
 
 	// scale down again
+	err = f.Client.Get(goctx.TODO(), types.NamespacedName{Name: "test-mm", Namespace: namespace}, exampleMattermost)
+	assert.Nil(t, err)
+
 	exampleMattermost.Spec.Replicas = 1
 	err = f.Client.Update(goctx.TODO(), exampleMattermost)
 	assert.Nil(t, err)
