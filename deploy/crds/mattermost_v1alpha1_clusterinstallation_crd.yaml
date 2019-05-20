@@ -3,6 +3,19 @@ kind: CustomResourceDefinition
 metadata:
   name: clusterinstallations.mattermost.com
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .status.state
+    description: State of Mattermost
+    name: State
+    type: string
+  - JSONPath: .status.image
+    description: Image of Mattermost
+    name: Image
+    type: string
+  - JSONPath: .status.version
+    description: Version of Mattermost
+    name: Version
+    type: string
   group: mattermost.com
   names:
     kind: ClusterInstallation
