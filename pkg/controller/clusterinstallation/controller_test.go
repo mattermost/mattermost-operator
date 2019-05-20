@@ -131,14 +131,13 @@ func TestReconcile(t *testing.T) {
 	defer c.Delete(context.TODO(), MinioSecret)
 
 	// Create the minio service
-	minioPort := corev1.ServicePort{Port: 9000}
 	minioService := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      instance.Name + "-minio",
 			Namespace: instance.Namespace,
 		},
 		Spec: corev1.ServiceSpec{
-			Ports:     []corev1.ServicePort{minioPort},
+			Ports:     []corev1.ServicePort{{Port: 9000}},
 			ClusterIP: corev1.ClusterIPNone,
 		},
 	}
@@ -149,14 +148,14 @@ func TestReconcile(t *testing.T) {
 	}
 	defer c.Delete(context.TODO(), minioService)
 
-	deploy := &appsv1.Deployment{}
-	g.Eventually(func() error { return c.Get(context.TODO(), depKey, deploy) }, timeout).
+	deployment := &appsv1.Deployment{}
+	g.Eventually(func() error { return c.Get(context.TODO(), depKey, deployment) }, timeout).
 		Should(gomega.Succeed())
 
 	// Delete the Deployment and expect Reconcile to be called for Deployment deletion
-	g.Expect(c.Delete(context.TODO(), deploy)).NotTo(gomega.HaveOccurred())
+	g.Expect(c.Delete(context.TODO(), deployment)).NotTo(gomega.HaveOccurred())
 	g.Eventually(requests, timeout).Should(gomega.Receive(gomega.Equal(expectedRequest)))
-	g.Eventually(func() error { return c.Get(context.TODO(), depKey, deploy) }, timeout).
+	g.Eventually(func() error { return c.Get(context.TODO(), depKey, deployment) }, timeout).
 		Should(gomega.Succeed())
 
 	g.Expect(c.Delete(context.TODO(), ingress)).NotTo(gomega.HaveOccurred())
@@ -168,5 +167,4 @@ func TestReconcile(t *testing.T) {
 	g.Eventually(requests, timeout).Should(gomega.Receive(gomega.Equal(expectedRequest)))
 	g.Eventually(func() error { return c.Get(context.TODO(), depKey, service) }, timeout).
 		Should(gomega.Succeed())
-
 }

@@ -64,5 +64,9 @@ func MinioSecret(mattermost *mattermostv1alpha1.ClusterInstallation) *corev1.Sec
 	data["accesskey"] = utils.New16ID()
 	data["secretkey"] = utils.New28ID()
 
-	return mattermost.GenerateSecret(secretName, data)
+	return mattermost.GenerateSecret(
+		secretName,
+		mattermostv1alpha1.ClusterInstallationResourceLabels(mattermost.Name),
+		data,
+	)
 }
