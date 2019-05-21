@@ -29,6 +29,9 @@ const (
 
 	// ClusterLabel is the label applied across all compoments
 	ClusterLabel = "v1alpha1.mattermost.com/installation"
+	// ClusterResourceLabel is the label applied to a given ClusterInstallation
+	// as well as all other resources created to support it.
+	ClusterResourceLabel = "v1alpha1.mattermost.com/resource"
 )
 
 // SetDefaults set the missing values in the manifest to the default ones
@@ -57,10 +60,9 @@ func (mattermost *ClusterInstallation) SetDefaults() error {
 
 // GenerateService returns the service for Mattermost
 func (mattermost *ClusterInstallation) GenerateService() *corev1.Service {
-	mattermostPort := corev1.ServicePort{Port: 8065}
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:    map[string]string{ClusterLabel: mattermost.Name},
+			Labels:    ClusterInstallationLabels(mattermost.Name),
 			Name:      mattermost.Name,
 			Namespace: mattermost.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
@@ -75,10 +77,8 @@ func (mattermost *ClusterInstallation) GenerateService() *corev1.Service {
 			},
 		},
 		Spec: corev1.ServiceSpec{
-			Ports: []corev1.ServicePort{mattermostPort},
-			Selector: map[string]string{
-				ClusterLabel: mattermost.Name,
-			},
+			Ports:     []corev1.ServicePort{{Port: 8065}},
+			Selector:  ClusterInstallationLabels(mattermost.Name),
 			ClusterIP: corev1.ClusterIPNone,
 		},
 	}
@@ -86,32 +86,11 @@ func (mattermost *ClusterInstallation) GenerateService() *corev1.Service {
 
 // GenerateIngress returns the ingress for Mattermost
 func (mattermost *ClusterInstallation) GenerateIngress() *v1beta1.Ingress {
-	ingressName := mattermost.Name + "-ingress"
-	spec := v1beta1.IngressSpec{}
-
-	backend := v1beta1.IngressBackend{
-		ServiceName: mattermost.Name,
-		ServicePort: intstr.FromInt(8065),
-	}
-	rules := v1beta1.IngressRule{
-		Host: mattermost.Spec.IngressName,
-		IngressRuleValue: v1beta1.IngressRuleValue{
-			HTTP: &v1beta1.HTTPIngressRuleValue{
-				Paths: []v1beta1.HTTPIngressPath{
-					{
-						Path:    "/",
-						Backend: backend,
-					},
-				},
-			},
-		},
-	}
-	spec.Rules = append(spec.Rules, rules)
-
 	return &v1beta1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      ingressName,
+			Name:      fmt.Sprintf("%s-ingress", mattermost.Name),
 			Namespace: mattermost.Namespace,
+			Labels:    ClusterInstallationLabels(mattermost.Name),
 			OwnerReferences: []metav1.OwnerReference{
 				*metav1.NewControllerRef(mattermost, schema.GroupVersionKind{
 					Group:   SchemeGroupVersion.Group,
@@ -124,7 +103,26 @@ func (mattermost *ClusterInstallation) GenerateIngress() *v1beta1.Ingress {
 				//"kubernetes.io/tls-acme":      "true",
 			},
 		},
-		Spec: spec,
+		Spec: v1beta1.IngressSpec{
+			Rules: []v1beta1.IngressRule{
+				{
+					Host: mattermost.Spec.IngressName,
+					IngressRuleValue: v1beta1.IngressRuleValue{
+						HTTP: &v1beta1.HTTPIngressRuleValue{
+							Paths: []v1beta1.HTTPIngressPath{
+								{
+									Path: "/",
+									Backend: v1beta1.IngressBackend{
+										ServiceName: mattermost.Name,
+										ServicePort: intstr.FromInt(8065),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -222,6 +220,7 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      mattermost.Name,
 			Namespace: mattermost.Namespace,
+			Labels:    ClusterInstallationLabels(mattermost.Name),
 			OwnerReferences: []metav1.OwnerReference{
 				*metav1.NewControllerRef(mattermost, schema.GroupVersionKind{
 					Group:   SchemeGroupVersion.Group,
@@ -233,11 +232,11 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &mattermost.Spec.Replicas,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: LabelsForClusterInstallation(mattermost.Name),
+				MatchLabels: ClusterInstallationLabels(mattermost.Name),
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: LabelsForClusterInstallation(mattermost.Name),
+					Labels: ClusterInstallationLabels(mattermost.Name),
 				},
 				Spec: corev1.PodSpec{
 					InitContainers: initContainers,
@@ -262,10 +261,10 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 }
 
 // GenerateSecret returns the service for Mattermost
-func (mattermost *ClusterInstallation) GenerateSecret(secretName string, values map[string][]byte) *corev1.Secret {
+func (mattermost *ClusterInstallation) GenerateSecret(secretName string, labels map[string]string, values map[string][]byte) *corev1.Secret {
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:    map[string]string{ClusterLabel: mattermost.Name},
+			Labels:    labels,
 			Name:      secretName,
 			Namespace: mattermost.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
@@ -286,8 +285,19 @@ func (mattermost *ClusterInstallation) GetImageName() string {
 	return fmt.Sprintf("%s:%s", mattermost.Spec.Image, mattermost.Spec.Version)
 }
 
-// LabelsForClusterInstallation returns the labels for selecting the resources
-// belonging to the given mattermost clusterinstallation name.
-func LabelsForClusterInstallation(name string) map[string]string {
-	return map[string]string{"app": "mattermost", ClusterLabel: name}
+// ClusterInstallationLabels returns the labels for selecting the resources
+// belonging to the given mattermost clusterinstallation.
+func ClusterInstallationLabels(name string) map[string]string {
+	l := ClusterInstallationResourceLabels(name)
+	l[ClusterLabel] = name
+	l["app"] = "mattermost"
+
+	return l
+}
+
+// ClusterInstallationResourceLabels returns the labels for selecting a given
+// ClusterInstallation as well as any external dependency resources that were
+// created for the installation.
+func ClusterInstallationResourceLabels(name string) map[string]string {
+	return map[string]string{ClusterResourceLabel: name}
 }

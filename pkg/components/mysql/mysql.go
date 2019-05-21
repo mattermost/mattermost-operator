@@ -18,13 +18,12 @@ const (
 	MySQLServiceAccountName = "mysql-agent"
 )
 
-// Cluster returns the MySQL component to deploy
+// Cluster returns the MySQL cluster to deploy
 func Cluster(mattermost *mattermostv1alpha1.ClusterInstallation) *mysqlOperator.Cluster {
-	mySQLName := fmt.Sprintf("%s-mysql", mattermost.Name)
-
 	mySQLCluster := &mysqlOperator.Cluster{}
-	mySQLCluster.SetName(mySQLName)
+	mySQLCluster.SetName(fmt.Sprintf("%s-mysql", mattermost.Name))
 	mySQLCluster.SetNamespace(mattermost.Namespace)
+	mySQLCluster.Labels = mattermostv1alpha1.ClusterInstallationResourceLabels(mattermost.Name)
 	mySQLCluster.Spec.Members = 1
 	mySQLCluster.ObjectMeta.OwnerReferences = []metav1.OwnerReference{
 		*metav1.NewControllerRef(mattermost, schema.GroupVersionKind{
@@ -41,7 +40,7 @@ func Cluster(mattermost *mattermostv1alpha1.ClusterInstallation) *mysqlOperator.
 func ServiceAccount(mattermost *mattermostv1alpha1.ClusterInstallation) *corev1.ServiceAccount {
 	return &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:    map[string]string{mattermostv1alpha1.ClusterLabel: mattermost.Name},
+			Labels:    mattermostv1alpha1.ClusterInstallationResourceLabels(mattermost.Name),
 			Name:      MySQLServiceAccountName,
 			Namespace: mattermost.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
@@ -59,7 +58,7 @@ func ServiceAccount(mattermost *mattermostv1alpha1.ClusterInstallation) *corev1.
 func RoleBinding(mattermost *mattermostv1alpha1.ClusterInstallation) *rbacv1beta1.RoleBinding {
 	return &rbacv1beta1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:    map[string]string{mattermostv1alpha1.ClusterLabel: mattermost.Name},
+			Labels:    mattermostv1alpha1.ClusterInstallationResourceLabels(mattermost.Name),
 			Name:      MySQLServiceAccountName,
 			Namespace: mattermost.Namespace,
 			OwnerReferences: []metav1.OwnerReference{

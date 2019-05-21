@@ -12,7 +12,7 @@ import (
 )
 
 func (r *ReconcileClusterInstallation) checkMattermostSecret(secretName string, values map[string][]byte, mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
-	return r.createSecretIfNotExists(mattermost, mattermost.GenerateSecret(secretName, values), reqLogger)
+	return r.createSecretIfNotExists(mattermost, mattermost.GenerateSecret(secretName, mattermostv1alpha1.ClusterInstallationLabels(mattermost.Name), values), reqLogger)
 }
 
 func (r *ReconcileClusterInstallation) checkSecret(secretName, namespace string) error {
