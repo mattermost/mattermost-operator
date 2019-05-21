@@ -85,6 +85,11 @@ type ClusterInstallationStatus struct {
 
 // ClusterInstallation is the Schema for the clusterinstallations API
 // +k8s:openapi-gen=true
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:priority=0,name="State",type=string,JSONPath=".status.state",description="State of Mattermost"
+// +kubebuilder:printcolumn:priority=0,name="Image",type=string,JSONPath=".status.image",description="Image of Mattermost"
+// +kubebuilder:printcolumn:priority=0,name="Version",type=string,JSONPath=".status.version",description="Version of Mattermost"
 type ClusterInstallation struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object’s metadata. More info:

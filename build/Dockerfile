@@ -1,5 +1,5 @@
 # Build the mattermost operator
-ARG BUILD_IMAGE=golang:1.12.1
+ARG BUILD_IMAGE=golang:1.12
 ARG BASE_IMAGE=alpine:3.9
 
 FROM ${BUILD_IMAGE} AS build
