@@ -40,15 +40,7 @@ jobs:
       - run: |
           go get golang.org/x/tools/cmd/cover
           go get github.com/mattn/goveralls
-      - run:
-          name: kubebuilder
-          command: |
-            version=1.0.8
-            curl -L -O https://github.com/kubernetes-sigs/kubebuilder/releases/download/v${version}/kubebuilder_${version}_linux_amd64.tar.gz
-            tar -zxvf kubebuilder_${version}_linux_amd64.tar.gz
-            sudo mv kubebuilder_${version}_linux_amd64 /usr/local/kubebuilder
       - run: |
-          export PATH=$PATH:/usr/local/kubebuilder/bin
           make unittest
       - run:
           name: coveralls

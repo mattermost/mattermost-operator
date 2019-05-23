@@ -1,140 +1,97 @@
 package clusterinstallation
 
 import (
+	"fmt"
 	"testing"
-	"time"
 
-	minioOperator "github.com/minio/minio-operator/pkg/apis/miniocontroller/v1beta1"
-	"github.com/onsi/gomega"
-	mysqlOperator "github.com/oracle/mysql-operator/pkg/apis/mysql/v1alpha1"
+	"github.com/mattermost/mattermost-operator/pkg/apis"
+	logmo "github.com/mattermost/mattermost-operator/pkg/log"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	v1beta1 "k8s.io/api/extensions/v1beta1"
-	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
+	minioOperator "github.com/minio/minio-operator/pkg/apis/miniocontroller/v1beta1"
+	mysqlOperator "github.com/oracle/mysql-operator/pkg/apis/mysql/v1alpha1"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	v1beta1 "k8s.io/api/extensions/v1beta1"
+	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var c client.Client
-
-var expectedRequest = reconcile.Request{NamespacedName: types.NamespacedName{Name: "foo", Namespace: "default"}}
-var depKey = types.NamespacedName{Name: "foo", Namespace: "default"}
-var depIngressKey = types.NamespacedName{Name: "foo-ingress", Namespace: "default"}
-var depMysqlKey = types.NamespacedName{Name: "foo-mysql", Namespace: "default"}
-var depMinioKey = types.NamespacedName{Name: "foo-minio", Namespace: "default"}
-var depSvcAccountKey = types.NamespacedName{Name: "mysql-agent", Namespace: "default"}
-
-const timeout = time.Second * 60
-
 func TestReconcile(t *testing.T) {
-	g := gomega.NewGomegaWithT(t)
+	// Setup logging for the reconciler so we can see what happened on failure.
+	logger := logmo.InitLogger()
+	logger = logger.WithName("test.opr")
+	logf.SetLogger(logger)
 
-	instance := &mattermostv1alpha1.ClusterInstallation{
+	ciName := "foo"
+	ciNamespace := "default"
+	replicas := int32(4)
+	ci := &mattermostv1alpha1.ClusterInstallation{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "foo",
-			Namespace: "default",
+			Name:      ciName,
+			Namespace: ciNamespace,
 		},
 		Spec: mattermostv1alpha1.ClusterInstallationSpec{
+			Replicas:    replicas,
+			Image:       "mattermost/mattermost-enterprise-edition",
+			Version:     "5.11.0",
 			IngressName: "foo.mattermost.dev",
 		},
 	}
 
-	// Setup the Manager and Controller.  Wrap the Controller Reconcile function so it writes each request to a
-	// channel when it is finished.
-	mgr, err := manager.New(cfg, manager.Options{})
-	g.Expect(err).NotTo(gomega.HaveOccurred())
-	c = mgr.GetClient()
+	// Register operator types with the runtime scheme.
+	apis.AddToScheme(scheme.Scheme)
+	s := scheme.Scheme
+	s.AddKnownTypes(mattermostv1alpha1.SchemeGroupVersion, ci)
+	// Create a fake client to mock API calls.
+	c := fake.NewFakeClient()
+	// Create a ReconcileClusterInstallation object with the scheme and fake
+	// client.
+	r := &ReconcileClusterInstallation{client: c, scheme: s}
 
-	recFn, requests := SetupTestReconcile(newReconciler(mgr))
-	g.Expect(add(mgr, recFn)).NotTo(gomega.HaveOccurred())
-	defer close(StartTestManager(mgr, g))
+	err := c.Create(context.TODO(), ci)
+	require.NoError(t, err)
 
-	// Create the ClusterInstallation object and expect the Reconcile and Deployment to be created
-	err = c.Create(context.TODO(), instance)
-	// The instance object may not be a valid object because it might be missing some required fields.
-	// Please modify the instance object by adding required fields and then remove the following if statement.
-	if apierrors.IsInvalid(err) {
-		t.Logf("failed to create object, got an invalid object error: %v", err)
-		return
-	}
-	g.Expect(err).NotTo(gomega.HaveOccurred())
-	defer c.Delete(context.TODO(), instance)
-	g.Eventually(requests, timeout).Should(gomega.Receive(gomega.Equal(expectedRequest)))
-
-	// Mysql test section
-	mysql := &mysqlOperator.Cluster{}
-	g.Eventually(func() error { return c.Get(context.TODO(), depMysqlKey, mysql) }, timeout).
-		Should(gomega.Succeed())
-
-	svcAccount := &corev1.ServiceAccount{}
-	g.Eventually(func() error { return c.Get(context.TODO(), depSvcAccountKey, svcAccount) }, timeout).
-		Should(gomega.Succeed())
-
-	roleBinding := &rbacv1beta1.RoleBinding{}
-	g.Eventually(func() error { return c.Get(context.TODO(), depSvcAccountKey, roleBinding) }, timeout).
-		Should(gomega.Succeed())
-
-	// Minio test section
-	minio := &minioOperator.MinioInstance{}
-	g.Eventually(func() error { return c.Get(context.TODO(), depMinioKey, minio) }, timeout).
-		Should(gomega.Succeed())
-
-	// Mattermost test section
-	service := &corev1.Service{}
-	g.Eventually(func() error { return c.Get(context.TODO(), depKey, service) }, timeout).
-		Should(gomega.Succeed())
-
-	ingress := &v1beta1.Ingress{}
-	g.Eventually(func() error { return c.Get(context.TODO(), depIngressKey, ingress) }, timeout).
-		Should(gomega.Succeed())
-
-	// Create the mysql secret
+	// Create the resources that would normally be created by other operators
+	// running on the kubernetes cluster.
 	dbSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      instance.Name + "-mysql-root-password",
-			Namespace: instance.Namespace,
+			Name:      ci.Name + "-mysql-root-password",
+			Namespace: ci.Namespace,
 		},
 		Data: map[string][]byte{
 			"password": []byte("mysupersecure"),
 		},
 	}
 	err = c.Create(context.TODO(), dbSecret)
-	if apierrors.IsInvalid(err) {
-		t.Logf("failed to create object, got an invalid object error: %v", err)
-		return
-	}
-	defer c.Delete(context.TODO(), dbSecret)
+	require.NoError(t, err)
 
-	// Create the minio secret
 	MinioSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      instance.Name + "-minio",
-			Namespace: instance.Namespace,
+			Name:      ci.Name + "-minio",
+			Namespace: ci.Namespace,
 		},
 		Data: map[string][]byte{
 			"accesskey": []byte("mysupersecure"),
 			"secretkey": []byte("mysupersecurekey"),
 		},
 	}
-	err = c.Create(context.TODO(), dbSecret)
-	if apierrors.IsInvalid(err) {
-		t.Logf("failed to create object, got an invalid object error: %v", err)
-		return
-	}
-	defer c.Delete(context.TODO(), MinioSecret)
+	err = c.Create(context.TODO(), MinioSecret)
+	require.NoError(t, err)
 
-	// Create the minio service
 	minioService := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      instance.Name + "-minio",
-			Namespace: instance.Namespace,
+			Name:      ci.Name + "-minio",
+			Namespace: ci.Namespace,
 		},
 		Spec: corev1.ServiceSpec{
 			Ports:     []corev1.ServicePort{{Port: 9000}},
@@ -142,29 +99,109 @@ func TestReconcile(t *testing.T) {
 		},
 	}
 	err = c.Create(context.TODO(), minioService)
-	if apierrors.IsInvalid(err) {
-		t.Logf("failed to create object, got an invalid object error: %v", err)
-		return
-	}
-	defer c.Delete(context.TODO(), minioService)
+	require.NoError(t, err)
 
-	deployment := &appsv1.Deployment{}
-	g.Eventually(func() error { return c.Get(context.TODO(), depKey, deployment) }, timeout).
-		Should(gomega.Succeed())
+	// Mock request to simulate Reconcile() being called on an event for a
+	// watched resource .
+	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: ciName, Namespace: ciNamespace}}
+	// Run Reconcile
+	// We expect an error on the first reconciliation due to the deployment pods
+	// not running yet.
+	res, err := r.Reconcile(req)
+	require.Error(t, err)
+	require.Equal(t, res, reconcile.Result{})
 
-	// Delete the Deployment and expect Reconcile to be called for Deployment deletion
-	g.Expect(c.Delete(context.TODO(), deployment)).NotTo(gomega.HaveOccurred())
-	g.Eventually(requests, timeout).Should(gomega.Receive(gomega.Equal(expectedRequest)))
-	g.Eventually(func() error { return c.Get(context.TODO(), depKey, deployment) }, timeout).
-		Should(gomega.Succeed())
+	// Define the NamespacedName objects that will be used to lookup the
+	// cluster resources.
+	ciKey := types.NamespacedName{Name: ciName, Namespace: ciNamespace}
+	ciIngressKey := types.NamespacedName{Name: ciName + "-ingress", Namespace: ciNamespace}
+	ciMysqlKey := types.NamespacedName{Name: ciName + "-mysql", Namespace: ciNamespace}
+	ciMinioKey := types.NamespacedName{Name: ciName + "-minio", Namespace: ciNamespace}
+	ciSvcAccountKey := types.NamespacedName{Name: "mysql-agent", Namespace: ciNamespace}
 
-	g.Expect(c.Delete(context.TODO(), ingress)).NotTo(gomega.HaveOccurred())
-	g.Eventually(requests, timeout).Should(gomega.Receive(gomega.Equal(expectedRequest)))
-	g.Eventually(func() error { return c.Get(context.TODO(), depIngressKey, ingress) }, timeout).
-		Should(gomega.Succeed())
+	t.Run("mysql", func(t *testing.T) {
+		t.Run("cluster", func(t *testing.T) {
+			mysql := &mysqlOperator.Cluster{}
+			err = c.Get(context.TODO(), ciMysqlKey, mysql)
+			require.NoError(t, err)
+		})
+		t.Run("service account", func(t *testing.T) {
+			svcAccount := &corev1.ServiceAccount{}
+			err = c.Get(context.TODO(), ciSvcAccountKey, svcAccount)
+			require.NoError(t, err)
+		})
+		t.Run("role binding", func(t *testing.T) {
+			roleBinding := &rbacv1beta1.RoleBinding{}
+			err = c.Get(context.TODO(), ciSvcAccountKey, roleBinding)
+			require.NoError(t, err)
+		})
+	})
 
-	g.Expect(c.Delete(context.TODO(), service)).NotTo(gomega.HaveOccurred())
-	g.Eventually(requests, timeout).Should(gomega.Receive(gomega.Equal(expectedRequest)))
-	g.Eventually(func() error { return c.Get(context.TODO(), depKey, service) }, timeout).
-		Should(gomega.Succeed())
+	t.Run("minio", func(t *testing.T) {
+		t.Run("instance", func(t *testing.T) {
+			minio := &minioOperator.MinioInstance{}
+			err = c.Get(context.TODO(), ciMinioKey, minio)
+			require.NoError(t, err)
+		})
+	})
+
+	t.Run("mattermost", func(t *testing.T) {
+		t.Run("service", func(t *testing.T) {
+			service := &corev1.Service{}
+			err = c.Get(context.TODO(), ciKey, service)
+			require.NoError(t, err)
+		})
+		t.Run("ingress", func(t *testing.T) {
+			ingress := &v1beta1.Ingress{}
+			err = c.Get(context.TODO(), ciIngressKey, ingress)
+			require.NoError(t, err)
+		})
+		t.Run("deployment", func(t *testing.T) {
+			deployment := &appsv1.Deployment{}
+			err = c.Get(context.TODO(), ciKey, deployment)
+			require.NoError(t, err)
+			require.Equal(t, deployment.Spec.Replicas, &ci.Spec.Replicas)
+		})
+	})
+
+	t.Run("final check", func(t *testing.T) {
+		// Create expected mattermost pods.
+		podTemplate := corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: ciNamespace,
+				Labels:    mattermostv1alpha1.ClusterInstallationLabels(ciName),
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Image: ci.GetImageName(),
+					},
+				},
+			},
+			Status: v1.PodStatus{
+				Phase: v1.PodRunning,
+			},
+		}
+		for i := 0; i < int(replicas); i++ {
+			podTemplate.ObjectMeta.Name = fmt.Sprintf("%s-pod-%d", ciName, i)
+			err = c.Create(context.TODO(), podTemplate.DeepCopy())
+			require.NoError(t, err)
+		}
+
+		t.Run("no reconcile errors", func(t *testing.T) {
+			// Reconcile again and check for errors this time.
+			res, err = r.Reconcile(req)
+			require.NoError(t, err)
+			require.Equal(t, res, reconcile.Result{})
+		})
+		t.Run("correct status", func(t *testing.T) {
+			finalCI := &mattermostv1alpha1.ClusterInstallation{}
+			err = c.Get(context.TODO(), ciKey, finalCI)
+			require.NoError(t, err)
+			assert.Equal(t, finalCI.Status.State, mattermostv1alpha1.Stable)
+			assert.Equal(t, finalCI.Status.Replicas, ci.Spec.Replicas)
+			assert.Equal(t, finalCI.Status.Version, ci.Spec.Version)
+			assert.Equal(t, finalCI.Status.Image, ci.Spec.Image)
+		})
+	})
 }

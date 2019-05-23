@@ -36,13 +36,13 @@ func (r *ReconcileClusterInstallation) checkClusterInstallation(mattermost *matt
 
 	for _, pod := range pods.Items {
 		if pod.Status.Phase != v1.PodRunning || pod.DeletionTimestamp != nil {
-			return nil, fmt.Errorf("mattermost pod %q is %q", pod.Name, pod.Status.Phase)
+			return nil, fmt.Errorf("mattermost pod %s is in state %q", pod.Name, pod.Status.Phase)
 		}
 		if len(pod.Spec.Containers) == 0 {
-			return nil, fmt.Errorf("mattermost pod %q has no containers", pod.Name)
+			return nil, fmt.Errorf("mattermost pod %s has no containers", pod.Name)
 		}
 		if pod.Spec.Containers[0].Image != mattermost.GetImageName() {
-			return nil, fmt.Errorf("mattermost pod %q is running incorrect version", pod.Name)
+			return nil, fmt.Errorf("mattermost pod %s is running incorrect image", pod.Name)
 		}
 	}
 

@@ -82,14 +82,16 @@ func main() {
 	logger.Info("Registering Components.")
 
 	// Setup Scheme for all resources
-	if errAddToScheme := apis.AddToScheme(mgr.GetScheme()); errAddToScheme != nil {
-		logger.Error(errAddToScheme, "Unable to setup scheme")
+	err = apis.AddToScheme(mgr.GetScheme())
+	if err != nil {
+		logger.Error(err, "Unable to setup scheme")
 		os.Exit(1)
 	}
 
 	// Setup all Controllers
-	if errAddToManager := controller.AddToManager(mgr); errAddToManager != nil {
-		logger.Error(errAddToManager, "Unable to setup controllers")
+	err = controller.AddToManager(mgr)
+	if err != nil {
+		logger.Error(err, "Unable to setup controllers")
 		os.Exit(1)
 	}
 
@@ -102,7 +104,8 @@ func main() {
 	logger.Info("Starting the Cmd.")
 
 	// Start the Cmd
-	if err := mgr.Start(signals.SetupSignalHandler()); err != nil {
+	err = mgr.Start(signals.SetupSignalHandler())
+	if err != nil {
 		logger.Error(err, "Manager exited non-zero")
 		os.Exit(1)
 	}
