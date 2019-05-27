@@ -128,11 +128,16 @@ func schema_pkg_apis_mattermost_v1alpha1_ClusterInstallationSpec(ref common.Refe
 							Ref: ref("github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.DatabaseType"),
 						},
 					},
+					"elasticSearch": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.ElasticSearch"),
+						},
+					},
 				},
 				Required: []string{"ingressName"},
 			},
 		},
 		Dependencies: []string{
-			"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.DatabaseType", "k8s.io/api/core/v1.Affinity"},
+			"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.DatabaseType", "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.ElasticSearch", "k8s.io/api/core/v1.Affinity"},
 	}
 }

@@ -59,6 +59,15 @@ spec:
                 type:
                   type: string
               type: object
+            elasticSearch:
+              properties:
+                host:
+                  type: string
+                password:
+                  type: string
+                username:
+                  type: string
+              type: object
             image:
               description: Image defines the ClusterInstallation Docker image.
               type: string

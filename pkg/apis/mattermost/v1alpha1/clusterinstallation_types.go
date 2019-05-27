@@ -38,6 +38,9 @@ type ClusterInstallationSpec struct {
 	MinioStorageSize string `json:"minioStorageSize,omitempty"`
 
 	DatabaseType DatabaseType `json:"databaseType,omitempty"`
+
+	// +optional
+	ElasticSearch ElasticSearch `json:"elasticSearch,omitempty"`
 }
 
 // DatabaseType defines the Database configuration for a ClusterInstallation
@@ -46,6 +49,15 @@ type DatabaseType struct {
 	// If the user want to use an external DB.
 	// This can be inside the same k8s cluster or outside like AWS RDS.
 	ExternalDatabaseSecret string `json:"externalDatabaseSecret,omitempty"`
+}
+
+// ElasticSearch defines the ElasticSearch configuration for a ClusterInstallation
+type ElasticSearch struct {
+	Host string `json:"host,omitempty"`
+	// +optional
+	UserName string `json:"username,omitempty"`
+
+	Password string `json:"password,omitempty"`
 }
 
 // RunningState is the state of the Mattermost instance
