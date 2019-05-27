@@ -135,7 +135,6 @@ func mattermostScaleTest(t *testing.T, f *framework.Framework, ctx *framework.Te
 
 	err = f.Client.Delete(context.TODO(), exampleMattermost)
 	require.NoError(t, err)
-
 }
 
 func mattermostUpgradeTest(t *testing.T, f *framework.Framework, ctx *framework.TestCtx) {
