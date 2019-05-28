@@ -20,7 +20,6 @@ import (
 	mysqlOperator "github.com/oracle/mysql-operator/pkg/apis/mysql/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -63,42 +62,7 @@ func TestReconcile(t *testing.T) {
 
 	// Create the resources that would normally be created by other operators
 	// running on the kubernetes cluster.
-	dbSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      ci.Name + "-mysql-root-password",
-			Namespace: ci.Namespace,
-		},
-		Data: map[string][]byte{
-			"password": []byte("mysupersecure"),
-		},
-	}
-	err = c.Create(context.TODO(), dbSecret)
-	require.NoError(t, err)
-
-	MinioSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      ci.Name + "-minio",
-			Namespace: ci.Namespace,
-		},
-		Data: map[string][]byte{
-			"accesskey": []byte("mysupersecure"),
-			"secretkey": []byte("mysupersecurekey"),
-		},
-	}
-	err = c.Create(context.TODO(), MinioSecret)
-	require.NoError(t, err)
-
-	minioService := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      ci.Name + "-minio",
-			Namespace: ci.Namespace,
-		},
-		Spec: corev1.ServiceSpec{
-			Ports:     []corev1.ServicePort{{Port: 9000}},
-			ClusterIP: corev1.ClusterIPNone,
-		},
-	}
-	err = c.Create(context.TODO(), minioService)
+	err = prepAllDependencyTestResources(r, ci)
 	require.NoError(t, err)
 
 	// Mock request to simulate Reconcile() being called on an event for a
@@ -114,7 +78,6 @@ func TestReconcile(t *testing.T) {
 	// Define the NamespacedName objects that will be used to lookup the
 	// cluster resources.
 	ciKey := types.NamespacedName{Name: ciName, Namespace: ciNamespace}
-	ciIngressKey := types.NamespacedName{Name: ciName + "-ingress", Namespace: ciNamespace}
 	ciMysqlKey := types.NamespacedName{Name: ciName + "-mysql", Namespace: ciNamespace}
 	ciMinioKey := types.NamespacedName{Name: ciName + "-minio", Namespace: ciNamespace}
 	ciSvcAccountKey := types.NamespacedName{Name: "mysql-agent", Namespace: ciNamespace}
@@ -153,7 +116,7 @@ func TestReconcile(t *testing.T) {
 		})
 		t.Run("ingress", func(t *testing.T) {
 			ingress := &v1beta1.Ingress{}
-			err = c.Get(context.TODO(), ciIngressKey, ingress)
+			err = c.Get(context.TODO(), ciKey, ingress)
 			require.NoError(t, err)
 		})
 		t.Run("deployment", func(t *testing.T) {
@@ -171,15 +134,15 @@ func TestReconcile(t *testing.T) {
 				Namespace: ciNamespace,
 				Labels:    mattermostv1alpha1.ClusterInstallationLabels(ciName),
 			},
-			Spec: v1.PodSpec{
-				Containers: []v1.Container{
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
 					{
 						Image: ci.GetImageName(),
 					},
 				},
 			},
-			Status: v1.PodStatus{
-				Phase: v1.PodRunning,
+			Status: corev1.PodStatus{
+				Phase: corev1.PodRunning,
 			},
 		}
 		for i := 0; i < int(replicas); i++ {
@@ -204,4 +167,47 @@ func TestReconcile(t *testing.T) {
 			assert.Equal(t, finalCI.Status.Image, ci.Spec.Image)
 		})
 	})
+}
+
+func prepAllDependencyTestResources(r *ReconcileClusterInstallation, ci *mattermostv1alpha1.ClusterInstallation) error {
+	dbSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      ci.Name + "-mysql-root-password",
+			Namespace: ci.Namespace,
+		},
+		Data: map[string][]byte{
+			"password": []byte("mysupersecure"),
+		},
+	}
+	err := r.client.Create(context.TODO(), dbSecret)
+	if err != nil {
+		return err
+	}
+
+	MinioSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      ci.Name + "-minio",
+			Namespace: ci.Namespace,
+		},
+		Data: map[string][]byte{
+			"accesskey": []byte("mysupersecure"),
+			"secretkey": []byte("mysupersecurekey"),
+		},
+	}
+	err = r.client.Create(context.TODO(), MinioSecret)
+	if err != nil {
+		return err
+	}
+
+	minioService := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      ci.Name + "-minio",
+			Namespace: ci.Namespace,
+		},
+		Spec: corev1.ServiceSpec{
+			Ports:     []corev1.ServicePort{{Port: 9000}},
+			ClusterIP: corev1.ClusterIPNone,
+		},
+	}
+	return r.client.Create(context.TODO(), minioService)
 }

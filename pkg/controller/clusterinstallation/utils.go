@@ -7,9 +7,12 @@ import (
 
 	"github.com/go-logr/logr"
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
+	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -36,7 +39,7 @@ func (r *ReconcileClusterInstallation) checkClusterInstallation(mattermost *matt
 
 	for _, pod := range pods.Items {
 		if pod.Status.Phase != v1.PodRunning || pod.DeletionTimestamp != nil {
-			return nil, fmt.Errorf("mattermost pod %s is in state %q", pod.Name, pod.Status.Phase)
+			return nil, fmt.Errorf("mattermost pod %s is in state '%s'", pod.Name, pod.Status.Phase)
 		}
 		if len(pod.Spec.Containers) == 0 {
 			return nil, fmt.Errorf("mattermost pod %s has no containers", pod.Name)
@@ -58,6 +61,16 @@ func (r *ReconcileClusterInstallation) checkClusterInstallation(mattermost *matt
 	}, nil
 }
 
+func (r *ReconcileClusterInstallation) checkSecret(secretName, namespace string) error {
+	foundSecret := &corev1.Secret{}
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: secretName, Namespace: namespace}, foundSecret)
+	if err != nil {
+		return errors.Wrap(err, "Error getting secret")
+	}
+
+	return nil
+}
+
 func (r *ReconcileClusterInstallation) updateStatus(mattermost *mattermostv1alpha1.ClusterInstallation, status mattermostv1alpha1.ClusterInstallationStatus, reqLogger logr.Logger) error {
 	if !reflect.DeepEqual(mattermost.Status, status) {
 		reqLogger.Info(fmt.Sprintf("Updating status"),
@@ -73,4 +86,20 @@ func (r *ReconcileClusterInstallation) updateStatus(mattermost *mattermostv1alph
 	}
 
 	return nil
+}
+
+func ensureLabels(required, final map[string]string) map[string]string {
+	if required == nil {
+		return final
+	}
+
+	if final == nil {
+		final = make(map[string]string)
+	}
+
+	for key, value := range required {
+		final[key] = value
+	}
+
+	return final
 }

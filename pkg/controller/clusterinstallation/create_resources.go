@@ -44,8 +44,6 @@ func (r *ReconcileClusterInstallation) createServiceAccountIfNotExists(owner v1.
 		return err
 	}
 
-	// TODO compare found service account versus expected
-
 	return nil
 }
 
@@ -59,8 +57,6 @@ func (r *ReconcileClusterInstallation) createRoleBindingIfNotExists(owner v1.Obj
 		reqLogger.Error(err, "Failed to check if role binding exists")
 		return err
 	}
-
-	// TODO compare found role binding versus expected
 
 	return nil
 }
@@ -76,8 +72,6 @@ func (r *ReconcileClusterInstallation) createServiceIfNotExists(owner v1.Object,
 		return err
 	}
 
-	// TODO check how to do the update
-
 	return nil
 }
 
@@ -91,8 +85,6 @@ func (r *ReconcileClusterInstallation) createIngressIfNotExists(owner v1.Object,
 		reqLogger.Error(err, "Failed to check if ingress exists")
 		return err
 	}
-
-	// TODO check how to do the update
 
 	return nil
 }

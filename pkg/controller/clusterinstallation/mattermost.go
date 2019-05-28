@@ -3,10 +3,13 @@ package clusterinstallation
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	v1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
@@ -28,11 +31,87 @@ func (r *ReconcileClusterInstallation) checkMattermost(mattermost *mattermostv1a
 }
 
 func (r *ReconcileClusterInstallation) checkMattermostService(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
-	return r.createServiceIfNotExists(mattermost, mattermost.GenerateService(), reqLogger)
+	service := mattermost.GenerateService()
+
+	err := r.createServiceIfNotExists(mattermost, service, reqLogger)
+	if err != nil {
+		return err
+	}
+
+	foundService := &corev1.Service{}
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: service.Name, Namespace: service.Namespace}, foundService)
+	if err != nil {
+		return err
+	}
+
+	var update bool
+
+	updatedLabels := ensureLabels(service.Labels, foundService.Labels)
+	if !reflect.DeepEqual(updatedLabels, foundService.Labels) {
+		reqLogger.Info("Updating mattermost service labels")
+		foundService.Labels = updatedLabels
+		update = true
+	}
+
+	if !reflect.DeepEqual(service.Annotations, foundService.Annotations) {
+		reqLogger.Info("Updating mattermost service annotations")
+		foundService.Annotations = service.Annotations
+		update = true
+	}
+
+	if !reflect.DeepEqual(service.Spec, foundService.Spec) {
+		reqLogger.Info("Updating mattermost service spec")
+		foundService.Spec = service.Spec
+		update = true
+	}
+
+	if update {
+		return r.client.Update(context.TODO(), foundService)
+	}
+
+	return nil
 }
 
 func (r *ReconcileClusterInstallation) checkMattermostIngress(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
-	return r.createIngressIfNotExists(mattermost, mattermost.GenerateIngress(), reqLogger)
+	ingress := mattermost.GenerateIngress()
+
+	err := r.createIngressIfNotExists(mattermost, ingress, reqLogger)
+	if err != nil {
+		return err
+	}
+
+	foundIngress := &v1beta1.Ingress{}
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: ingress.Name, Namespace: ingress.Namespace}, foundIngress)
+	if err != nil {
+		return err
+	}
+
+	var update bool
+
+	updatedLabels := ensureLabels(ingress.Labels, foundIngress.Labels)
+	if !reflect.DeepEqual(updatedLabels, foundIngress.Labels) {
+		reqLogger.Info("Updating mattermost ingress labels")
+		foundIngress.Labels = updatedLabels
+		update = true
+	}
+
+	if !reflect.DeepEqual(ingress.Annotations, foundIngress.Annotations) {
+		reqLogger.Info("Updating mattermost ingress annotations")
+		foundIngress.Annotations = ingress.Annotations
+		update = true
+	}
+
+	if !reflect.DeepEqual(ingress.Spec, foundIngress.Spec) {
+		reqLogger.Info("Updating mattermost ingress spec")
+		foundIngress.Spec = ingress.Spec
+		update = true
+	}
+
+	if update {
+		return r.client.Update(context.TODO(), foundIngress)
+	}
+
+	return nil
 }
 
 func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
@@ -89,6 +168,7 @@ func (r *ReconcileClusterInstallation) updateMattermostDeployment(mi *mattermost
 
 	// Ensure deployment replicas is the same as the spec
 	if *d.Spec.Replicas != mi.Spec.Replicas {
+		reqLogger.Info("Updating mattermost deployment replica count")
 		d.Spec.Replicas = &mi.Spec.Replicas
 		update = true
 	}
@@ -99,6 +179,7 @@ func (r *ReconcileClusterInstallation) updateMattermostDeployment(mi *mattermost
 		if container.Name == mi.Name {
 			image := mi.GetImageName()
 			if container.Image != image {
+				reqLogger.Info("Updating mattermost deployment pod image")
 				container.Image = image
 				d.Spec.Template.Spec.Containers[pos] = container
 				update = true
@@ -111,10 +192,19 @@ func (r *ReconcileClusterInstallation) updateMattermostDeployment(mi *mattermost
 		return fmt.Errorf("Unable to find mattermost container in deployment")
 	}
 
+	updatedLabels := ensureLabels(mattermostv1alpha1.ClusterInstallationLabels(mi.Name), d.Labels)
+	if !reflect.DeepEqual(updatedLabels, d.Labels) {
+		reqLogger.Info("Updating mattermost deployment labels")
+		update = true
+		d.Labels = updatedLabels
+	}
+
 	if update {
 		mu := intstr.FromInt(int(mi.Spec.Replicas - 1))
+		if d.Spec.Strategy.RollingUpdate == nil {
+			d.Spec.Strategy.RollingUpdate = &appsv1.RollingUpdateDeployment{}
+		}
 		d.Spec.Strategy.RollingUpdate.MaxUnavailable = &mu
-		reqLogger.Info("Updating deployment", "name", d.Name)
 		return r.client.Update(context.TODO(), d)
 	}
 

@@ -15,11 +15,23 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-// MinioInstance returns the Minio component to deploy
-func MinioInstance(mattermost *mattermostv1alpha1.ClusterInstallation) *minioOperator.MinioInstance {
+// Instance returns the Minio component to deploy
+func Instance(mattermost *mattermostv1alpha1.ClusterInstallation) *minioOperator.MinioInstance {
 	minioName := fmt.Sprintf("%s-minio", mattermost.Name)
 
-	minioInstance := &minioOperator.MinioInstance{
+	return &minioOperator.MinioInstance{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      minioName,
+			Namespace: mattermost.Namespace,
+			Labels:    mattermostv1alpha1.ClusterInstallationResourceLabels(mattermost.Name),
+			OwnerReferences: []metav1.OwnerReference{
+				*metav1.NewControllerRef(mattermost, schema.GroupVersionKind{
+					Group:   mattermostv1alpha1.SchemeGroupVersion.Group,
+					Version: mattermostv1alpha1.SchemeGroupVersion.Version,
+					Kind:    "ClusterInstallation",
+				}),
+			},
+		},
 		Spec: minioOperator.MinioInstanceSpec{
 			Version:     "RELEASE.2018-11-22T02-51-56Z",
 			Replicas:    4,
@@ -42,23 +54,10 @@ func MinioInstance(mattermost *mattermostv1alpha1.ClusterInstallation) *minioOpe
 			},
 		},
 	}
-	minioInstance.SetName(minioName)
-	minioInstance.SetNamespace(mattermost.Namespace)
-
-	ownerRef := []metav1.OwnerReference{
-		*metav1.NewControllerRef(mattermost, schema.GroupVersionKind{
-			Group:   mattermostv1alpha1.SchemeGroupVersion.Group,
-			Version: mattermostv1alpha1.SchemeGroupVersion.Version,
-			Kind:    "ClusterInstallation",
-		}),
-	}
-	minioInstance.SetOwnerReferences(ownerRef)
-
-	return minioInstance
 }
 
-// MinioSecret returns the secret name created to use togehter with Minio deployment
-func MinioSecret(mattermost *mattermostv1alpha1.ClusterInstallation) *corev1.Secret {
+// Secret returns the secret name created to use togehter with Minio deployment
+func Secret(mattermost *mattermostv1alpha1.ClusterInstallation) *corev1.Secret {
 	secretName := fmt.Sprintf("%s-minio", mattermost.Name)
 	data := make(map[string][]byte)
 	data["accesskey"] = utils.New16ID()
