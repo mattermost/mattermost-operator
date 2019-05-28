@@ -88,7 +88,7 @@ func (mattermost *ClusterInstallation) GenerateService() *corev1.Service {
 func (mattermost *ClusterInstallation) GenerateIngress() *v1beta1.Ingress {
 	return &v1beta1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-ingress", mattermost.Name),
+			Name:      mattermost.Name,
 			Namespace: mattermost.Namespace,
 			Labels:    ClusterInstallationLabels(mattermost.Name),
 			OwnerReferences: []metav1.OwnerReference{

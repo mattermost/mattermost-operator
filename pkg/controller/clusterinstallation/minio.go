@@ -28,11 +28,31 @@ func (r *ReconcileClusterInstallation) checkMinio(mattermost *mattermostv1alpha1
 }
 
 func (r *ReconcileClusterInstallation) checkMinioSecret(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
-	return r.createSecretIfNotExists(mattermost, mattermostMinio.MinioSecret(mattermost), reqLogger)
+	secret := mattermostMinio.Secret(mattermost)
+
+	err := r.createSecretIfNotExists(mattermost, secret, reqLogger)
+	if err != nil {
+		return err
+	}
+
+	foundSecret := &corev1.Secret{}
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: secret.Name, Namespace: secret.Namespace}, foundSecret)
+	if err != nil {
+		return err
+	}
+
+	updatedLabels := ensureLabels(secret.Labels, foundSecret.Labels)
+	if !reflect.DeepEqual(updatedLabels, foundSecret.Labels) {
+		reqLogger.Info("Updating minio secret labels")
+		foundSecret.Labels = updatedLabels
+		return r.client.Update(context.TODO(), foundSecret)
+	}
+
+	return nil
 }
 
 func (r *ReconcileClusterInstallation) checkMinioInstance(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
-	instance := mattermostMinio.MinioInstance(mattermost)
+	instance := mattermostMinio.Instance(mattermost)
 
 	err := r.createMinioInstanceIfNotExists(mattermost, instance, reqLogger)
 	if err != nil {
@@ -45,9 +65,26 @@ func (r *ReconcileClusterInstallation) checkMinioInstance(mattermost *mattermost
 		return err
 	}
 
+	var update bool
+
+	// Note:
+	// For some reason, our current minio operator seems to remove labels on
+	// the instance resource when we add them. For that reason, trying to
+	// ensure the labels are correct doesn't work.
+	updatedLabels := ensureLabels(instance.Labels, foundInstance.Labels)
+	if !reflect.DeepEqual(updatedLabels, foundInstance.Labels) {
+		reqLogger.Info("Updating minio instance labels")
+		foundInstance.Labels = updatedLabels
+		update = true
+	}
+
 	if !reflect.DeepEqual(instance.Spec, foundInstance.Spec) {
-		reqLogger.Info("Updating Minio instance")
+		reqLogger.Info("Updating minio instance spec")
 		foundInstance.Spec = instance.Spec
+		update = true
+	}
+
+	if update {
 		return r.client.Update(context.TODO(), foundInstance)
 	}
 
@@ -61,7 +98,7 @@ func (r *ReconcileClusterInstallation) createMinioInstanceIfNotExists(mattermost
 		reqLogger.Info("Creating minio instance")
 		return r.createResource(mattermost, instance, reqLogger)
 	} else if err != nil {
-		reqLogger.Error(err, "ClusterInstallation Minio")
+		reqLogger.Error(err, "Unable to get minio instance")
 		return err
 	}
 
