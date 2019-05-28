@@ -133,6 +133,13 @@ func mattermostScaleTest(t *testing.T, f *framework.Framework, ctx *framework.Te
 	err = f.Client.Update(context.TODO(), exampleMattermost)
 	require.NoError(t, err)
 
+	// wait for test-mm to reach 2 replicas
+	err = e2eutil.WaitForDeployment(t, f.KubeClient, namespace, "test-mm", 1, retryInterval, timeout)
+	require.NoError(t, err)
+
+	err = waitForReconcilicationComplete(t, f.Client.Client, namespace, "test-mm", retryInterval, timeout)
+	require.NoError(t, err)
+
 	err = f.Client.Delete(context.TODO(), exampleMattermost)
 	require.NoError(t, err)
 }
