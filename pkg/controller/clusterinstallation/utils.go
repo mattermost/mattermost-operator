@@ -69,7 +69,7 @@ func (r *ReconcileClusterInstallation) checkClusterInstallation(mattermost *matt
 			return nil, fmt.Errorf("should return just one service but returned %d", len(svc.Items))
 		}
 		if svc.Items[0].Status.LoadBalancer.Ingress == nil {
-			return nil, fmt.Errorf("waiting for the Load Balancers be active")
+			return nil, fmt.Errorf("waiting for the Load Balancers to be active")
 		}
 		if svc.Items[0].Status.LoadBalancer.Ingress[0].Hostname != "" {
 			mmEndpoint = svc.Items[0].Status.LoadBalancer.Ingress[0].Hostname
