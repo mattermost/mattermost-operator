@@ -16,6 +16,10 @@ spec:
     description: Version of Mattermost
     name: Version
     type: string
+  - JSONPath: .status.endpoint
+    description: Endpoint
+    name: Endpoint
+    type: string
   group: mattermost.com
   names:
     kind: ClusterInstallation
@@ -91,6 +95,12 @@ spec:
                 a ClusterInstallation resource
               format: int32
               type: integer
+            serviceAnnotations:
+              additionalProperties:
+                type: string
+              type: object
+            useServiceLoadBalancer:
+              type: boolean
             version:
               description: Version defines the ClusterInstallation Docker image version.
               type: string
@@ -102,6 +112,9 @@ spec:
             Not included when requesting from the apiserver, only from the Mattermost
             Operator API itself. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status'
           properties:
+            endpoint:
+              description: The endpoint to access the Mattermost instance
+              type: string
             image:
               description: The image running on the pods in the Mattermost instance
               type: string
