@@ -59,7 +59,7 @@ func (r *ReconcileClusterInstallation) checkMattermostService(mattermost *matter
 		update = true
 	}
 
-	// If we are using the loadBalancer the ClusterIp is imutable
+	// If we are using the loadBalancer the ClusterIp is immutable
 	// and other fields are created in the first time
 	if mattermost.Spec.UseServiceLoadBalancer {
 		service.Spec.ClusterIP = foundService.Spec.ClusterIP
