@@ -53,7 +53,7 @@ func (r *ReconcileClusterInstallation) checkClusterInstallation(mattermost *matt
 		return nil, fmt.Errorf("found %d pods, but wanted %d", len(pods.Items), mattermost.Spec.Replicas)
 	}
 
-	var mmEndpoint string
+	mmEndpoint := "not available"
 	if mattermost.Spec.UseServiceLoadBalancer {
 		svc := &corev1.ServiceList{
 			TypeMeta: metav1.TypeMeta{
