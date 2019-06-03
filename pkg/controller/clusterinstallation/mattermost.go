@@ -59,6 +59,21 @@ func (r *ReconcileClusterInstallation) checkMattermostService(mattermost *matter
 		update = true
 	}
 
+	// If we are using the loadBalancer the ClusterIp is immutable
+	// and other fields are created in the first time
+	if mattermost.Spec.UseServiceLoadBalancer {
+		service.Spec.ClusterIP = foundService.Spec.ClusterIP
+		service.Spec.ExternalTrafficPolicy = foundService.Spec.ExternalTrafficPolicy
+		service.Spec.SessionAffinity = foundService.Spec.SessionAffinity
+		for _, foundPort := range foundService.Spec.Ports {
+			for i, servicePort := range service.Spec.Ports {
+				if foundPort.Name == servicePort.Name {
+					service.Spec.Ports[i].NodePort = foundPort.NodePort
+					service.Spec.Ports[i].Protocol = foundPort.Protocol
+				}
+			}
+		}
+	}
 	if !reflect.DeepEqual(service.Spec, foundService.Spec) {
 		reqLogger.Info("Updating mattermost service spec")
 		foundService.Spec = service.Spec

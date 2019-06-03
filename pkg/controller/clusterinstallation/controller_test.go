@@ -3,6 +3,7 @@ package clusterinstallation
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/mattermost/mattermost-operator/pkg/apis"
 	logmo "github.com/mattermost/mattermost-operator/pkg/log"
@@ -73,7 +74,7 @@ func TestReconcile(t *testing.T) {
 	// not running yet.
 	res, err := r.Reconcile(req)
 	require.Error(t, err)
-	require.Equal(t, res, reconcile.Result{})
+	require.Equal(t, res, reconcile.Result{RequeueAfter: time.Second * 5})
 
 	// Define the NamespacedName objects that will be used to lookup the
 	// cluster resources.

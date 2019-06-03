@@ -66,6 +66,46 @@ func (mattermost *ClusterInstallation) SetDefaults() error {
 
 // GenerateService returns the service for Mattermost
 func (mattermost *ClusterInstallation) GenerateService() *corev1.Service {
+	svcAnnotations := map[string]string{
+		"service.alpha.kubernetes.io/tolerate-unready-endpoints": "true",
+	}
+	if mattermost.Spec.UseServiceLoadBalancer {
+		for k, v := range mattermost.Spec.ServiceAnnotations {
+			svcAnnotations[k] = v
+		}
+		return &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels:    ClusterInstallationLabels(mattermost.Name),
+				Name:      mattermost.Name,
+				Namespace: mattermost.Namespace,
+				OwnerReferences: []metav1.OwnerReference{
+					*metav1.NewControllerRef(mattermost, schema.GroupVersionKind{
+						Group:   SchemeGroupVersion.Group,
+						Version: SchemeGroupVersion.Version,
+						Kind:    "ClusterInstallation",
+					}),
+				},
+				Annotations: svcAnnotations,
+			},
+			Spec: corev1.ServiceSpec{
+				Ports: []corev1.ServicePort{
+					{
+						Name:       "https",
+						Port:       433,
+						TargetPort: intstr.FromString("app"),
+					},
+					{
+						Name:       "http",
+						Port:       80,
+						TargetPort: intstr.FromString("app"),
+					},
+				},
+				Selector: ClusterInstallationLabels(mattermost.Name),
+				Type:     corev1.ServiceTypeLoadBalancer,
+			},
+		}
+	}
+
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:    ClusterInstallationLabels(mattermost.Name),
@@ -78,12 +118,15 @@ func (mattermost *ClusterInstallation) GenerateService() *corev1.Service {
 					Kind:    "ClusterInstallation",
 				}),
 			},
-			Annotations: map[string]string{
-				"service.alpha.kubernetes.io/tolerate-unready-endpoints": "true",
-			},
+			Annotations: svcAnnotations,
 		},
 		Spec: corev1.ServiceSpec{
-			Ports:     []corev1.ServicePort{{Port: 8065}},
+			Ports: []corev1.ServicePort{
+				{
+					Port:       8065,
+					TargetPort: intstr.FromString("app"),
+				},
+			},
 			Selector:  ClusterInstallationLabels(mattermost.Name),
 			ClusterIP: corev1.ClusterIPNone,
 		},
@@ -283,7 +326,7 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 							Ports: []corev1.ContainerPort{
 								{
 									ContainerPort: 8065,
-									Name:          mattermost.Name,
+									Name:          "app",
 								},
 							},
 						},

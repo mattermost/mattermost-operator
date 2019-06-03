@@ -41,6 +41,12 @@ type ClusterInstallationSpec struct {
 	DatabaseType DatabaseType `json:"databaseType,omitempty"`
 	// +optional
 	ElasticSearch ElasticSearch `json:"elasticSearch,omitempty"`
+
+	// +optional
+	UseServiceLoadBalancer bool `json:"useServiceLoadBalancer,omitempty"`
+
+	// +optional
+	ServiceAnnotations map[string]string `json:"serviceAnnotations,omitempty"`
 }
 
 // DatabaseType defines the Database configuration for a ClusterInstallation
@@ -95,6 +101,9 @@ type ClusterInstallationStatus struct {
 	// The image running on the pods in the Mattermost instance
 	// +optional
 	Image string `json:"image,omitempty"`
+	// The endpoint to access the Mattermost instance
+	// +optional
+	Endpoint string `json:"endpoint,omitempty"`
 }
 
 // +genclient
@@ -107,6 +116,7 @@ type ClusterInstallationStatus struct {
 // +kubebuilder:printcolumn:priority=0,name="State",type=string,JSONPath=".status.state",description="State of Mattermost"
 // +kubebuilder:printcolumn:priority=0,name="Image",type=string,JSONPath=".status.image",description="Image of Mattermost"
 // +kubebuilder:printcolumn:priority=0,name="Version",type=string,JSONPath=".status.version",description="Version of Mattermost"
+// +kubebuilder:printcolumn:priority=0,name="Endpoint",type=string,JSONPath=".status.endpoint",description="Endpoint"
 type ClusterInstallation struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object’s metadata. More info:
