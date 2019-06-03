@@ -49,6 +49,8 @@ type DatabaseType struct {
 	// If the user want to use an external DB.
 	// This can be inside the same k8s cluster or outside like AWS RDS.
 	ExternalDatabaseSecret string `json:"externalDatabaseSecret,omitempty"`
+	// DbStorageSize defines the storage size for the database. ie 50Gi
+	DbStorageSize string `json:"dbStorageSize,omitempty"`
 }
 
 // ElasticSearch defines the ElasticSearch configuration for a ClusterInstallation

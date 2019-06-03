@@ -52,6 +52,10 @@ spec:
               type: object
             databaseType:
               properties:
+                dbStorageSize:
+                  description: DbStorageSize defines the storage size for the database.
+                    ie 50Gi
+                  type: string
                 externalDatabaseSecret:
                   description: If the user want to use an external DB. This can be
                     inside the same k8s cluster or outside like AWS RDS.
