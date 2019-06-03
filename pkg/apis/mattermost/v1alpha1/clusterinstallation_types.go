@@ -48,8 +48,11 @@ type DatabaseType struct {
 	Type string `json:"type,omitempty"`
 	// If the user want to use an external DB.
 	// This can be inside the same k8s cluster or outside like AWS RDS.
+	// +optional
 	ExternalDatabaseSecret string `json:"externalDatabaseSecret,omitempty"`
-	// DbStorageSize defines the storage size for the database. ie 50Gi
+	// Defines the storage size for the database. ie 50Gi
+	// +optional
+	//
 	DbStorageSize string `json:"dbStorageSize,omitempty"`
 }
 

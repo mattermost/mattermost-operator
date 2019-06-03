@@ -53,8 +53,7 @@ spec:
             databaseType:
               properties:
                 dbStorageSize:
-                  description: DbStorageSize defines the storage size for the database.
-                    ie 50Gi
+                  description: Defines the storage size for the database. ie 50Gi
                   type: string
                 externalDatabaseSecret:
                   description: If the user want to use an external DB. This can be
