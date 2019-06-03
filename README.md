@@ -28,7 +28,7 @@ To install MySQL-Operator apply the manifests that you can find in the `docs` fo
 
 ```bash
 $ kubectl create ns mysql-operator
-$ kubectl apply -n mysql-operator -f https://github.com/mattertmost/mattermost-operator/blob/master/docs/mysql-operator/mysql-operator.yaml?raw=true
+$ kubectl apply -n mysql-operator -f https://raw.githubusercontent.com/mattermost/mattermost-operator/master/docs/mysql-operator/mysql-operator.yaml
 ```
 
 #### Minio-Operator
@@ -36,7 +36,7 @@ To install Minio-Operator apply the manifests that you can find in the `docs` fo
 
 ```bash
 $ kubectl create ns minio-operator-ns
-$ kubectl apply -n minio-operator-ns -f https://github.com/mattertmost/mattermost-operator/blob/master/docs/minio-operator/minio-operator.yaml?raw=true
+$ kubectl apply -n minio-operator-ns -f https://raw.githubusercontent.com/mattermost/mattermost-operator/master/docs/minio-operator/minio-operator.yaml
 ```
 
 #### Mattermost-Operator
@@ -45,7 +45,7 @@ Apply the manifests in the `docs` folder as well
 
 ```bash
 $ kubectl create ns mattermost-operator
-$ kubectl apply -n mattermost-operator -f https://github.com/mattermost/mattermost-operator/blob/master/docs/mattermost-operator/mattermost-operator.yaml?raw=true
+$ kubectl apply -n mattermost-operator -f https://raw.githubusercontent.com/mattermost/mattermost-operator/master/docs/mattermost-operator/mattermost-operator.yaml
 ```
 
 ### Install Mattermost
@@ -53,10 +53,10 @@ $ kubectl apply -n mattermost-operator -f https://github.com/mattermost/mattermo
 With the above operators installed, install Mattermost using the mattermost-operator:
 
 ```bash
-$ kubectl create -f https://github.com/minio/mattermost-operator/blob/master/docs/examples/simple.yaml?raw=true
+$ kubectl create -f https://raw.githubusercontent.com/mattermost/mattermost-operator/master/docs/examples/simple.yaml
 ```
 
-The [simple.yml](https://github.com/minio/mattermost-operator/blob/master/docs/examples/simple.yaml?raw=true) configures the options available for installing Mattermost.
+The [simple.yml](https://raw.githubusercontent.com/mattermost/mattermost-operator/master/docs/examples/simple.yaml) configures the options available for installing Mattermost.
 
 They are documented as follows:
  - `name`: Name of the Mattermost deployment
