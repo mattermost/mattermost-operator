@@ -33,12 +33,12 @@ type ClusterInstallationSpec struct {
 	// If specified, affinity will define the pod's scheduling constraints
 	// +optional
 	Affinity *corev1.Affinity `json:"affinity,omitempty"`
-
 	// MinioStorageSize defines the storage size for minio. ie 50Gi
+	// +optional
+	// +kubebuilder:validation:Pattern=^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$
 	MinioStorageSize string `json:"minioStorageSize,omitempty"`
 
 	DatabaseType DatabaseType `json:"databaseType,omitempty"`
-
 	// +optional
 	ElasticSearch ElasticSearch `json:"elasticSearch,omitempty"`
 }
@@ -52,7 +52,7 @@ type DatabaseType struct {
 	ExternalDatabaseSecret string `json:"externalDatabaseSecret,omitempty"`
 	// Defines the storage size for the database. ie 50Gi
 	// +optional
-	//
+	// +kubebuilder:validation:Pattern=^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$
 	DbStorageSize string `json:"dbStorageSize,omitempty"`
 }
 
