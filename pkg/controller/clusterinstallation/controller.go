@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"time"
 
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
@@ -181,7 +182,7 @@ func (r *ReconcileClusterInstallation) Reconcile(request reconcile.Request) (rec
 	status, err := r.checkClusterInstallation(mattermost)
 	if err != nil {
 		r.setReconciling()
-		return reconcile.Result{}, err
+		return reconcile.Result{RequeueAfter: time.Second * 5}, err
 	}
 	err = r.updateStatus(mattermost, *status, reqLogger)
 	if err != nil {
