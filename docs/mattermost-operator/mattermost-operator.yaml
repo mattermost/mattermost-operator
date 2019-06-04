@@ -8,6 +8,23 @@ kind: CustomResourceDefinition
 metadata:
   name: clusterinstallations.mattermost.com
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .status.state
+    description: State of Mattermost
+    name: State
+    type: string
+  - JSONPath: .status.image
+    description: Image of Mattermost
+    name: Image
+    type: string
+  - JSONPath: .status.version
+    description: Version of Mattermost
+    name: Version
+    type: string
+  - JSONPath: .status.endpoint
+    description: Endpoint
+    name: Endpoint
+    type: string
   group: mattermost.com
   names:
     kind: ClusterInstallation
@@ -44,11 +61,20 @@ spec:
               type: object
             databaseType:
               properties:
-                externalDatabase:
+                externalDatabaseSecret:
                   description: If the user want to use an external DB. This can be
                     inside the same k8s cluster or outside like AWS RDS.
                   type: string
                 type:
+                  type: string
+              type: object
+            elasticSearch:
+              properties:
+                host:
+                  type: string
+                password:
+                  type: string
+                username:
                   type: string
               type: object
             image:
@@ -57,6 +83,10 @@ spec:
             ingressName:
               description: IngressName defines the name to be used when creating the
                 ingress rules
+              type: string
+            minioStorageSize:
+              description: MinioStorageSize defines the storage size for minio. ie
+                50Gi
               type: string
             nodeSelector:
               additionalProperties:
@@ -70,6 +100,12 @@ spec:
                 a ClusterInstallation resource
               format: int32
               type: integer
+            serviceAnnotations:
+              additionalProperties:
+                type: string
+              type: object
+            useServiceLoadBalancer:
+              type: boolean
             version:
               description: Version defines the ClusterInstallation Docker image version.
               type: string
@@ -81,18 +117,23 @@ spec:
             Not included when requesting from the apiserver, only from the Mattermost
             Operator API itself. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status'
           properties:
-            paused:
-              description: Represents whether any actions on the underlying managed
-                objects are being performed. Only delete actions will be performed.
-              type: boolean
+            endpoint:
+              description: The endpoint to access the Mattermost instance
+              type: string
+            image:
+              description: The image running on the pods in the Mattermost instance
+              type: string
             replicas:
               description: Total number of non-terminated pods targeted by this Mattermost
                 deployment (their labels match the selector).
               format: int32
               type: integer
-          required:
-          - paused
-          - replicas
+            state:
+              description: Represents the running state of the Mattermost instance
+              type: string
+            version:
+              description: The version currently running in the Mattermost instance
+              type: string
           type: object
       required:
       - spec
@@ -199,6 +240,18 @@ rules:
   - mysqlbackups
   verbs:
   - create
+- apiGroups:
+  - miniocontroller.minio.io
+  resources:
+  - "*"
+  verbs:
+  - "*"
+- apiGroups:
+  - minio.io
+  resources:
+  - "*"
+  verbs:
+  - "*"
 ---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
@@ -230,7 +283,7 @@ spec:
       serviceAccountName: mattermost-operator
       containers:
         - name: mattermost-operator
-          image: mattermost/mattermost-operator:latest
+          image: mattermost/mattermost-operator:test
           command:
           - mattermost-operator
           imagePullPolicy: IfNotPresent
