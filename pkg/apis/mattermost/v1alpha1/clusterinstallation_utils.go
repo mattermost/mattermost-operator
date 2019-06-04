@@ -323,6 +323,17 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 									Name:          "app",
 								},
 							},
+							LivenessProbe: &corev1.Probe{
+								Handler: corev1.Handler{
+									HTTPGet: &corev1.HTTPGetAction{
+										Path: "/api/v4/system/ping",
+										Port: intstr.FromInt(8065),
+									},
+								},
+								InitialDelaySeconds: 10,
+								PeriodSeconds:       10,
+								FailureThreshold:    3,
+							},
 						},
 					},
 				},
