@@ -1,4 +1,4 @@
-.PHONY: all check-style unittest generate build clean build-image operator-sdk
+.PHONY: all check-style unittest generate build clean build-image operator-sdk yaml
 
 OPERATOR_IMAGE ?= mattermost/mattermost-operator:test
 SDK_VERSION = v0.8.0
@@ -17,6 +17,7 @@ GO_LINKER_FLAGS ?= -ldflags\
 
 PACKAGES=$(shell go list ./...)
 TEST_PACKAGES=$(shell go list ./...| grep -v test/e2e)
+INSTALL_YAML=docs/mattermost-operator/mattermost-operator.yaml
 
 all: check-style unittest build ## Run all the things
 
@@ -65,6 +66,17 @@ generate: ## Runs the kubernetes code-generators and openapi
 	operator-sdk generate k8s
 	operator-sdk generate openapi
 	vendor/k8s.io/code-generator/generate-groups.sh all github.com/mattermost/mattermost-operator/pkg/client github.com/mattermost/mattermost-operator/pkg/apis mattermost:v1alpha1
+
+yaml: ## Generate the YAML file for easy operator installation
+	cat deploy/service_account.yaml > $(INSTALL_YAML)
+	echo --- >> $(INSTALL_YAML)
+	cat deploy/crds/mattermost_v1alpha1_clusterinstallation_crd.yaml >> $(INSTALL_YAML)
+	echo --- >> $(INSTALL_YAML)
+	cat deploy/role.yaml >> $(INSTALL_YAML)
+	echo --- >> $(INSTALL_YAML)
+	cat deploy/role_binding.yaml >> $(INSTALL_YAML)
+	echo --- >> $(INSTALL_YAML)
+	cat deploy/operator.yaml >> $(INSTALL_YAML)
 
 
 dep: ## Get dependencies
