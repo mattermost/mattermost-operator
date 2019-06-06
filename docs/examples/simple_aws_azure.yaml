@@ -1,0 +1,7 @@
+apiVersion: mattermost.com/v1alpha1
+kind: ClusterInstallation
+metadata:
+  name: mm-example-aws-azure
+spec:
+  ingressName: example.dev.cloud.mattermost.com
+  useServiceLoadBalancer: true
