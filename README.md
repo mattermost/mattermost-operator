@@ -1,7 +1,7 @@
 # Mattermost Operator for Kubernetes ![CircleCI branch](https://img.shields.io/circleci/project/github/mattermost/mattermost-operator/master.svg) [![Community Server](https://img.shields.io/badge/Mattermost_Community-cloud_channel-blue.svg)](https://community.mattermost.com/core/channels/cloud)
 
 ## Status
-The Mattermost operator is in alpha but being actively developed.
+The Mattermost operator is in alpha, but is being actively developed.
 
 ## Summary
 Mattermost is a scalable, open source collaboration tool. It's written in Golang and React.
