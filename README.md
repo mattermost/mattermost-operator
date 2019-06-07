@@ -15,7 +15,7 @@ The Mattermost server source code is available at https://github.com/mattermost/
 ## 1. Prerequisites
 
 ### 1.1 Kubernetes Cluster with `kubectl`
-You must have a running Kubernetes 1.8.0+ cluster. If you do not, then see the [official Kubernetes documentation](https://kubernetes.io/docs/setup/) to get one set up.
+You must have a running Kubernetes 1.11.0+ cluster. If you do not, then see the [official Kubernetes documentation](https://kubernetes.io/docs/setup/) to get one set up.
 
 In addition you must have [kubectl](https://kubernetes.io/docs/reference/kubectl/overview/) configured for the relevant Kubernetes cluster. 
 
