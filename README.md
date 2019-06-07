@@ -121,7 +121,7 @@ $ kubectl delete -f mm_clusterinstallation.yaml
 To test the operator locally. We recommend [Kind](https://kind.sigs.k8s.io/), however, you can use Minikube or Minishift as well.
 
 ### 3.1 Prerequisites
-To developer locally you will need the [Operator SDK](https://github.com/operator-framework/operator-sdk).
+To develop locally you will need the [Operator SDK](https://github.com/operator-framework/operator-sdk).
 
 First, checkout and install the operator-sdk CLI:
 
