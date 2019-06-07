@@ -138,7 +138,7 @@ $ make install
 ### 3.2 Testing locally
 Developing and testing local changes to Mattermost operator is fairly simple. For that you can deploy Kind and then apply the manifests to deploy the dependencies and the Mattermost operator as well.
 
-You dont need to push the mattermost-operator image to DockerHub or any other registry you can load the image, built with `make build-image`, directly to the Kind cluster:
+You don't need to push the mattermost-operator image to DockerHub or any other registry if testing with kind. You can load the image, built with `make build-image`, directly to the Kind cluster by running the following:
 
 ```bash
 $ kind load docker-image mattermost/mattermost-operator:test
