@@ -100,6 +100,9 @@ func mattermostScaleTest(t *testing.T, f *framework.Framework, ctx *framework.Te
 			IngressName:      "test-example.mattermost.dev",
 			Replicas:         1,
 			MinioStorageSize: "1Gi",
+			DatabaseType: operator.DatabaseType{
+				DbStorageSize: "1Gi",
+			},
 		},
 	}
 
@@ -164,6 +167,9 @@ func mattermostUpgradeTest(t *testing.T, f *framework.Framework, ctx *framework.
 			IngressName:      "test-example2.mattermost.dev",
 			Replicas:         1,
 			MinioStorageSize: "1Gi",
+			DatabaseType: operator.DatabaseType{
+				DbStorageSize: "1Gi",
+			},
 		},
 	}
 
