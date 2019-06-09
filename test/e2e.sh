@@ -103,6 +103,10 @@ main() {
     kind load docker-image mattermost/mattermost-enterprise-edition:5.11.0
     kind load docker-image mattermost/mattermost-enterprise-edition:5.10.0
 
+
+    # Setup a local storage class
+    kubectl delete storageclass standard
+    kubectl apply -f test/local-path-provisioner.yaml
     # Create a namespace for testing operator.
     # This is needed because the service account created using
     # deploy/service_account.yaml has a static namespace. Creating operator in
