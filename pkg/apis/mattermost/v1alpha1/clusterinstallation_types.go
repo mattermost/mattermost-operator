@@ -47,6 +47,9 @@ type ClusterInstallationSpec struct {
 
 	// +optional
 	ServiceAnnotations map[string]string `json:"serviceAnnotations,omitempty"`
+
+	// +optional
+	IngressAnnotations map[string]string `json:"ingressAnnotations,omitempty"`
 }
 
 // DatabaseType defines the Database configuration for a ClusterInstallation
