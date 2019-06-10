@@ -4,12 +4,16 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
@@ -17,6 +21,8 @@ import (
 )
 
 func (r *ReconcileClusterInstallation) checkMattermost(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
+	reqLogger = reqLogger.WithValues("Reconcile", "mattermost")
+
 	err := r.checkMattermostService(mattermost, reqLogger)
 	if err != nil {
 		return err
@@ -165,7 +171,7 @@ func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mat
 		return err
 	}
 
-	err = r.updateMattermostDeployment(mattermost, foundDeployment, reqLogger)
+	err = r.updateMattermostDeployment(mattermost, deployment, foundDeployment, reqLogger)
 	if err != nil {
 		reqLogger.Error(err, "Failed to update mattermost deployment")
 		return err
@@ -178,21 +184,14 @@ func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mat
 // If an update is required then the deployment spec is set to:
 // - roll forward version
 // - keep active MattermostInstallation available by setting maxUnavailable=N-1
-func (r *ReconcileClusterInstallation) updateMattermostDeployment(mi *mattermostv1alpha1.ClusterInstallation, d *appsv1.Deployment, reqLogger logr.Logger) error {
+func (r *ReconcileClusterInstallation) updateMattermostDeployment(mi *mattermostv1alpha1.ClusterInstallation, original, d *appsv1.Deployment, reqLogger logr.Logger) error {
 	var update bool
-
-	// Ensure deployment replicas is the same as the spec
-	if *d.Spec.Replicas != mi.Spec.Replicas {
-		reqLogger.Info("Updating mattermost deployment replica count")
-		d.Spec.Replicas = &mi.Spec.Replicas
-		update = true
-	}
 
 	// Look for mattermost container in pod spec and determine if the image
 	// needs to be updated.
+	image := mi.GetImageName()
 	for pos, container := range d.Spec.Template.Spec.Containers {
 		if container.Name == mi.Name {
-			image := mi.GetImageName()
 			if container.Image != image {
 				reqLogger.Info("Updating mattermost deployment pod image")
 				container.Image = image
@@ -205,6 +204,87 @@ func (r *ReconcileClusterInstallation) updateMattermostDeployment(mi *mattermost
 
 		// If we got here, something went wrong
 		return fmt.Errorf("Unable to find mattermost container in deployment")
+	}
+
+	// Run a single-pod job with the new mattermost image to perform any
+	// database migrations before altering the deployment. If this fails,
+	// we will return and not upgrade the deployment.
+	if update {
+		reqLogger.Info(fmt.Sprintf("Running Mattermost image %s upgrade job check", image))
+
+		updateName := "mattermost-image-update-check"
+		job := &batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      updateName,
+				Namespace: mi.GetNamespace(),
+			},
+			Spec: batchv1.JobSpec{
+				Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{"app": updateName},
+					},
+					Spec: original.Spec.Template.Spec,
+				},
+			},
+		}
+
+		// Override values for job-specific behavior.
+		job.Spec.Template.Spec.RestartPolicy = corev1.RestartPolicyNever
+		for i := range job.Spec.Template.Spec.Containers {
+			job.Spec.Template.Spec.Containers[i].Command = []string{"mattermost", "version"}
+		}
+
+		err := r.client.Create(context.TODO(), job)
+		if err != nil && !k8sErrors.IsAlreadyExists(err) {
+			return err
+		}
+		defer func() {
+			err = r.client.Delete(context.TODO(), job)
+			if err != nil {
+				reqLogger.Error(err, "Unable to cleanup image update check job")
+			}
+		}()
+
+		// Wait up to 60 seconds for the update check job to return successfully.
+		timer := time.NewTimer(60 * time.Second)
+		defer timer.Stop()
+
+	upgradeJobCheck:
+		for {
+			select {
+			case <-timer.C:
+				return errors.New("timed out waiting for mattermost image update check job to succeed")
+			default:
+				foundJob := &batchv1.Job{}
+				err = r.client.Get(
+					context.TODO(),
+					types.NamespacedName{
+						Name:      updateName,
+						Namespace: mi.GetNamespace(),
+					},
+					foundJob,
+				)
+				if err != nil {
+					continue
+				}
+				if foundJob.Status.Failed > 0 {
+					return errors.New("Upgrade image job check failed")
+				}
+				if foundJob.Status.Succeeded > 0 {
+					reqLogger.Info("Upgrade image job ran successfully")
+					break upgradeJobCheck
+				}
+
+				time.Sleep(1 * time.Second)
+			}
+		}
+	}
+
+	// Ensure deployment replicas is the same as the spec
+	if *d.Spec.Replicas != mi.Spec.Replicas {
+		reqLogger.Info("Updating mattermost deployment replica count")
+		d.Spec.Replicas = &mi.Spec.Replicas
+		update = true
 	}
 
 	updatedLabels := ensureLabels(mattermostv1alpha1.ClusterInstallationLabels(mi.Name), d.Labels)
@@ -220,6 +300,7 @@ func (r *ReconcileClusterInstallation) updateMattermostDeployment(mi *mattermost
 			d.Spec.Strategy.RollingUpdate = &appsv1.RollingUpdateDeployment{}
 		}
 		d.Spec.Strategy.RollingUpdate.MaxUnavailable = &mu
+
 		return r.client.Update(context.TODO(), d)
 	}
 

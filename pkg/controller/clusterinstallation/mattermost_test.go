@@ -11,6 +11,7 @@ import (
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
 	logmo "github.com/mattermost/mattermost-operator/pkg/log"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -99,6 +100,19 @@ func TestCheckMattermost(t *testing.T) {
 	})
 
 	t.Run("deployment", func(t *testing.T) {
+		updateName := "mattermost-image-update-check"
+		job := &batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      updateName,
+				Namespace: ci.GetNamespace(),
+			},
+			Status: batchv1.JobStatus{
+				Succeeded: 1,
+			},
+		}
+		err := r.client.Create(context.TODO(), job)
+		require.NoError(t, err)
+
 		err = r.checkMattermostDeployment(ci, logger)
 		assert.NoError(t, err)
 
