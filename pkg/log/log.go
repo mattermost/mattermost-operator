@@ -38,8 +38,7 @@ func (l *infoLogger) Info(msg string, keysAndVals ...interface{}) {
 
 func (l *logrusLogger) Error(err error, msg string, keysAndVals ...interface{}) {
 	fields := parseFields(l.l, l.name, keysAndVals)
-	fields["err.ctx"] = msg
-	l.l.WithFields(fields).Error(prependName(l.name, err.Error()))
+	l.l.WithFields(fields).WithError(err).Error(prependName(l.name, msg))
 }
 
 // TODO
