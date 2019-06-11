@@ -135,11 +135,6 @@ func (mattermost *ClusterInstallation) GenerateService() *corev1.Service {
 
 // GenerateIngress returns the ingress for Mattermost
 func (mattermost *ClusterInstallation) GenerateIngress() *v1beta1.Ingress {
-	ingressAnnotations := map[string]string{}
-	for k, v := range mattermost.Spec.IngressAnnotations {
-		ingressAnnotations[k] = v
-	}
-
 	return &v1beta1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      mattermost.Name,
@@ -152,7 +147,7 @@ func (mattermost *ClusterInstallation) GenerateIngress() *v1beta1.Ingress {
 					Kind:    "ClusterInstallation",
 				}),
 			},
-			Annotations: ingressAnnotations,
+			Annotations: mattermost.Spec.IngressAnnotations,
 		},
 		Spec: v1beta1.IngressSpec{
 			Rules: []v1beta1.IngressRule{
