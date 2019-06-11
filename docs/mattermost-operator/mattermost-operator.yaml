@@ -61,6 +61,10 @@ spec:
               type: object
             databaseType:
               properties:
+                dbStorageSize:
+                  description: Defines the storage size for the database. ie 50Gi
+                  pattern: ^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$
+                  type: string
                 externalDatabaseSecret:
                   description: If the user want to use an external DB. This can be
                     inside the same k8s cluster or outside like AWS RDS.
@@ -80,6 +84,10 @@ spec:
             image:
               description: Image defines the ClusterInstallation Docker image.
               type: string
+            ingressAnnotations:
+              additionalProperties:
+                type: string
+              type: object
             ingressName:
               description: IngressName defines the name to be used when creating the
                 ingress rules
@@ -87,6 +95,7 @@ spec:
             minioStorageSize:
               description: MinioStorageSize defines the storage size for minio. ie
                 50Gi
+              pattern: ^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$
               type: string
             nodeSelector:
               additionalProperties:
@@ -283,7 +292,7 @@ spec:
       serviceAccountName: mattermost-operator
       containers:
         - name: mattermost-operator
-          image: mattermost/mattermost-operator:latest
+          image: mattermost/mattermost-operator:test
           command:
           - mattermost-operator
           imagePullPolicy: IfNotPresent
