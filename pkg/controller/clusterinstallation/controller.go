@@ -182,9 +182,10 @@ func (r *ReconcileClusterInstallation) Reconcile(request reconcile.Request) (rec
 	status, err := r.checkClusterInstallation(mattermost)
 	if err != nil {
 		r.setReconciling()
-		return reconcile.Result{RequeueAfter: time.Second * 5}, err
+		r.updateStatus(mattermost, status, reqLogger)
+		return reconcile.Result{RequeueAfter: time.Second * 3}, err
 	}
-	err = r.updateStatus(mattermost, *status, reqLogger)
+	err = r.updateStatus(mattermost, status, reqLogger)
 	if err != nil {
 		r.setReconciling()
 		return reconcile.Result{}, err
