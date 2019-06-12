@@ -90,13 +90,13 @@ func (mattermost *ClusterInstallation) GenerateService() *corev1.Service {
 			Spec: corev1.ServiceSpec{
 				Ports: []corev1.ServicePort{
 					{
-						Name:       "https",
-						Port:       433,
+						Name:       "http",
+						Port:       80,
 						TargetPort: intstr.FromString("app"),
 					},
 					{
-						Name:       "http",
-						Port:       80,
+						Name:       "https",
+						Port:       433,
 						TargetPort: intstr.FromString("app"),
 					},
 				},
