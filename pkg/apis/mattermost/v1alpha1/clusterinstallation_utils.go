@@ -96,7 +96,7 @@ func (mattermost *ClusterInstallation) GenerateService() *corev1.Service {
 					},
 					{
 						Name:       "https",
-						Port:       433,
+						Port:       443,
 						TargetPort: intstr.FromString("app"),
 					},
 				},
