@@ -94,10 +94,6 @@ type ClusterInstallationStatus struct {
 	// Represents the running state of the Mattermost instance
 	// +optional
 	State RunningState `json:"state,omitempty"`
-	// Total number of non-terminated pods targeted by this Mattermost deployment
-	// (their labels match the selector).
-	// +optional
-	Replicas int32 `json:"replicas,omitempty"`
 	// The version currently running in the Mattermost instance
 	// +optional
 	Version string `json:"version,omitempty"`
@@ -107,6 +103,13 @@ type ClusterInstallationStatus struct {
 	// The endpoint to access the Mattermost instance
 	// +optional
 	Endpoint string `json:"endpoint,omitempty"`
+	// Total number of non-terminated pods targeted by this Mattermost deployment
+	// +optional
+	Replicas int32 `json:"replicas,omitempty"`
+	// Total number of non-terminated pods targeted by this Mattermost deployment
+	// that are running with the desired image.
+	// +optional
+	UpdatedReplicas int32 `json:"updatedReplicas,omitempty"`
 }
 
 // +genclient

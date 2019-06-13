@@ -107,3 +107,14 @@ rules:
   - "*"
   verbs:
   - "*"
+- apiGroups:
+  - "batch"
+  resources:
+  - jobs
+  verbs:
+  - get
+  - create
+  - list
+  - delete
+  - watch
+  - update

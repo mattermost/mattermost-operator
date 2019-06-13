@@ -74,7 +74,7 @@ func TestReconcile(t *testing.T) {
 	// not running yet.
 	res, err := r.Reconcile(req)
 	require.Error(t, err)
-	require.Equal(t, res, reconcile.Result{RequeueAfter: time.Second * 5})
+	require.Equal(t, res, reconcile.Result{RequeueAfter: time.Second * 3})
 
 	// Define the NamespacedName objects that will be used to lookup the
 	// cluster resources.

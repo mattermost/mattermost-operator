@@ -22,7 +22,13 @@ import (
 // NOTE: this is a vital health check. Every reconciliation loop should run this
 // check at the very end to ensure that everything in the installation is as it
 // should be. Over time, more types of checks should be added here as needed.
-func (r *ReconcileClusterInstallation) checkClusterInstallation(mattermost *mattermostv1alpha1.ClusterInstallation) (*mattermostv1alpha1.ClusterInstallationStatus, error) {
+func (r *ReconcileClusterInstallation) checkClusterInstallation(mattermost *mattermostv1alpha1.ClusterInstallation) (mattermostv1alpha1.ClusterInstallationStatus, error) {
+	status := mattermostv1alpha1.ClusterInstallationStatus{
+		State:           mattermostv1alpha1.Reconciling,
+		Replicas:        0,
+		UpdatedReplicas: 0,
+	}
+
 	pods := &corev1.PodList{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -34,26 +40,32 @@ func (r *ReconcileClusterInstallation) checkClusterInstallation(mattermost *matt
 
 	err := r.client.List(context.TODO(), opts, pods)
 	if err != nil {
-		return nil, err
+		return status, errors.Wrap(err, "unable to get pod list")
 	}
+
+	status.Replicas = int32(len(pods.Items))
 
 	for _, pod := range pods.Items {
 		if pod.Status.Phase != corev1.PodRunning || pod.DeletionTimestamp != nil {
-			return nil, fmt.Errorf("mattermost pod %s is in state '%s'", pod.Name, pod.Status.Phase)
+			return status, fmt.Errorf("mattermost pod %s is in state '%s'", pod.Name, pod.Status.Phase)
 		}
 		if len(pod.Spec.Containers) == 0 {
-			return nil, fmt.Errorf("mattermost pod %s has no containers", pod.Name)
+			return status, fmt.Errorf("mattermost pod %s has no containers", pod.Name)
 		}
 		if pod.Spec.Containers[0].Image != mattermost.GetImageName() {
-			return nil, fmt.Errorf("mattermost pod %s is running incorrect image", pod.Name)
+			return status, fmt.Errorf("mattermost pod %s is running incorrect image", pod.Name)
 		}
+		status.UpdatedReplicas++
 	}
 
 	if int32(len(pods.Items)) != mattermost.Spec.Replicas {
-		return nil, fmt.Errorf("found %d pods, but wanted %d", len(pods.Items), mattermost.Spec.Replicas)
+		return status, fmt.Errorf("found %d pods, but wanted %d", len(pods.Items), mattermost.Spec.Replicas)
 	}
 
-	mmEndpoint := "not available"
+	status.Image = mattermost.Spec.Image
+	status.Version = mattermost.Spec.Version
+
+	status.Endpoint = "not available"
 	if mattermost.Spec.UseServiceLoadBalancer {
 		svc := &corev1.ServiceList{
 			TypeMeta: metav1.TypeMeta{
@@ -61,20 +73,21 @@ func (r *ReconcileClusterInstallation) checkClusterInstallation(mattermost *matt
 				APIVersion: "v1",
 			},
 		}
-		err := r.client.List(context.TODO(), opts, svc)
+		err = r.client.List(context.TODO(), opts, svc)
 		if err != nil {
-			return nil, err
+			return status, errors.Wrap(err, "unable to get service list")
 		}
-		if len(svc.Items) > 1 {
-			return nil, fmt.Errorf("should return just one service but returned %d", len(svc.Items))
+		if len(svc.Items) != 1 {
+			return status, fmt.Errorf("should return just one service, but returned %d", len(svc.Items))
 		}
 		if svc.Items[0].Status.LoadBalancer.Ingress == nil {
-			return nil, fmt.Errorf("waiting for the Load Balancers to be active")
+			return status, errors.New("waiting for the Load Balancer to be active")
 		}
-		if svc.Items[0].Status.LoadBalancer.Ingress[0].Hostname != "" {
-			mmEndpoint = svc.Items[0].Status.LoadBalancer.Ingress[0].Hostname
-		} else if svc.Items[0].Status.LoadBalancer.Ingress[0].IP != "" {
-			mmEndpoint = svc.Items[0].Status.LoadBalancer.Ingress[0].IP
+		lbIngress := svc.Items[0].Status.LoadBalancer.Ingress[0]
+		if lbIngress.Hostname != "" {
+			status.Endpoint = lbIngress.Hostname
+		} else if lbIngress.IP != "" {
+			status.Endpoint = lbIngress.IP
 		}
 	} else {
 		ingress := &v1beta1.IngressList{
@@ -83,23 +96,20 @@ func (r *ReconcileClusterInstallation) checkClusterInstallation(mattermost *matt
 				APIVersion: "v1",
 			},
 		}
-		err := r.client.List(context.TODO(), opts, ingress)
+		err = r.client.List(context.TODO(), opts, ingress)
 		if err != nil {
-			return nil, err
+			return status, errors.Wrap(err, "unable to get ingress list")
 		}
-		if len(ingress.Items) > 1 {
-			return nil, fmt.Errorf("should return just one ingress but returned %d", len(ingress.Items))
+		if len(ingress.Items) != 1 {
+			return status, fmt.Errorf("should return just one ingress, but returned %d", len(ingress.Items))
 		}
-		mmEndpoint = ingress.Items[0].Spec.Rules[0].Host
+		status.Endpoint = ingress.Items[0].Spec.Rules[0].Host
 	}
 
-	return &mattermostv1alpha1.ClusterInstallationStatus{
-		State:    mattermostv1alpha1.Stable,
-		Image:    mattermost.Spec.Image,
-		Version:  mattermost.Spec.Version,
-		Replicas: mattermost.Spec.Replicas,
-		Endpoint: mmEndpoint,
-	}, nil
+	// Everything checks out. The installation is stable.
+	status.State = mattermostv1alpha1.Stable
+
+	return status, nil
 }
 
 func (r *ReconcileClusterInstallation) checkSecret(secretName, namespace string) error {
@@ -114,10 +124,6 @@ func (r *ReconcileClusterInstallation) checkSecret(secretName, namespace string)
 
 func (r *ReconcileClusterInstallation) updateStatus(mattermost *mattermostv1alpha1.ClusterInstallation, status mattermostv1alpha1.ClusterInstallationStatus, reqLogger logr.Logger) error {
 	if !reflect.DeepEqual(mattermost.Status, status) {
-		reqLogger.Info(fmt.Sprintf("Updating status"),
-			"Old", fmt.Sprintf("%+v", mattermost.Status),
-			"New", fmt.Sprintf("%+v", status),
-		)
 		mattermost.Status = status
 		err := r.client.Status().Update(context.TODO(), mattermost)
 		if err != nil {

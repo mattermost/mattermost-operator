@@ -90,13 +90,13 @@ func (mattermost *ClusterInstallation) GenerateService() *corev1.Service {
 			Spec: corev1.ServiceSpec{
 				Ports: []corev1.ServicePort{
 					{
-						Name:       "https",
-						Port:       433,
+						Name:       "http",
+						Port:       80,
 						TargetPort: intstr.FromString("app"),
 					},
 					{
-						Name:       "http",
-						Port:       80,
+						Name:       "https",
+						Port:       443,
 						TargetPort: intstr.FromString("app"),
 					},
 				},
@@ -197,8 +197,9 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 
 		// Create the init container to check that the DB is up and running
 		initContainers = append(initContainers, corev1.Container{
-			Name:  "init-check-mysql",
-			Image: "appropriate/curl:latest",
+			Name:            "init-check-mysql",
+			Image:           "appropriate/curl:latest",
+			ImagePullPolicy: corev1.PullIfNotPresent,
 			Command: []string{
 				"sh", "-c",
 				fmt.Sprintf("until curl --max-time 5 http://%s-mysql.%s:3306; do echo waiting for mysql; sleep 5; done;", mattermost.Name, mattermost.Namespace),
@@ -208,14 +209,26 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 		// Create the init container to create the database.
 		// Mysql Operator does not create it by default
 		initContainers = append(initContainers, corev1.Container{
-			Name:  "init-create-mysql",
-			Image: "mysql:8.0.12",
+			Name:            "init-create-mysql",
+			Image:           "mysql:8.0.12",
+			ImagePullPolicy: corev1.PullIfNotPresent,
 			Command: []string{
 				"sh", "-c",
 				fmt.Sprintf("mysql -h %s-mysql.%s -u %s -p%s -e 'CREATE DATABASE IF NOT EXISTS mattermost'", mattermost.Name, mattermost.Namespace, dbUser, dbPassword),
 			},
 		})
 	}
+
+	// Create the init container to check that MinIO is up and running
+	initContainers = append(initContainers, corev1.Container{
+		Name:            "init-check-minio",
+		Image:           "appropriate/curl:latest",
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		Command: []string{
+			"sh", "-c",
+			fmt.Sprintf("until curl --max-time 5 http://%s/minio/health/live; do echo waiting for minio; sleep 5; done;", minioService),
+		},
+	})
 
 	// Generate Minio config
 	minioName := fmt.Sprintf("%s-minio", mattermost.Name)
@@ -290,6 +303,9 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 	envVars := []corev1.EnvVar{envVarDB}
 	envVars = append(envVars, envVarMinio...)
 	envVars = append(envVars, envVarES...)
+
+	revHistoryLimit := int32(5)
+
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      mattermost.Name,
@@ -304,7 +320,14 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 			},
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: &mattermost.Spec.Replicas,
+			Strategy: appsv1.DeploymentStrategy{
+				Type: appsv1.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: &appsv1.RollingUpdateDeployment{
+					MaxUnavailable: &intstr.IntOrString{IntVal: 1},
+				},
+			},
+			RevisionHistoryLimit: &revHistoryLimit,
+			Replicas:             &mattermost.Spec.Replicas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: ClusterInstallationLabels(mattermost.Name),
 			},
@@ -316,10 +339,12 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 					InitContainers: initContainers,
 					Containers: []corev1.Container{
 						{
-							Image:   mattermost.GetImageName(),
-							Name:    mattermost.Name,
-							Command: []string{"mattermost"},
-							Env:     envVars,
+							Image:                    mattermost.GetImageName(),
+							Name:                     mattermost.Name,
+							ImagePullPolicy:          corev1.PullAlways,
+							TerminationMessagePolicy: corev1.TerminationMessageFallbackToLogsOnError,
+							Command:                  []string{"mattermost"},
+							Env:                      envVars,
 							Ports: []corev1.ContainerPort{
 								{
 									ContainerPort: 8065,
