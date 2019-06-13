@@ -11,7 +11,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	utilpointer "k8s.io/utils/pointer"
 )
 
 const (
@@ -203,7 +202,7 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 		initContainers = append(initContainers, corev1.Container{
 			Name:            "init-check-mysql",
 			Image:           "appropriate/curl:latest",
-			ImagePullPolicy: "IfNotPresent",
+			ImagePullPolicy: corev1.PullIfNotPresent,
 			Command: []string{
 				"sh", "-c",
 				fmt.Sprintf("until curl --max-time 5 http://%s-mysql.%s:3306; do echo waiting for mysql; sleep 5; done;", mattermost.Name, mattermost.Namespace),
@@ -307,6 +306,9 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 	envVars := []corev1.EnvVar{envVarDB}
 	envVars = append(envVars, envVarMinio...)
 	envVars = append(envVars, envVarES...)
+
+	revHistoryLimit := int32(5)
+
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      mattermost.Name,
@@ -327,7 +329,7 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 					MaxUnavailable: &intstr.IntOrString{IntVal: 1},
 				},
 			},
-			RevisionHistoryLimit: utilpointer.Int32Ptr(2),
+			RevisionHistoryLimit: &revHistoryLimit,
 			Replicas:             &mattermost.Spec.Replicas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: ClusterInstallationLabels(mattermost.Name),
@@ -359,7 +361,7 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 										Port: intstr.FromInt(8065),
 									},
 								},
-								InitialDelaySeconds: 30,
+								InitialDelaySeconds: 10,
 								PeriodSeconds:       5,
 								FailureThreshold:    6,
 							},
@@ -370,7 +372,7 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 										Port: intstr.FromInt(8065),
 									},
 								},
-								InitialDelaySeconds: 60,
+								InitialDelaySeconds: 10,
 								PeriodSeconds:       10,
 								FailureThreshold:    3,
 							},
