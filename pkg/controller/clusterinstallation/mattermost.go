@@ -158,7 +158,7 @@ func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mat
 		return errors.Wrap(err, "Error getting the minio service.")
 	}
 
-	deployment := mattermost.GenerateDeployment(dbUser, dbPassword, externalDB, minioService)
+	deployment := mattermost.GenerateDeployment(mattermost.Spec.IngressName, dbUser, dbPassword, externalDB, minioService)
 	err = r.createDeploymentIfNotExists(mattermost, deployment, reqLogger)
 	if err != nil {
 		return err

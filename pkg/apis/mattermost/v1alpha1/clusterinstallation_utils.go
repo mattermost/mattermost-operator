@@ -176,7 +176,12 @@ func (mattermost *ClusterInstallation) GenerateIngress() *v1beta1.Ingress {
 }
 
 // GenerateDeployment returns the deployment spec for Mattermost
-func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword string, externalDB bool, minioService string) *appsv1.Deployment {
+func (mattermost *ClusterInstallation) GenerateDeployment(hostname string, dbUser, dbPassword string, externalDB bool, minioService string) *appsv1.Deployment {
+	envVarApp := corev1.EnvVar{
+		Name:  "MM_SERVICESETTINGS_SITEURL",
+		Value: fmt.Sprintf("https://%s", hostname),
+	}
+
 	// Generate database config
 	envVarDB := corev1.EnvVar{
 		Name: "MM_CONFIG",
@@ -303,7 +308,7 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 		}
 	}
 
-	envVars := []corev1.EnvVar{envVarDB}
+	envVars := []corev1.EnvVar{envVarApp, envVarDB}
 	envVars = append(envVars, envVarMinio...)
 	envVars = append(envVars, envVarES...)
 
