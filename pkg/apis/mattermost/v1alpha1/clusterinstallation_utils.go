@@ -303,9 +303,18 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 		}
 	}
 
+	siteURL := fmt.Sprintf("https://%s", mattermost.Spec.IngressName)
+	envVarGeneral := []corev1.EnvVar{
+		{
+			Name:  "MM_SERVICESETTINGS_SITEURL",
+			Value: siteURL,
+		},
+	}
+
 	envVars := []corev1.EnvVar{envVarDB}
 	envVars = append(envVars, envVarMinio...)
 	envVars = append(envVars, envVarES...)
+	envVars = append(envVars, envVarGeneral...)
 
 	revHistoryLimit := int32(5)
 
