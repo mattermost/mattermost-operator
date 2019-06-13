@@ -263,6 +263,26 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 		},
 	}
 
+	envVarMinioInit := append(envVarMinio,
+		corev1.EnvVar{
+			Name:  "AWS_ACCESS_KEY_ID",
+			Value: "${MM_FILESETTINGS_AMAZONS3ACCESSKEYID}",
+		},
+		corev1.EnvVar{
+			Name:  "AWS_SECRET_ACCESS_KEY",
+			Value: "${MM_FILESETTINGS_AMAZONS3SECRETACCESSKEY}",
+		},
+	)
+
+	initContainers = append(initContainers, corev1.Container{
+		Name:  "create-minio-bucket",
+		Image: "mesosphere/aws-cli",
+		Env:   envVarMinioInit,
+		Command: []string{
+			"aws", "s3api", "create-bucket", "--bucket", "${MM_FILESETTINGS_AMAZONS3BUCKET}",
+		},
+	})
+
 	// ES section vars
 	envVarES := []corev1.EnvVar{}
 	if mattermost.Spec.ElasticSearch.Host != "" {
