@@ -147,10 +147,7 @@ func (mattermost *ClusterInstallation) GenerateIngress() *v1beta1.Ingress {
 					Kind:    "ClusterInstallation",
 				}),
 			},
-			Annotations: map[string]string{
-				"kubernetes.io/ingress.class": "nginx",
-				//"kubernetes.io/tls-acme":      "true",
-			},
+			Annotations: mattermost.Spec.IngressAnnotations,
 		},
 		Spec: v1beta1.IngressSpec{
 			Rules: []v1beta1.IngressRule{

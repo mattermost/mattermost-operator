@@ -79,6 +79,10 @@ spec:
             image:
               description: Image defines the ClusterInstallation Docker image.
               type: string
+            ingressAnnotations:
+              additionalProperties:
+                type: string
+              type: object
             ingressName:
               description: IngressName defines the name to be used when creating the
                 ingress rules
