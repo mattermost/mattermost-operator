@@ -134,12 +134,17 @@ spec:
               type: string
             replicas:
               description: Total number of non-terminated pods targeted by this Mattermost
-                deployment (their labels match the selector).
+                deployment
               format: int32
               type: integer
             state:
               description: Represents the running state of the Mattermost instance
               type: string
+            updatedReplicas:
+              description: Total number of non-terminated pods targeted by this Mattermost
+                deployment that are running with the desired image.
+              format: int32
+              type: integer
             version:
               description: The version currently running in the Mattermost instance
               type: string
