@@ -226,7 +226,7 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		Command: []string{
 			"sh", "-c",
-			fmt.Sprintf("until curl --max-time 5 http://%s/minio/health/live; do echo waiting for minio; sleep 5; done;", minioService),
+			fmt.Sprintf("until curl --max-time 5 http://%s/minio/health/ready; do echo waiting for minio; sleep 5; done;", minioService),
 		},
 	})
 
