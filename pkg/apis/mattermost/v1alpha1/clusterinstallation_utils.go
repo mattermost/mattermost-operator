@@ -173,7 +173,7 @@ func (mattermost *ClusterInstallation) GenerateIngress() *v1beta1.Ingress {
 }
 
 // GenerateDeployment returns the deployment spec for Mattermost
-func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword string, externalDB bool, minioService string) *appsv1.Deployment {
+func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword string, externalDB, isLicensed bool, minioService string) *appsv1.Deployment {
 	// Generate database config
 	envVarDB := corev1.EnvVar{
 		Name: "MM_CONFIG",
@@ -308,6 +308,33 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 		},
 	}
 
+	// Mattermost License
+	volumeLicense := []corev1.Volume{}
+	volumeMountLicense := []corev1.VolumeMount{}
+	if mattermost.Spec.MattermostLicenseSecret != "" {
+
+		envVarGeneral = append(envVarGeneral, corev1.EnvVar{
+			Name:  "MM_SERVICESETTINGS_LICENSEFILELOCATION",
+			Value: "/mattermost-license/license",
+		})
+
+		volumeMountLicense = append(volumeMountLicense, corev1.VolumeMount{
+			MountPath: "/mattermost-license",
+			Name:      "mattermost-license",
+			ReadOnly:  true,
+		})
+
+		volumeLicense = append(volumeLicense, corev1.Volume{
+			Name: "mattermost-license",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: mattermost.Spec.MattermostLicenseSecret,
+				},
+			},
+		})
+	}
+
+	// EnvVars Section
 	envVars := []corev1.EnvVar{envVarDB}
 	envVars = append(envVars, envVarMinio...)
 	envVars = append(envVars, envVarES...)
@@ -382,8 +409,10 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 								PeriodSeconds:       10,
 								FailureThreshold:    3,
 							},
+							VolumeMounts: volumeMountLicense,
 						},
 					},
+					Volumes: volumeLicense,
 				},
 			},
 		},

@@ -96,6 +96,13 @@ func schema_pkg_apis_mattermost_v1alpha1_ClusterInstallationSpec(ref common.Refe
 							Format:      "",
 						},
 					},
+					"mattermostLicenseSecret": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Secret that contains the mattermost license",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 					"nodeSelector": {
 						SchemaProps: spec.SchemaProps{
 							Description: "NodeSelector is a selector which must be true for the pod to fit on a node. Selector which must match a node's labels for the pod to be scheduled on that node. More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/",
