@@ -311,8 +311,7 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 	// Mattermost License
 	volumeLicense := []corev1.Volume{}
 	volumeMountLicense := []corev1.VolumeMount{}
-	if mattermost.Spec.MattermostLicenseSecret != "" {
-
+	if isLicensed {
 		envVarGeneral = append(envVarGeneral, corev1.EnvVar{
 			Name:  "MM_SERVICESETTINGS_LICENSEFILELOCATION",
 			Value: "/mattermost-license/license",

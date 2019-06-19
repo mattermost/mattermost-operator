@@ -140,10 +140,11 @@ func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mat
 	var dbUser, dbPassword string
 	var err error
 	if mattermost.Spec.DatabaseType.ExternalDatabaseSecret != "" {
-		externalDB, err = r.checkSecret(mattermost.Spec.DatabaseType.ExternalDatabaseSecret, "externalDB", mattermost.Namespace)
+		err = r.checkSecret(mattermost.Spec.DatabaseType.ExternalDatabaseSecret, "externalDB", mattermost.Namespace)
 		if err != nil {
 			return errors.Wrap(err, "Error getting the external database secret.")
 		}
+		externalDB = true
 	} else {
 		dbPassword, err = r.getMySQLSecrets(mattermost)
 		if err != nil {
@@ -158,10 +159,11 @@ func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mat
 	}
 
 	if mattermost.Spec.MattermostLicenseSecret != "" {
-		isLicensed, err = r.checkSecret(mattermost.Spec.MattermostLicenseSecret, "license", mattermost.Namespace)
+		err = r.checkSecret(mattermost.Spec.MattermostLicenseSecret, "license", mattermost.Namespace)
 		if err != nil {
 			return errors.Wrap(err, "Error getting the mattermost license secret.")
 		}
+		isLicensed = true
 	}
 
 	deployment := mattermost.GenerateDeployment(dbUser, dbPassword, externalDB, isLicensed, minioService)

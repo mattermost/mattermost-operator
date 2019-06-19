@@ -197,8 +197,8 @@ func (r *ReconcileClusterInstallation) Reconcile(request reconcile.Request) (rec
 
 func (r *ReconcileClusterInstallation) checkDatabase(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
 	if mattermost.Spec.DatabaseType.ExternalDatabaseSecret != "" {
-		_, errSecret := r.checkSecret(mattermost.Spec.DatabaseType.ExternalDatabaseSecret, "externalDB", mattermost.Namespace)
-		return errSecret
+		err := r.checkSecret(mattermost.Spec.DatabaseType.ExternalDatabaseSecret, "externalDB", mattermost.Namespace)
+		return err
 	}
 
 	switch mattermost.Spec.DatabaseType.Type {
