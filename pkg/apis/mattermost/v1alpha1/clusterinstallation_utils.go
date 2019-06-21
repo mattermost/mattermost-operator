@@ -230,34 +230,58 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 		},
 	})
 
-	// Generate Minio config
 	minioName := fmt.Sprintf("%s-minio", mattermost.Name)
+	minioAccessEnv := &corev1.EnvVarSource{
+		SecretKeyRef: &corev1.SecretKeySelector{
+			LocalObjectReference: corev1.LocalObjectReference{
+				Name: minioName,
+			},
+			Key: "accesskey",
+		},
+	}
+
+	minioSecretEnv := &corev1.EnvVarSource{
+		SecretKeyRef: &corev1.SecretKeySelector{
+			LocalObjectReference: corev1.LocalObjectReference{
+				Name: minioName,
+			},
+			Key: "secretkey",
+		},
+	}
+	// Create the init container to create the MinIO bucker
+	initContainers = append(initContainers, corev1.Container{
+		Name:            "create-minio-bucket",
+		Image:           "minio/mc:latest",
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		Command: []string{
+			"/bin/sh", "-c",
+			fmt.Sprintf("mc config host add localminio http://%s $(MINIO_ACCESS_KEY) $(MINIO_SECRET_KEY) && mc mb localminio/%s -q -p", minioService, mattermost.Name),
+		},
+		Env: []corev1.EnvVar{
+			{
+				Name:      "MINIO_ACCESS_KEY",
+				ValueFrom: minioAccessEnv,
+			},
+			{
+				Name:      "MINIO_SECRET_KEY",
+				ValueFrom: minioSecretEnv,
+			},
+		},
+	})
+
+	// Generate Minio config
 	envVarMinio := []corev1.EnvVar{
 		{
 			Name:  "MM_FILESETTINGS_DRIVERNAME",
 			Value: "amazons3",
 		},
 		{
-			Name: "MM_FILESETTINGS_AMAZONS3ACCESSKEYID",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: minioName,
-					},
-					Key: "accesskey",
-				},
-			},
+			Name:      "MM_FILESETTINGS_AMAZONS3ACCESSKEYID",
+			ValueFrom: minioAccessEnv,
 		},
 		{
-			Name: "MM_FILESETTINGS_AMAZONS3SECRETACCESSKEY",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: minioName,
-					},
-					Key: "secretkey",
-				},
-			},
+			Name:      "MM_FILESETTINGS_AMAZONS3SECRETACCESSKEY",
+			ValueFrom: minioSecretEnv,
 		},
 		{
 			Name:  "MM_FILESETTINGS_AMAZONS3BUCKET",
