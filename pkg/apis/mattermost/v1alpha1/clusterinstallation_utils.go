@@ -231,6 +231,23 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 	})
 
 	minioName := fmt.Sprintf("%s-minio", mattermost.Name)
+	minioAccessEnv := &corev1.EnvVarSource{
+		SecretKeyRef: &corev1.SecretKeySelector{
+			LocalObjectReference: corev1.LocalObjectReference{
+				Name: minioName,
+			},
+			Key: "accesskey",
+		},
+	}
+
+	minioSecretEnv := &corev1.EnvVarSource{
+		SecretKeyRef: &corev1.SecretKeySelector{
+			LocalObjectReference: corev1.LocalObjectReference{
+				Name: minioName,
+			},
+			Key: "secretkey",
+		},
+	}
 	// Create the init container to create the MinIO bucker
 	initContainers = append(initContainers, corev1.Container{
 		Name:            "create-minio-bucket",
@@ -242,26 +259,12 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 		},
 		Env: []corev1.EnvVar{
 			{
-				Name: "MINIO_ACCESS_KEY",
-				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: minioName,
-						},
-						Key: "accesskey",
-					},
-				},
+				Name:      "MINIO_ACCESS_KEY",
+				ValueFrom: minioAccessEnv,
 			},
 			{
-				Name: "MINIO_SECRET_KEY",
-				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: minioName,
-						},
-						Key: "secretkey",
-					},
-				},
+				Name:      "MINIO_SECRET_KEY",
+				ValueFrom: minioSecretEnv,
 			},
 		},
 	})
@@ -273,26 +276,12 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 			Value: "amazons3",
 		},
 		{
-			Name: "MM_FILESETTINGS_AMAZONS3ACCESSKEYID",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: minioName,
-					},
-					Key: "accesskey",
-				},
-			},
+			Name:      "MM_FILESETTINGS_AMAZONS3ACCESSKEYID",
+			ValueFrom: minioAccessEnv,
 		},
 		{
-			Name: "MM_FILESETTINGS_AMAZONS3SECRETACCESSKEY",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: minioName,
-					},
-					Key: "secretkey",
-				},
-			},
+			Name:      "MM_FILESETTINGS_AMAZONS3SECRETACCESSKEY",
+			ValueFrom: minioSecretEnv,
 		},
 		{
 			Name:  "MM_FILESETTINGS_AMAZONS3BUCKET",
