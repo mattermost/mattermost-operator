@@ -7,10 +7,11 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -118,7 +119,7 @@ func (r *ReconcileClusterInstallation) Reconcile(request reconcile.Request) (rec
 	// Fetch the ClusterInstallation instance
 	mattermost := &mattermostv1alpha1.ClusterInstallation{}
 	err := r.client.Get(context.TODO(), request.NamespacedName, mattermost)
-	if err != nil && errors.IsNotFound(err) {
+	if err != nil && k8sErrors.IsNotFound(err) {
 		// Request object not found, could have been deleted after reconcile request.
 		// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
 		// Return and don't requeue
@@ -197,7 +198,10 @@ func (r *ReconcileClusterInstallation) Reconcile(request reconcile.Request) (rec
 
 func (r *ReconcileClusterInstallation) checkDatabase(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
 	if mattermost.Spec.DatabaseType.ExternalDatabaseSecret != "" {
-		return r.checkSecret(mattermost.Spec.DatabaseType.ExternalDatabaseSecret, mattermost.Namespace)
+		err := r.checkSecret(mattermost.Spec.DatabaseType.ExternalDatabaseSecret, "externalDB", mattermost.Namespace)
+		if err != nil {
+			return errors.Wrap(err, "Error getting the external database secret.")
+		}
 	}
 
 	switch mattermost.Spec.DatabaseType.Type {
@@ -207,5 +211,5 @@ func (r *ReconcileClusterInstallation) checkDatabase(mattermost *mattermostv1alp
 		return r.checkPostgres(mattermost, reqLogger)
 	}
 
-	return errors.NewInvalid(mattermostv1alpha1.SchemeGroupVersion.WithKind("ClusterInstallation").GroupKind(), "Database type invalid", nil)
+	return k8sErrors.NewInvalid(mattermostv1alpha1.SchemeGroupVersion.WithKind("ClusterInstallation").GroupKind(), "Database type invalid", nil)
 }

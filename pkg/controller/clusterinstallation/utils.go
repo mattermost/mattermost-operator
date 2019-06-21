@@ -112,14 +112,21 @@ func (r *ReconcileClusterInstallation) checkClusterInstallation(mattermost *matt
 	return status, nil
 }
 
-func (r *ReconcileClusterInstallation) checkSecret(secretName, namespace string) error {
+func (r *ReconcileClusterInstallation) checkSecret(secretName, keyName, namespace string) error {
 	foundSecret := &corev1.Secret{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: secretName, Namespace: namespace}, foundSecret)
 	if err != nil {
 		return errors.Wrap(err, "Error getting secret")
 	}
 
-	return nil
+	for key := range foundSecret.Data {
+		if keyName == key {
+			return nil
+		}
+	}
+
+	msg := fmt.Sprintf("Missing required secret data. Want: %s", keyName)
+	return errors.Wrap(err, msg)
 }
 
 func (r *ReconcileClusterInstallation) updateStatus(mattermost *mattermostv1alpha1.ClusterInstallation, status mattermostv1alpha1.ClusterInstallationStatus, reqLogger logr.Logger) error {
