@@ -230,8 +230,43 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 		},
 	})
 
-	// Generate Minio config
 	minioName := fmt.Sprintf("%s-minio", mattermost.Name)
+	// Create the init container to create the MinIO bucker
+	initContainers = append(initContainers, corev1.Container{
+		Name:            "create-minio-bucket",
+		Image:           "minio/mc:latest",
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		Command: []string{
+			"/bin/sh", "-c",
+			fmt.Sprintf("mc config host add localminio http://%s $(MINIO_ACCESS_KEY) $(MINIO_SECRET_KEY) && mc mb localminio/%s -q -p", minioService, mattermost.Name),
+		},
+		Env: []corev1.EnvVar{
+			{
+				Name: "MINIO_ACCESS_KEY",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: minioName,
+						},
+						Key: "accesskey",
+					},
+				},
+			},
+			{
+				Name: "MINIO_SECRET_KEY",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: minioName,
+						},
+						Key: "secretkey",
+					},
+				},
+			},
+		},
+	})
+
+	// Generate Minio config
 	envVarMinio := []corev1.EnvVar{
 		{
 			Name:  "MM_FILESETTINGS_DRIVERNAME",
