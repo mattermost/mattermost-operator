@@ -77,6 +77,7 @@ yaml: ## Generate the YAML file for easy operator installation
 	cat deploy/role_binding.yaml >> $(INSTALL_YAML)
 	echo --- >> $(INSTALL_YAML)
 	cat deploy/operator.yaml >> $(INSTALL_YAML)
+	sed -i '' 's/mattermost-operator:test/mattermost-operator:latest/g' ./$(INSTALL_YAML)
 
 
 dep: ## Get dependencies
