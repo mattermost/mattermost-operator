@@ -16,10 +16,10 @@ import (
 )
 
 // Instance returns the Minio component to deploy
-func Instance(mattermost *mattermostv1alpha1.ClusterInstallation) *minioOperator.MinioInstance {
+func Instance(mattermost *mattermostv1alpha1.ClusterInstallation) *minioOperator.MinIOInstance {
 	minioName := fmt.Sprintf("%s-minio", mattermost.Name)
 
-	return &minioOperator.MinioInstance{
+	return &minioOperator.MinIOInstance{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      minioName,
 			Namespace: mattermost.Namespace,
@@ -32,7 +32,7 @@ func Instance(mattermost *mattermostv1alpha1.ClusterInstallation) *minioOperator
 				}),
 			},
 		},
-		Spec: minioOperator.MinioInstanceSpec{
+		Spec: minioOperator.MinIOInstanceSpec{
 			Version:     "RELEASE.2018-11-22T02-51-56Z",
 			Replicas:    4,
 			Mountpath:   "/export",
