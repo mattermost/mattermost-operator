@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: minio-operator-ns
+  name: minio-operator
 ---
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
@@ -61,13 +61,13 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: minio-operator-sa
-  namespace: minio-operator-ns
+  namespace: minio-operator
 ---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1beta1
 metadata:
   name: minio-operator-binding
-  namespace: minio-operator-ns
+  namespace: minio-operator
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -75,13 +75,13 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: minio-operator-sa
-  namespace: minio-operator-ns
+  namespace: minio-operator
 ---
 apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
   name: minio-operator
-  namespace: minio-operator-ns
+  namespace: minio-operator
 spec:
   replicas: 1
   template:
@@ -93,3 +93,5 @@ spec:
       containers:
       - name: minio-operator
         image: minio/k8s-operator:latest
+        imagePullPolicy: Always
+
