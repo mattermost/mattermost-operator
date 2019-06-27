@@ -96,7 +96,7 @@ rules:
   verbs:
   - create
 - apiGroups:
-  - miniocontroller.minio.io
+  - miniocontroller.min.io
   resources:
   - "*"
   verbs:
