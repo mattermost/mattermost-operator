@@ -206,7 +206,7 @@ func (r *ReconcileClusterInstallation) checkDatabase(mattermost *mattermostv1alp
 
 	switch mattermost.Spec.DatabaseType.Type {
 	case "mysql":
-		return r.checkMySQL(mattermost, reqLogger)
+		return r.checkMySQLCluster(mattermost, reqLogger)
 	case "postgres":
 		return r.checkPostgres(mattermost, reqLogger)
 	}

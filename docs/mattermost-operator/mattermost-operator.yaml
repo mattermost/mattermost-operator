@@ -242,21 +242,30 @@ rules:
   verbs:
   - '*'
 - apiGroups:
-  - mysql.oracle.com
-  resources:
-  - mysqlbackups
-  - mysqlbackupschedules
-  - mysqlclusters
-  - mysqlclusters/finalizers
-  - mysqlrestores
-  verbs:
-  - '*'
-- apiGroups:
-  - mysql.oracle.com
+  - mysql.presslabs.org
   resources:
   - mysqlbackups
   verbs:
+  - get
+  - list
+  - watch
   - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - mysql.presslabs.org
+  resources:
+  - mysqlclusters
+  - mysqlclusters/status
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
 - apiGroups:
   - miniocontroller.minio.io
   resources:

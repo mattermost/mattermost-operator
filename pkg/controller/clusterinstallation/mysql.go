@@ -8,7 +8,6 @@ import (
 	"github.com/go-logr/logr"
 	mysqlOperator "github.com/presslabs/mysql-operator/pkg/apis/mysql/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/api/rbac/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -17,71 +16,8 @@ import (
 	"github.com/mattermost/mattermost-operator/pkg/components/utils"
 )
 
-func (r *ReconcileClusterInstallation) checkMySQL(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
-	reqLogger = reqLogger.WithValues("Reconcile", "mysql")
-
-	err := r.checkMySQLServiceAccount(mattermost, reqLogger)
-	if err != nil {
-		return err
-	}
-
-	err = r.checkMySQLRoleBinding(mattermost, reqLogger)
-	if err != nil {
-		return err
-	}
-
-	return r.checkMySQLCluster(mattermost, reqLogger)
-}
-
-func (r *ReconcileClusterInstallation) checkMySQLServiceAccount(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
-	serviceAccount := mattermostmysql.ServiceAccount(mattermost)
-
-	err := r.createServiceAccountIfNotExists(mattermost, serviceAccount, reqLogger)
-	if err != nil {
-		return err
-	}
-
-	foundServiceAccount := &corev1.ServiceAccount{}
-	err = r.client.Get(context.TODO(), types.NamespacedName{Name: serviceAccount.Name, Namespace: serviceAccount.Namespace}, foundServiceAccount)
-	if err != nil {
-		return err
-	}
-
-	updatedLabels := ensureLabels(serviceAccount.Labels, foundServiceAccount.Labels)
-	if !reflect.DeepEqual(updatedLabels, foundServiceAccount.Labels) {
-		reqLogger.Info("Updating mysql service account labels")
-		foundServiceAccount.Labels = updatedLabels
-		return r.client.Update(context.TODO(), foundServiceAccount)
-	}
-
-	return nil
-}
-
-func (r *ReconcileClusterInstallation) checkMySQLRoleBinding(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
-	roleBinding := mattermostmysql.RoleBinding(mattermost)
-
-	err := r.createRoleBindingIfNotExists(mattermost, roleBinding, reqLogger)
-	if err != nil {
-		return err
-	}
-
-	foundRoleBinding := &v1beta1.RoleBinding{}
-	err = r.client.Get(context.TODO(), types.NamespacedName{Name: roleBinding.Name, Namespace: roleBinding.Namespace}, foundRoleBinding)
-	if err != nil {
-		return err
-	}
-
-	updatedLabels := ensureLabels(roleBinding.Labels, foundRoleBinding.Labels)
-	if !reflect.DeepEqual(updatedLabels, foundRoleBinding.Labels) {
-		reqLogger.Info("Updating mysql role binding labels")
-		foundRoleBinding.Labels = updatedLabels
-		return r.client.Update(context.TODO(), foundRoleBinding)
-	}
-
-	return nil
-}
-
 func (r *ReconcileClusterInstallation) checkMySQLCluster(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
+	reqLogger = reqLogger.WithValues("Reconcile", "mysql")
 	cluster := mattermostmysql.Cluster(mattermost)
 
 	err := r.createMySQLClusterIfNotExists(mattermost, cluster, reqLogger)
