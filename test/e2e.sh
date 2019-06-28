@@ -122,8 +122,8 @@ main() {
     kubectl apply -n mysql-operator -f docs/mysql-operator/mysql-operator.yaml
 
     # Create the minio operator
-    kubectl create ns minio-operator-ns
-    kubectl apply -n minio-operator-ns -f docs/minio-operator/minio-operator.yaml
+    kubectl create ns minio-operator
+    kubectl apply -n minio-operator -f docs/minio-operator/minio-operator.yaml
 
     kubectl get pods --all-namespaces
     # NOTE: Append this test command with `|| true` to debug by inspecting the

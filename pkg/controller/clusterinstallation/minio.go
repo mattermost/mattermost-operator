@@ -59,7 +59,7 @@ func (r *ReconcileClusterInstallation) checkMinioInstance(mattermost *mattermost
 		return err
 	}
 
-	foundInstance := &minioOperator.MinioInstance{}
+	foundInstance := &minioOperator.MinIOInstance{}
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: instance.Name, Namespace: instance.Namespace}, foundInstance)
 	if err != nil {
 		return err
@@ -91,8 +91,8 @@ func (r *ReconcileClusterInstallation) checkMinioInstance(mattermost *mattermost
 	return nil
 }
 
-func (r *ReconcileClusterInstallation) createMinioInstanceIfNotExists(mattermost *mattermostv1alpha1.ClusterInstallation, instance *minioOperator.MinioInstance, reqLogger logr.Logger) error {
-	foundInstance := &minioOperator.MinioInstance{}
+func (r *ReconcileClusterInstallation) createMinioInstanceIfNotExists(mattermost *mattermostv1alpha1.ClusterInstallation, instance *minioOperator.MinIOInstance, reqLogger logr.Logger) error {
+	foundInstance := &minioOperator.MinIOInstance{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: instance.Name, Namespace: instance.Namespace}, foundInstance)
 	if err != nil && errors.IsNotFound(err) {
 		reqLogger.Info("Creating minio instance")
