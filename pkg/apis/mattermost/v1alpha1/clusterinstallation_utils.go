@@ -174,14 +174,15 @@ func (mattermost *ClusterInstallation) GenerateIngress() *v1beta1.Ingress {
 
 // GenerateDeployment returns the deployment spec for Mattermost
 func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword string, externalDB, isLicensed bool, minioService string) *appsv1.Deployment {
-	// Generate database config
-	envVarDB := corev1.EnvVar{
+	envVarDB := []corev1.EnvVar{}
+
+	masterDBEnvVar := corev1.EnvVar{
 		Name: "MM_CONFIG",
 	}
 
 	var initContainers []corev1.Container
 	if externalDB {
-		envVarDB.ValueFrom = &corev1.EnvVarSource{
+		masterDBEnvVar.ValueFrom = &corev1.EnvVarSource{
 			SecretKeyRef: &corev1.SecretKeySelector{
 				LocalObjectReference: corev1.LocalObjectReference{
 					Name: mattermost.Spec.DatabaseType.ExternalDatabaseSecret,
@@ -190,10 +191,18 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 			},
 		}
 	} else {
-		envVarDB.Value = fmt.Sprintf(
-			"mysql://%s:%s@tcp(%s-mysql.%s:3306)/mattermost?charset=utf8mb4,utf8&readTimeout=30s&writeTimeout=30s",
+		masterDBEnvVar.Value = fmt.Sprintf(
+			"mysql://%s:%s@tcp(%s-mysql-mysql-master.%s:3306)/mattermost?charset=utf8mb4,utf8&readTimeout=30s&writeTimeout=30s",
 			dbUser, dbPassword, mattermost.Name, mattermost.Namespace,
 		)
+
+		envVarDB = append(envVarDB, corev1.EnvVar{
+			Name: "MM_SQLSETTINGS_DATASOURCEREPLICAS",
+			Value: fmt.Sprintf(
+				"%s:%s@tcp(%s-mysql-mysql-nodes.%s:3306)/mattermost?readTimeout=30s&writeTimeout=30s",
+				dbUser, dbPassword, mattermost.Name, mattermost.Namespace,
+			),
+		})
 
 		// Create the init container to check that the DB is up and running
 		initContainers = append(initContainers, corev1.Container{
@@ -202,7 +211,7 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 			ImagePullPolicy: corev1.PullIfNotPresent,
 			Command: []string{
 				"sh", "-c",
-				fmt.Sprintf("until curl --max-time 5 http://%s-mysql.%s:3306; do echo waiting for mysql; sleep 5; done;", mattermost.Name, mattermost.Namespace),
+				fmt.Sprintf("until curl --max-time 5 http://%s-mysql-mysql-master.%s:3306; do echo waiting for mysql; sleep 5; done;", mattermost.Name, mattermost.Namespace),
 			},
 		})
 
@@ -214,10 +223,12 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 			ImagePullPolicy: corev1.PullIfNotPresent,
 			Command: []string{
 				"sh", "-c",
-				fmt.Sprintf("mysql -h %s-mysql.%s -u %s -p%s -e 'CREATE DATABASE IF NOT EXISTS mattermost'", mattermost.Name, mattermost.Namespace, dbUser, dbPassword),
+				fmt.Sprintf("mysql -h %s-mysql-mysql-master.%s -u %s -p%s -e 'CREATE DATABASE IF NOT EXISTS mattermost'", mattermost.Name, mattermost.Namespace, dbUser, dbPassword),
 			},
 		})
 	}
+
+	envVarDB = append(envVarDB, masterDBEnvVar)
 
 	// Create the init container to check that MinIO is up and running
 	initContainers = append(initContainers, corev1.Container{
@@ -358,7 +369,8 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 	}
 
 	// EnvVars Section
-	envVars := []corev1.EnvVar{envVarDB}
+	envVars := []corev1.EnvVar{}
+	envVars = append(envVars, envVarDB...)
 	envVars = append(envVars, envVarMinio...)
 	envVars = append(envVars, envVarES...)
 	envVars = append(envVars, envVarGeneral...)

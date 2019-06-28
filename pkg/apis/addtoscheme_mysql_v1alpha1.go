@@ -1,7 +1,7 @@
 package apis
 
 import (
-	v1alpha1MySQL "github.com/oracle/mysql-operator/pkg/apis/mysql/v1alpha1"
+	v1alpha1MySQL "github.com/presslabs/mysql-operator/pkg/apis/mysql/v1alpha1"
 )
 
 func init() {

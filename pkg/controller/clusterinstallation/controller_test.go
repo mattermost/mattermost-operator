@@ -18,7 +18,7 @@ import (
 
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
 	minioOperator "github.com/minio/minio-operator/pkg/apis/miniocontroller/v1beta1"
-	mysqlOperator "github.com/oracle/mysql-operator/pkg/apis/mysql/v1alpha1"
+	mysqlOperator "github.com/presslabs/mysql-operator/pkg/apis/mysql/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
@@ -85,7 +85,7 @@ func TestReconcile(t *testing.T) {
 
 	t.Run("mysql", func(t *testing.T) {
 		t.Run("cluster", func(t *testing.T) {
-			mysql := &mysqlOperator.Cluster{}
+			mysql := &mysqlOperator.MysqlCluster{}
 			err = c.Get(context.TODO(), ciMysqlKey, mysql)
 			require.NoError(t, err)
 		})
