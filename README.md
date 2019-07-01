@@ -20,7 +20,7 @@ You must have a running Kubernetes 1.11.0+ cluster. If you do not, then see the 
 In addition you must have [kubectl](https://kubernetes.io/docs/reference/kubectl/overview/) configured for the relevant Kubernetes cluster. 
 
 ### 1.2 MySQL Operator
-The oracle/mysql-operator is required if you are not using an external database. To install the MySQL operator run:
+The presslabs/mysql-operator is required if you are not using an external database. To install the MySQL operator run:
 
 ```bash
 $ kubectl create ns mysql-operator
