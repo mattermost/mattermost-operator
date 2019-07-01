@@ -553,6 +553,14 @@
   version = "v1.0.0"
 
 [[projects]]
+  digest = "1:752482fc318d9953463ab59a0fb370bf9924fadc2d69591de04ac53e0b492894"
+  name = "github.com/presslabs/mysql-operator"
+  packages = ["pkg/apis/mysql/v1alpha1"]
+  pruneopts = "NT"
+  revision = "80e8f35dbac0d9dfa9ab2c77aa2d8a8cab4dbfa4"
+  version = "v0.3.0"
+
+[[projects]]
   digest = "1:ec2a29e3bd141038ae5c3d3a4f57db0c341fcc1d98055a607aedd683aed124ee"
   name = "github.com/prometheus/client_golang"
   packages = [
@@ -1281,6 +1289,7 @@
     "github.com/oracle/mysql-operator/pkg/apis/mysql/v1alpha1",
     "github.com/pborman/uuid",
     "github.com/pkg/errors",
+    "github.com/presslabs/mysql-operator/pkg/apis/mysql/v1alpha1",
     "github.com/sirupsen/logrus",
     "github.com/spf13/pflag",
     "github.com/stretchr/testify/assert",

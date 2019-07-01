@@ -146,7 +146,7 @@ func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mat
 		}
 		externalDB = true
 	} else {
-		dbPassword, err = r.getMySQLSecrets(mattermost)
+		dbPassword, err = r.getOrCreateMySQLSecrets(mattermost, reqLogger)
 		if err != nil {
 			return errors.Wrap(err, "Error getting mysql database password.")
 		}

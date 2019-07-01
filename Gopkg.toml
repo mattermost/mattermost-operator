@@ -87,3 +87,7 @@ version="v1.4.7"
   [[prune.project]]
     name = "k8s.io/gengo"
     non-go = false
+
+[[constraint]]
+  name = "github.com/presslabs/mysql-operator"
+  version = "0.3.0"

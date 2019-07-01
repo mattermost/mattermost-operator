@@ -6,81 +6,18 @@ import (
 	"reflect"
 
 	"github.com/go-logr/logr"
-	mysqlOperator "github.com/oracle/mysql-operator/pkg/apis/mysql/v1alpha1"
+	mysqlOperator "github.com/presslabs/mysql-operator/pkg/apis/mysql/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/api/rbac/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
 	mattermostmysql "github.com/mattermost/mattermost-operator/pkg/components/mysql"
+	"github.com/mattermost/mattermost-operator/pkg/components/utils"
 )
 
-func (r *ReconcileClusterInstallation) checkMySQL(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
-	reqLogger = reqLogger.WithValues("Reconcile", "mysql")
-
-	err := r.checkMySQLServiceAccount(mattermost, reqLogger)
-	if err != nil {
-		return err
-	}
-
-	err = r.checkMySQLRoleBinding(mattermost, reqLogger)
-	if err != nil {
-		return err
-	}
-
-	return r.checkMySQLCluster(mattermost, reqLogger)
-}
-
-func (r *ReconcileClusterInstallation) checkMySQLServiceAccount(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
-	serviceAccount := mattermostmysql.ServiceAccount(mattermost)
-
-	err := r.createServiceAccountIfNotExists(mattermost, serviceAccount, reqLogger)
-	if err != nil {
-		return err
-	}
-
-	foundServiceAccount := &corev1.ServiceAccount{}
-	err = r.client.Get(context.TODO(), types.NamespacedName{Name: serviceAccount.Name, Namespace: serviceAccount.Namespace}, foundServiceAccount)
-	if err != nil {
-		return err
-	}
-
-	updatedLabels := ensureLabels(serviceAccount.Labels, foundServiceAccount.Labels)
-	if !reflect.DeepEqual(updatedLabels, foundServiceAccount.Labels) {
-		reqLogger.Info("Updating mysql service account labels")
-		foundServiceAccount.Labels = updatedLabels
-		return r.client.Update(context.TODO(), foundServiceAccount)
-	}
-
-	return nil
-}
-
-func (r *ReconcileClusterInstallation) checkMySQLRoleBinding(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
-	roleBinding := mattermostmysql.RoleBinding(mattermost)
-
-	err := r.createRoleBindingIfNotExists(mattermost, roleBinding, reqLogger)
-	if err != nil {
-		return err
-	}
-
-	foundRoleBinding := &v1beta1.RoleBinding{}
-	err = r.client.Get(context.TODO(), types.NamespacedName{Name: roleBinding.Name, Namespace: roleBinding.Namespace}, foundRoleBinding)
-	if err != nil {
-		return err
-	}
-
-	updatedLabels := ensureLabels(roleBinding.Labels, foundRoleBinding.Labels)
-	if !reflect.DeepEqual(updatedLabels, foundRoleBinding.Labels) {
-		reqLogger.Info("Updating mysql role binding labels")
-		foundRoleBinding.Labels = updatedLabels
-		return r.client.Update(context.TODO(), foundRoleBinding)
-	}
-
-	return nil
-}
-
 func (r *ReconcileClusterInstallation) checkMySQLCluster(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
+	reqLogger = reqLogger.WithValues("Reconcile", "mysql")
 	cluster := mattermostmysql.Cluster(mattermost)
 
 	err := r.createMySQLClusterIfNotExists(mattermost, cluster, reqLogger)
@@ -88,7 +25,7 @@ func (r *ReconcileClusterInstallation) checkMySQLCluster(mattermost *mattermostv
 		return err
 	}
 
-	foundCluster := &mysqlOperator.Cluster{}
+	foundCluster := &mysqlOperator.MysqlCluster{}
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: cluster.Name, Namespace: cluster.Namespace}, foundCluster)
 	if err != nil {
 		return err
@@ -116,8 +53,8 @@ func (r *ReconcileClusterInstallation) checkMySQLCluster(mattermost *mattermostv
 	return nil
 }
 
-func (r *ReconcileClusterInstallation) createMySQLClusterIfNotExists(mattermost *mattermostv1alpha1.ClusterInstallation, cluster *mysqlOperator.Cluster, reqLogger logr.Logger) error {
-	foundCluster := &mysqlOperator.Cluster{}
+func (r *ReconcileClusterInstallation) createMySQLClusterIfNotExists(mattermost *mattermostv1alpha1.ClusterInstallation, cluster *mysqlOperator.MysqlCluster, reqLogger logr.Logger) error {
+	foundCluster := &mysqlOperator.MysqlCluster{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: cluster.Name, Namespace: cluster.Namespace}, foundCluster)
 	if err != nil && errors.IsNotFound(err) {
 		reqLogger.Info("Creating mysql cluster")
@@ -130,12 +67,22 @@ func (r *ReconcileClusterInstallation) createMySQLClusterIfNotExists(mattermost 
 	return nil
 }
 
-func (r *ReconcileClusterInstallation) getMySQLSecrets(mattermost *mattermostv1alpha1.ClusterInstallation) (string, error) {
+func (r *ReconcileClusterInstallation) getOrCreateMySQLSecrets(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) (string, error) {
 	dbSecretName := fmt.Sprintf("%s-mysql-root-password", mattermost.Name)
 	dbSecret := &corev1.Secret{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: dbSecretName, Namespace: mattermost.Namespace}, dbSecret)
-	if err != nil {
+	if err != nil && errors.IsNotFound(err) {
+		reqLogger.Info("Creating mysql secret")
+
+		dbSecret.SetName(dbSecretName)
+		dbSecret.SetNamespace(mattermost.Namespace)
+		password := string(utils.New16ID())
+		dbSecret.Data = map[string][]byte{"ROOT_PASSWORD": []byte(password)}
+
+		return password, r.createResource(mattermost, dbSecret, reqLogger)
+	} else if err != nil {
+		reqLogger.Error(err, "Failed to check if mysql secret exists")
 		return "", err
 	}
-	return string(dbSecret.Data["password"]), nil
+	return string(dbSecret.Data["ROOT_PASSWORD"]), nil
 }

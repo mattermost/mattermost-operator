@@ -10,7 +10,6 @@ import (
 
 	apis "github.com/mattermost/mattermost-operator/pkg/apis"
 	operator "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
-	mysqlOperator "github.com/oracle/mysql-operator/pkg/apis/mysql/v1alpha1"
 
 	framework "github.com/operator-framework/operator-sdk/pkg/test"
 	"github.com/operator-framework/operator-sdk/pkg/test/e2eutil"
@@ -28,22 +27,13 @@ var (
 )
 
 func TestMattermost(t *testing.T) {
-	mysqlList := &mysqlOperator.ClusterList{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Cluster",
-			APIVersion: "mysql.oracle.com/v1alpha1",
-		},
-	}
-	err := framework.AddToFrameworkScheme(mysqlOperator.AddToScheme, mysqlList)
-	require.NoError(t, err)
-
 	mattermostList := &operator.ClusterInstallationList{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ClusterInstallation",
 			APIVersion: "mattermost.com/v1alpha1",
 		},
 	}
-	err = framework.AddToFrameworkScheme(apis.AddToScheme, mattermostList)
+	err := framework.AddToFrameworkScheme(apis.AddToScheme, mattermostList)
 	require.NoError(t, err)
 
 	ctx := framework.NewTestCtx(t)
