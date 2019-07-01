@@ -91,7 +91,7 @@ func TestReconcile(t *testing.T) {
 
 	t.Run("minio", func(t *testing.T) {
 		t.Run("instance", func(t *testing.T) {
-			minio := &minioOperator.MinioInstance{}
+			minio := &minioOperator.MinIOInstance{}
 			err = c.Get(context.TODO(), ciMinioKey, minio)
 			require.NoError(t, err)
 		})

@@ -65,7 +65,7 @@ func TestMattermost(t *testing.T) {
 		require.NoError(t, err)
 	})
 	t.Run("minio operator ready", func(t *testing.T) {
-		err = e2eutil.WaitForDeployment(t, f.KubeClient, "minio-operator-ns", "minio-operator", 1, retryInterval, timeout)
+		err = e2eutil.WaitForDeployment(t, f.KubeClient, "minio-operator", "minio-operator", 1, retryInterval, timeout)
 		require.NoError(t, err)
 	})
 	t.Run("mattermost operator ready", func(t *testing.T) {

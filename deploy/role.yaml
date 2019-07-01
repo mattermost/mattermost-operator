@@ -105,7 +105,7 @@ rules:
   - patch
   - delete
 - apiGroups:
-  - miniocontroller.minio.io
+  - miniocontroller.min.io
   resources:
   - "*"
   verbs:
