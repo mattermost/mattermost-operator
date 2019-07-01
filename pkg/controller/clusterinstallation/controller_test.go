@@ -22,7 +22,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
-	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -81,22 +80,11 @@ func TestReconcile(t *testing.T) {
 	ciKey := types.NamespacedName{Name: ciName, Namespace: ciNamespace}
 	ciMysqlKey := types.NamespacedName{Name: ciName + "-mysql", Namespace: ciNamespace}
 	ciMinioKey := types.NamespacedName{Name: ciName + "-minio", Namespace: ciNamespace}
-	ciSvcAccountKey := types.NamespacedName{Name: "mysql-agent", Namespace: ciNamespace}
 
 	t.Run("mysql", func(t *testing.T) {
 		t.Run("cluster", func(t *testing.T) {
 			mysql := &mysqlOperator.MysqlCluster{}
 			err = c.Get(context.TODO(), ciMysqlKey, mysql)
-			require.NoError(t, err)
-		})
-		t.Run("service account", func(t *testing.T) {
-			svcAccount := &corev1.ServiceAccount{}
-			err = c.Get(context.TODO(), ciSvcAccountKey, svcAccount)
-			require.NoError(t, err)
-		})
-		t.Run("role binding", func(t *testing.T) {
-			roleBinding := &rbacv1beta1.RoleBinding{}
-			err = c.Get(context.TODO(), ciSvcAccountKey, roleBinding)
 			require.NoError(t, err)
 		})
 	})

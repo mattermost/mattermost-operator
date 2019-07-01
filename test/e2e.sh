@@ -92,16 +92,16 @@ main() {
     # Move the operator container inside Kind container so that the image is
     # available to the docker in docker environment.
     # Copy the image to the cluster to make a bit more fast to start
-    docker pull iad.ocir.io/oracle/mysql-operator:0.3.0
-    docker pull iad.ocir.io/oracle/mysql-agent:0.3.0
-    docker pull mysql/mysql-server:8.0.12
+    docker pull quay.io/presslabs/mysql-operator:0.2.10
+    docker pull quay.io/presslabs/mysql-operator-sidecar:0.2.10
+    docker pull quay.io/presslabs/orchestrator:v3.0.13-r29
     docker pull minio/k8s-operator:latest
     docker pull mattermost/mattermost-enterprise-edition:5.10.0
     docker pull mattermost/mattermost-enterprise-edition:5.11.0
 
-    kind load docker-image iad.ocir.io/oracle/mysql-operator:0.3.0
-    kind load docker-image iad.ocir.io/oracle/mysql-agent:0.3.0
-    kind load docker-image mysql/mysql-server:8.0.12
+    kind load docker-image quay.io/presslabs/mysql-operator:0.2.10
+    kind load docker-image quay.io/presslabs/mysql-operator-sidecar:0.2.10
+    kind load docker-image quay.io/presslabs/orchestrator:v3.0.13-r29
     kind load docker-image mattermost/mattermost-operator:test
     kind load docker-image minio/k8s-operator:latest
     kind load docker-image mattermost/mattermost-enterprise-edition:5.11.0

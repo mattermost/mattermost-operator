@@ -31,7 +31,7 @@ func TestMattermost(t *testing.T) {
 	mysqlList := &mysqlOperator.ClusterList{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Cluster",
-			APIVersion: "mysql.oracle.com/v1alpha1",
+			APIVersion: "mysql.presslabs.org/v1alpha1",
 		},
 	}
 	err := framework.AddToFrameworkScheme(mysqlOperator.AddToScheme, mysqlList)
