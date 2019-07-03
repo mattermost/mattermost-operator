@@ -354,6 +354,19 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 				},
 			},
 		})
+
+		clusterEnvVars := []corev1.EnvVar{
+			{
+				Name:  "MM_CLUSTERSETTINGS_ENABLE",
+				Value: "true",
+			},
+			{
+				Name:  "MM_CLUSTERSETTINGS_CLUSTERNAME",
+				Value: "production",
+			},
+		}
+
+		envVarGeneral = append(envVarGeneral, clusterEnvVars...)
 	}
 
 	// EnvVars Section
