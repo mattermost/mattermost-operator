@@ -150,7 +150,7 @@ func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mat
 		if err != nil {
 			return errors.Wrap(err, "Error getting mysql database password.")
 		}
-		dbUser = "root"
+		dbUser = "mmuser"
 	}
 
 	minioService, err := r.getMinioService(mattermost, reqLogger)

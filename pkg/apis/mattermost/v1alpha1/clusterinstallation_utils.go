@@ -214,18 +214,6 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 				fmt.Sprintf("until curl --max-time 5 http://%s-mysql-mysql-master.%s:3306; do echo waiting for mysql; sleep 5; done;", mattermost.Name, mattermost.Namespace),
 			},
 		})
-
-		// Create the init container to create the database.
-		// Mysql Operator does not create it by default
-		initContainers = append(initContainers, corev1.Container{
-			Name:            "init-create-mysql",
-			Image:           "mysql:8.0.12",
-			ImagePullPolicy: corev1.PullIfNotPresent,
-			Command: []string{
-				"sh", "-c",
-				fmt.Sprintf("mysql -h %s-mysql-mysql-master.%s -u %s -p%s -e 'CREATE DATABASE IF NOT EXISTS mattermost'", mattermost.Name, mattermost.Namespace, dbUser, dbPassword),
-			},
-		})
 	}
 
 	envVarDB = append(envVarDB, masterDBEnvVar)

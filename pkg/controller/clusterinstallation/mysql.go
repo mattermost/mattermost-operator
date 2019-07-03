@@ -76,13 +76,20 @@ func (r *ReconcileClusterInstallation) getOrCreateMySQLSecrets(mattermost *matte
 
 		dbSecret.SetName(dbSecretName)
 		dbSecret.SetNamespace(mattermost.Namespace)
-		password := string(utils.New16ID())
-		dbSecret.Data = map[string][]byte{"ROOT_PASSWORD": []byte(password)}
+		rootPassword := string(utils.New16ID())
+		userPassword := string(utils.New16ID())
 
-		return password, r.createResource(mattermost, dbSecret, reqLogger)
+		dbSecret.Data = map[string][]byte{
+			"ROOT_PASSWORD": []byte(rootPassword),
+			"USER":          []byte("mmuser"),
+			"PASSWORD":      []byte(userPassword),
+			"DATABASE":      []byte("mattermost"),
+		}
+
+		return userPassword, r.createResource(mattermost, dbSecret, reqLogger)
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to check if mysql secret exists")
 		return "", err
 	}
-	return string(dbSecret.Data["ROOT_PASSWORD"]), nil
+	return string(dbSecret.Data["PASSWORD"]), nil
 }
