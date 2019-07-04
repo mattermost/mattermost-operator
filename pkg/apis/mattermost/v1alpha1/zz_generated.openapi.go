@@ -130,6 +130,13 @@ func schema_pkg_apis_mattermost_v1alpha1_ClusterInstallationSpec(ref common.Refe
 							Format:      "",
 						},
 					},
+					"minioReplicas": {
+						SchemaProps: spec.SchemaProps{
+							Description: "MinioReplicas defines the number of Minio replicas. Supply 1 to run MiniO in standalone mode with no redundancy. Supply 4 or more to run Minio in distributed mode. Note that it is not possible to upgrade Minio from standalone to distributed mode. More info: https://docs.min.io/docs/distributed-minio-quickstart-guide.html",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
 					"databaseType": {
 						SchemaProps: spec.SchemaProps{
 							Ref: ref("github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.DatabaseType"),

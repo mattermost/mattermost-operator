@@ -40,6 +40,13 @@ type ClusterInstallationSpec struct {
 	// +optional
 	// +kubebuilder:validation:Pattern=^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$
 	MinioStorageSize string `json:"minioStorageSize,omitempty"`
+	// MinioReplicas defines the number of Minio replicas.
+	// Supply 1 to run MiniO in standalone mode with no redundancy.
+	// Supply 4 or more to run Minio in distributed mode.
+	// Note that it is not possible to upgrade Minio from standalone to distributed mode.
+	// More info: https://docs.min.io/docs/distributed-minio-quickstart-guide.html
+	// +optional
+	MinioReplicas int32 `json:"minioReplicas,omitempty"`
 
 	DatabaseType DatabaseType `json:"databaseType,omitempty"`
 	// +optional
@@ -65,7 +72,11 @@ type DatabaseType struct {
 	// Defines the storage size for the database. ie 50Gi
 	// +optional
 	// +kubebuilder:validation:Pattern=^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$
-	DbStorageSize string `json:"dbStorageSize,omitempty"`
+	DatabaseStorageSize string `json:"databaseStorageSize,omitempty"`
+	// DatabaseReplicas defines the number of database replicas
+	// For redundancy use at least 2 replicas
+	// +optional
+	DatabaseReplicas int32 `json:"databaseReplicas,omitempty"`
 }
 
 // ElasticSearch defines the ElasticSearch configuration for a ClusterInstallation

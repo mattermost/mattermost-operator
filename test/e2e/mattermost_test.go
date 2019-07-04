@@ -90,8 +90,10 @@ func mattermostScaleTest(t *testing.T, f *framework.Framework, ctx *framework.Te
 			IngressName:      "test-example.mattermost.dev",
 			Replicas:         1,
 			MinioStorageSize: "1Gi",
+			MinioReplicas:    1,
 			DatabaseType: operator.DatabaseType{
-				DbStorageSize: "1Gi",
+				DatabaseStorageSize: "1Gi",
+				DatabaseReplicas:    1,
 			},
 		},
 	}
@@ -102,6 +104,12 @@ func mattermostScaleTest(t *testing.T, f *framework.Framework, ctx *framework.Te
 
 	// wait for test-mm to reach 1 replicas
 	err = e2eutil.WaitForDeployment(t, f.KubeClient, namespace, "test-mm", 1, retryInterval, timeout)
+	require.NoError(t, err)
+
+	err = e2eutil.WaitForDeployment(t, f.KubeClient, namespace, "test-mm-minio", 1, retryInterval, timeout)
+	require.NoError(t, err)
+
+	err = e2eutil.WaitForDeployment(t, f.KubeClient, namespace, "test-mm-mysql-mysql", 1, retryInterval, timeout)
 	require.NoError(t, err)
 
 	err = f.Client.Get(context.TODO(), types.NamespacedName{Name: "test-mm", Namespace: namespace}, exampleMattermost)
@@ -158,7 +166,7 @@ func mattermostUpgradeTest(t *testing.T, f *framework.Framework, ctx *framework.
 			Replicas:         1,
 			MinioStorageSize: "1Gi",
 			DatabaseType: operator.DatabaseType{
-				DbStorageSize: "1Gi",
+				DatabaseStorageSize: "1Gi",
 			},
 		},
 	}

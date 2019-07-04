@@ -61,7 +61,7 @@ spec:
               type: object
             databaseType:
               properties:
-                dbStorageSize:
+                databaseStorageSize:
                   description: Defines the storage size for the database. ie 50Gi
                   pattern: ^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$
                   type: string

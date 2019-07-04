@@ -24,10 +24,14 @@ const (
 	DefaultMattermostVersion = "5.11.0"
 	// DefaultMattermostDatabaseType is the default Mattermost database
 	DefaultMattermostDatabaseType = "mysql"
+	// DefaultMattermostDatabaseReplicas is the default number of database replicas
+	DefaultMattermostDatabaseReplicas = 3
 	// DefaultMinioStorageSize is the default Storage size for Minio
 	DefaultMinioStorageSize = "50Gi"
-	// DefaultDbStorageSize is the default Storage size for the Database
-	DefaultDbStorageSize = "50Gi"
+	// DefaultMinioReplicas is the default number of Minio replicas
+	DefaultMinioReplicas = 4
+	// DefaultDatabaseStorageSize is the default Storage size for the Database
+	DefaultDatabaseStorageSize = "50Gi"
 
 	// ClusterLabel is the label applied across all compoments
 	ClusterLabel = "v1alpha1.mattermost.com/installation"
@@ -53,15 +57,26 @@ func (mattermost *ClusterInstallation) SetDefaults() error {
 	if mattermost.Spec.MinioStorageSize == "" {
 		mattermost.Spec.MinioStorageSize = DefaultMinioStorageSize
 	}
-	if len(mattermost.Spec.DatabaseType.Type) == 0 {
-		mattermost.Spec.DatabaseType.Type = DefaultMattermostDatabaseType
+	if mattermost.Spec.MinioReplicas == 0 {
+		mattermost.Spec.MinioReplicas = DefaultMinioReplicas
 	}
 
-	if mattermost.Spec.DatabaseType.DbStorageSize == "" {
-		mattermost.Spec.DatabaseType.DbStorageSize = DefaultDbStorageSize
-	}
+	mattermost.Spec.DatabaseType.SetDefaults()
 
 	return nil
+}
+
+// SetDefaults sets the missing values in the DatabaseType to the default ones
+func (db *DatabaseType) SetDefaults() {
+	if len(db.Type) == 0 {
+		db.Type = DefaultMattermostDatabaseType
+	}
+	if db.DatabaseStorageSize == "" {
+		db.DatabaseStorageSize = DefaultDatabaseStorageSize
+	}
+	if db.DatabaseReplicas == 0 {
+		db.DatabaseReplicas = DefaultMattermostDatabaseReplicas
+	}
 }
 
 // GenerateService returns the service for Mattermost

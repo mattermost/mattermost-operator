@@ -34,7 +34,7 @@ func Cluster(mattermost *mattermostv1alpha1.ClusterInstallation) *mysqlOperator.
 		},
 		Spec: mysqlOperator.MysqlClusterSpec{
 			MysqlVersion: "5.7",
-			Replicas:     utils.NewInt32(4),
+			Replicas:     utils.NewInt32(mattermost.Spec.DatabaseType.DatabaseReplicas),
 			SecretName:   fmt.Sprintf("%s-mysql-root-password", mattermost.Name),
 			VolumeSpec: mysqlOperator.VolumeSpec{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimSpec{
@@ -43,7 +43,7 @@ func Cluster(mattermost *mattermostv1alpha1.ClusterInstallation) *mysqlOperator.
 					},
 					Resources: corev1.ResourceRequirements{
 						Requests: corev1.ResourceList{
-							corev1.ResourceStorage: resource.MustParse(mattermost.Spec.DatabaseType.DbStorageSize),
+							corev1.ResourceStorage: resource.MustParse(mattermost.Spec.DatabaseType.DatabaseStorageSize),
 						},
 					},
 				},
