@@ -192,7 +192,7 @@ func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mat
 // If an update is required then the deployment spec is set to:
 // - roll forward version
 // - keep active MattermostInstallation available by setting maxUnavailable=N-1
-func (r *ReconcileClusterInstallation) updateMattermostDeployment(mi *mattermostv1alpha1.ClusterInstallation, modified, original *appsv1.Deployment, reqLogger logr.Logger) error {
+func (r *ReconcileClusterInstallation) updateMattermostDeployment(mi *mattermostv1alpha1.ClusterInstallation, new, original *appsv1.Deployment, reqLogger logr.Logger) error {
 	var update bool
 
 	// Look for mattermost container in pod spec and determine if the image
@@ -284,19 +284,19 @@ func (r *ReconcileClusterInstallation) updateMattermostDeployment(mi *mattermost
 		}
 	}
 
-	patchResult, err := objectMatcher.DefaultPatchMaker.Calculate(original, modified)
+	patchResult, err := objectMatcher.DefaultPatchMaker.Calculate(original, new)
 	if err != nil {
 		reqLogger.Error(err, "Error checking the difference in the deployment")
 		return err
 	}
 
 	if !patchResult.IsEmpty() {
-		errMatcher := objectMatcher.DefaultAnnotator.SetLastAppliedAnnotation(modified)
-		if errMatcher != nil {
-			reqLogger.Error(errMatcher, "Error applying the annotation in the deployment")
-			return errMatcher
+		err := objectMatcher.DefaultAnnotator.SetLastAppliedAnnotation(new)
+		if err != nil {
+			reqLogger.Error(err, "Error applying the annotation in the deployment")
+			return err
 		}
-		return r.client.Update(context.TODO(), modified)
+		return r.client.Update(context.TODO(), new)
 	}
 
 	return nil
