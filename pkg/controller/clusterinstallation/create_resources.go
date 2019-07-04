@@ -26,12 +26,12 @@ type Object interface {
 func (r *ReconcileClusterInstallation) createResource(owner v1.Object, resource Object, reqLogger logr.Logger) error {
 	// adding the last applied annotation to use the object matcher later
 	// see: https://github.com/banzaicloud/k8s-objectmatcher
-	errMatcher := objectMatcher.DefaultAnnotator.SetLastAppliedAnnotation(resource)
-	if errMatcher != nil {
-		reqLogger.Error(errMatcher, "Error applying the annotation in the resource")
-		return errMatcher
+	err := objectMatcher.DefaultAnnotator.SetLastAppliedAnnotation(resource)
+	if err != nil {
+		reqLogger.Error(err, "Error applying the annotation in the resource")
+		return err
 	}
-	err := r.client.Create(context.TODO(), resource)
+	err = r.client.Create(context.TODO(), resource)
 	if err != nil {
 		reqLogger.Error(err, "Error creating resource")
 		return err
