@@ -31,8 +31,8 @@ $ kubectl apply -n mysql-operator -f https://raw.githubusercontent.com/mattermos
 The Minio operator is required. To install the Minio operator run:
 
 ```bash
-$ kubectl create ns minio-operator-ns
-$ kubectl apply -n minio-operator-ns -f https://raw.githubusercontent.com/mattermost/mattermost-operator/master/docs/minio-operator/minio-operator.yaml
+$ kubectl create ns minio-operator
+$ kubectl apply -n minio-operator -f https://raw.githubusercontent.com/mattermost/mattermost-operator/master/docs/minio-operator/minio-operator.yaml
 ```
 
 ### 1.4 Mattermost Operator
