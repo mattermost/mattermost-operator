@@ -3,6 +3,7 @@ package clusterinstallation
 import (
 	"context"
 
+	objectMatcher "github.com/banzaicloud/k8s-objectmatcher/patch"
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -23,7 +24,14 @@ type Object interface {
 
 // createResource creates the provided resource and sets the owner
 func (r *ReconcileClusterInstallation) createResource(owner v1.Object, resource Object, reqLogger logr.Logger) error {
-	err := r.client.Create(context.TODO(), resource)
+	// adding the last applied annotation to use the object matcher later
+	// see: https://github.com/banzaicloud/k8s-objectmatcher
+	err := objectMatcher.DefaultAnnotator.SetLastAppliedAnnotation(resource)
+	if err != nil {
+		reqLogger.Error(err, "Error applying the annotation in the resource")
+		return err
+	}
+	err = r.client.Create(context.TODO(), resource)
 	if err != nil {
 		reqLogger.Error(err, "Error creating resource")
 		return err

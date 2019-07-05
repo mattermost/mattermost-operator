@@ -73,6 +73,14 @@
   version = "1.0.0"
 
 [[projects]]
+  digest = "1:46dd90a1970c3922902d0e9a5cbd93fc180d53d4d6d73b1f48795600316f8376"
+  name = "github.com/banzaicloud/k8s-objectmatcher"
+  packages = ["patch"]
+  pruneopts = "NT"
+  revision = "1596e84aae2764cab454a32215e756bbbee3af5d"
+  version = "v0.1.1"
+
+[[projects]]
   branch = "master"
   digest = "1:c819830f4f5ef85874a90ac3cbcc96cd322c715f5c96fbe4722eacd3dafbaa07"
   name = "github.com/beorn7/perks"
@@ -322,6 +330,14 @@
   pruneopts = "NT"
   revision = "7c663266750e7d82587642f65e60bc4083f1f84e"
   version = "v0.2.0"
+
+[[projects]]
+  digest = "1:cfc5b2c22306eb2edbdce2850686525aa037415d7b67bf1293db0dbd013d5723"
+  name = "github.com/goph/emperror"
+  packages = ["."]
+  pruneopts = "NT"
+  revision = "ae59d9fdc3f0c4814bc5fac2d4a68441dcff5a17"
+  version = "v0.17.1"
 
 [[projects]]
   branch = "master"
@@ -1015,6 +1031,7 @@
     "pkg/util/framer",
     "pkg/util/intstr",
     "pkg/util/json",
+    "pkg/util/jsonmergepatch",
     "pkg/util/mergepatch",
     "pkg/util/naming",
     "pkg/util/net",
@@ -1277,6 +1294,7 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
+    "github.com/banzaicloud/k8s-objectmatcher/patch",
     "github.com/go-logr/logr",
     "github.com/go-openapi/spec",
     "github.com/minio/minio-operator/pkg/apis/miniocontroller/v1beta1",

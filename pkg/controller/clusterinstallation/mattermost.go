@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"time"
 
+	objectMatcher "github.com/banzaicloud/k8s-objectmatcher/patch"
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
@@ -15,7 +16,6 @@ import (
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
 
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
 )
@@ -192,24 +192,20 @@ func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mat
 // If an update is required then the deployment spec is set to:
 // - roll forward version
 // - keep active MattermostInstallation available by setting maxUnavailable=N-1
-func (r *ReconcileClusterInstallation) updateMattermostDeployment(mi *mattermostv1alpha1.ClusterInstallation, original, d *appsv1.Deployment, reqLogger logr.Logger) error {
+func (r *ReconcileClusterInstallation) updateMattermostDeployment(mi *mattermostv1alpha1.ClusterInstallation, new, original *appsv1.Deployment, reqLogger logr.Logger) error {
 	var update bool
 
 	// Look for mattermost container in pod spec and determine if the image
 	// needs to be updated.
 	image := mi.GetImageName()
-	for pos, container := range d.Spec.Template.Spec.Containers {
+	for _, container := range original.Spec.Template.Spec.Containers {
 		if container.Name == mi.Name {
 			if container.Image != image {
-				reqLogger.Info("Updating mattermost deployment pod image")
-				container.Image = image
-				d.Spec.Template.Spec.Containers[pos] = container
+				reqLogger.Info("Current image is not the same as the requested, will upgrade the Mattermost installation")
 				update = true
 			}
-
 			break
 		}
-
 		// If we got here, something went wrong
 		return fmt.Errorf("Unable to find mattermost container in deployment")
 	}
@@ -288,28 +284,19 @@ func (r *ReconcileClusterInstallation) updateMattermostDeployment(mi *mattermost
 		}
 	}
 
-	// Ensure deployment replicas is the same as the spec
-	if *d.Spec.Replicas != mi.Spec.Replicas {
-		reqLogger.Info("Updating mattermost deployment replica count")
-		d.Spec.Replicas = &mi.Spec.Replicas
-		update = true
+	patchResult, err := objectMatcher.DefaultPatchMaker.Calculate(original, new)
+	if err != nil {
+		reqLogger.Error(err, "Error checking the difference in the deployment")
+		return err
 	}
 
-	updatedLabels := ensureLabels(mattermostv1alpha1.ClusterInstallationLabels(mi.Name), d.Labels)
-	if !reflect.DeepEqual(updatedLabels, d.Labels) {
-		reqLogger.Info("Updating mattermost deployment labels")
-		update = true
-		d.Labels = updatedLabels
-	}
-
-	if update {
-		mu := intstr.FromInt(int(mi.Spec.Replicas - 1))
-		if d.Spec.Strategy.RollingUpdate == nil {
-			d.Spec.Strategy.RollingUpdate = &appsv1.RollingUpdateDeployment{}
+	if !patchResult.IsEmpty() {
+		err := objectMatcher.DefaultAnnotator.SetLastAppliedAnnotation(new)
+		if err != nil {
+			reqLogger.Error(err, "Error applying the annotation in the deployment")
+			return err
 		}
-		d.Spec.Strategy.RollingUpdate.MaxUnavailable = &mu
-
-		return r.client.Update(context.TODO(), d)
+		return r.client.Update(context.TODO(), new)
 	}
 
 	return nil

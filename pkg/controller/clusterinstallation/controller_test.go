@@ -38,6 +38,7 @@ func TestReconcile(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      ciName,
 			Namespace: ciNamespace,
+			UID:       types.UID("test"),
 		},
 		Spec: mattermostv1alpha1.ClusterInstallationSpec{
 			Replicas:    replicas,

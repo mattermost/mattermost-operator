@@ -377,6 +377,10 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 	envVars = append(envVars, envVarGeneral...)
 
 	revHistoryLimit := int32(5)
+	maxUnavailable := intstr.FromInt(int(mattermost.Spec.Replicas - 1))
+	if mattermost.Spec.Replicas == 1 {
+		maxUnavailable = intstr.FromInt(1)
+	}
 
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -395,7 +399,7 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 			Strategy: appsv1.DeploymentStrategy{
 				Type: appsv1.RollingUpdateDeploymentStrategyType,
 				RollingUpdate: &appsv1.RollingUpdateDeployment{
-					MaxUnavailable: &intstr.IntOrString{IntVal: 1},
+					MaxUnavailable: &maxUnavailable,
 				},
 			},
 			RevisionHistoryLimit: &revHistoryLimit,
