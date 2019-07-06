@@ -87,6 +87,5 @@ spec:
       serviceAccountName: minio-operator-sa
       containers:
       - name: minio-operator
-        image: mattermost/minio-operator
-        imagePullPolicy: Always
-
+        image: mattermost/minio-operator:latest
+        imagePullPolicy: IfNotPresent

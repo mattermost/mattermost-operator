@@ -102,14 +102,14 @@ func mattermostScaleTest(t *testing.T, f *framework.Framework, ctx *framework.Te
 	err = f.Client.Create(context.TODO(), exampleMattermost, &framework.CleanupOptions{TestContext: ctx, Timeout: cleanupTimeout, RetryInterval: cleanupRetryInterval})
 	require.NoError(t, err)
 
+	err = waitForStatefulSet(t, f.Client.Client, namespace, "test-mm-minio", 1, retryInterval, timeout)
+	require.NoError(t, err)
+
+	err = waitForStatefulSet(t, f.Client.Client, namespace, "test-mm-mysql-mysql", 1, retryInterval, timeout)
+	require.NoError(t, err)
+
 	// wait for test-mm to reach 1 replicas
 	err = e2eutil.WaitForDeployment(t, f.KubeClient, namespace, "test-mm", 1, retryInterval, timeout)
-	require.NoError(t, err)
-
-	err = e2eutil.WaitForDeployment(t, f.KubeClient, namespace, "test-mm-minio", 1, retryInterval, timeout)
-	require.NoError(t, err)
-
-	err = e2eutil.WaitForDeployment(t, f.KubeClient, namespace, "test-mm-mysql-mysql", 1, retryInterval, timeout)
 	require.NoError(t, err)
 
 	err = f.Client.Get(context.TODO(), types.NamespacedName{Name: "test-mm", Namespace: namespace}, exampleMattermost)
