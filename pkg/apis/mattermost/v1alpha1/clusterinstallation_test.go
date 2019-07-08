@@ -15,10 +15,14 @@ func TestClusterInstallation(t *testing.T) {
 			Namespace: "default",
 		},
 		Spec: ClusterInstallationSpec{
-			Replicas:    2,
-			Image:       "mattermost/mattermost-enterprise-edition",
-			Version:     "5.11.0",
-			IngressName: "foo.mattermost.dev",
+			Replicas:      2,
+			Image:         "mattermost/mattermost-enterprise-edition",
+			Version:       "5.11.0",
+			IngressName:   "foo.mattermost.dev",
+			MinioReplicas: 7,
+			DatabaseType: DatabaseType{
+				DatabaseReplicas: 5,
+			},
 		},
 	}
 

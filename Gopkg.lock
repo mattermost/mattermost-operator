@@ -104,13 +104,6 @@
   version = "v0.2.0"
 
 [[projects]]
-  digest = "1:e29f05b742d9ccbfb65faca82ec43da7742cb7b039469640823c64b639b91b92"
-  name = "github.com/coreos/go-semver"
-  packages = ["semver"]
-  pruneopts = "NT"
-  revision = "e214231b295a8ea9479f11b70b35d5acf3556d9b"
-
-[[projects]]
   digest = "1:c61f4f97321a37adcb5b4fd4fd61209cd553e46c99ee606c465553541b12a229"
   name = "github.com/coreos/prometheus-operator"
   packages = [
@@ -515,18 +508,6 @@
   ]
   pruneopts = "NT"
   revision = "e2aec8e8af7904e0ab23f4e88b10b1e77d47d828"
-
-[[projects]]
-  digest = "1:6768d18767971e38080b81a85ab4cac3b0d2ca5b8005352a6ab2d19b7b1bad62"
-  name = "github.com/oracle/mysql-operator"
-  packages = [
-    "pkg/apis/mysql/v1alpha1",
-    "pkg/constants",
-    "pkg/version",
-  ]
-  pruneopts = "NT"
-  revision = "e3e319777091c8b0c76493cb1e974902fd4161e1"
-  version = "0.3.0"
 
 [[projects]]
   digest = "1:93b1d84c5fa6d1ea52f4114c37714cddd84d5b78f151b62bb101128dd51399bf"
@@ -1255,6 +1236,7 @@
     "pkg/recorder",
     "pkg/runtime/inject",
     "pkg/runtime/log",
+    "pkg/runtime/scheme",
     "pkg/runtime/signals",
     "pkg/source",
     "pkg/source/internal",
@@ -1304,7 +1286,6 @@
     "github.com/operator-framework/operator-sdk/pkg/test",
     "github.com/operator-framework/operator-sdk/pkg/test/e2eutil",
     "github.com/operator-framework/operator-sdk/version",
-    "github.com/oracle/mysql-operator/pkg/apis/mysql/v1alpha1",
     "github.com/pborman/uuid",
     "github.com/pkg/errors",
     "github.com/presslabs/mysql-operator/pkg/apis/mysql/v1alpha1",

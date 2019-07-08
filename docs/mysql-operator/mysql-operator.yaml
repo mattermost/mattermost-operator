@@ -319,7 +319,7 @@ spec:
               path: /api/raft-health
               port: 3000
           resources:
-            {}           
+            {}
       volumes:
         - name: config
           configMap:

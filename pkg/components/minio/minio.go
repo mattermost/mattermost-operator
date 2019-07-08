@@ -34,7 +34,7 @@ func Instance(mattermost *mattermostv1alpha1.ClusterInstallation) *minioOperator
 		},
 		Spec: minioOperator.MinIOInstanceSpec{
 			Version:     "RELEASE.2018-11-22T02-51-56Z",
-			Replicas:    4,
+			Replicas:    mattermost.Spec.MinioReplicas,
 			Mountpath:   "/export",
 			CredsSecret: &corev1.LocalObjectReference{Name: minioName},
 			VolumeClaimTemplate: &corev1.PersistentVolumeClaim{

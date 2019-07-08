@@ -90,14 +90,22 @@ func mattermostScaleTest(t *testing.T, f *framework.Framework, ctx *framework.Te
 			IngressName:      "test-example.mattermost.dev",
 			Replicas:         1,
 			MinioStorageSize: "1Gi",
+			MinioReplicas:    1,
 			DatabaseType: operator.DatabaseType{
-				DbStorageSize: "1Gi",
+				DatabaseStorageSize: "1Gi",
+				DatabaseReplicas:    1,
 			},
 		},
 	}
 
 	// use TestCtx's create helper to create the object and add a cleanup function for the new object
 	err = f.Client.Create(context.TODO(), exampleMattermost, &framework.CleanupOptions{TestContext: ctx, Timeout: cleanupTimeout, RetryInterval: cleanupRetryInterval})
+	require.NoError(t, err)
+
+	err = waitForStatefulSet(t, f.Client.Client, namespace, "test-mm-minio", 1, retryInterval, timeout)
+	require.NoError(t, err)
+
+	err = waitForStatefulSet(t, f.Client.Client, namespace, "test-mm-mysql-mysql", 1, retryInterval, timeout)
 	require.NoError(t, err)
 
 	// wait for test-mm to reach 1 replicas
@@ -158,7 +166,7 @@ func mattermostUpgradeTest(t *testing.T, f *framework.Framework, ctx *framework.
 			Replicas:         1,
 			MinioStorageSize: "1Gi",
 			DatabaseType: operator.DatabaseType{
-				DbStorageSize: "1Gi",
+				DatabaseStorageSize: "1Gi",
 			},
 		},
 	}
