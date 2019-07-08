@@ -87,13 +87,15 @@ func mattermostScaleTest(t *testing.T, f *framework.Framework, ctx *framework.Te
 			Namespace: namespace,
 		},
 		Spec: operator.ClusterInstallationSpec{
-			IngressName:      "test-example.mattermost.dev",
-			Replicas:         1,
-			MinioStorageSize: "1Gi",
-			MinioReplicas:    1,
-			DatabaseType: operator.DatabaseType{
-				DatabaseStorageSize: "1Gi",
-				DatabaseReplicas:    1,
+			IngressName: "test-example.mattermost.dev",
+			Replicas:    1,
+			Minio: operator.Minio{
+				StorageSize: "1Gi",
+				Replicas:    1,
+			},
+			Database: operator.Database{
+				StorageSize: "1Gi",
+				Replicas:    1,
 			},
 		},
 	}
@@ -160,13 +162,15 @@ func mattermostUpgradeTest(t *testing.T, f *framework.Framework, ctx *framework.
 			Namespace: namespace,
 		},
 		Spec: operator.ClusterInstallationSpec{
-			Image:            "mattermost/mattermost-enterprise-edition",
-			Version:          "5.10.0",
-			IngressName:      "test-example2.mattermost.dev",
-			Replicas:         1,
-			MinioStorageSize: "1Gi",
-			DatabaseType: operator.DatabaseType{
-				DatabaseStorageSize: "1Gi",
+			Image:       "mattermost/mattermost-enterprise-edition",
+			Version:     "5.10.0",
+			IngressName: "test-example2.mattermost.dev",
+			Replicas:    1,
+			Minio: operator.Minio{
+				StorageSize: "1Gi",
+			},
+			Database: operator.Database{
+				StorageSize: "1Gi",
 			},
 		},
 	}

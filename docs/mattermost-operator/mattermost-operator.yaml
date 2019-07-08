@@ -59,15 +59,25 @@ spec:
               description: If specified, affinity will define the pod's scheduling
                 constraints
               type: object
-            databaseType:
+            database:
               properties:
-                databaseStorageSize:
-                  description: Defines the storage size for the database. ie 50Gi
-                  pattern: ^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$
-                  type: string
-                externalDatabaseSecret:
+                externalSecret:
                   description: If the user want to use an external DB. This can be
                     inside the same k8s cluster or outside like AWS RDS.
+                  type: string
+                replicas:
+                  description: Defines the number of database replicas. For redundancy
+                    use at least 2 replicas. Setting this will override the number
+                    of replicas set by 'Size'.
+                  format: int32
+                  type: integer
+                resources:
+                  description: Defines the resource requests and limits for the database
+                    pods.
+                  type: object
+                storageSize:
+                  description: Defines the storage size for the database. ie 50Gi
+                  pattern: ^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$
                   type: string
                 type:
                   type: string
@@ -95,11 +105,26 @@ spec:
             mattermostLicenseSecret:
               description: Secret that contains the mattermost license
               type: string
-            minioStorageSize:
-              description: MinioStorageSize defines the storage size for minio. ie
-                50Gi
-              pattern: ^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$
-              type: string
+            minio:
+              properties:
+                replicas:
+                  description: 'Defines the number of Minio replicas. Supply 1 to
+                    run Minio in standalone mode with no redundancy. Supply 4 or more
+                    to run Minio in distributed mode. Note that it is not possible
+                    to upgrade Minio from standalone to distributed mode. Setting
+                    this will override the number of replicas set by ''Size''. More
+                    info: https://docs.min.io/docs/distributed-minio-quickstart-guide.html'
+                  format: int32
+                  type: integer
+                resources:
+                  description: Defines the resource requests and limits for the Minio
+                    pods.
+                  type: object
+                storageSize:
+                  description: Defines the storage size for Minio. ie 50Gi
+                  pattern: ^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$
+                  type: string
+              type: object
             nodeSelector:
               additionalProperties:
                 type: string
@@ -108,14 +133,28 @@ spec:
                 the pod to be scheduled on that node. More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/'
               type: object
             replicas:
-              description: Replicas defines the number of Mattermost instances in
-                a ClusterInstallation resource
+              description: Replicas defines the number of replicas to use for the
+                Mattermost app servers. Setting this will override the number of replicas
+                set by 'Size'.
               format: int32
               type: integer
+            resources:
+              description: Defines the resource requests and limits for the Mattermost
+                app server pods.
+              type: object
             serviceAnnotations:
               additionalProperties:
                 type: string
               type: object
+            size:
+              description: 'Size defines the size of the ClusterInstallation. This
+                is typically specified in number of users. This will set replica and
+                resource requests/limits appropriately for the provided number of
+                users. Accepted values are: 100users, 1000users, 5000users, 10000users,
+                250000users. Defaults to 5000users. Setting ''Replicas'', ''Resources'',
+                ''Minio.Replicas'', ''Minio.Resource'', ''Database.Replicas'', or
+                ''Database.Resources'' will override the values set by Size.'
+              type: string
             useServiceLoadBalancer:
               type: boolean
             version:

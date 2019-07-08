@@ -149,6 +149,12 @@ func (r *ReconcileClusterInstallation) Reconcile(request reconcile.Request) (rec
 		r.setReconciling()
 		return reconcile.Result{}, err
 	}
+
+	softError := mattermost.SetReplicasAndResourcesFromSize()
+	if softError != nil {
+		reqLogger.Error(softError, "Error setting replicas and resources from user count")
+	}
+
 	if !reflect.DeepEqual(originalMattermost.Spec, mattermost.Spec) {
 		reqLogger.Info(fmt.Sprintf("Updating spec"),
 			"Old", fmt.Sprintf("%+v", originalMattermost.Spec),
@@ -197,14 +203,14 @@ func (r *ReconcileClusterInstallation) Reconcile(request reconcile.Request) (rec
 }
 
 func (r *ReconcileClusterInstallation) checkDatabase(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
-	if mattermost.Spec.DatabaseType.ExternalDatabaseSecret != "" {
-		err := r.checkSecret(mattermost.Spec.DatabaseType.ExternalDatabaseSecret, "externalDB", mattermost.Namespace)
+	if mattermost.Spec.Database.ExternalSecret != "" {
+		err := r.checkSecret(mattermost.Spec.Database.ExternalSecret, "externalDB", mattermost.Namespace)
 		if err != nil {
 			return errors.Wrap(err, "Error getting the external database secret.")
 		}
 	}
 
-	switch mattermost.Spec.DatabaseType.Type {
+	switch mattermost.Spec.Database.Type {
 	case "mysql":
 		return r.checkMySQLCluster(mattermost, reqLogger)
 	case "postgres":
