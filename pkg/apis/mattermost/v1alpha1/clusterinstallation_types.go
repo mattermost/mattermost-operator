@@ -74,7 +74,7 @@ type DatabaseType struct {
 	// +kubebuilder:validation:Pattern=^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$
 	DatabaseStorageSize string `json:"databaseStorageSize,omitempty"`
 	// DatabaseReplicas defines the number of database replicas
-	// For redundancy use at least 2 replicas
+	// For redundancy use at least 2 replicas.
 	// +optional
 	DatabaseReplicas int32 `json:"databaseReplicas,omitempty"`
 }
