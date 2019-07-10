@@ -21,8 +21,19 @@ type ClusterInstallationSpec struct {
 	Image string `json:"image,omitempty"`
 	// Version defines the ClusterInstallation Docker image version.
 	Version string `json:"version,omitempty"`
-	// Replicas defines the number of Mattermost instances in a ClusterInstallation resource
+	// Size defines the size of the ClusterInstallation. This is typically specified in number of users.
+	// This will set replica and resource requests/limits appropriately for the provided number of users.
+	// Accepted values are: 100users, 1000users, 5000users, 10000users, 250000users. Defaults to 5000users.
+	// Setting 'Replicas', 'Resources', 'Minio.Replicas', 'Minio.Resource', 'Database.Replicas',
+	// or 'Database.Resources' will override the values set by Size.
+	Size string `json:"size,omitempty"`
+	// Replicas defines the number of replicas to use for the Mattermost app servers.
+	// Setting this will override the number of replicas set by 'Size'.
+	// +optional
 	Replicas int32 `json:"replicas,omitempty"`
+	// Defines the resource requests and limits for the Mattermost app server pods.
+	// +optional
+	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 	// IngressName defines the name to be used when creating the ingress rules
 	IngressName string `json:"ingressName"`
 	// Secret that contains the mattermost license
@@ -36,19 +47,10 @@ type ClusterInstallationSpec struct {
 	// If specified, affinity will define the pod's scheduling constraints
 	// +optional
 	Affinity *corev1.Affinity `json:"affinity,omitempty"`
-	// MinioStorageSize defines the storage size for minio. ie 50Gi
-	// +optional
-	// +kubebuilder:validation:Pattern=^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$
-	MinioStorageSize string `json:"minioStorageSize,omitempty"`
-	// MinioReplicas defines the number of Minio replicas.
-	// Supply 1 to run MiniO in standalone mode with no redundancy.
-	// Supply 4 or more to run Minio in distributed mode.
-	// Note that it is not possible to upgrade Minio from standalone to distributed mode.
-	// More info: https://docs.min.io/docs/distributed-minio-quickstart-guide.html
-	// +optional
-	MinioReplicas int32 `json:"minioReplicas,omitempty"`
 
-	DatabaseType DatabaseType `json:"databaseType,omitempty"`
+	Minio Minio `json:"minio,omitempty"`
+
+	Database Database `json:"database,omitempty"`
 	// +optional
 	ElasticSearch ElasticSearch `json:"elasticSearch,omitempty"`
 
@@ -62,24 +64,47 @@ type ClusterInstallationSpec struct {
 	IngressAnnotations map[string]string `json:"ingressAnnotations,omitempty"`
 }
 
-// DatabaseType defines the Database configuration for a ClusterInstallation
-type DatabaseType struct {
+// Minio defines the configuration of Minio for a ClusterInstallation.
+type Minio struct {
+	// Defines the storage size for Minio. ie 50Gi
+	// +optional
+	// +kubebuilder:validation:Pattern=^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$
+	StorageSize string `json:"storageSize,omitempty"`
+	// Defines the number of Minio replicas.
+	// Supply 1 to run Minio in standalone mode with no redundancy.
+	// Supply 4 or more to run Minio in distributed mode.
+	// Note that it is not possible to upgrade Minio from standalone to distributed mode.
+	// Setting this will override the number of replicas set by 'Size'.
+	// More info: https://docs.min.io/docs/distributed-minio-quickstart-guide.html
+	// +optional
+	Replicas int32 `json:"replicas,omitempty"`
+	// Defines the resource requests and limits for the Minio pods.
+	// +optional
+	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+}
+
+// Database defines the database configuration for a ClusterInstallation.
+type Database struct {
 	Type string `json:"type,omitempty"`
 	// If the user want to use an external DB.
 	// This can be inside the same k8s cluster or outside like AWS RDS.
 	// +optional
-	ExternalDatabaseSecret string `json:"externalDatabaseSecret,omitempty"`
+	ExternalSecret string `json:"externalSecret,omitempty"`
 	// Defines the storage size for the database. ie 50Gi
 	// +optional
 	// +kubebuilder:validation:Pattern=^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$
-	DatabaseStorageSize string `json:"databaseStorageSize,omitempty"`
-	// DatabaseReplicas defines the number of database replicas
+	StorageSize string `json:"storageSize,omitempty"`
+	// Defines the number of database replicas.
 	// For redundancy use at least 2 replicas.
+	// Setting this will override the number of replicas set by 'Size'.
 	// +optional
-	DatabaseReplicas int32 `json:"databaseReplicas,omitempty"`
+	Replicas int32 `json:"replicas,omitempty"`
+	// Defines the resource requests and limits for the database pods.
+	// +optional
+	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
-// ElasticSearch defines the ElasticSearch configuration for a ClusterInstallation
+// ElasticSearch defines the ElasticSearch configuration for a ClusterInstallation.
 type ElasticSearch struct {
 	Host string `json:"host,omitempty"`
 	// +optional

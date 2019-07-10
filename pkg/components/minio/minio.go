@@ -34,7 +34,7 @@ func Instance(mattermost *mattermostv1alpha1.ClusterInstallation) *minioOperator
 		},
 		Spec: minioOperator.MinIOInstanceSpec{
 			Version:     "RELEASE.2018-11-22T02-51-56Z",
-			Replicas:    mattermost.Spec.MinioReplicas,
+			Replicas:    mattermost.Spec.Minio.Replicas,
 			Mountpath:   "/export",
 			CredsSecret: &corev1.LocalObjectReference{Name: minioName},
 			VolumeClaimTemplate: &corev1.PersistentVolumeClaim{
@@ -47,7 +47,7 @@ func Instance(mattermost *mattermostv1alpha1.ClusterInstallation) *minioOperator
 					},
 					Resources: corev1.ResourceRequirements{
 						Requests: corev1.ResourceList{
-							corev1.ResourceStorage: resource.MustParse(mattermost.Spec.MinioStorageSize),
+							corev1.ResourceStorage: resource.MustParse(mattermost.Spec.Minio.StorageSize),
 						},
 					},
 				},

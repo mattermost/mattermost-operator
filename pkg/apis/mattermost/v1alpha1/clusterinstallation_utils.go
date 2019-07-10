@@ -16,22 +16,18 @@ import (
 const (
 	// OperatorName is the name of the Mattermost operator
 	OperatorName = "mattermost-operator"
-	// DefaultAmountOfPods is the default amount of Mattermost pods
-	DefaultAmountOfPods = 2
 	// DefaultMattermostImage is the default Mattermost docker image
 	DefaultMattermostImage = "mattermost/mattermost-enterprise-edition"
 	// DefaultMattermostVersion is the default Mattermost docker tag
 	DefaultMattermostVersion = "5.11.0"
+	// DefaultMattermostSize is the default number of users
+	DefaultMattermostSize = "5000users"
 	// DefaultMattermostDatabaseType is the default Mattermost database
 	DefaultMattermostDatabaseType = "mysql"
-	// DefaultMattermostDatabaseReplicas is the default number of database replicas
-	DefaultMattermostDatabaseReplicas = 3
 	// DefaultMinioStorageSize is the default Storage size for Minio
 	DefaultMinioStorageSize = "50Gi"
-	// DefaultMinioReplicas is the default number of Minio replicas
-	DefaultMinioReplicas = 4
-	// DefaultDatabaseStorageSize is the default Storage size for the Database
-	DefaultDatabaseStorageSize = "50Gi"
+	// DefaultStorageSize is the default Storage size for the Database
+	DefaultStorageSize = "50Gi"
 
 	// ClusterLabel is the label applied across all compoments
 	ClusterLabel = "v1alpha1.mattermost.com/installation"
@@ -51,31 +47,30 @@ func (mattermost *ClusterInstallation) SetDefaults() error {
 	if mattermost.Spec.Version == "" {
 		mattermost.Spec.Version = DefaultMattermostVersion
 	}
-	if mattermost.Spec.Replicas == 0 {
-		mattermost.Spec.Replicas = DefaultAmountOfPods
-	}
-	if mattermost.Spec.MinioStorageSize == "" {
-		mattermost.Spec.MinioStorageSize = DefaultMinioStorageSize
-	}
-	if mattermost.Spec.MinioReplicas == 0 {
-		mattermost.Spec.MinioReplicas = DefaultMinioReplicas
+	if mattermost.Spec.Size == "" {
+		mattermost.Spec.Size = DefaultMattermostSize
 	}
 
-	mattermost.Spec.DatabaseType.SetDefaults()
+	mattermost.Spec.Minio.SetDefaults()
+	mattermost.Spec.Database.SetDefaults()
 
 	return nil
 }
 
-// SetDefaults sets the missing values in the DatabaseType to the default ones
-func (db *DatabaseType) SetDefaults() {
+// SetDefaults sets the missing values in Minio to the default ones
+func (mi *Minio) SetDefaults() {
+	if mi.StorageSize == "" {
+		mi.StorageSize = DefaultMinioStorageSize
+	}
+}
+
+// SetDefaults sets the missing values in Database to the default ones
+func (db *Database) SetDefaults() {
 	if len(db.Type) == 0 {
 		db.Type = DefaultMattermostDatabaseType
 	}
-	if db.DatabaseStorageSize == "" {
-		db.DatabaseStorageSize = DefaultDatabaseStorageSize
-	}
-	if db.DatabaseReplicas == 0 {
-		db.DatabaseReplicas = DefaultMattermostDatabaseReplicas
+	if db.StorageSize == "" {
+		db.StorageSize = DefaultStorageSize
 	}
 }
 
@@ -200,7 +195,7 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 		masterDBEnvVar.ValueFrom = &corev1.EnvVarSource{
 			SecretKeyRef: &corev1.SecretKeySelector{
 				LocalObjectReference: corev1.LocalObjectReference{
-					Name: mattermost.Spec.DatabaseType.ExternalDatabaseSecret,
+					Name: mattermost.Spec.Database.ExternalSecret,
 				},
 				Key: "externalDB",
 			},
@@ -465,6 +460,7 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 								FailureThreshold:    3,
 							},
 							VolumeMounts: volumeMountLicense,
+							Resources:    mattermost.Spec.Resources,
 						},
 					},
 					Volumes: volumeLicense,

@@ -82,11 +82,24 @@ func schema_pkg_apis_mattermost_v1alpha1_ClusterInstallationSpec(ref common.Refe
 							Format:      "",
 						},
 					},
+					"size": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Size defines the size of the ClusterInstallation. This is typically specified in number of users. This will set replica and resource requests/limits appropriately for the provided number of users. Accepted values are: 100users, 1000users, 5000users, 10000users, 250000users. Defaults to 5000users. Setting 'Replicas', 'Resources', 'Minio.Replicas', 'Minio.Resource', 'Database.Replicas', or 'Database.Resources' will override the values set by Size.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 					"replicas": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Replicas defines the number of Mattermost instances in a ClusterInstallation resource",
+							Description: "Replicas defines the number of replicas to use for the Mattermost app servers. Setting this will override the number of replicas set by 'Size'.",
 							Type:        []string{"integer"},
 							Format:      "int32",
+						},
+					},
+					"resources": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Defines the resource requests and limits for the Mattermost app server pods.",
+							Ref:         ref("k8s.io/api/core/v1.ResourceRequirements"),
 						},
 					},
 					"ingressName": {
@@ -123,23 +136,14 @@ func schema_pkg_apis_mattermost_v1alpha1_ClusterInstallationSpec(ref common.Refe
 							Ref:         ref("k8s.io/api/core/v1.Affinity"),
 						},
 					},
-					"minioStorageSize": {
+					"minio": {
 						SchemaProps: spec.SchemaProps{
-							Description: "MinioStorageSize defines the storage size for minio. ie 50Gi",
-							Type:        []string{"string"},
-							Format:      "",
+							Ref: ref("github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.Minio"),
 						},
 					},
-					"minioReplicas": {
+					"database": {
 						SchemaProps: spec.SchemaProps{
-							Description: "MinioReplicas defines the number of Minio replicas. Supply 1 to run MiniO in standalone mode with no redundancy. Supply 4 or more to run Minio in distributed mode. Note that it is not possible to upgrade Minio from standalone to distributed mode. More info: https://docs.min.io/docs/distributed-minio-quickstart-guide.html",
-							Type:        []string{"integer"},
-							Format:      "int32",
-						},
-					},
-					"databaseType": {
-						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.DatabaseType"),
+							Ref: ref("github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.Database"),
 						},
 					},
 					"elasticSearch": {
@@ -184,6 +188,6 @@ func schema_pkg_apis_mattermost_v1alpha1_ClusterInstallationSpec(ref common.Refe
 			},
 		},
 		Dependencies: []string{
-			"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.DatabaseType", "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.ElasticSearch", "k8s.io/api/core/v1.Affinity"},
+			"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.Database", "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.ElasticSearch", "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.Minio", "k8s.io/api/core/v1.Affinity", "k8s.io/api/core/v1.ResourceRequirements"},
 	}
 }

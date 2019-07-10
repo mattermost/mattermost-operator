@@ -139,8 +139,8 @@ func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mat
 	var externalDB, isLicensed bool
 	var dbUser, dbPassword string
 	var err error
-	if mattermost.Spec.DatabaseType.ExternalDatabaseSecret != "" {
-		err = r.checkSecret(mattermost.Spec.DatabaseType.ExternalDatabaseSecret, "externalDB", mattermost.Namespace)
+	if mattermost.Spec.Database.ExternalSecret != "" {
+		err = r.checkSecret(mattermost.Spec.Database.ExternalSecret, "externalDB", mattermost.Namespace)
 		if err != nil {
 			return errors.Wrap(err, "Error getting the external database secret.")
 		}
