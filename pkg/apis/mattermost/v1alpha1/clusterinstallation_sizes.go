@@ -14,7 +14,7 @@ type ClusterInstallationSize struct {
 	Database ComponentSize
 }
 
-// ComponentSize is sizing configuartion for different components of a ClusterInstallation.
+// ComponentSize is sizing configuration for different components of a ClusterInstallation.
 type ComponentSize struct {
 	Replicas  int32
 	Resources corev1.ResourceRequirements
