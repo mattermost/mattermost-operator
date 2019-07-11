@@ -339,6 +339,10 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 			Name:  "MM_SERVICESETTINGS_SITEURL",
 			Value: siteURL,
 		},
+		{
+			Name:  "MM_PLUGINSETTINGS_ENABLEUPLOADS",
+			Value: "true",
+		},
 	}
 
 	// Mattermost License
