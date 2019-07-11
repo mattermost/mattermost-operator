@@ -17,11 +17,9 @@ import (
 
 // Cluster returns the MySQL cluster to deploy
 func Cluster(mattermost *mattermostv1alpha1.ClusterInstallation) *mysqlOperator.MysqlCluster {
-	mysqlName := fmt.Sprintf("%s-mysql", mattermost.Name)
-
 	return &mysqlOperator.MysqlCluster{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      mysqlName,
+			Name:      mattermost.Name,
 			Namespace: mattermost.Namespace,
 			Labels:    mattermostv1alpha1.ClusterInstallationResourceLabels(mattermost.Name),
 			OwnerReferences: []metav1.OwnerReference{
