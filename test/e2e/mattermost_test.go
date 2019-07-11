@@ -107,7 +107,7 @@ func mattermostScaleTest(t *testing.T, f *framework.Framework, ctx *framework.Te
 	err = waitForStatefulSet(t, f.Client.Client, namespace, "test-mm-minio", 1, retryInterval, timeout)
 	require.NoError(t, err)
 
-	err = waitForStatefulSet(t, f.Client.Client, namespace, "test-mm-mysql-mysql", 1, retryInterval, timeout)
+	err = waitForStatefulSet(t, f.Client.Client, namespace, "db", 1, retryInterval, timeout)
 	require.NoError(t, err)
 
 	// wait for test-mm to reach 1 replicas

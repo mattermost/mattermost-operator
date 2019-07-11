@@ -202,15 +202,15 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 		}
 	} else {
 		masterDBEnvVar.Value = fmt.Sprintf(
-			"mysql://%s:%s@tcp(%s-mysql-mysql-master.%s:3306)/mattermost?charset=utf8mb4,utf8&readTimeout=30s&writeTimeout=30s",
-			dbUser, dbPassword, mattermost.Name, mattermost.Namespace,
+			"mysql://%s:%s@tcp(db-mysql-master.%s:3306)/mattermost?charset=utf8mb4,utf8&readTimeout=30s&writeTimeout=30s",
+			dbUser, dbPassword, mattermost.Namespace,
 		)
 
 		envVarDB = append(envVarDB, corev1.EnvVar{
 			Name: "MM_SQLSETTINGS_DATASOURCEREPLICAS",
 			Value: fmt.Sprintf(
-				"%s:%s@tcp(%s-mysql-mysql-nodes.%s:3306)/mattermost?readTimeout=30s&writeTimeout=30s",
-				dbUser, dbPassword, mattermost.Name, mattermost.Namespace,
+				"%s:%s@tcp(db-mysql-nodes.%s:3306)/mattermost?readTimeout=30s&writeTimeout=30s",
+				dbUser, dbPassword, mattermost.Namespace,
 			),
 		})
 
@@ -221,7 +221,7 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 			ImagePullPolicy: corev1.PullIfNotPresent,
 			Command: []string{
 				"sh", "-c",
-				fmt.Sprintf("until curl --max-time 5 http://%s-mysql-mysql-master.%s:3306; do echo waiting for mysql; sleep 5; done;", mattermost.Name, mattermost.Namespace),
+				fmt.Sprintf("until curl --max-time 5 http://db-mysql-master.%s:3306; do echo waiting for mysql; sleep 5; done;", mattermost.Namespace),
 			},
 		})
 	}
