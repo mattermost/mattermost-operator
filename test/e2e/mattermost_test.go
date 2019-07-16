@@ -163,7 +163,7 @@ func mattermostUpgradeTest(t *testing.T, f *framework.Framework, ctx *framework.
 		},
 		Spec: operator.ClusterInstallationSpec{
 			Image:       "mattermost/mattermost-enterprise-edition",
-			Version:     "5.10.0",
+			Version:     "5.11.1",
 			IngressName: "test-example2.mattermost.dev",
 			Replicas:    1,
 			Minio: operator.Minio{
@@ -199,7 +199,7 @@ func mattermostUpgradeTest(t *testing.T, f *framework.Framework, ctx *framework.
 	require.NoError(t, err)
 
 	// Apply the new version
-	exampleMattermost.Spec.Version = "5.11.0"
+	exampleMattermost.Spec.Version = "5.12.4"
 	err = f.Client.Update(context.TODO(), exampleMattermost)
 	require.NoError(t, err)
 
@@ -218,12 +218,12 @@ func mattermostUpgradeTest(t *testing.T, f *framework.Framework, ctx *framework.
 	err = f.Client.Get(context.TODO(), types.NamespacedName{Name: "test-mm2", Namespace: namespace}, newMattermost)
 	require.NoError(t, err)
 	require.Equal(t, "mattermost/mattermost-enterprise-edition", newMattermost.Status.Image)
-	require.Equal(t, "5.11.0", newMattermost.Status.Version)
+	require.Equal(t, "5.12.4", newMattermost.Status.Version)
 
 	mmDeployment := &appsv1.Deployment{}
 	err = f.Client.Get(context.TODO(), types.NamespacedName{Name: "test-mm2", Namespace: namespace}, mmDeployment)
 	require.NoError(t, err)
-	require.Equal(t, "mattermost/mattermost-enterprise-edition:5.11.0", mmDeployment.Spec.Template.Spec.Containers[0].Image)
+	require.Equal(t, "mattermost/mattermost-enterprise-edition:5.12.4", mmDeployment.Spec.Template.Spec.Containers[0].Image)
 
 	err = f.Client.Delete(context.TODO(), newMattermost)
 	require.NoError(t, err)
