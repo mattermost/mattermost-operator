@@ -1,0 +1,189 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: '[{"apiVersion":"mattermost.com/v1alpha1","kind":"ClusterInstallation","metadata":{"name":"example-clusterinstallation"},"spec":{"ingressName":"example.mattermost-example.dev"}}]'
+    capabilities: Basic Install
+  name: mattermost-operator.v0.5.0
+  namespace: placeholder
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - kind: ClusterInstallation
+      name: clusterinstallations.mattermost.com
+      version: v1alpha1
+  description: Mattermost is an open source, private cloud and secure collaboration tool
+  displayName: Mattermost Operator
+  install:
+    spec:
+      clusterPermissions:
+      - rules:
+        - apiGroups:
+          - ""
+          resources:
+          - pods
+          verbs:
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - pods
+          - services
+          - endpoints
+          - persistentvolumeclaims
+          - events
+          - configmaps
+          - secrets
+          - serviceaccounts
+          verbs:
+          - '*'
+        - apiGroups:
+          - ""
+          resources:
+          - namespaces
+          verbs:
+          - get
+        - apiGroups:
+          - apps
+          resources:
+          - deployments
+          - daemonsets
+          - replicasets
+          - statefulsets
+          verbs:
+          - '*'
+        - apiGroups:
+          - extensions
+          resources:
+          - '*'
+          verbs:
+          - '*'
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - rolebindings
+          verbs:
+          - get
+          - create
+          - list
+          - delete
+          - watch
+          - update
+        - apiGroups:
+          - monitoring.coreos.com
+          resources:
+          - servicemonitors
+          verbs:
+          - get
+          - create
+        - apiGroups:
+          - apps
+          resourceNames:
+          - mattermost-operator
+          resources:
+          - deployments/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - mattermost.com
+          resources:
+          - '*'
+          - clusterinstallations
+          verbs:
+          - '*'
+        - apiGroups:
+          - mysql.presslabs.org
+          resources:
+          - mysqlbackups
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - mysql.presslabs.org
+          resources:
+          - mysqlclusters
+          - mysqlclusters/status
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - miniocontroller.min.io
+          resources:
+          - '*'
+          verbs:
+          - '*'
+        - apiGroups:
+          - minio.io
+          resources:
+          - '*'
+          verbs:
+          - '*'
+        - apiGroups:
+          - batch
+          resources:
+          - jobs
+          verbs:
+          - get
+          - create
+          - list
+          - delete
+          - watch
+          - update
+        serviceAccountName: mattermost-operator
+      deployments:
+      - name: mattermost-operator
+        spec:
+          replicas: 1
+          selector:
+            matchLabels:
+              name: mattermost-operator
+          strategy: {}
+          template:
+            metadata:
+              labels:
+                name: mattermost-operator
+            spec:
+              containers:
+              - command:
+                - mattermost-operator
+                env:
+                - name: WATCH_NAMESPACE
+                - name: POD_NAME
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.name
+                - name: OPERATOR_NAME
+                  value: mattermost-operator
+                image: mattermost/mattermost-operator:v0.5.0
+                imagePullPolicy: IfNotPresent
+                name: mattermost-operator
+                resources: {}
+              serviceAccountName: mattermost-operator
+    strategy: deployment
+  installModes:
+  - supported: true
+    type: OwnNamespace
+  - supported: true
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
+  maturity: alpha
+  provider: {}
+  version: 0.5.0
