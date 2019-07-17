@@ -13,7 +13,7 @@ spec:
     - kind: ClusterInstallation
       name: clusterinstallations.mattermost.com
       version: v1alpha1
-  description: Mattermost is an open source, private cloud and secure collaboration tool
+  description: Mattermost is a flexible, open source messaging platform that enables secure team collaboration.
   displayName: Mattermost Operator
   install:
     spec:
