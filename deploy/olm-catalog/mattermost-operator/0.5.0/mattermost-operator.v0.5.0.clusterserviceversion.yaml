@@ -42,13 +42,15 @@ spec:
 
     ### Operator features
 
-    * **Upgrade** - Supports Rolling updates.
+    * **Upgrade** - Supports rolling upgrades.
 
     ### Before you start
 
-    1. Before use the mattermost operator you will need to install the following operators:
-      - [Mysql Operator](https://github.com/presslabs/mysql-operator) from PressLabs
-      - [Minio Operator](https://github.com/minio/minio-operator) from MinIO
+    1. Before using the Mattermost operator you will need to install the following operators:
+      - [MySQL Operator](https://github.com/presslabs/mysql-operator) from PressLabs
+      - [MinIO Operator](https://github.com/minio/minio-operator) from MinIO
+
+    For more detailed information on how to use the Mattermost Operator, see [here](https://github.com/mattermost/mattermost-operator/blob/master/README.md).
 
     ### Example Configuration
 
@@ -76,7 +78,7 @@ spec:
 
   displayName: Mattermost Operator
 
-  keywords: ['mattermost', 'collaboration']
+  keywords: ['mattermost', 'collaboration', 'chat']
 
   maturity: alpha
 
