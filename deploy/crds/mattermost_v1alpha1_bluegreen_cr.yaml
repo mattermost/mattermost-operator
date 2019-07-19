@@ -1,0 +1,7 @@
+apiVersion: mattermost.com/v1alpha1
+kind: BlueGreen
+metadata:
+  name: stelios-test
+spec:
+  # Add fields here
+  size: 3

@@ -4,8 +4,10 @@ metadata:
   creationTimestamp: null
   name: mattermost-operator
 rules:
-- apiGroups: [""]
-  resources: ["pods"]
+- apiGroups:
+  - ""
+  resources:
+  - pods
   verbs:
   - get
   - list
@@ -77,6 +79,7 @@ rules:
   resources:
   - '*'
   - clusterinstallations
+  - bluegreens
   verbs:
   - '*'
 - apiGroups:
@@ -107,17 +110,17 @@ rules:
 - apiGroups:
   - miniocontroller.min.io
   resources:
-  - "*"
+  - '*'
   verbs:
-  - "*"
+  - '*'
 - apiGroups:
   - minio.io
   resources:
-  - "*"
+  - '*'
   verbs:
-  - "*"
+  - '*'
 - apiGroups:
-  - "batch"
+  - batch
   resources:
   - jobs
   verbs:

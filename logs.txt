@@ -1,0 +1,463 @@
+[debug] Created tunnel using local port: '58901'
+
+[debug] SERVER: "127.0.0.1:58901"
+
+[debug] Original chart version: ""
+[debug] Fetched presslabs/mysql-operator to /Users/stylianosrigas/.helm/cache/archive/mysql-operator-0.2.10.tgz
+
+[debug] CHART PATH: /Users/stylianosrigas/.helm/cache/archive/mysql-operator-0.2.10.tgz
+
+NAME:   mysql-operator1
+REVISION: 1
+RELEASED: Fri Jun 28 14:52:14 2019
+CHART: mysql-operator-0.2.10
+USER-SUPPLIED VALUES:
+{}
+
+COMPUTED VALUES:
+affinity: {}
+extraArgs: []
+image: quay.io/presslabs/mysql-operator:0.2.10
+imagePullPolicy: IfNotPresent
+installCRDs: true
+nodeSelector: {}
+orchestrator:
+  antiAffinity: hard
+  global: {}
+  image: quay.io/presslabs/orchestrator:v3.0.13-r29
+  imagePullPolicy: IfNotPresent
+  nodeSelector: []
+  orchestratorConf:
+    ApplyMySQLPromotionAfterMasterFailover: false
+    Debug: false
+    DetachLostReplicasAfterMasterFailover: true
+    DetectClusterAliasQuery: SELECT CONCAT(SUBSTRING(@@hostname, 1, LENGTH(@@hostname)
+      - 1 - LENGTH(SUBSTRING_INDEX(@@hostname,'-',-2))),'.',SUBSTRING_INDEX(@@report_host,'.',-1))
+    DetectInstanceAliasQuery: SELECT @@hostname
+    DiscoverByShowSlaveHosts: false
+    FailMasterPromotionIfSQLThreadNotUpToDate: true
+    HostnameResolveMethod: none
+    InstancePollSeconds: 5
+    MasterFailoverDetachReplicaMasterHost: true
+    MySQLHostnameResolveMethod: '@@report_host'
+    RecoverIntermediateMasterClusterFilters:
+    - .*
+    RecoverMasterClusterFilters:
+    - .*
+    RecoveryIgnoreHostnameFilters: []
+    RecoveryPeriodBlockSeconds: 300
+    RemoveTextFromHostnameDisplay: :3306
+    SlaveLagQuery: SELECT TIMESTAMPDIFF(SECOND,ts,NOW()) as drift FROM sys_operator.heartbeat
+      ORDER BY drift ASC LIMIT 1
+    UnseenInstanceForgetHours: 1
+  persistence:
+    accessMode: ReadWriteOnce
+    enabled: true
+    size: 1Gi
+  podDisruptionBudget:
+    enabled: true
+    maxUnavailable: 1
+  replicas: 1
+  resources: {}
+  service:
+    port: 80
+    type: ClusterIP
+  tolerations: []
+  topologyUser: orchestrator
+rbac:
+  create: true
+  serviceAccountName: default
+replicaCount: 1
+resources: {}
+sidecarImage: quay.io/presslabs/mysql-operator-sidecar:0.2.10
+tolerations: []
+watchNamespace: null
+
+HOOKS:
+---
+# mysqlbackups.mysql.presslabs.org
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  labels:
+    app: 'mysql-operator'
+    chart: 'mysql-operator-0.2.10'
+    controller-tools.k8s.io: "1.0"
+    heritage: 'Tiller'
+    release: 'mysql-operator1'
+  name: mysqlbackups.mysql.presslabs.org
+  annotations:
+    helm.sh/hook: crd-install
+spec:
+  group: mysql.presslabs.org
+  names:
+    kind: MysqlBackup
+    plural: mysqlbackups
+  scope: Namespaced
+  version: v1alpha1
+---
+# mysqlclusters.mysql.presslabs.org
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  labels:
+    app: 'mysql-operator'
+    chart: 'mysql-operator-0.2.10'
+    controller-tools.k8s.io: "1.0"
+    heritage: 'Tiller'
+    release: 'mysql-operator1'
+  name: mysqlclusters.mysql.presslabs.org
+  annotations:
+    helm.sh/hook: crd-install
+spec:
+  group: mysql.presslabs.org
+  names:
+    kind: MysqlCluster
+    plural: mysqlclusters
+    shortNames:
+    - mysql
+  scope: Namespaced
+  subresources:
+    scale:
+      specReplicasPath: .spec.replicas
+      statusReplicasPath: .status.readyNodes
+    status: {}
+  version: v1alpha1
+MANIFEST:
+
+---
+# Source: mysql-operator/charts/orchestrator/templates/secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mysql-operator1-orchestrator
+  labels:
+    app: mysql-operator1-orchestrator
+    chart: "orchestrator-0.1.5"
+    release: "mysql-operator1"
+    heritage: "Tiller"
+data:
+  TOPOLOGY_USER: "b3JjaGVzdHJhdG9y"
+  TOPOLOGY_PASSWORD: "RFdSNzltdFgxaw=="
+---
+# Source: mysql-operator/charts/orchestrator/templates/config.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-operator1-orchestrator
+  labels:
+    app: mysql-operator1-orchestrator
+    chart: "orchestrator-0.1.5"
+    release: "mysql-operator1"
+    heritage: "Tiller"
+data:
+  orchestrator.conf.json: "{\n  \"ApplyMySQLPromotionAfterMasterFailover\": false,\n  \"BackendDB\": \"sqlite\",\n  \"Debug\": false,\n  \"DetachLostReplicasAfterMasterFailover\": true,\n  \"DetectClusterAliasQuery\": \"SELECT CONCAT(SUBSTRING(@@hostname, 1, LENGTH(@@hostname) - 1 - LENGTH(SUBSTRING_INDEX(@@hostname,'-',-2))),'.',SUBSTRING_INDEX(@@report_host,'.',-1))\",\n  \"DetectInstanceAliasQuery\": \"SELECT @@hostname\",\n  \"DiscoverByShowSlaveHosts\": false,\n  \"FailMasterPromotionIfSQLThreadNotUpToDate\": true,\n  \"HostnameResolveMethod\": \"none\",\n  \"InstancePollSeconds\": 5,\n  \"ListenAddress\": \":3000\",\n  \"MasterFailoverDetachReplicaMasterHost\": true,\n  \"MySQLHostnameResolveMethod\": \"@@report_host\",\n  \"MySQLTopologyCredentialsConfigFile\": \"/etc/orchestrator/orc-topology.cnf\",\n  \"RaftBind\": \"{{ .Env.HOSTNAME }}.mysql-operator1-orchestrator-headless\",\n  \"RaftDataDir\": \"/var/lib/orchestrator\",\n  \"RaftEnabled\": true,\n  \"RaftNodes\": [],\n  \"RecoverIntermediateMasterClusterFilters\": [\n    \".*\"\n  ],\n  \"RecoverMasterClusterFilters\": [\n    \".*\"\n  ],\n  \"RecoveryIgnoreHostnameFilters\": [],\n  \"RecoveryPeriodBlockSeconds\": 300,\n  \"RemoveTextFromHostnameDisplay\": \":3306\",\n  \"SQLite3DataFile\": \"/var/lib/orchestrator/orc.db\",\n  \"SlaveLagQuery\": \"SELECT TIMESTAMPDIFF(SECOND,ts,NOW()) as drift FROM sys_operator.heartbeat ORDER BY drift ASC LIMIT 1\",\n  \"UnseenInstanceForgetHours\": 1\n}"
+  orc-topology.cnf: |
+    [client]
+    user = {{ .Env.ORC_TOPOLOGY_USER }}
+    password = {{ .Env.ORC_TOPOLOGY_PASSWORD }}
+---
+# Source: mysql-operator/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mysql-operator1
+  labels:
+    app: mysql-operator
+    chart: mysql-operator-0.2.10
+    release: mysql-operator1
+    heritage: Tiller
+---
+# Source: mysql-operator/templates/clusterrole.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app: 'mysql-operator'
+    chart: 'mysql-operator-0.2.10'
+    heritage: 'Tiller'
+    release: 'mysql-operator1'
+  name: 'mysql-operator1'
+rules:
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - mysql.presslabs.org
+  resources:
+  - mysqlbackups
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - apps
+  resources:
+  - statefulsets
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  - secrets
+  - services
+  - events
+  - jobs
+  - pods
+  - persistentvolumeclaims
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - mysql.presslabs.org
+  resources:
+  - mysqlclusters
+  - mysqlclusters/status
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - policy
+  resources:
+  - poddisruptionbudgets
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+---
+# Source: mysql-operator/templates/clusterrolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: mysql-operator1
+  labels:
+    app: mysql-operator
+    chart: mysql-operator-0.2.10
+    release: mysql-operator1
+    heritage: Tiller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: mysql-operator1
+subjects:
+  - name: mysql-operator1
+    namespace: "default"
+    kind: ServiceAccount
+---
+# Source: mysql-operator/charts/orchestrator/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-operator1-orchestrator-headless
+  labels:
+    app: mysql-operator1-orchestrator
+    chart: "orchestrator-0.1.5"
+    release: "mysql-operator1"
+    heritage: "Tiller"
+  annotations:
+    service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
+spec:
+  clusterIP: None
+  ports:
+    - name: web
+      port: 80
+      targetPort: 3000
+    - name: raft
+      port: 10008
+      targetPort: 10008
+  selector:
+    app: mysql-operator1-orchestrator
+---
+# Source: mysql-operator/charts/orchestrator/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-operator1-orchestrator
+  labels:
+    app: mysql-operator1-orchestrator
+    chart: "orchestrator-0.1.5"
+    release: "mysql-operator1"
+    heritage: "Tiller"
+spec:
+  type: ClusterIP
+  selector:
+    app: mysql-operator1-orchestrator
+  ports:
+    - name: web
+      port: 80
+      protocol: TCP
+      targetPort: 3000
+---
+# Source: mysql-operator/templates/deployment.yaml
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: mysql-operator1
+  labels:
+    app: mysql-operator
+    chart: mysql-operator-0.2.10
+    release: mysql-operator1
+    heritage: Tiller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql-operator
+      release: mysql-operator1
+  template:
+    metadata:
+      labels:
+        app: mysql-operator
+        release: mysql-operator1
+      annotations:
+        checksum/topology-secret: f7176df1798204a65fe2c09aa9338d9fc6aaf94acd29ce8b415f68fefd9e092b
+    spec:
+      serviceAccountName: mysql-operator1
+      containers:
+        - name: mysql-operator
+          image: "quay.io/presslabs/mysql-operator:0.2.10"
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: ORC_TOPOLOGY_USER
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-operator1-orchestrator
+                  key: TOPOLOGY_USER
+            - name: ORC_TOPOLOGY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-operator1-orchestrator
+                  key: TOPOLOGY_PASSWORD
+          args:
+            - --leader-election-namespace=default
+            - --orchestrator-uri=http://mysql-operator1-orchestrator.default/api
+            - --sidecar-image=quay.io/presslabs/mysql-operator-sidecar:0.2.10
+          resources:
+            
+            {}
+            
+          # TODO: add livenessProbe to controller
+          # livenessProbe:
+          #   httpGet:
+          #     path: /health
+          #     port: 80
+---
+# Source: mysql-operator/charts/orchestrator/templates/statefulset.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mysql-operator1-orchestrator
+  labels:
+    app: mysql-operator1-orchestrator
+    chart: "orchestrator-0.1.5"
+    release: "mysql-operator1"
+    heritage: "Tiller"
+spec:
+  replicas: 1
+  serviceName: mysql-operator1-orchestrator-headless
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      app: mysql-operator1-orchestrator
+  template:
+    metadata:
+      labels:
+        app: mysql-operator1-orchestrator
+      annotations:
+        checksum/config: 14ea4db5e95777bfdd1c0f8a71b7cd56083a7418d26f7ef58d78e67ec545e979
+        checksum/secret: d94d22996d7d04dc773c7b74a1158bcb5437bb03f74b6d3851ac8352f4f01711
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - topologyKey: kubernetes.io/hostname
+            labelSelector:
+              matchLabels:
+                app: mysql-operator1-orchestrator
+      containers:
+        - name: orchestrator
+          image: quay.io/presslabs/orchestrator:v3.0.13-r29
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+              name: web
+              protocol: TCP
+            - containerPort: 10008
+              name: raft
+              protocol: TCP
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+          envFrom:
+            - prefix: ORC_
+              secretRef:
+                name: mysql-operator1-orchestrator
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/orchestrator/
+            - name: config
+              mountPath: /templates/
+          livenessProbe:
+            timeoutSeconds: 10
+            initialDelaySeconds: 200
+            httpGet:
+              path: /api/lb-check
+              port: 3000
+          # https://github.com/github/orchestrator/blob/master/docs/raft.md#proxy-healthy-raft-nodes
+          readinessProbe:
+            timeoutSeconds: 10
+            httpGet:
+              path: /api/raft-health
+              port: 3000
+          resources:
+            {}
+            
+      volumes:
+        - name: config
+          configMap:
+            name: mysql-operator1-orchestrator
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ ReadWriteOnce ]
+        resources:
+          requests:
+            storage: 1Gi
+WARNING: Validation skipped because CRDs are not installed
