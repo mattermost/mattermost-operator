@@ -1,22 +1,21 @@
-// Copyright (c) 2017-present Mattermost, Inc. All Rights Reserved.
-// See License.txt for license information.
-
 package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+////////////////////////////////////////////////////////////////////////////////
+//                                 IMPORTANT!                                 //
+////////////////////////////////////////////////////////////////////////////////
+// Run "make generate" in the root of this repository to regenerate code      //
+// after modifying this file.                                                 //
+// Add custom validation using kubebuilder tags:                              //
+// https://book.kubebuilder.io/beyond_basics/generating_crd.html              //
+////////////////////////////////////////////////////////////////////////////////
 
 // BlueGreenSpec defines the desired state of BlueGreen
 // +k8s:openapi-gen=true
 type BlueGreenSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
-	// Add custom validation using kubebuilder tags: https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html
-	
 	// IngressName defines the name to be used when creating the ingress rules
 	IngressName string `json:"ingressName"`
 
@@ -59,7 +58,3 @@ type BlueGreenList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []BlueGreen `json:"items"`
 }
-
-// func init() {
-// 	SchemeBuilder.Register(&BlueGreen{}, &BlueGreenList{})
-// }
