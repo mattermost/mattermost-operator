@@ -66,8 +66,6 @@ spec:
               additionalProperties:
                 type: string
               type: object
-            useServiceLoadBalancer:
-              type: boolean
             version:
               description: InstallationNamespace defines the ClusterInstallation namespace
                 that will be usef for the BlueGreen deployment

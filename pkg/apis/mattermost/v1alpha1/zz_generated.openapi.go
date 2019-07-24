@@ -89,12 +89,6 @@ func schema_pkg_apis_mattermost_v1alpha1_BlueGreenSpec(ref common.ReferenceCallb
 							Format:      "",
 						},
 					},
-					"useServiceLoadBalancer": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"boolean"},
-							Format: "",
-						},
-					},
 					"serviceAnnotations": {
 						SchemaProps: spec.SchemaProps{
 							Type: []string{"object"},
