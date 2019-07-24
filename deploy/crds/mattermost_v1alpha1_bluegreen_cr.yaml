@@ -1,7 +1,9 @@
 apiVersion: mattermost.com/v1alpha1
 kind: BlueGreen
 metadata:
-  name: stelios-test
+  name: example-bluegreen
+  namespace: example-clusterinstallation-namespace
 spec:
-  # Add fields here
-  size: 3
+  ingressName: example.mattermost-example.dev
+  version: example-mattermost-image-version
+  installationName: example-clusterinstallation-name
