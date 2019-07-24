@@ -36,7 +36,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&ClusterInstallation{},
 		&ClusterInstallationList{},
-		&BlueGreen{}, 
+		&BlueGreen{},
 		&BlueGreenList{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
