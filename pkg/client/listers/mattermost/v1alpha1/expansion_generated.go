@@ -18,6 +18,14 @@ limitations under the License.
 
 package v1alpha1
 
+// BlueGreenListerExpansion allows custom methods to be added to
+// BlueGreenLister.
+type BlueGreenListerExpansion interface{}
+
+// BlueGreenNamespaceListerExpansion allows custom methods to be added to
+// BlueGreenNamespaceLister.
+type BlueGreenNamespaceListerExpansion interface{}
+
 // ClusterInstallationListerExpansion allows custom methods to be added to
 // ClusterInstallationLister.
 type ClusterInstallationListerExpansion interface{}

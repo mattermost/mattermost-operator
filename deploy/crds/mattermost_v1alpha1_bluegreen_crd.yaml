@@ -3,6 +3,23 @@ kind: CustomResourceDefinition
 metadata:
   name: bluegreens.mattermost.com
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .status.state
+    description: State of Mattermost
+    name: State
+    type: string
+  - JSONPath: .status.image
+    description: Image of Mattermost
+    name: Image
+    type: string
+  - JSONPath: .status.version
+    description: Version of Mattermost
+    name: Version
+    type: string
+  - JSONPath: .status.endpoint
+    description: Endpoint
+    name: Endpoint
+    type: string
   group: mattermost.com
   names:
     kind: BlueGreen
@@ -26,8 +43,12 @@ spec:
             submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds'
           type: string
         metadata:
+          description: 'Standard object’s metadata. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
+            +k8s:openapi-gen=false'
           type: object
         spec:
+          description: 'Specification of the desired behavior of the Mattermost cluster.
+            More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status'
           properties:
             ingressAnnotations:
               additionalProperties:
@@ -37,17 +58,54 @@ spec:
               description: IngressName defines the name to be used when creating the
                 ingress rules
               type: string
+            installationName:
+              description: InstallationName defines the ClusterInstallation name that
+                will be usef for the BlueGreen deployment
+              type: string
             serviceAnnotations:
               additionalProperties:
                 type: string
               type: object
             useServiceLoadBalancer:
               type: boolean
+            version:
+              description: InstallationNamespace defines the ClusterInstallation namespace
+                that will be usef for the BlueGreen deployment
+              type: string
           required:
+          - installationName
           - ingressName
           type: object
         status:
+          description: 'Most recent observed status of the Mattermost cluster. Read-only.
+            Not included when requesting from the apiserver, only from the Mattermost
+            Operator API itself. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status'
+          properties:
+            endpoint:
+              description: The endpoint to access the Mattermost instance
+              type: string
+            image:
+              description: The image running on the pods in the Mattermost instance
+              type: string
+            replicas:
+              description: Total number of non-terminated pods targeted by this Mattermost
+                deployment
+              format: int32
+              type: integer
+            state:
+              description: Represents the running state of the Mattermost instance
+              type: string
+            updatedReplicas:
+              description: Total number of non-terminated pods targeted by this Mattermost
+                deployment that are running with the desired image.
+              format: int32
+              type: integer
+            version:
+              description: The version currently running in the Mattermost instance
+              type: string
           type: object
+      required:
+      - spec
   version: v1alpha1
   versions:
   - name: v1alpha1

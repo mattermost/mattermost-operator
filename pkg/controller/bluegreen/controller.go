@@ -5,16 +5,17 @@ package bluegreen
 
 import (
 	"context"
+	"time"
 
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
+	v1beta1 "k8s.io/api/extensions/v1beta1"
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	// metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	// "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	// "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -24,11 +25,6 @@ import (
 
 var log = logf.Log.WithName("controller_bluegreen")
 
-/**
-* USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
-* business logic.  Delete these comments after modifying this file.*
- */
-
 // Add creates a new BlueGreen Controller and adds it to the Manager. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
@@ -37,7 +33,7 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileBlueGreen{client: mgr.GetClient(), scheme: mgr.GetScheme()}
+	return &ReconcileBlueGreen{client: mgr.GetClient(), scheme: mgr.GetScheme(), state: mattermostv1alpha1.Reconciling}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -54,9 +50,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// TODO(user): Modify this to be the types you create that are owned by the primary resource
-	// Watch for changes to secondary resource Pods and requeue the owner BlueGreen
-	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &handler.EnqueueRequestForOwner{
+	err = c.Watch(&source.Kind{Type: &corev1.Service{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &mattermostv1alpha1.BlueGreen{},
 	})
@@ -64,29 +58,21 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// err = c.Watch(&source.Kind{Type: &corev1.Service{}}, &handler.EnqueueRequestForOwner{
-	// 	IsController: true,
-	// 	OwnerType:    &mattermostv1alpha1.BlueGreen{},
-	// })
-	// if err != nil {
-	// 	return err
-	// }
+	err = c.Watch(&source.Kind{Type: &v1beta1.Ingress{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &mattermostv1alpha1.BlueGreen{},
+	})
+	if err != nil {
+		return err
+	}
 
-	// err = c.Watch(&source.Kind{Type: &v1beta1.Ingress{}}, &handler.EnqueueRequestForOwner{
-	// 	IsController: true,
-	// 	OwnerType:    &mattermostv1alpha1.BlueGreen{},
-	// })
-	// if err != nil {
-	// 	return err
-	// }
-
-	// err = c.Watch(&source.Kind{Type: &appsv1.Deployment{}}, &handler.EnqueueRequestForOwner{
-	// 	IsController: true,
-	// 	OwnerType:    &mattermostv1alpha1.BlueGreen{},
-	// })
-	// if err != nil {
-	// 	return err
-	// }
+	err = c.Watch(&source.Kind{Type: &appsv1.Deployment{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &mattermostv1alpha1.BlueGreen{},
+	})
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -124,23 +110,62 @@ func (r *ReconcileBlueGreen) Reconcile(request reconcile.Request) (reconcile.Res
 	reqLogger.Info("Reconciling BlueGreen")
 
 	// Fetch the BlueGreen instance
-	instance := &mattermostv1alpha1.BlueGreen{}
-	err := r.client.Get(context.TODO(), request.NamespacedName, instance)
+	blueGreen := &mattermostv1alpha1.BlueGreen{}
+	err := r.client.Get(context.TODO(), request.NamespacedName, blueGreen)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
 			// Return and don't requeue
+			r.setReconciling()
 			return reconcile.Result{}, nil
 		}
+		// Error reading the object - requeue the request.
+		r.setReconciling()
+		return reconcile.Result{}, err
+	}
+
+	mattermost := &mattermostv1alpha1.ClusterInstallation{}
+	key := types.NamespacedName{Namespace: request.Namespace, Name: blueGreen.Spec.InstallationName}
+	err = r.client.Get(context.TODO(), key, mattermost)
+	if err != nil && errors.IsNotFound(err) {
+		// Request object not found, could have been deleted after reconcile request.
+		// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
+		// Return and don't requeue
+		return reconcile.Result{}, nil
+	} else if err != nil {
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
 	}
 
-	err = r.checkBlueGreen(instance, reqLogger)
+	if blueGreen.Status.State != r.state {
+		status := blueGreen.Status
+		status.State = r.state
+		err = r.updateStatus(blueGreen, status, reqLogger)
+		if err != nil {
+			r.setReconciling()
+			return reconcile.Result{}, err
+		}
+	}
+
+	err = r.checkBlueGreen(blueGreen, mattermost, reqLogger)
 	if err != nil {
 		r.setReconciling()
 		return reconcile.Result{}, err
 	}
+
+	status, err := r.checkBlueGreenStatus(blueGreen, mattermost)
+	if err != nil {
+		r.setReconciling()
+		r.updateStatus(blueGreen, status, reqLogger)
+		return reconcile.Result{RequeueAfter: time.Second * 3}, err
+	}
+
+	err = r.updateStatus(blueGreen, status, reqLogger)
+	if err != nil {
+		r.setReconciling()
+		return reconcile.Result{}, err
+	}
+	r.setStable()
 	return reconcile.Result{}, nil
 }

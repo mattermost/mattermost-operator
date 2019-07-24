@@ -27,12 +27,17 @@ import (
 
 type MattermostV1alpha1Interface interface {
 	RESTClient() rest.Interface
+	BlueGreensGetter
 	ClusterInstallationsGetter
 }
 
 // MattermostV1alpha1Client is used to interact with features provided by the mattermost.com group.
 type MattermostV1alpha1Client struct {
 	restClient rest.Interface
+}
+
+func (c *MattermostV1alpha1Client) BlueGreens(namespace string) BlueGreenInterface {
+	return newBlueGreens(c, namespace)
 }
 
 func (c *MattermostV1alpha1Client) ClusterInstallations(namespace string) ClusterInstallationInterface {

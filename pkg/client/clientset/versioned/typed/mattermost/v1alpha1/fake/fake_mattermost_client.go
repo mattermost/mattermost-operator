@@ -28,6 +28,10 @@ type FakeMattermostV1alpha1 struct {
 	*testing.Fake
 }
 
+func (c *FakeMattermostV1alpha1) BlueGreens(namespace string) v1alpha1.BlueGreenInterface {
+	return &FakeBlueGreens{c, namespace}
+}
+
 func (c *FakeMattermostV1alpha1) ClusterInstallations(namespace string) v1alpha1.ClusterInstallationInterface {
 	return &FakeClusterInstallations{c, namespace}
 }

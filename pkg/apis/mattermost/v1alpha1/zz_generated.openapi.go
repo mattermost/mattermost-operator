@@ -16,7 +16,6 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 	return map[string]common.OpenAPIDefinition{
 		"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.BlueGreen":               schema_pkg_apis_mattermost_v1alpha1_BlueGreen(ref),
 		"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.BlueGreenSpec":           schema_pkg_apis_mattermost_v1alpha1_BlueGreenSpec(ref),
-		"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.BlueGreenStatus":         schema_pkg_apis_mattermost_v1alpha1_BlueGreenStatus(ref),
 		"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.ClusterInstallation":     schema_pkg_apis_mattermost_v1alpha1_ClusterInstallation(ref),
 		"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.ClusterInstallationSpec": schema_pkg_apis_mattermost_v1alpha1_ClusterInstallationSpec(ref),
 	}
@@ -42,26 +41,24 @@ func schema_pkg_apis_mattermost_v1alpha1_BlueGreen(ref common.ReferenceCallback)
 							Format:      "",
 						},
 					},
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
-						},
-					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.BlueGreenSpec"),
+							Description: "Specification of the desired behavior of the Mattermost cluster. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status",
+							Ref:         ref("github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.BlueGreenSpec"),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.BlueGreenStatus"),
+							Description: "Most recent observed status of the Mattermost cluster. Read-only. Not included when requesting from the apiserver, only from the Mattermost Operator API itself. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status",
+							Ref:         ref("github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.BlueGreenStatus"),
 						},
 					},
 				},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
-			"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.BlueGreenSpec", "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.BlueGreenStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.BlueGreenSpec", "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.BlueGreenStatus"},
 	}
 }
 
@@ -71,6 +68,20 @@ func schema_pkg_apis_mattermost_v1alpha1_BlueGreenSpec(ref common.ReferenceCallb
 			SchemaProps: spec.SchemaProps{
 				Description: "BlueGreenSpec defines the desired state of BlueGreen",
 				Properties: map[string]spec.Schema{
+					"installationName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "InstallationName defines the ClusterInstallation name that will be usef for the BlueGreen deployment",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"version": {
+						SchemaProps: spec.SchemaProps{
+							Description: "InstallationNamespace defines the ClusterInstallation namespace that will be usef for the BlueGreen deployment",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 					"ingressName": {
 						SchemaProps: spec.SchemaProps{
 							Description: "IngressName defines the name to be used when creating the ingress rules",
@@ -111,19 +122,7 @@ func schema_pkg_apis_mattermost_v1alpha1_BlueGreenSpec(ref common.ReferenceCallb
 						},
 					},
 				},
-				Required: []string{"ingressName"},
-			},
-		},
-		Dependencies: []string{},
-	}
-}
-
-func schema_pkg_apis_mattermost_v1alpha1_BlueGreenStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "BlueGreenStatus defines the observed state of BlueGreen",
-				Properties:  map[string]spec.Schema{},
+				Required: []string{"installationName", "ingressName"},
 			},
 		},
 		Dependencies: []string{},

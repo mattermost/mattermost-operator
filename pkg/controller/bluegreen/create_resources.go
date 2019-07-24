@@ -5,10 +5,9 @@ import (
 
 	objectMatcher "github.com/banzaicloud/k8s-objectmatcher/patch"
 	"github.com/go-logr/logr"
-	// appsv1 "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
-	// rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -62,6 +61,20 @@ func (r *ReconcileBlueGreen) createIngressIfNotExists(owner v1.Object, ingress *
 		return r.createResource(owner, ingress, reqLogger)
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to check if ingress exists")
+		return err
+	}
+
+	return nil
+}
+
+func (r *ReconcileBlueGreen) createDeploymentIfNotExists(owner v1.Object, deployment *appsv1.Deployment, reqLogger logr.Logger) error {
+	foundDeployment := &appsv1.Deployment{}
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: deployment.Name, Namespace: deployment.Namespace}, foundDeployment)
+	if err != nil && errors.IsNotFound(err) {
+		reqLogger.Info("Creating deployment", "name", deployment.Name)
+		return r.createResource(owner, deployment, reqLogger)
+	} else if err != nil {
+		reqLogger.Error(err, "Failed to check if deployment exists")
 		return err
 	}
 
