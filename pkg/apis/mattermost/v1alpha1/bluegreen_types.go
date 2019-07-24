@@ -65,14 +65,14 @@ type BlueGreenStatus struct {
 // +kubebuilder:printcolumn:priority=0,name="Version",type=string,JSONPath=".status.version",description="Version of Mattermost"
 // +kubebuilder:printcolumn:priority=0,name="Endpoint",type=string,JSONPath=".status.endpoint",description="Endpoint"
 type BlueGreen struct {
-	metav1.TypeMeta  `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
 	// Standard object’s metadata. More info:
 	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
 	// +k8s:openapi-gen=false
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	// Specification of the desired behavior of the Mattermost cluster. More info:
 	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
-	Spec   BlueGreenSpec   `json:"spec"`
+	Spec BlueGreenSpec `json:"spec"`
 	// Most recent observed status of the Mattermost cluster. Read-only. Not
 	// included when requesting from the apiserver, only from the Mattermost
 	// Operator API itself. More info:

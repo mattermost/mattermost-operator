@@ -8,9 +8,9 @@ import (
 	"time"
 
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
-	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -88,7 +88,6 @@ type ReconcileBlueGreen struct {
 	scheme *runtime.Scheme
 	state  mattermostv1alpha1.RunningState
 }
-
 
 func (r *ReconcileBlueGreen) setReconciling() {
 	r.state = mattermostv1alpha1.Reconciling

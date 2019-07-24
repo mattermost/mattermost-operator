@@ -15,9 +15,9 @@ func TestBlueGreen(t *testing.T) {
 			Namespace: "default",
 		},
 		Spec: BlueGreenSpec{
-			InstallationName:    "mm-foo",
-			Version:     "5.11.0",
-			IngressName: "foo.mattermost.dev",
+			InstallationName: "mm-foo",
+			Version:          "5.11.0",
+			IngressName:      "foo.mattermost.dev",
 		},
 	}
 

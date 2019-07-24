@@ -34,9 +34,9 @@ func TestCheckBlueGreen(t *testing.T) {
 			UID:       types.UID("test"),
 		},
 		Spec: mattermostv1alpha1.BlueGreenSpec{
-			InstallationName:    "mm-foo",
-			Version:     "5.11.0",
-			IngressName: "foo.mattermost.dev",
+			InstallationName: "mm-foo",
+			Version:          "5.11.0",
+			IngressName:      "foo.mattermost.dev",
 		},
 	}
 
