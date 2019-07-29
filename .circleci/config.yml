@@ -23,6 +23,7 @@ jobs:
     steps:
       - checkout
       - run: |
+          make clean
           make operator-sdk
           sudo chmod +x build/operator-sdk
           sudo mv build/operator-sdk /usr/local/bin/
