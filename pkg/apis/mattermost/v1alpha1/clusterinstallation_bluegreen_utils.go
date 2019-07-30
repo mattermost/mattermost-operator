@@ -1,7 +1,7 @@
 package v1alpha1
 
 import (
-	"errors"
+	// "errors"
 	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -13,69 +13,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-const (
-	// OperatorName is the name of the Mattermost operator
-	OperatorName = "mattermost-operator"
-	// DefaultMattermostImage is the default Mattermost docker image
-	DefaultMattermostImage = "mattermost/mattermost-enterprise-edition"
-	// DefaultMattermostVersion is the default Mattermost docker tag
-	DefaultMattermostVersion = "5.12.4"
-	// DefaultMattermostSize is the default number of users
-	DefaultMattermostSize = "5000users"
-	// DefaultMattermostDatabaseType is the default Mattermost database
-	DefaultMattermostDatabaseType = "mysql"
-	// DefaultMinioStorageSize is the default Storage size for Minio
-	DefaultMinioStorageSize = "50Gi"
-	// DefaultStorageSize is the default Storage size for the Database
-	DefaultStorageSize = "x50Gi"
-
-	// ClusterLabel is the label applied across all compoments
-	ClusterLabel = "v1alpha1.mattermost.com/installation"
-	// ClusterResourceLabel is the label applied to a given ClusterInstallation
-	// as well as all other resources created to support it.
-	ClusterResourceLabel = "v1alpha1.mattermost.com/resource"
-)
-
-// SetDefaults set the missing values in the manifest to the default ones
-func (mattermost *ClusterInstallation) SetDefaults() error {
-	if mattermost.Spec.IngressName == "" {
-		return errors.New("IngressName required, but not set")
-	}
-	if mattermost.Spec.Image == "" {
-		mattermost.Spec.Image = DefaultMattermostImage
-	}
-	if mattermost.Spec.Version == "" {
-		mattermost.Spec.Version = DefaultMattermostVersion
-	}
-	if mattermost.Spec.Size == "" {
-		mattermost.Spec.Size = DefaultMattermostSize
-	}
-
-	mattermost.Spec.Minio.SetDefaults()
-	mattermost.Spec.Database.SetDefaults()
-
-	return nil
-}
-
-// SetDefaults sets the missing values in Minio to the default ones
-func (mi *Minio) SetDefaults() {
-	if mi.StorageSize == "" {
-		mi.StorageSize = DefaultMinioStorageSize
-	}
-}
-
-// SetDefaults sets the missing values in Database to the default ones
-func (db *Database) SetDefaults() {
-	if len(db.Type) == 0 {
-		db.Type = DefaultMattermostDatabaseType
-	}
-	if db.StorageSize == "" {
-		db.StorageSize = DefaultStorageSize
-	}
-}
-
 // GenerateService returns the service for Mattermost
-func (mattermost *ClusterInstallation) GenerateService() *corev1.Service {
+func (mattermost *ClusterInstallation) GenerateBlueGreenService() *corev1.Service {
+	blueGreenName := fmt.Sprintf("%s-green", mattermost.Name)
 	svcAnnotations := map[string]string{
 		"service.alpha.kubernetes.io/tolerate-unready-endpoints": "true",
 	}
@@ -83,10 +23,11 @@ func (mattermost *ClusterInstallation) GenerateService() *corev1.Service {
 		for k, v := range mattermost.Spec.ServiceAnnotations {
 			svcAnnotations[k] = v
 		}
+
 		return &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
-				Labels:    ClusterInstallationLabels(mattermost.Spec.InstallationName),
-				Name:      mattermost.Spec.InstallationName,
+				Labels:    ClusterInstallationLabels(blueGreenName),
+				Name:      blueGreenName,
 				Namespace: mattermost.Namespace,
 				OwnerReferences: []metav1.OwnerReference{
 					*metav1.NewControllerRef(mattermost, schema.GroupVersionKind{
@@ -110,7 +51,7 @@ func (mattermost *ClusterInstallation) GenerateService() *corev1.Service {
 						TargetPort: intstr.FromString("app"),
 					},
 				},
-				Selector: ClusterInstallationLabels(mattermost.Spec.InstallationName),
+				Selector: ClusterInstallationLabels(blueGreenName),
 				Type:     corev1.ServiceTypeLoadBalancer,
 			},
 		}
@@ -118,8 +59,8 @@ func (mattermost *ClusterInstallation) GenerateService() *corev1.Service {
 
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:    ClusterInstallationLabels(mattermost.Spec.InstallationName),
-			Name:      mattermost.Spec.InstallationName,
+			Labels:    ClusterInstallationLabels(blueGreenName),
+			Name:      blueGreenName,
 			Namespace: mattermost.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
 				*metav1.NewControllerRef(mattermost, schema.GroupVersionKind{
@@ -137,19 +78,20 @@ func (mattermost *ClusterInstallation) GenerateService() *corev1.Service {
 					TargetPort: intstr.FromString("app"),
 				},
 			},
-			Selector:  ClusterInstallationLabels(mattermost.Spec.InstallationName),
+			Selector:  ClusterInstallationLabels(blueGreenName),
 			ClusterIP: corev1.ClusterIPNone,
 		},
 	}
 }
 
 // GenerateIngress returns the ingress for Mattermost
-func (mattermost *ClusterInstallation) GenerateIngress() *v1beta1.Ingress {
+func (mattermost *ClusterInstallation) GenerateBlueGreenIngress() *v1beta1.Ingress {
+	blueGreenName := fmt.Sprintf("%s-green", mattermost.Name)
 	return &v1beta1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      mattermost.Spec.InstallationName,
+			Name:      blueGreenName,
 			Namespace: mattermost.Namespace,
-			Labels:    ClusterInstallationLabels(mattermost.Spec.InstallationName),
+			Labels:    ClusterInstallationLabels(blueGreenName),
 			OwnerReferences: []metav1.OwnerReference{
 				*metav1.NewControllerRef(mattermost, schema.GroupVersionKind{
 					Group:   SchemeGroupVersion.Group,
@@ -169,7 +111,7 @@ func (mattermost *ClusterInstallation) GenerateIngress() *v1beta1.Ingress {
 								{
 									Path: "/",
 									Backend: v1beta1.IngressBackend{
-										ServiceName: mattermost.Spec.InstallationName,
+										ServiceName: blueGreenName,
 										ServicePort: intstr.FromInt(8065),
 									},
 								},
@@ -183,13 +125,13 @@ func (mattermost *ClusterInstallation) GenerateIngress() *v1beta1.Ingress {
 }
 
 // GenerateDeployment returns the deployment spec for Mattermost
-func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword string, externalDB, isLicensed bool, minioService string) *appsv1.Deployment {
+func (mattermost *ClusterInstallation) GenerateBlueGreenDeployment(dbUser, dbPassword string, externalDB, isLicensed bool, minioService string) *appsv1.Deployment {
 	envVarDB := []corev1.EnvVar{}
 
 	masterDBEnvVar := corev1.EnvVar{
 		Name: "MM_CONFIG",
 	}
-
+	blueGreenName := fmt.Sprintf("%s-green", mattermost.Name)
 	var initContainers []corev1.Container
 	if externalDB {
 		masterDBEnvVar.ValueFrom = &corev1.EnvVarSource{
@@ -209,7 +151,7 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 		envVarDB = append(envVarDB, corev1.EnvVar{
 			Name: "MM_SQLSETTINGS_DATASOURCEREPLICAS",
 			Value: fmt.Sprintf(
-				"%s:%s@tcp(db-mysql.%s:3306)/mattermost?readTimeout=30s&writeTimeout=30s",
+				"%s:%s@tcp(db-mysql-nodes.%s:3306)/mattermost?readTimeout=30s&writeTimeout=30s",
 				dbUser, dbPassword, mattermost.Namespace,
 			),
 		})
@@ -240,12 +182,6 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 	})
 
 	minioName := fmt.Sprintf("%s-minio", mattermost.Name)
-
-	// Check if custom secret was passed
-	if mattermost.Spec.Minio.Secret != "" {
-		minioName = mattermost.Spec.Minio.Secret
-	}
-
 	minioAccessEnv := &corev1.EnvVarSource{
 		SecretKeyRef: &corev1.SecretKeySelector{
 			LocalObjectReference: corev1.LocalObjectReference{
@@ -339,7 +275,7 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 		}
 	}
 
-	siteURL := fmt.Sprintf("https://%s", mattermost.Spec.IngressName)
+	siteURL := fmt.Sprintf("https://%s", mattermost.Spec.BlueGreen.BlueGreenIngressName)
 	envVarGeneral := []corev1.EnvVar{
 		{
 			Name:  "MM_SERVICESETTINGS_SITEURL",
@@ -402,11 +338,13 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 		maxUnavailable = intstr.FromInt(1)
 	}
 
+
+
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      mattermost.Spec.InstallationName,
+			Name:      blueGreenName,
 			Namespace: mattermost.Namespace,
-			Labels:    ClusterInstallationLabels(mattermost.Spec.InstallationName),
+			Labels:    ClusterInstallationLabels(blueGreenName),
 			OwnerReferences: []metav1.OwnerReference{
 				*metav1.NewControllerRef(mattermost, schema.GroupVersionKind{
 					Group:   SchemeGroupVersion.Group,
@@ -425,18 +363,18 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 			RevisionHistoryLimit: &revHistoryLimit,
 			Replicas:             &mattermost.Spec.Replicas,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: ClusterInstallationLabels(mattermost.Spec.InstallationName),
+				MatchLabels: ClusterInstallationLabels(blueGreenName),
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: ClusterInstallationLabels(mattermost.Spec.InstallationName),
+					Labels: ClusterInstallationLabels(blueGreenName),
 				},
 				Spec: corev1.PodSpec{
 					InitContainers: initContainers,
 					Containers: []corev1.Container{
 						{
-							Image:                    mattermost.GetImageName(),
-							Name:                     mattermost.Spec.InstallationName,
+							Image:                    mattermost.GetBlueGreenImageName(),
+							Name:                     blueGreenName,
 							ImagePullPolicy:          corev1.PullAlways,
 							TerminationMessagePolicy: corev1.TerminationMessageFallbackToLogsOnError,
 							Command:                  []string{"mattermost"},
@@ -473,53 +411,32 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 							Resources:    mattermost.Spec.Resources,
 						},
 					},
-					Volumes:      volumeLicense,
-					Affinity:     mattermost.Spec.Affinity,
-					NodeSelector: mattermost.Spec.NodeSelector,
+					Volumes: volumeLicense,
 				},
 			},
 		},
 	}
 }
 
-// GenerateSecret returns the service for Mattermost
-func (mattermost *ClusterInstallation) GenerateSecret(secretName string, labels map[string]string, values map[string][]byte) *corev1.Secret {
-	return &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Labels:    labels,
-			Name:      secretName,
-			Namespace: mattermost.Namespace,
-			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(mattermost, schema.GroupVersionKind{
-					Group:   SchemeGroupVersion.Group,
-					Version: SchemeGroupVersion.Version,
-					Kind:    "ClusterInstallation",
-				}),
-			},
-		},
-		Data: values,
-	}
-}
-
-// GetImageName returns the container image name that matches the spec of the
+// GetBlueGreenImageName returns the container image name that matches the spec of the
 // ClusterInstallation.
-func (mattermost *ClusterInstallation) GetImageName() string {
-	return fmt.Sprintf("%s:%s", mattermost.Spec.Image, mattermost.Spec.Version)
+func (mattermost *ClusterInstallation) GetBlueGreenImageName() string {
+	return fmt.Sprintf("%s:%s", mattermost.Spec.Image, mattermost.Spec.BlueGreen.BlueGreenVersion)
 }
 
-// ClusterInstallationLabels returns the labels for selecting the resources
-// belonging to the given mattermost clusterinstallation.
-func ClusterInstallationLabels(name string) map[string]string {
-	l := ClusterInstallationResourceLabels(name)
-	l[ClusterLabel] = name
-	l["app"] = "mattermost"
+// // ClusterInstallationLabels returns the labels for selecting the resources
+// // belonging to the given mattermost clusterinstallation.
+// func ClusterInstallationLabels(name string) map[string]string {
+// 	l := ClusterInstallationResourceLabels(name)
+// 	l[ClusterLabel] = name
+// 	l["app"] = "mattermost"
 
-	return l
-}
+// 	return l
+// }
 
-// ClusterInstallationResourceLabels returns the labels for selecting a given
-// ClusterInstallation as well as any external dependency resources that were
-// created for the installation.
-func ClusterInstallationResourceLabels(name string) map[string]string {
-	return map[string]string{ClusterResourceLabel: name}
-}
+// // ClusterInstallationResourceLabels returns the labels for selecting a given
+// // ClusterInstallation as well as any external dependency resources that were
+// // created for the installation.
+// func ClusterInstallationResourceLabels(name string) map[string]string {
+// 	return map[string]string{ClusterResourceLabel: name}
+// }

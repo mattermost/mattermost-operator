@@ -199,7 +199,7 @@ func (r *ReconcileClusterInstallation) updateMattermostDeployment(mi *mattermost
 	// needs to be updated.
 	image := mi.GetImageName()
 	for _, container := range original.Spec.Template.Spec.Containers {
-		if container.Name == mi.Name {
+		if container.Name == mi.Name || container.Name == mi.Spec.InstallationName {
 			if container.Image != image {
 				reqLogger.Info("Current image is not the same as the requested, will upgrade the Mattermost installation")
 				update = true

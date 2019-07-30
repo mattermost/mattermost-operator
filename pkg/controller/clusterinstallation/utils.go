@@ -35,7 +35,7 @@ func (r *ReconcileClusterInstallation) checkClusterInstallation(mattermost *matt
 			APIVersion: "v1",
 		},
 	}
-	sel := mattermostv1alpha1.ClusterInstallationLabels(mattermost.Name)
+	sel := mattermostv1alpha1.ClusterInstallationLabels(mattermost.Spec.InstallationName)
 	opts := &client.ListOptions{LabelSelector: labels.SelectorFromSet(sel)}
 
 	err := r.client.List(context.TODO(), opts, pods)

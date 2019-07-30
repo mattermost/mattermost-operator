@@ -17,6 +17,10 @@ import (
 // ClusterInstallationSpec defines the desired state of ClusterInstallation
 // +k8s:openapi-gen=true
 type ClusterInstallationSpec struct {
+	// InstallationName defines the name of the installation.
+	// InstallationName is the Mattermost name + blue
+	// +optional
+	InstallationName string `json:"installationName,omitempty"`
 	// Image defines the ClusterInstallation Docker image.
 	Image string `json:"image,omitempty"`
 	// Version defines the ClusterInstallation Docker image version.
@@ -51,6 +55,10 @@ type ClusterInstallationSpec struct {
 	Minio Minio `json:"minio,omitempty"`
 
 	Database Database `json:"database,omitempty"`
+
+	// +optional
+	BlueGreen BlueGreen `json:"blueGreen,omitempty"`
+
 	// +optional
 	ElasticSearch ElasticSearch `json:"elasticSearch,omitempty"`
 
@@ -62,6 +70,21 @@ type ClusterInstallationSpec struct {
 
 	// +optional
 	IngressAnnotations map[string]string `json:"ingressAnnotations,omitempty"`
+}
+
+// BlueGreen defines the configuration of BlueGreen deployment for a ClusterInstallation
+type BlueGreen struct {
+	// BlueGreen defines if BlueGreen deployment will be applied
+	// +optional
+	UseBlueGreen bool `json:"useBlueGreen,omitempty"`
+	// BlueGreenIngressName defines the ingress name that will be used by the BlueGreen deployment.
+	// Required when BlueGreen boolean is set to true.
+	// +optional
+	BlueGreenIngressName string `json:"blueGreenIngressName,omitempty"`
+	// BlueGreenVersion defines the Docker image version that will be used for the BlueGreen deployment.
+	// Required when BlueGreen boolean is set to true.
+	// +optional
+	BlueGreenVersion string `json:"blueGreenVersion,omitempty"`
 }
 
 // Minio defines the configuration of Minio for a ClusterInstallation.
