@@ -524,7 +524,6 @@ func ClusterInstallationResourceLabels(name string) map[string]string {
 	return map[string]string{ClusterResourceLabel: name}
 }
 
-
 // GetSelector returns the selector that should be used depending on whether blue-green is enabled or not
 func GetSelector(mattermost *ClusterInstallation) map[string]string {
 	if mattermost.Spec.BlueGreen.Enable {
@@ -536,7 +535,7 @@ func GetSelector(mattermost *ClusterInstallation) map[string]string {
 			fmt.Sprint("Wrong ProductionDeployment type used. Select either blue or green")
 			return ClusterInstallationLabels(mattermost.Name)
 		}
-		
+
 	} else {
 		return ClusterInstallationLabels(mattermost.Name)
 	}
