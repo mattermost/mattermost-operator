@@ -91,6 +91,7 @@ operator-sdk: ## Download sdk only if it's not available. Used in the docker bui
 
 clean: ## Clean up everything
 	rm -Rf build/_output
+	rm -Rf build/operator-sdk
 	go clean $(GOFLAGS) -i ./...
 	rm -f *.out
 	rm -f *.test

@@ -131,8 +131,6 @@ func (r *ReconcileClusterInstallation) Reconcile(request reconcile.Request) (rec
 		return reconcile.Result{}, err
 	}
 
-	mattermost.Spec.InstallationName = fmt.Sprintf("%s-blue", mattermost.Name)
-
 	if mattermost.Status.State != r.state {
 		status := mattermost.Status
 		status.State = r.state
@@ -182,17 +180,14 @@ func (r *ReconcileClusterInstallation) Reconcile(request reconcile.Request) (rec
 		return reconcile.Result{}, err
 	}
 
+	mattermost.Spec.BlueGreen.GreenInstallationName = fmt.Sprintf("%s-green", mattermost.Name)
+	mattermost.Spec.BlueGreen.BlueInstallationName = fmt.Sprintf("%s-blue", mattermost.Name)
+
 	err = r.checkMattermost(mattermost, reqLogger)
 	if err != nil {
 		r.setReconciling()
 		return reconcile.Result{}, err
 	}
-
-	// err = r.checkBlueGreen(mattermost, reqLogger)
-	// if err != nil {
-	// 	r.setReconciling()
-	// 	return reconcile.Result{}, err
-	// }
 
 	status, err := r.checkClusterInstallation(mattermost)
 	if err != nil {
@@ -200,6 +195,27 @@ func (r *ReconcileClusterInstallation) Reconcile(request reconcile.Request) (rec
 		r.updateStatus(mattermost, status, reqLogger)
 		return reconcile.Result{RequeueAfter: time.Second * 3}, err
 	}
+
+	if mattermost.Spec.BlueGreen.Enable {
+		err = r.checkBlueGreen(mattermost, reqLogger)
+		if err != nil {
+			r.setReconciling()
+			return reconcile.Result{}, err
+		}
+		status, err := r.checkGreenInstallation(mattermost)
+		if err != nil {
+			r.setReconciling()
+			r.updateStatus(mattermost, status, reqLogger)
+			return reconcile.Result{RequeueAfter: time.Second * 3}, err
+		}
+		status, err = r.checkBlueInstallation(mattermost)
+		if err != nil {
+			r.setReconciling()
+			r.updateStatus(mattermost, status, reqLogger)
+			return reconcile.Result{RequeueAfter: time.Second * 3}, err
+		}
+	}
+
 	err = r.updateStatus(mattermost, status, reqLogger)
 	if err != nil {
 		r.setReconciling()

@@ -33,7 +33,14 @@ func (r *ReconcileClusterInstallation) checkMattermost(mattermost *mattermostv1a
 		return err
 	}
 
-	return r.checkMattermostDeployment(mattermost, reqLogger)
+	if mattermost.Spec.BlueGreen.Enable == false {
+		err = r.checkMattermostDeployment(mattermost, reqLogger)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (r *ReconcileClusterInstallation) checkMattermostService(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
@@ -179,10 +186,12 @@ func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mat
 		return err
 	}
 
-	err = r.updateMattermostDeployment(mattermost, deployment, foundDeployment, reqLogger)
-	if err != nil {
-		reqLogger.Error(err, "Failed to update mattermost deployment")
-		return err
+	if mattermost.Spec.BlueGreen.Enable != true {
+		err = r.updateMattermostDeployment(mattermost, deployment, foundDeployment, reqLogger)
+		if err != nil {
+			reqLogger.Error(err, "Failed to update mattermost deployment")
+			return err
+		}
 	}
 
 	return nil
@@ -199,7 +208,7 @@ func (r *ReconcileClusterInstallation) updateMattermostDeployment(mi *mattermost
 	// needs to be updated.
 	image := mi.GetImageName()
 	for _, container := range original.Spec.Template.Spec.Containers {
-		if container.Name == mi.Name || container.Name == mi.Spec.InstallationName {
+		if container.Name == mi.Name {
 			if container.Image != image {
 				reqLogger.Info("Current image is not the same as the requested, will upgrade the Mattermost installation")
 				update = true

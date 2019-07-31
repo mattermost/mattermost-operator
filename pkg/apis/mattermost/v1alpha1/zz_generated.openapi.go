@@ -66,13 +66,6 @@ func schema_pkg_apis_mattermost_v1alpha1_ClusterInstallationSpec(ref common.Refe
 			SchemaProps: spec.SchemaProps{
 				Description: "ClusterInstallationSpec defines the desired state of ClusterInstallation",
 				Properties: map[string]spec.Schema{
-					"installationName": {
-						SchemaProps: spec.SchemaProps{
-							Description: "InstallationName defines the name of the installation. InstallationName is the Mattermost name + blue",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
 					"image": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Image defines the ClusterInstallation Docker image.",

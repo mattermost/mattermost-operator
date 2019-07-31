@@ -17,10 +17,6 @@ import (
 // ClusterInstallationSpec defines the desired state of ClusterInstallation
 // +k8s:openapi-gen=true
 type ClusterInstallationSpec struct {
-	// InstallationName defines the name of the installation.
-	// InstallationName is the Mattermost name + blue
-	// +optional
-	InstallationName string `json:"installationName,omitempty"`
 	// Image defines the ClusterInstallation Docker image.
 	Image string `json:"image,omitempty"`
 	// Version defines the ClusterInstallation Docker image version.
@@ -74,17 +70,37 @@ type ClusterInstallationSpec struct {
 
 // BlueGreen defines the configuration of BlueGreen deployment for a ClusterInstallation
 type BlueGreen struct {
-	// BlueGreen defines if BlueGreen deployment will be applied
+	//ProductionDeployment defines if the current production is blue or green
+	//Default is blue
 	// +optional
-	UseBlueGreen bool `json:"useBlueGreen,omitempty"`
-	// BlueGreenIngressName defines the ingress name that will be used by the BlueGreen deployment.
+	ProductionDeployment string `json:"productionDeployment,omitempty"`
+	// Enable defines if BlueGreen deployment will be applied
+	// +optional
+	Enable bool `json:"enable,omitempty"`
+	// GreenIngressName defines the ingress name that will be used by the BlueGreen deployment.
 	// Required when BlueGreen boolean is set to true.
 	// +optional
-	BlueGreenIngressName string `json:"blueGreenIngressName,omitempty"`
-	// BlueGreenVersion defines the Docker image version that will be used for the BlueGreen deployment.
+	GreenIngressName string `json:"greenIngressName,omitempty"`
+	// BlueIngressName defines the ingress name that will be used by the BlueGreen deployment.
 	// Required when BlueGreen boolean is set to true.
 	// +optional
-	BlueGreenVersion string `json:"blueGreenVersion,omitempty"`
+	BlueIngressName string `json:"blueIngressName,omitempty"`
+	// GreenVersion defines the Docker image version that will be used for the Green deployment.
+	// Required when BlueGreen boolean is set to true.
+	// +optional
+	GreenVersion string `json:"greenVersion,omitempty"`
+	// BlueVersion defines the Docker image version that will be used for the Blue deployment.
+	// Required when BlueGreen boolean is set to true.
+	// +optional
+	BlueVersion string `json:"blueVersion,omitempty"`
+	// GreenInstallationName defines the name of the BlueGreen installation.
+	// GreenInstallationName is the Mattermost name + green
+	// +optional
+	GreenInstallationName string `json:"greenInstallationName,omitempty"`
+	// BlueInstallationName defines the name of the BlueGreen installation.
+	// BlueInstallationName is the Mattermost name + green
+	// +optional
+	BlueInstallationName string `json:"blueInstallationName,omitempty"`
 }
 
 // Minio defines the configuration of Minio for a ClusterInstallation.

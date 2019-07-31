@@ -85,8 +85,8 @@ func (mattermost *ClusterInstallation) GenerateService() *corev1.Service {
 		}
 		return &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
-				Labels:    ClusterInstallationLabels(mattermost.Spec.InstallationName),
-				Name:      mattermost.Spec.InstallationName,
+				Labels:    ClusterInstallationLabels(mattermost.Name),
+				Name:      mattermost.Name,
 				Namespace: mattermost.Namespace,
 				OwnerReferences: []metav1.OwnerReference{
 					*metav1.NewControllerRef(mattermost, schema.GroupVersionKind{
@@ -110,7 +110,7 @@ func (mattermost *ClusterInstallation) GenerateService() *corev1.Service {
 						TargetPort: intstr.FromString("app"),
 					},
 				},
-				Selector: ClusterInstallationLabels(mattermost.Spec.InstallationName),
+				Selector: GetSelector(mattermost),
 				Type:     corev1.ServiceTypeLoadBalancer,
 			},
 		}
@@ -118,8 +118,8 @@ func (mattermost *ClusterInstallation) GenerateService() *corev1.Service {
 
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:    ClusterInstallationLabels(mattermost.Spec.InstallationName),
-			Name:      mattermost.Spec.InstallationName,
+			Labels:    ClusterInstallationLabels(mattermost.Name),
+			Name:      mattermost.Name,
 			Namespace: mattermost.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
 				*metav1.NewControllerRef(mattermost, schema.GroupVersionKind{
@@ -137,7 +137,7 @@ func (mattermost *ClusterInstallation) GenerateService() *corev1.Service {
 					TargetPort: intstr.FromString("app"),
 				},
 			},
-			Selector:  ClusterInstallationLabels(mattermost.Spec.InstallationName),
+			Selector:  GetSelector(mattermost),
 			ClusterIP: corev1.ClusterIPNone,
 		},
 	}
@@ -147,9 +147,9 @@ func (mattermost *ClusterInstallation) GenerateService() *corev1.Service {
 func (mattermost *ClusterInstallation) GenerateIngress() *v1beta1.Ingress {
 	return &v1beta1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      mattermost.Spec.InstallationName,
+			Name:      mattermost.Name,
 			Namespace: mattermost.Namespace,
-			Labels:    ClusterInstallationLabels(mattermost.Spec.InstallationName),
+			Labels:    ClusterInstallationLabels(mattermost.Name),
 			OwnerReferences: []metav1.OwnerReference{
 				*metav1.NewControllerRef(mattermost, schema.GroupVersionKind{
 					Group:   SchemeGroupVersion.Group,
@@ -169,7 +169,7 @@ func (mattermost *ClusterInstallation) GenerateIngress() *v1beta1.Ingress {
 								{
 									Path: "/",
 									Backend: v1beta1.IngressBackend{
-										ServiceName: mattermost.Spec.InstallationName,
+										ServiceName: mattermost.Name,
 										ServicePort: intstr.FromInt(8065),
 									},
 								},
@@ -404,9 +404,9 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      mattermost.Spec.InstallationName,
+			Name:      mattermost.Name,
 			Namespace: mattermost.Namespace,
-			Labels:    ClusterInstallationLabels(mattermost.Spec.InstallationName),
+			Labels:    ClusterInstallationLabels(mattermost.Name),
 			OwnerReferences: []metav1.OwnerReference{
 				*metav1.NewControllerRef(mattermost, schema.GroupVersionKind{
 					Group:   SchemeGroupVersion.Group,
@@ -425,18 +425,18 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 			RevisionHistoryLimit: &revHistoryLimit,
 			Replicas:             &mattermost.Spec.Replicas,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: ClusterInstallationLabels(mattermost.Spec.InstallationName),
+				MatchLabels: ClusterInstallationLabels(mattermost.Name),
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: ClusterInstallationLabels(mattermost.Spec.InstallationName),
+					Labels: ClusterInstallationLabels(mattermost.Name),
 				},
 				Spec: corev1.PodSpec{
 					InitContainers: initContainers,
 					Containers: []corev1.Container{
 						{
 							Image:                    mattermost.GetImageName(),
-							Name:                     mattermost.Spec.InstallationName,
+							Name:                     mattermost.Name,
 							ImagePullPolicy:          corev1.PullAlways,
 							TerminationMessagePolicy: corev1.TerminationMessageFallbackToLogsOnError,
 							Command:                  []string{"mattermost"},
@@ -522,4 +522,22 @@ func ClusterInstallationLabels(name string) map[string]string {
 // created for the installation.
 func ClusterInstallationResourceLabels(name string) map[string]string {
 	return map[string]string{ClusterResourceLabel: name}
+}
+
+
+// GetSelector returns the selector that should be used depending on whether blue-green is enabled or not
+func GetSelector(mattermost *ClusterInstallation) map[string]string {
+	if mattermost.Spec.BlueGreen.Enable {
+		if mattermost.Spec.BlueGreen.ProductionDeployment == "blue" {
+			return ClusterInstallationLabels(mattermost.Spec.BlueGreen.BlueInstallationName)
+		} else if mattermost.Spec.BlueGreen.ProductionDeployment == "green" {
+			return ClusterInstallationLabels(mattermost.Spec.BlueGreen.GreenInstallationName)
+		} else {
+			fmt.Sprint("Wrong ProductionDeployment type used. Select either blue or green")
+			return ClusterInstallationLabels(mattermost.Name)
+		}
+		
+	} else {
+		return ClusterInstallationLabels(mattermost.Name)
+	}
 }
