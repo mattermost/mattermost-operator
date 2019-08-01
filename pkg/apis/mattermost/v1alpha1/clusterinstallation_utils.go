@@ -27,7 +27,7 @@ const (
 	// DefaultMinioStorageSize is the default Storage size for Minio
 	DefaultMinioStorageSize = "50Gi"
 	// DefaultStorageSize is the default Storage size for the Database
-	DefaultStorageSize = "x50Gi"
+	DefaultStorageSize = "50Gi"
 
 	// ClusterLabel is the label applied across all compoments
 	ClusterLabel = "v1alpha1.mattermost.com/installation"
@@ -53,7 +53,36 @@ func (mattermost *ClusterInstallation) SetDefaults() error {
 
 	mattermost.Spec.Minio.SetDefaults()
 	mattermost.Spec.Database.SetDefaults()
+	err := mattermost.Spec.BlueGreen.SetDefaults(mattermost)
+	if err != nil {
+		return err
+	}
 
+	return nil
+}
+
+// SetDefaults sets the missing values in BlueGreen to the default ones
+func (bg *BlueGreen) SetDefaults(mattermost *ClusterInstallation) error {
+	if bg.Enable == true {
+		if bg.GreenInstallationName == "" {
+			bg.GreenInstallationName = fmt.Sprintf("%s-green", mattermost.Name)
+		}
+		if bg.BlueInstallationName == "" {
+			bg.BlueInstallationName = fmt.Sprintf("%s-blue", mattermost.Name)
+		}
+		if bg.GreenIngressName == "" {
+			bg.GreenIngressName = fmt.Sprintf("green.%s", mattermost.Spec.IngressName)
+		}
+		if bg.BlueIngressName == "" {
+			bg.BlueIngressName = fmt.Sprintf("blue.%s", mattermost.Spec.IngressName)
+		}
+		if bg.GreenVersion == "" || bg.BlueVersion == "" {
+			return errors.New("Both Blue and Green deployment versions required, but not set")
+		}
+		if bg.ProductionDeployment == "" {
+			return errors.New("Either blue or green needs to be specified as production, but not set")
+		}
+	}
 	return nil
 }
 
@@ -532,7 +561,7 @@ func GetSelector(mattermost *ClusterInstallation) map[string]string {
 		} else if mattermost.Spec.BlueGreen.ProductionDeployment == "green" {
 			return ClusterInstallationLabels(mattermost.Spec.BlueGreen.GreenInstallationName)
 		} else {
-			fmt.Sprint("Wrong ProductionDeployment type used. Select either blue or green")
+			fmt.Print("Wrong ProductionDeployment type used. Select either blue or green")
 			return ClusterInstallationLabels(mattermost.Name)
 		}
 

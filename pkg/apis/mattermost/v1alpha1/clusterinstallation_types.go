@@ -71,8 +71,6 @@ type ClusterInstallationSpec struct {
 // BlueGreen defines the configuration of BlueGreen deployment for a ClusterInstallation
 type BlueGreen struct {
 	//ProductionDeployment defines if the current production is blue or green
-	//Default is blue
-	// +optional
 	ProductionDeployment string `json:"productionDeployment,omitempty"`
 	// Enable defines if BlueGreen deployment will be applied
 	// +optional
@@ -87,11 +85,9 @@ type BlueGreen struct {
 	BlueIngressName string `json:"blueIngressName,omitempty"`
 	// GreenVersion defines the Docker image version that will be used for the Green deployment.
 	// Required when BlueGreen boolean is set to true.
-	// +optional
 	GreenVersion string `json:"greenVersion,omitempty"`
 	// BlueVersion defines the Docker image version that will be used for the Blue deployment.
 	// Required when BlueGreen boolean is set to true.
-	// +optional
 	BlueVersion string `json:"blueVersion,omitempty"`
 	// GreenInstallationName defines the name of the BlueGreen installation.
 	// GreenInstallationName is the Mattermost name + green

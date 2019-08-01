@@ -89,7 +89,7 @@ spec:
                   type: string
                 productionDeployment:
                   description: ProductionDeployment defines if the current production
-                    is blue or green Default is blue
+                    is blue or green
                   type: string
               type: object
             database:

@@ -186,7 +186,7 @@ func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mat
 		return err
 	}
 
-	if mattermost.Spec.BlueGreen.Enable != true {
+	if mattermost.Spec.BlueGreen.Enable == false {
 		err = r.updateMattermostDeployment(mattermost, deployment, foundDeployment, reqLogger)
 		if err != nil {
 			reqLogger.Error(err, "Failed to update mattermost deployment")

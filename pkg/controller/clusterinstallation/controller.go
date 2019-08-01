@@ -180,9 +180,6 @@ func (r *ReconcileClusterInstallation) Reconcile(request reconcile.Request) (rec
 		return reconcile.Result{}, err
 	}
 
-	mattermost.Spec.BlueGreen.GreenInstallationName = fmt.Sprintf("%s-green", mattermost.Name)
-	mattermost.Spec.BlueGreen.BlueInstallationName = fmt.Sprintf("%s-blue", mattermost.Name)
-
 	err = r.checkMattermost(mattermost, reqLogger)
 	if err != nil {
 		r.setReconciling()
@@ -202,7 +199,7 @@ func (r *ReconcileClusterInstallation) Reconcile(request reconcile.Request) (rec
 			r.setReconciling()
 			return reconcile.Result{}, err
 		}
-		status, err := r.checkGreenInstallation(mattermost)
+		status, err = r.checkGreenInstallation(mattermost)
 		if err != nil {
 			r.setReconciling()
 			r.updateStatus(mattermost, status, reqLogger)
