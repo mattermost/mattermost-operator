@@ -13,8 +13,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// checkClusterInstallation checks the health and correctness of the k8s
-// objects that make up a MattermostInstallation.
+// checkGreenInstallation checks the health and correctness of the k8s
+// objects that make up a GreenInstallation.
 //
 // NOTE: this is a vital health check. Every reconciliation loop should run this
 // check at the very end to ensure that everything in the installation is as it
@@ -109,6 +109,12 @@ func (r *ReconcileClusterInstallation) checkGreenInstallation(mattermost *matter
 	return status, nil
 }
 
+// checkBlueInstallation checks the health and correctness of the k8s
+// objects that make up a BlueInstallation.
+//
+// NOTE: this is a vital health check. Every reconciliation loop should run this
+// check at the very end to ensure that everything in the installation is as it
+// should be. Over time, more types of checks should be added here as needed.
 func (r *ReconcileClusterInstallation) checkBlueInstallation(mattermost *mattermostv1alpha1.ClusterInstallation) (mattermostv1alpha1.ClusterInstallationStatus, error) {
 	status := mattermostv1alpha1.ClusterInstallationStatus{
 		State:           mattermostv1alpha1.Reconciling,

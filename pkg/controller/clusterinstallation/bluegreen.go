@@ -221,7 +221,7 @@ func (r *ReconcileClusterInstallation) checkBlueGreenDeployment(mattermost *matt
 	return nil
 }
 
-// updateMattermostDeployment checks if the deployment should be updated.
+// updateBlueGreenDeployment checks if the BlueGreen deployment should be updated.
 // If an update is required then the deployment spec is set to:
 // - roll forward version
 // - keep active MattermostInstallation available by setting maxUnavailable=N-1
