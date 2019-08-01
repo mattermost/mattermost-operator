@@ -102,7 +102,7 @@ func (mattermost *ClusterInstallation) GenerateBlueGreenIngress(blueGreenType st
 		Spec: v1beta1.IngressSpec{
 			Rules: []v1beta1.IngressRule{
 				{
-					Host: mattermost.Spec.IngressName,
+					Host: mattermost.GetBlueGreenIngressName(blueGreenType),
 					IngressRuleValue: v1beta1.IngressRuleValue{
 						HTTP: &v1beta1.HTTPIngressRuleValue{
 							Paths: []v1beta1.HTTPIngressPath{
