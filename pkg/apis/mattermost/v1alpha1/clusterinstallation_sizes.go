@@ -190,12 +190,84 @@ var size25000 = ClusterInstallationSize{
 	},
 }
 
+// Sizes used for development and testing
+
+var sizeMiniSingleton = ClusterInstallationSize{
+	App: ComponentSize{
+		Replicas: 1,
+		Resources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("250m"),
+				corev1.ResourceMemory: resource.MustParse("512Mi"),
+			},
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("1"),
+				corev1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+		},
+	},
+	Minio: ComponentSize{
+		Replicas: 1,
+		Resources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("250m"),
+				corev1.ResourceMemory: resource.MustParse("512Mi"),
+			},
+		},
+	},
+	Database: ComponentSize{
+		Replicas: 1,
+		Resources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("500m"),
+				corev1.ResourceMemory: resource.MustParse("512Mi"),
+			},
+		},
+	},
+}
+
+var sizeMiniHA = ClusterInstallationSize{
+	App: ComponentSize{
+		Replicas: 2,
+		Resources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("250m"),
+				corev1.ResourceMemory: resource.MustParse("512Mi"),
+			},
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("1"),
+				corev1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+		},
+	},
+	Minio: ComponentSize{
+		Replicas: 4,
+		Resources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("250m"),
+				corev1.ResourceMemory: resource.MustParse("512Mi"),
+			},
+		},
+	},
+	Database: ComponentSize{
+		Replicas: 2,
+		Resources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("500m"),
+				corev1.ResourceMemory: resource.MustParse("512Mi"),
+			},
+		},
+	},
+}
+
 var validSizes = map[string]ClusterInstallationSize{
-	"100users":   size100,
-	"1000users":  size1000,
-	"5000users":  size5000,
-	"10000users": size10000,
-	"25000users": size25000,
+	"100users":      size100,
+	"1000users":     size1000,
+	"5000users":     size5000,
+	"10000users":    size10000,
+	"25000users":    size25000,
+	"miniSingleton": sizeMiniSingleton,
+	"miniHA":        sizeMiniHA,
 }
 
 var defaultSize = size5000
