@@ -112,3 +112,83 @@ func TestClusterInstallation(t *testing.T) {
 		})
 	})
 }
+
+func TestCalculateResourceMilliRequirements(t *testing.T) {
+	cis := ClusterInstallationSize{
+		App: ComponentSize{
+			Replicas: 3,
+			Resources: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("100m"),
+					corev1.ResourceMemory: resource.MustParse("100k"),
+				},
+			},
+		},
+		Minio: ComponentSize{
+			Replicas: 6,
+			Resources: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("100m"),
+					corev1.ResourceMemory: resource.MustParse("100k"),
+				},
+			},
+		},
+		Database: ComponentSize{
+			Replicas: 2,
+			Resources: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("100m"),
+					corev1.ResourceMemory: resource.MustParse("100k"),
+				},
+			},
+		},
+	}
+
+	t.Run("baseline", func(t *testing.T) {
+		t.Run("all components", func(t *testing.T) {
+			cpu, memory := cis.CalculateResourceMilliRequirements(true, true)
+			assert.Equal(t, int64(1100), cpu)
+			assert.Equal(t, int64(1100000000), memory)
+		})
+		t.Run("no database", func(t *testing.T) {
+			cpu, memory := cis.CalculateResourceMilliRequirements(false, true)
+			assert.Equal(t, int64(900), cpu)
+			assert.Equal(t, int64(900000000), memory)
+		})
+		t.Run("no minio", func(t *testing.T) {
+			cpu, memory := cis.CalculateResourceMilliRequirements(true, false)
+			assert.Equal(t, int64(500), cpu)
+			assert.Equal(t, int64(500000000), memory)
+		})
+		t.Run("no database or minio", func(t *testing.T) {
+			cpu, memory := cis.CalculateResourceMilliRequirements(false, false)
+			assert.Equal(t, int64(300), cpu)
+			assert.Equal(t, int64(300000000), memory)
+		})
+	})
+
+	t.Run("updated", func(t *testing.T) {
+		cis.App.Replicas = 10
+		cis.App.Resources.Requests = corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("1"),
+			corev1.ResourceMemory: resource.MustParse("100G"),
+		}
+
+		cpu, memory := cis.CalculateResourceMilliRequirements(false, false)
+		assert.Equal(t, int64(10000), cpu)
+		assert.Equal(t, int64(1000000000000000), memory)
+	})
+}
+
+// This is a basic sanity check on any cluster size we define as valid.
+func TestCalculateResourceMilliRequirementsOnAllValidClusterSizes(t *testing.T) {
+	for name, cis := range validSizes {
+		t.Run(name, func(t *testing.T) {
+			cpu, memory := cis.CalculateResourceMilliRequirements(true, true)
+			assert.True(t, cpu > 0)
+			assert.True(t, memory > 0)
+			assert.Equal(t, cpu, cis.CalculateCPUMilliRequirement(true, true))
+			assert.Equal(t, memory, cis.CalculateMemoryMilliRequirement(true, true))
+		})
+	}
+}

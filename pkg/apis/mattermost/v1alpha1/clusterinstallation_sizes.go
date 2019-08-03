@@ -1,7 +1,7 @@
 package v1alpha1
 
 import (
-	"errors"
+	"github.com/pkg/errors"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -19,6 +19,8 @@ type ComponentSize struct {
 	Replicas  int32
 	Resources corev1.ResourceRequirements
 }
+
+const Size100String = "100users"
 
 var size100 = ClusterInstallationSize{
 	App: ComponentSize{
@@ -54,6 +56,8 @@ var size100 = ClusterInstallationSize{
 	},
 }
 
+const Size1000String = "1000users"
+
 var size1000 = ClusterInstallationSize{
 	App: ComponentSize{
 		Replicas: 2,
@@ -87,6 +91,8 @@ var size1000 = ClusterInstallationSize{
 		},
 	},
 }
+
+const Size5000String = "5000users"
 
 var size5000 = ClusterInstallationSize{
 	App: ComponentSize{
@@ -122,6 +128,8 @@ var size5000 = ClusterInstallationSize{
 	},
 }
 
+const Size10000String = "10000users"
+
 var size10000 = ClusterInstallationSize{
 	App: ComponentSize{
 		Replicas: 3,
@@ -155,6 +163,8 @@ var size10000 = ClusterInstallationSize{
 		},
 	},
 }
+
+const Size25000String = "25000users"
 
 var size25000 = ClusterInstallationSize{
 	App: ComponentSize{
@@ -192,6 +202,8 @@ var size25000 = ClusterInstallationSize{
 
 // Sizes used for development and testing
 
+const SizeMiniSingletonString = "miniSingleton"
+
 var sizeMiniSingleton = ClusterInstallationSize{
 	App: ComponentSize{
 		Replicas: 1,
@@ -225,6 +237,8 @@ var sizeMiniSingleton = ClusterInstallationSize{
 		},
 	},
 }
+
+const SizeMiniHAString = "miniHA"
 
 var sizeMiniHA = ClusterInstallationSize{
 	App: ComponentSize{
@@ -261,25 +275,69 @@ var sizeMiniHA = ClusterInstallationSize{
 }
 
 var validSizes = map[string]ClusterInstallationSize{
-	"100users":      size100,
-	"1000users":     size1000,
-	"5000users":     size5000,
-	"10000users":    size10000,
-	"25000users":    size25000,
-	"miniSingleton": sizeMiniSingleton,
-	"miniHA":        sizeMiniHA,
+	Size100String:           size100,
+	Size1000String:          size1000,
+	Size5000String:          size5000,
+	Size10000String:         size10000,
+	Size25000String:         size25000,
+	SizeMiniSingletonString: sizeMiniSingleton,
+	SizeMiniHAString:        sizeMiniHA,
 }
 
 var defaultSize = size5000
+
+// CalculateResourceMilliRequirements returns the milli values for the CPU and
+// memory requests of the cluster size.
+func (cis *ClusterInstallationSize) CalculateResourceMilliRequirements(includeDatabase, includeMinio bool) (int64, int64) {
+	return cis.CalculateCPUMilliRequirement(includeDatabase, includeMinio), cis.CalculateMemoryMilliRequirement(includeDatabase, includeMinio)
+}
+
+// CalculateCPUMilliRequirement returns the milli value for the CPU request of
+// the cluster size.
+func (cis *ClusterInstallationSize) CalculateCPUMilliRequirement(includeDatabase, includeMinio bool) int64 {
+	cpuRequirement := (cis.App.Resources.Requests.Cpu().MilliValue() * int64(cis.App.Replicas))
+	if includeDatabase {
+		cpuRequirement += (cis.Database.Resources.Requests.Cpu().MilliValue() * int64(cis.Database.Replicas))
+	}
+	if includeMinio {
+		cpuRequirement += (cis.Minio.Resources.Requests.Cpu().MilliValue() * int64(cis.Minio.Replicas))
+	}
+
+	return cpuRequirement
+}
+
+// CalculateMemoryMilliRequirement returns the milli value for the memory
+// request of the cluster size.
+func (cis *ClusterInstallationSize) CalculateMemoryMilliRequirement(includeDatabase, includeMinio bool) int64 {
+	memRequirement := (cis.App.Resources.Requests.Memory().MilliValue() * int64(cis.App.Replicas))
+	if includeDatabase {
+		memRequirement += (cis.Database.Resources.Requests.Memory().MilliValue() * int64(cis.Database.Replicas))
+	}
+	if includeMinio {
+		memRequirement += (cis.Minio.Resources.Requests.Memory().MilliValue() * int64(cis.Minio.Replicas))
+	}
+
+	return memRequirement
+}
+
+// GetClusterSize returns a ClusterInstallationSize based on the provided
+// size key.
+func GetClusterSize(key string) (ClusterInstallationSize, error) {
+	size, ok := validSizes[key]
+	if !ok {
+		return ClusterInstallationSize{}, errors.New("invalid cluster size")
+	}
+
+	return size, nil
+}
 
 // SetReplicasAndResourcesFromSize will use the Size field to determine the number of replicas
 // and resource requests to set for a ClusterInstallation. If Replicas or Resources for any components are
 // manually set in the spec then those values will not be changed.
 func (mattermost *ClusterInstallation) SetReplicasAndResourcesFromSize() error {
-	var err error
-	size, ok := validSizes[mattermost.Spec.Size]
-	if !ok {
-		err = errors.New("Invalid size, using default")
+	size, err := GetClusterSize(mattermost.Spec.Size)
+	if err != nil {
+		err = errors.Wrap(err, "using default")
 		size = defaultSize
 	}
 
