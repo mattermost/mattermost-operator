@@ -1,6 +1,6 @@
 # Build the mattermost operator
 ARG BUILD_IMAGE=golang:1.12
-ARG BASE_IMAGE=alpine:3.9
+ARG BASE_IMAGE=alpine:3.10
 
 FROM ${BUILD_IMAGE} AS build
 WORKDIR /go/src/github.com/mattermost/mattermost-operator/
