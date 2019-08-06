@@ -10,7 +10,6 @@ spec:
     kind: MinIOInstance
     singular: minioinstance
     plural: minioinstances
-  preserveUnknownFields: true
   validation:
   # openAPIV3Schema is the schema for validating custom objects.
   # Refer https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#specifying-a-structural-schema
