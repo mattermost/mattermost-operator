@@ -95,8 +95,7 @@ main() {
     docker pull quay.io/presslabs/mysql-operator:0.2.10
     docker pull quay.io/presslabs/mysql-operator-sidecar:0.2.10
     docker pull quay.io/presslabs/orchestrator:v3.0.13-r29
-    #docker pull minio/k8s-operator:latest
-    docker pull mattermost/minio-operator:1.0.0
+    docker pull minio/k8s-operator:1.0.0
     docker pull mattermost/mattermost-enterprise-edition:5.12.4
     docker pull mattermost/mattermost-enterprise-edition:5.11.1
 
@@ -104,8 +103,7 @@ main() {
     kind load docker-image quay.io/presslabs/mysql-operator-sidecar:0.2.10
     kind load docker-image quay.io/presslabs/orchestrator:v3.0.13-r29
     kind load docker-image mattermost/mattermost-operator:test
-    #kind load docker-image minio/k8s-operator:latest
-    kind load docker-image mattermost/minio-operator:1.0.0
+    kind load docker-image minio/k8s-operator:1.0.0
     kind load docker-image mattermost/mattermost-enterprise-edition:5.11.1
     kind load docker-image mattermost/mattermost-enterprise-edition:5.12.4
 
