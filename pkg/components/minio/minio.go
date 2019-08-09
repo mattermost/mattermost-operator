@@ -18,6 +18,12 @@ import (
 // Instance returns the Minio component to deploy
 func Instance(mattermost *mattermostv1alpha1.ClusterInstallation) *minioOperator.MinIOInstance {
 	minioName := fmt.Sprintf("%s-minio", mattermost.Name)
+	secret := minioName
+
+	// Check if custom secret was passed
+	if mattermost.Spec.Minio.Secret != "" {
+		secret = mattermost.Spec.Minio.Secret
+	}
 
 	return &minioOperator.MinIOInstance{
 		ObjectMeta: metav1.ObjectMeta{
@@ -36,7 +42,7 @@ func Instance(mattermost *mattermostv1alpha1.ClusterInstallation) *minioOperator
 			Version:     "RELEASE.2018-11-22T02-51-56Z",
 			Replicas:    mattermost.Spec.Minio.Replicas,
 			Mountpath:   "/export",
-			CredsSecret: &corev1.LocalObjectReference{Name: minioName},
+			CredsSecret: &corev1.LocalObjectReference{Name: secret},
 			VolumeClaimTemplate: &corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: minioName,

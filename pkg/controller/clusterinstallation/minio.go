@@ -28,6 +28,12 @@ func (r *ReconcileClusterInstallation) checkMinio(mattermost *mattermostv1alpha1
 }
 
 func (r *ReconcileClusterInstallation) checkMinioSecret(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
+	// Check if custom secret was specified
+	if mattermost.Spec.Minio.Secret != "" {
+		reqLogger.Info("Skipping minio secret creation, using custom secret")
+		return nil
+	}
+
 	secret := mattermostMinio.Secret(mattermost)
 
 	err := r.createSecretIfNotExists(mattermost, secret, reqLogger)
