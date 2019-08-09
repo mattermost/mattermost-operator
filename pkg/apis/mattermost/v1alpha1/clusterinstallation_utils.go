@@ -209,7 +209,7 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 		envVarDB = append(envVarDB, corev1.EnvVar{
 			Name: "MM_SQLSETTINGS_DATASOURCEREPLICAS",
 			Value: fmt.Sprintf(
-				"%s:%s@tcp(db-mysql-nodes.%s:3306)/mattermost?readTimeout=30s&writeTimeout=30s",
+				"%s:%s@tcp(db-mysql.%s:3306)/mattermost?readTimeout=30s&writeTimeout=30s",
 				dbUser, dbPassword, mattermost.Namespace,
 			),
 		})

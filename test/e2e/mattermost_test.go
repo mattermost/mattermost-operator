@@ -15,6 +15,7 @@ import (
 	"github.com/operator-framework/operator-sdk/pkg/test/e2eutil"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -51,7 +52,7 @@ func TestMattermost(t *testing.T) {
 	f := framework.Global
 
 	t.Run("mysql operator ready", func(t *testing.T) {
-		err = e2eutil.WaitForDeployment(t, f.KubeClient, "mysql-operator", "mysql-operator", 1, retryInterval, timeout)
+		err = waitForStatefulSet(t, f.Client.Client, "mysql-operator", "mysql-operator", 1, retryInterval, timeout)
 		require.NoError(t, err)
 	})
 	t.Run("minio operator ready", func(t *testing.T) {
@@ -89,13 +90,31 @@ func mattermostScaleTest(t *testing.T, f *framework.Framework, ctx *framework.Te
 		Spec: operator.ClusterInstallationSpec{
 			IngressName: "test-example.mattermost.dev",
 			Replicas:    1,
+			Resources: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("100m"),
+					corev1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+			},
 			Minio: operator.Minio{
 				StorageSize: "1Gi",
 				Replicas:    1,
+				Resources: corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("100m"),
+						corev1.ResourceMemory: resource.MustParse("100Mi"),
+					},
+				},
 			},
 			Database: operator.Database{
 				StorageSize: "1Gi",
 				Replicas:    1,
+				Resources: corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("100m"),
+						corev1.ResourceMemory: resource.MustParse("100Mi"),
+					},
+				},
 			},
 		},
 	}
@@ -166,11 +185,31 @@ func mattermostUpgradeTest(t *testing.T, f *framework.Framework, ctx *framework.
 			Version:     "5.11.1",
 			IngressName: "test-example2.mattermost.dev",
 			Replicas:    1,
+			Resources: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("100m"),
+					corev1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+			},
 			Minio: operator.Minio{
 				StorageSize: "1Gi",
+				Replicas:    1,
+				Resources: corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("100m"),
+						corev1.ResourceMemory: resource.MustParse("100Mi"),
+					},
+				},
 			},
 			Database: operator.Database{
 				StorageSize: "1Gi",
+				Replicas:    1,
+				Resources: corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("100m"),
+						corev1.ResourceMemory: resource.MustParse("100Mi"),
+					},
+				},
 			},
 		},
 	}
