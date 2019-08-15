@@ -6,8 +6,9 @@ import (
 	"reflect"
 
 	"github.com/go-logr/logr"
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
@@ -28,6 +29,28 @@ func (r *ReconcileClusterInstallation) checkMinio(mattermost *mattermostv1alpha1
 }
 
 func (r *ReconcileClusterInstallation) checkMinioSecret(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
+	// Check if custom secret was specified
+	if mattermost.Spec.Minio.Secret != "" {
+		// Check if the Secret exists
+		var secret *corev1.Secret
+		err := r.client.Get(context.TODO(), types.NamespacedName{Name: mattermost.Spec.Minio.Secret, Namespace: mattermost.Namespace}, secret)
+		if err != nil {
+			// Secret does not exist
+			return errors.Wrap(err, "unable to locate custom minio secret")
+		}
+
+		// Check if the Secret has required fields
+		if _, ok := secret.Data["accesskey"]; !ok {
+			return fmt.Errorf("custom Minio Secret %s does not have an 'accesskey' value", mattermost.Spec.Minio.Secret)
+		}
+		if _, ok := secret.Data["secretkey"]; !ok {
+			return fmt.Errorf("custom Minio Secret %s does not have an 'secretkey' value", mattermost.Spec.Minio.Secret)
+		}
+
+		reqLogger.Info("Skipping minio secret creation, using custom secret")
+		return nil
+	}
+
 	secret := mattermostMinio.Secret(mattermost)
 
 	err := r.createSecretIfNotExists(mattermost, secret, reqLogger)
@@ -94,7 +117,7 @@ func (r *ReconcileClusterInstallation) checkMinioInstance(mattermost *mattermost
 func (r *ReconcileClusterInstallation) createMinioInstanceIfNotExists(mattermost *mattermostv1alpha1.ClusterInstallation, instance *minioOperator.MinIOInstance, reqLogger logr.Logger) error {
 	foundInstance := &minioOperator.MinIOInstance{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: instance.Name, Namespace: instance.Namespace}, foundInstance)
-	if err != nil && errors.IsNotFound(err) {
+	if err != nil && kerrors.IsNotFound(err) {
 		reqLogger.Info("Creating minio instance")
 		return r.createResource(mattermost, instance, reqLogger)
 	} else if err != nil {

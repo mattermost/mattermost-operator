@@ -81,6 +81,9 @@ type Minio struct {
 	// Defines the resource requests and limits for the Minio pods.
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+	// Optionally enter the name of already existing Secret
+	// +optional
+	Secret string `json:"secret,omitempty"`
 }
 
 // Database defines the database configuration for a ClusterInstallation.

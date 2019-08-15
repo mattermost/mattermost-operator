@@ -19,6 +19,11 @@ import (
 func Instance(mattermost *mattermostv1alpha1.ClusterInstallation) *minioOperator.MinIOInstance {
 	minioName := fmt.Sprintf("%s-minio", mattermost.Name)
 
+	// Check if custom secret was passed
+	if mattermost.Spec.Minio.Secret != "" {
+		minioName = mattermost.Spec.Minio.Secret
+	}
+
 	return &minioOperator.MinIOInstance{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      minioName,
