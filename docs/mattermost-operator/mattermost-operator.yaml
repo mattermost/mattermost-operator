@@ -120,6 +120,9 @@ spec:
                   description: Defines the resource requests and limits for the Minio
                     pods.
                   type: object
+                secret:
+                  description: Optionally enter the name of already existing Secret
+                  type: string
                 storageSize:
                   description: Defines the storage size for Minio. ie 50Gi
                   pattern: ^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$

@@ -240,6 +240,12 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 	})
 
 	minioName := fmt.Sprintf("%s-minio", mattermost.Name)
+
+	// Check if custom secret was passed
+	if mattermost.Spec.Minio.Secret != "" {
+		minioName = mattermost.Spec.Minio.Secret
+	}
+
 	minioAccessEnv := &corev1.EnvVarSource{
 		SecretKeyRef: &corev1.SecretKeySelector{
 			LocalObjectReference: corev1.LocalObjectReference{
@@ -467,8 +473,9 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 							Resources:    mattermost.Spec.Resources,
 						},
 					},
-					Volumes:  volumeLicense,
-					Affinity: mattermost.Spec.Affinity,
+					Volumes:      volumeLicense,
+					Affinity:     mattermost.Spec.Affinity,
+					NodeSelector: mattermost.Spec.NodeSelector,
 				},
 			},
 		},
