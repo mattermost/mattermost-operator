@@ -474,6 +474,7 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 						},
 					},
 					Volumes:      volumeLicense,
+					Affinity:     mattermost.Spec.Affinity,
 					NodeSelector: mattermost.Spec.NodeSelector,
 				},
 			},
