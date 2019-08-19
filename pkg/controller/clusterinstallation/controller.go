@@ -186,31 +186,17 @@ func (r *ReconcileClusterInstallation) Reconcile(request reconcile.Request) (rec
 		return reconcile.Result{}, err
 	}
 
-	status, err := r.checkClusterInstallation(mattermost)
+	err = r.checkBlueGreen(mattermost, reqLogger)
+	if err != nil {
+		r.setReconciling()
+		return reconcile.Result{}, err
+	}
+
+	status, err := r.handleCheckClusterInstallation(mattermost)
 	if err != nil {
 		r.setReconciling()
 		r.updateStatus(mattermost, status, reqLogger)
 		return reconcile.Result{RequeueAfter: time.Second * 3}, err
-	}
-
-	if mattermost.Spec.BlueGreen.Enable {
-		err = r.checkBlueGreen(mattermost, reqLogger)
-		if err != nil {
-			r.setReconciling()
-			return reconcile.Result{}, err
-		}
-		status, err = r.checkGreenInstallation(mattermost)
-		if err != nil {
-			r.setReconciling()
-			r.updateStatus(mattermost, status, reqLogger)
-			return reconcile.Result{RequeueAfter: time.Second * 3}, err
-		}
-		status, err = r.checkBlueInstallation(mattermost)
-		if err != nil {
-			r.setReconciling()
-			r.updateStatus(mattermost, status, reqLogger)
-			return reconcile.Result{RequeueAfter: time.Second * 3}, err
-		}
 	}
 
 	err = r.updateStatus(mattermost, status, reqLogger)

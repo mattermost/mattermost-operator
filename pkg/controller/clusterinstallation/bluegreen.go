@@ -3,27 +3,16 @@ package clusterinstallation
 import (
 	"context"
 	"fmt"
-	"time"
-
-	// "fmt"
 	"reflect"
-	// "time"
-
-	// objectMatcher "github.com/banzaicloud/k8s-objectmatcher/patch"
+	"time"
 
 	objectMatcher "github.com/banzaicloud/k8s-objectmatcher/patch"
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
-
-	// batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
-
-	// k8sErrors "k8s.io/apimachinery/pkg/api/errors"
-	// metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -32,36 +21,24 @@ import (
 )
 
 func (r *ReconcileClusterInstallation) checkBlueGreen(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
-	reqLogger = reqLogger.WithValues("Reconcile", "mattermost")
+	if mattermost.Spec.BlueGreen.Enable {
+		reqLogger = reqLogger.WithValues("Reconcile", "mattermost")
 
-	err := r.checkBlueGreenService(mattermost, reqLogger, "blue")
-	if err != nil {
-		return err
-	}
-
-	err = r.checkBlueGreenService(mattermost, reqLogger, "green")
-	if err != nil {
-		return err
-	}
-
-	err = r.checkBlueGreenIngress(mattermost, reqLogger, "blue")
-	if err != nil {
-		return err
-	}
-
-	err = r.checkBlueGreenIngress(mattermost, reqLogger, "green")
-	if err != nil {
-		return err
-	}
-
-	err = r.checkBlueGreenDeployment(mattermost, reqLogger, "blue")
-	if err != nil {
-		return err
-	}
-
-	err = r.checkBlueGreenDeployment(mattermost, reqLogger, "green")
-	if err != nil {
-		return err
+		blueGreen := []string{mattermostv1alpha1.BlueName, mattermostv1alpha1.GreenName}
+		for _, installation := range blueGreen {
+			err := r.checkBlueGreenService(mattermost, reqLogger, installation)
+			if err != nil {
+				return err
+			}
+			err = r.checkBlueGreenIngress(mattermost, reqLogger, installation)
+			if err != nil {
+				return err
+			}
+			err = r.checkBlueGreenDeployment(mattermost, reqLogger, installation)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil

@@ -3,6 +3,7 @@ package v1alpha1
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -34,6 +35,13 @@ const (
 	// ClusterResourceLabel is the label applied to a given ClusterInstallation
 	// as well as all other resources created to support it.
 	ClusterResourceLabel = "v1alpha1.mattermost.com/resource"
+
+	// BlueName is the name of the blue Mattermmost installation in a blue/green
+	// deployment type.
+	BlueName = "blue"
+	// GreenName is the name of the green Mattermmost installation in a blue/green
+	// deployment type.
+	GreenName = "green"
 )
 
 // SetDefaults set the missing values in the manifest to the default ones
@@ -54,16 +62,21 @@ func (mattermost *ClusterInstallation) SetDefaults() error {
 	mattermost.Spec.Minio.SetDefaults()
 	mattermost.Spec.Database.SetDefaults()
 	err := mattermost.Spec.BlueGreen.SetDefaults(mattermost)
-	if err != nil {
-		return err
-	}
 
-	return nil
+	return err
 }
 
 // SetDefaults sets the missing values in BlueGreen to the default ones
 func (bg *BlueGreen) SetDefaults(mattermost *ClusterInstallation) error {
 	if bg.Enable == true {
+		bg.ProductionDeployment = strings.ToLower(bg.ProductionDeployment)
+		if bg.ProductionDeployment != BlueName && bg.ProductionDeployment != GreenName {
+			return fmt.Errorf("%s is not a valid ProductionDeployment value, must be 'blue' or 'green'", bg.ProductionDeployment)
+		}
+		if bg.GreenVersion == "" || bg.BlueVersion == "" {
+			return errors.New("Both Blue and Green deployment versions required, but not set")
+		}
+
 		if bg.GreenInstallationName == "" {
 			bg.GreenInstallationName = fmt.Sprintf("%s-green", mattermost.Name)
 		}
@@ -76,13 +89,8 @@ func (bg *BlueGreen) SetDefaults(mattermost *ClusterInstallation) error {
 		if bg.BlueIngressName == "" {
 			bg.BlueIngressName = fmt.Sprintf("blue.%s", mattermost.Spec.IngressName)
 		}
-		if bg.GreenVersion == "" || bg.BlueVersion == "" {
-			return errors.New("Both Blue and Green deployment versions required, but not set")
-		}
-		if bg.ProductionDeployment == "" {
-			return errors.New("Either blue or green needs to be specified as production, but not set")
-		}
 	}
+
 	return nil
 }
 
@@ -553,19 +561,17 @@ func ClusterInstallationResourceLabels(name string) map[string]string {
 	return map[string]string{ClusterResourceLabel: name}
 }
 
-// GetSelector returns the selector that should be used depending on whether blue-green is enabled or not
+// GetSelector returns the selector that should be used depending on whether
+// blue-green is enabled or not.
 func GetSelector(mattermost *ClusterInstallation) map[string]string {
 	if mattermost.Spec.BlueGreen.Enable {
-		if mattermost.Spec.BlueGreen.ProductionDeployment == "blue" {
+		if mattermost.Spec.BlueGreen.ProductionDeployment == BlueName {
 			return ClusterInstallationLabels(mattermost.Spec.BlueGreen.BlueInstallationName)
-		} else if mattermost.Spec.BlueGreen.ProductionDeployment == "green" {
-			return ClusterInstallationLabels(mattermost.Spec.BlueGreen.GreenInstallationName)
-		} else {
-			fmt.Print("Wrong ProductionDeployment type used. Select either blue or green")
-			return ClusterInstallationLabels(mattermost.Name)
 		}
-
-	} else {
-		return ClusterInstallationLabels(mattermost.Name)
+		if mattermost.Spec.BlueGreen.ProductionDeployment == GreenName {
+			return ClusterInstallationLabels(mattermost.Spec.BlueGreen.GreenInstallationName)
+		}
 	}
+
+	return ClusterInstallationLabels(mattermost.Name)
 }

@@ -16,60 +16,104 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+func (r *ReconcileClusterInstallation) handleCheckClusterInstallation(mattermost *mattermostv1alpha1.ClusterInstallation) (mattermostv1alpha1.ClusterInstallationStatus, error) {
+	if !mattermost.Spec.BlueGreen.Enable {
+		return r.checkClusterInstallation(
+			mattermost.Name,
+			mattermost.GetImageName(),
+			mattermost.Spec.Image,
+			mattermost.Spec.Version,
+			mattermost.Spec.Replicas,
+			mattermost.Spec.UseServiceLoadBalancer,
+		)
+	}
+
+	// BlueGreen is a bit tricky. To properly check for errors and also to return
+	// the correct status, we should check both and then manually return status.
+	blueStatus, blueErr := r.checkClusterInstallation(
+		mattermost.Spec.BlueGreen.BlueInstallationName,
+		mattermost.GetBlueGreenImageName(mattermostv1alpha1.BlueName),
+		mattermost.Spec.Image, mattermost.Spec.BlueGreen.BlueVersion,
+		mattermost.Spec.Replicas,
+		mattermost.Spec.UseServiceLoadBalancer,
+	)
+	greenStatus, greenErr := r.checkClusterInstallation(
+		mattermost.Spec.BlueGreen.GreenInstallationName,
+		mattermost.GetBlueGreenImageName(mattermostv1alpha1.GreenName),
+		mattermost.Spec.Image, mattermost.Spec.BlueGreen.GreenVersion,
+		mattermost.Spec.Replicas,
+		mattermost.Spec.UseServiceLoadBalancer,
+	)
+
+	var status mattermostv1alpha1.ClusterInstallationStatus
+	if mattermost.Spec.BlueGreen.ProductionDeployment == mattermostv1alpha1.BlueName {
+		status = blueStatus
+	} else {
+		status = greenStatus
+	}
+
+	if blueErr != nil {
+		return status, errors.Wrap(blueErr, "blue installation validation failed")
+	}
+	if greenErr != nil {
+		return status, errors.Wrap(greenErr, "green installation validation failed")
+	}
+
+	return status, nil
+}
+
 // checkClusterInstallation checks the health and correctness of the k8s
 // objects that make up a MattermostInstallation.
 //
 // NOTE: this is a vital health check. Every reconciliation loop should run this
 // check at the very end to ensure that everything in the installation is as it
 // should be. Over time, more types of checks should be added here as needed.
-func (r *ReconcileClusterInstallation) checkClusterInstallation(mattermost *mattermostv1alpha1.ClusterInstallation) (mattermostv1alpha1.ClusterInstallationStatus, error) {
+func (r *ReconcileClusterInstallation) checkClusterInstallation(name, imageName, image, version string, replicas int32, useServiceLoadBalancer bool) (mattermostv1alpha1.ClusterInstallationStatus, error) {
 	status := mattermostv1alpha1.ClusterInstallationStatus{
 		State:           mattermostv1alpha1.Reconciling,
 		Replicas:        0,
 		UpdatedReplicas: 0,
 	}
 
-	sel := mattermostv1alpha1.ClusterInstallationLabels(mattermost.Name)
+	sel := mattermostv1alpha1.ClusterInstallationLabels(name)
 	opts := &client.ListOptions{LabelSelector: labels.SelectorFromSet(sel)}
 
-	if mattermost.Spec.BlueGreen.Enable == false {
-		pods := &corev1.PodList{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "Pod",
-				APIVersion: "v1",
-			},
-		}
-
-		err := r.client.List(context.TODO(), opts, pods)
-		if err != nil {
-			return status, errors.Wrap(err, "unable to get pod list")
-		}
-
-		status.Replicas = int32(len(pods.Items))
-
-		for _, pod := range pods.Items {
-			if pod.Status.Phase != corev1.PodRunning || pod.DeletionTimestamp != nil {
-				return status, fmt.Errorf("mattermost pod %s is in state '%s'", pod.Name, pod.Status.Phase)
-			}
-			if len(pod.Spec.Containers) == 0 {
-				return status, fmt.Errorf("mattermost pod %s has no containers", pod.Name)
-			}
-			if pod.Spec.Containers[0].Image != mattermost.GetImageName() {
-				return status, fmt.Errorf("mattermost pod %s is running incorrect image", pod.Name)
-			}
-			status.UpdatedReplicas++
-		}
-
-		if int32(len(pods.Items)) != mattermost.Spec.Replicas {
-			return status, fmt.Errorf("found %d pods, but wanted %d", len(pods.Items), mattermost.Spec.Replicas)
-		}
-
-		status.Image = mattermost.Spec.Image
-		status.Version = mattermost.Spec.Version
+	pods := &corev1.PodList{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: "v1",
+		},
 	}
 
+	err := r.client.List(context.TODO(), opts, pods)
+	if err != nil {
+		return status, errors.Wrap(err, "unable to get pod list")
+	}
+
+	status.Replicas = int32(len(pods.Items))
+
+	for _, pod := range pods.Items {
+		if pod.Status.Phase != corev1.PodRunning || pod.DeletionTimestamp != nil {
+			return status, fmt.Errorf("mattermost pod %s is in state '%s'", pod.Name, pod.Status.Phase)
+		}
+		if len(pod.Spec.Containers) == 0 {
+			return status, fmt.Errorf("mattermost pod %s has no containers", pod.Name)
+		}
+		if pod.Spec.Containers[0].Image != imageName {
+			return status, fmt.Errorf("mattermost pod %s is running incorrect image", pod.Name)
+		}
+		status.UpdatedReplicas++
+	}
+
+	if int32(len(pods.Items)) != replicas {
+		return status, fmt.Errorf("found %d pods, but wanted %d", len(pods.Items), replicas)
+	}
+
+	status.Image = image
+	status.Version = version
+
 	status.Endpoint = "not available"
-	if mattermost.Spec.UseServiceLoadBalancer {
+	if useServiceLoadBalancer {
 		svc := &corev1.ServiceList{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       "Service",

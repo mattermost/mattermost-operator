@@ -416,29 +416,34 @@ func (mattermost *ClusterInstallation) GenerateBlueGreenDeployment(blueGreenType
 // GetBlueGreenImageName returns the container image name that matches the spec of the
 // ClusterInstallation.
 func (mattermost *ClusterInstallation) GetBlueGreenImageName(deployment string) string {
-	if deployment == "green" {
+	if deployment == GreenName {
 		return fmt.Sprintf("%s:%s", mattermost.Spec.Image, mattermost.Spec.BlueGreen.GreenVersion)
-	} else if deployment == "blue" {
+	}
+	if deployment == BlueName {
 		return fmt.Sprintf("%s:%s", mattermost.Spec.Image, mattermost.Spec.BlueGreen.BlueVersion)
 	}
+
 	return "Cannot return BlueGreen image name."
 }
 
 // GetBlueGreenInstallationName returns the BlueGreen installation name based on the deployment type
 func (mattermost *ClusterInstallation) GetBlueGreenInstallationName(deployment string) string {
-	if deployment == "green" {
+	if deployment == GreenName {
 		return mattermost.Spec.BlueGreen.GreenInstallationName
-	} else if deployment == "blue" {
+	}
+	if deployment == BlueName {
 		return mattermost.Spec.BlueGreen.BlueInstallationName
 	}
+
 	return "Cannot return BlueGreen installation name."
 }
 
 // GetBlueGreenIngressName returns the BlueGreen installation name based on the deployment type
 func (mattermost *ClusterInstallation) GetBlueGreenIngressName(deployment string) string {
-	if deployment == "green" {
+	if deployment == GreenName {
 		return mattermost.Spec.BlueGreen.GreenIngressName
-	} else if deployment == "blue" {
+	}
+	if deployment == BlueName {
 		return mattermost.Spec.BlueGreen.BlueIngressName
 	}
 	return "Cannot return BlueGreen ingress name."
