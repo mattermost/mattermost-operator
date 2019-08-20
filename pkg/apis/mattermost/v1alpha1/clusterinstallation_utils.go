@@ -19,7 +19,7 @@ const (
 	// DefaultMattermostImage is the default Mattermost docker image
 	DefaultMattermostImage = "mattermost/mattermost-enterprise-edition"
 	// DefaultMattermostVersion is the default Mattermost docker tag
-	DefaultMattermostVersion = "5.12.4"
+	DefaultMattermostVersion = "5.14.0"
 	// DefaultMattermostSize is the default number of users
 	DefaultMattermostSize = "5000users"
 	// DefaultMattermostDatabaseType is the default Mattermost database
