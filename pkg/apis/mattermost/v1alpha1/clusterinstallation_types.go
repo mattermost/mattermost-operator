@@ -51,6 +51,10 @@ type ClusterInstallationSpec struct {
 	Minio Minio `json:"minio,omitempty"`
 
 	Database Database `json:"database,omitempty"`
+
+	// +optional
+	BlueGreen BlueGreen `json:"blueGreen,omitempty"`
+
 	// +optional
 	ElasticSearch ElasticSearch `json:"elasticSearch,omitempty"`
 
@@ -62,6 +66,37 @@ type ClusterInstallationSpec struct {
 
 	// +optional
 	IngressAnnotations map[string]string `json:"ingressAnnotations,omitempty"`
+}
+
+// BlueGreen defines the configuration of BlueGreen deployment for a ClusterInstallation
+type BlueGreen struct {
+	//ProductionDeployment defines if the current production is blue or green
+	ProductionDeployment string `json:"productionDeployment,omitempty"`
+	// Enable defines if BlueGreen deployment will be applied
+	// +optional
+	Enable bool `json:"enable,omitempty"`
+	// GreenIngressName defines the ingress name that will be used by the BlueGreen deployment.
+	// Required when BlueGreen boolean is set to true.
+	// +optional
+	GreenIngressName string `json:"greenIngressName,omitempty"`
+	// BlueIngressName defines the ingress name that will be used by the BlueGreen deployment.
+	// Required when BlueGreen boolean is set to true.
+	// +optional
+	BlueIngressName string `json:"blueIngressName,omitempty"`
+	// GreenVersion defines the Docker image version that will be used for the Green deployment.
+	// Required when BlueGreen boolean is set to true.
+	GreenVersion string `json:"greenVersion,omitempty"`
+	// BlueVersion defines the Docker image version that will be used for the Blue deployment.
+	// Required when BlueGreen boolean is set to true.
+	BlueVersion string `json:"blueVersion,omitempty"`
+	// GreenInstallationName defines the name of the BlueGreen installation.
+	// GreenInstallationName is the Mattermost name + green
+	// +optional
+	GreenInstallationName string `json:"greenInstallationName,omitempty"`
+	// BlueInstallationName defines the name of the BlueGreen installation.
+	// BlueInstallationName is the Mattermost name + green
+	// +optional
+	BlueInstallationName string `json:"blueInstallationName,omitempty"`
 }
 
 // Minio defines the configuration of Minio for a ClusterInstallation.

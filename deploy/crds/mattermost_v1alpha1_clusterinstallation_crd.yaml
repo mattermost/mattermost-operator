@@ -54,6 +54,44 @@ spec:
               description: If specified, affinity will define the pod's scheduling
                 constraints
               type: object
+            blueGreen:
+              properties:
+                blueIngressName:
+                  description: BlueIngressName defines the ingress name that will
+                    be used by the BlueGreen deployment. Required when BlueGreen boolean
+                    is set to true.
+                  type: string
+                blueInstallationName:
+                  description: BlueInstallationName defines the name of the BlueGreen
+                    installation. BlueInstallationName is the Mattermost name + green
+                  type: string
+                blueVersion:
+                  description: BlueVersion defines the Docker image version that will
+                    be used for the Blue deployment. Required when BlueGreen boolean
+                    is set to true.
+                  type: string
+                enable:
+                  description: Enable defines if BlueGreen deployment will be applied
+                  type: boolean
+                greenIngressName:
+                  description: GreenIngressName defines the ingress name that will
+                    be used by the BlueGreen deployment. Required when BlueGreen boolean
+                    is set to true.
+                  type: string
+                greenInstallationName:
+                  description: GreenInstallationName defines the name of the BlueGreen
+                    installation. GreenInstallationName is the Mattermost name + green
+                  type: string
+                greenVersion:
+                  description: GreenVersion defines the Docker image version that
+                    will be used for the Green deployment. Required when BlueGreen
+                    boolean is set to true.
+                  type: string
+                productionDeployment:
+                  description: ProductionDeployment defines if the current production
+                    is blue or green
+                  type: string
+              type: object
             database:
               properties:
                 externalSecret:

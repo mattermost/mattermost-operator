@@ -20,31 +20,32 @@ import (
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
 )
 
-func (r *ReconcileClusterInstallation) checkMattermost(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
-	reqLogger = reqLogger.WithValues("Reconcile", "mattermost")
+func (r *ReconcileClusterInstallation) checkBlueGreen(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
+	if mattermost.Spec.BlueGreen.Enable {
+		reqLogger = reqLogger.WithValues("Reconcile", "mattermost")
 
-	err := r.checkMattermostService(mattermost, reqLogger)
-	if err != nil {
-		return err
-	}
-
-	err = r.checkMattermostIngress(mattermost, reqLogger)
-	if err != nil {
-		return err
-	}
-
-	if mattermost.Spec.BlueGreen.Enable == false {
-		err = r.checkMattermostDeployment(mattermost, reqLogger)
-		if err != nil {
-			return err
+		blueGreen := []string{mattermostv1alpha1.BlueName, mattermostv1alpha1.GreenName}
+		for _, installation := range blueGreen {
+			err := r.checkBlueGreenService(mattermost, reqLogger, installation)
+			if err != nil {
+				return err
+			}
+			err = r.checkBlueGreenIngress(mattermost, reqLogger, installation)
+			if err != nil {
+				return err
+			}
+			err = r.checkBlueGreenDeployment(mattermost, reqLogger, installation)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
 	return nil
 }
 
-func (r *ReconcileClusterInstallation) checkMattermostService(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
-	service := mattermost.GenerateService()
+func (r *ReconcileClusterInstallation) checkBlueGreenService(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger, blueGreenType string) error {
+	service := mattermost.GenerateBlueGreenService(blueGreenType)
 
 	err := r.createServiceIfNotExists(mattermost, service, reqLogger)
 	if err != nil {
@@ -61,13 +62,13 @@ func (r *ReconcileClusterInstallation) checkMattermostService(mattermost *matter
 
 	updatedLabels := ensureLabels(service.Labels, foundService.Labels)
 	if !reflect.DeepEqual(updatedLabels, foundService.Labels) {
-		reqLogger.Info("Updating mattermost service labels")
+		reqLogger.Info("Updating BlueGreen service labels")
 		foundService.Labels = updatedLabels
 		update = true
 	}
 
 	if !reflect.DeepEqual(service.Annotations, foundService.Annotations) {
-		reqLogger.Info("Updating mattermost service annotations")
+		reqLogger.Info("Updating BlueGreen service annotations")
 		foundService.Annotations = service.Annotations
 		update = true
 	}
@@ -88,7 +89,7 @@ func (r *ReconcileClusterInstallation) checkMattermostService(mattermost *matter
 		}
 	}
 	if !reflect.DeepEqual(service.Spec, foundService.Spec) {
-		reqLogger.Info("Updating mattermost service spec")
+		reqLogger.Info("Updating BlueGreen service spec")
 		foundService.Spec = service.Spec
 		update = true
 	}
@@ -100,8 +101,8 @@ func (r *ReconcileClusterInstallation) checkMattermostService(mattermost *matter
 	return nil
 }
 
-func (r *ReconcileClusterInstallation) checkMattermostIngress(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
-	ingress := mattermost.GenerateIngress()
+func (r *ReconcileClusterInstallation) checkBlueGreenIngress(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger, blueGreenType string) error {
+	ingress := mattermost.GenerateBlueGreenIngress(blueGreenType)
 
 	err := r.createIngressIfNotExists(mattermost, ingress, reqLogger)
 	if err != nil {
@@ -118,19 +119,19 @@ func (r *ReconcileClusterInstallation) checkMattermostIngress(mattermost *matter
 
 	updatedLabels := ensureLabels(ingress.Labels, foundIngress.Labels)
 	if !reflect.DeepEqual(updatedLabels, foundIngress.Labels) {
-		reqLogger.Info("Updating mattermost ingress labels")
+		reqLogger.Info("Updating BlueGreen ingress labels")
 		foundIngress.Labels = updatedLabels
 		update = true
 	}
 
 	if !reflect.DeepEqual(ingress.Annotations, foundIngress.Annotations) {
-		reqLogger.Info("Updating mattermost ingress annotations")
+		reqLogger.Info("Updating BlueGreen ingress annotations")
 		foundIngress.Annotations = ingress.Annotations
 		update = true
 	}
 
 	if !reflect.DeepEqual(ingress.Spec, foundIngress.Spec) {
-		reqLogger.Info("Updating mattermost ingress spec")
+		reqLogger.Info("Updating BlueGreen ingress spec")
 		foundIngress.Spec = ingress.Spec
 		update = true
 	}
@@ -142,7 +143,7 @@ func (r *ReconcileClusterInstallation) checkMattermostIngress(mattermost *matter
 	return nil
 }
 
-func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
+func (r *ReconcileClusterInstallation) checkBlueGreenDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger, blueGreenType string) error {
 	var externalDB, isLicensed bool
 	var dbUser, dbPassword string
 	var err error
@@ -173,7 +174,7 @@ func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mat
 		isLicensed = true
 	}
 
-	deployment := mattermost.GenerateDeployment(dbUser, dbPassword, externalDB, isLicensed, minioService)
+	deployment := mattermost.GenerateBlueGreenDeployment(blueGreenType, dbUser, dbPassword, externalDB, isLicensed, minioService)
 	err = r.createDeploymentIfNotExists(mattermost, deployment, reqLogger)
 	if err != nil {
 		return err
@@ -182,14 +183,14 @@ func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mat
 	foundDeployment := &appsv1.Deployment{}
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: deployment.Name, Namespace: deployment.Namespace}, foundDeployment)
 	if err != nil {
-		reqLogger.Error(err, "Failed to get mattermost deployment")
+		reqLogger.Error(err, "Failed to get mattermost BlueGreen deployment")
 		return err
 	}
 
-	if mattermost.Spec.BlueGreen.Enable == false {
-		err = r.updateMattermostDeployment(mattermost, deployment, foundDeployment, reqLogger)
+	if mattermost.Spec.BlueGreen.ProductionDeployment != blueGreenType {
+		err = r.updateBlueGreenDeployment(mattermost, deployment, foundDeployment, reqLogger, blueGreenType)
 		if err != nil {
-			reqLogger.Error(err, "Failed to update mattermost deployment")
+			reqLogger.Error(err, "Failed to update BlueGreen deployment")
 			return err
 		}
 	}
@@ -197,18 +198,18 @@ func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mat
 	return nil
 }
 
-// updateMattermostDeployment checks if the deployment should be updated.
+// updateBlueGreenDeployment checks if the BlueGreen deployment should be updated.
 // If an update is required then the deployment spec is set to:
 // - roll forward version
 // - keep active MattermostInstallation available by setting maxUnavailable=N-1
-func (r *ReconcileClusterInstallation) updateMattermostDeployment(mi *mattermostv1alpha1.ClusterInstallation, new, original *appsv1.Deployment, reqLogger logr.Logger) error {
+func (r *ReconcileClusterInstallation) updateBlueGreenDeployment(mi *mattermostv1alpha1.ClusterInstallation, new, original *appsv1.Deployment, reqLogger logr.Logger, blueGreenType string) error {
 	var update bool
 
 	// Look for mattermost container in pod spec and determine if the image
 	// needs to be updated.
-	image := mi.GetImageName()
+	image := mi.GetBlueGreenImageName(blueGreenType)
 	for _, container := range original.Spec.Template.Spec.Containers {
-		if container.Name == mi.Name {
+		if container.Name == mi.GetBlueGreenInstallationName(blueGreenType) {
 			if container.Image != image {
 				reqLogger.Info("Current image is not the same as the requested, will upgrade the Mattermost installation")
 				update = true
