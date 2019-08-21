@@ -31,16 +31,18 @@ func (r *ReconcileClusterInstallation) handleCheckClusterInstallation(mattermost
 	// BlueGreen is a bit tricky. To properly check for errors and also to return
 	// the correct status, we should check both and then manually return status.
 	blueStatus, blueErr := r.checkClusterInstallation(
-		mattermost.Spec.BlueGreen.BlueInstallationName,
-		mattermost.GetBlueGreenImageName(mattermostv1alpha1.BlueName),
-		mattermost.Spec.Image, mattermost.Spec.BlueGreen.BlueVersion,
+		mattermost.Spec.BlueGreen.Blue.Name,
+		mattermost.Spec.BlueGreen.Blue.GetDeploymentImageName(),
+		mattermost.Spec.BlueGreen.Blue.Image,
+		mattermost.Spec.BlueGreen.Blue.Version,
 		mattermost.Spec.Replicas,
 		mattermost.Spec.UseServiceLoadBalancer,
 	)
 	greenStatus, greenErr := r.checkClusterInstallation(
-		mattermost.Spec.BlueGreen.GreenInstallationName,
-		mattermost.GetBlueGreenImageName(mattermostv1alpha1.GreenName),
-		mattermost.Spec.Image, mattermost.Spec.BlueGreen.GreenVersion,
+		mattermost.Spec.BlueGreen.Green.Name,
+		mattermost.Spec.BlueGreen.Green.GetDeploymentImageName(),
+		mattermost.Spec.BlueGreen.Green.Image,
+		mattermost.Spec.BlueGreen.Green.Version,
 		mattermost.Spec.Replicas,
 		mattermost.Spec.UseServiceLoadBalancer,
 	)
