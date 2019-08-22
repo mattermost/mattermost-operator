@@ -20,7 +20,7 @@ func TestClusterInstallation(t *testing.T) {
 		Spec: ClusterInstallationSpec{
 			Replicas:    7,
 			Image:       "mattermost/mattermost-enterprise-edition",
-			Version:     "5.11.0",
+			Version:     "5.14.0",
 			IngressName: "foo.mattermost.dev",
 		},
 	}
@@ -52,7 +52,7 @@ func TestClusterInstallation(t *testing.T) {
 			},
 			Spec: ClusterInstallationSpec{
 				Image:       "mattermost/mattermost-enterprise-edition",
-				Version:     "5.11.0",
+				Version:     "5.14.0",
 				IngressName: "foo.mattermost.dev",
 				Size:        "1000users",
 			},

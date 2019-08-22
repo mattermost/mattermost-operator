@@ -43,7 +43,7 @@ func TestReconcile(t *testing.T) {
 		Spec: mattermostv1alpha1.ClusterInstallationSpec{
 			Replicas:    replicas,
 			Image:       "mattermost/mattermost-enterprise-edition",
-			Version:     "5.11.0",
+			Version:     "5.14.0",
 			IngressName: "foo.mattermost.dev",
 		},
 	}
