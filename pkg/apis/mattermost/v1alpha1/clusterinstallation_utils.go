@@ -562,17 +562,6 @@ func (mattermost *ClusterInstallation) GetProductionDeploymentName() string {
 	return mattermost.Name
 }
 
-// MockBaseDeployment returns the ClusterInstallation in the form of a bluegreen
-// deployment object.
-func (mattermost *ClusterInstallation) MockBaseDeployment() AppDeployment {
-	return AppDeployment{
-		Name:        mattermost.Name,
-		IngressName: mattermost.Spec.IngressName,
-		Image:       mattermost.Spec.Image,
-		Version:     mattermost.Spec.Version,
-	}
-}
-
 // GetDeploymentImageName returns the container image name that matches the spec
 // of the deployment.
 func (d *AppDeployment) GetDeploymentImageName() string {
