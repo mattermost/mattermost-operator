@@ -23,18 +23,18 @@ import (
 func (r *ReconcileClusterInstallation) checkMattermost(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
 	reqLogger = reqLogger.WithValues("Reconcile", "mattermost")
 
-	err := r.checkMattermostService(mattermost, reqLogger)
+	err := r.checkMattermostService(mattermost, mattermost.Name, mattermost.GetProductionDeploymentName(), reqLogger)
 	if err != nil {
 		return err
 	}
 
-	err = r.checkMattermostIngress(mattermost, reqLogger)
+	err = r.checkMattermostIngress(mattermost, mattermost.Name, mattermost.Spec.IngressName, reqLogger)
 	if err != nil {
 		return err
 	}
 
-	if mattermost.Spec.BlueGreen.Enable == false {
-		err = r.checkMattermostDeployment(mattermost, reqLogger)
+	if !mattermost.Spec.BlueGreen.Enable {
+		err = r.checkMattermostDeployment(mattermost, mattermost.Name, mattermost.Spec.IngressName, mattermost.GetImageName(), reqLogger)
 		if err != nil {
 			return err
 		}
@@ -43,8 +43,8 @@ func (r *ReconcileClusterInstallation) checkMattermost(mattermost *mattermostv1a
 	return nil
 }
 
-func (r *ReconcileClusterInstallation) checkMattermostService(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
-	service := mattermost.GenerateService()
+func (r *ReconcileClusterInstallation) checkMattermostService(mattermost *mattermostv1alpha1.ClusterInstallation, resourceName, selectorName string, reqLogger logr.Logger) error {
+	service := mattermost.GenerateService(resourceName, selectorName)
 
 	err := r.createServiceIfNotExists(mattermost, service, reqLogger)
 	if err != nil {
@@ -100,8 +100,8 @@ func (r *ReconcileClusterInstallation) checkMattermostService(mattermost *matter
 	return nil
 }
 
-func (r *ReconcileClusterInstallation) checkMattermostIngress(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
-	ingress := mattermost.GenerateIngress()
+func (r *ReconcileClusterInstallation) checkMattermostIngress(mattermost *mattermostv1alpha1.ClusterInstallation, resourceName, ingressName string, reqLogger logr.Logger) error {
+	ingress := mattermost.GenerateIngress(resourceName, ingressName)
 
 	err := r.createIngressIfNotExists(mattermost, ingress, reqLogger)
 	if err != nil {
@@ -142,7 +142,7 @@ func (r *ReconcileClusterInstallation) checkMattermostIngress(mattermost *matter
 	return nil
 }
 
-func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
+func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, resourceName, ingressName, imageName string, reqLogger logr.Logger) error {
 	var externalDB, isLicensed bool
 	var dbUser, dbPassword string
 	var err error
@@ -173,7 +173,7 @@ func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mat
 		isLicensed = true
 	}
 
-	deployment := mattermost.GenerateDeployment(dbUser, dbPassword, externalDB, isLicensed, minioService)
+	deployment := mattermost.GenerateDeployment(resourceName, ingressName, imageName, dbUser, dbPassword, externalDB, isLicensed, minioService)
 	err = r.createDeploymentIfNotExists(mattermost, deployment, reqLogger)
 	if err != nil {
 		return err
@@ -186,12 +186,10 @@ func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mat
 		return err
 	}
 
-	if mattermost.Spec.BlueGreen.Enable == false {
-		err = r.updateMattermostDeployment(mattermost, deployment, foundDeployment, reqLogger)
-		if err != nil {
-			reqLogger.Error(err, "Failed to update mattermost deployment")
-			return err
-		}
+	err = r.updateMattermostDeployment(mattermost, deployment, foundDeployment, imageName, reqLogger)
+	if err != nil {
+		reqLogger.Error(err, "Failed to update mattermost deployment")
+		return err
 	}
 
 	return nil
@@ -201,31 +199,30 @@ func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mat
 // If an update is required then the deployment spec is set to:
 // - roll forward version
 // - keep active MattermostInstallation available by setting maxUnavailable=N-1
-func (r *ReconcileClusterInstallation) updateMattermostDeployment(mi *mattermostv1alpha1.ClusterInstallation, new, original *appsv1.Deployment, reqLogger logr.Logger) error {
+func (r *ReconcileClusterInstallation) updateMattermostDeployment(mi *mattermostv1alpha1.ClusterInstallation, new, original *appsv1.Deployment, imageName string, reqLogger logr.Logger) error {
 	var update bool
 
 	// Look for mattermost container in pod spec and determine if the image
 	// needs to be updated.
-	image := mi.GetImageName()
 	for _, container := range original.Spec.Template.Spec.Containers {
-		if container.Name == mi.Name {
-			if container.Image != image {
+		if container.Name == new.Spec.Template.Spec.Containers[0].Name {
+			if container.Image != imageName {
 				reqLogger.Info("Current image is not the same as the requested, will upgrade the Mattermost installation")
 				update = true
 			}
 			break
 		}
 		// If we got here, something went wrong
-		return fmt.Errorf("Unable to find mattermost container in deployment")
+		return errors.New("Unable to find mattermost container in deployment")
 	}
 
 	// Run a single-pod job with the new mattermost image to perform any
 	// database migrations before altering the deployment. If this fails,
 	// we will return and not upgrade the deployment.
 	if update {
-		reqLogger.Info(fmt.Sprintf("Running Mattermost image %s upgrade job check", image))
+		reqLogger.Info(fmt.Sprintf("Running Mattermost image %s upgrade job check", imageName))
 
-		updateName := "mattermost-image-update-check"
+		updateName := "mattermost-update-check"
 		job := &batchv1.Job{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      updateName,
@@ -236,7 +233,7 @@ func (r *ReconcileClusterInstallation) updateMattermostDeployment(mi *mattermost
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{"app": updateName},
 					},
-					Spec: original.Spec.Template.Spec,
+					Spec: *new.Spec.Template.Spec.DeepCopy(),
 				},
 			},
 		}
@@ -284,7 +281,6 @@ func (r *ReconcileClusterInstallation) updateMattermostDeployment(mi *mattermost
 					return errors.New("Upgrade image job check failed")
 				}
 				if foundJob.Status.Succeeded > 0 {
-					reqLogger.Info("Upgrade image job ran successfully")
 					break upgradeJobCheck
 				}
 
@@ -293,18 +289,19 @@ func (r *ReconcileClusterInstallation) updateMattermostDeployment(mi *mattermost
 		}
 	}
 
+	reqLogger.Info("Upgrade image job ran successfully")
+
 	patchResult, err := objectMatcher.DefaultPatchMaker.Calculate(original, new)
 	if err != nil {
-		reqLogger.Error(err, "Error checking the difference in the deployment")
-		return err
+		return errors.Wrap(err, "error checking the difference in the deployment")
 	}
 
 	if !patchResult.IsEmpty() {
 		err := objectMatcher.DefaultAnnotator.SetLastAppliedAnnotation(new)
 		if err != nil {
-			reqLogger.Error(err, "Error applying the annotation in the deployment")
-			return err
+			return errors.Wrap(err, "error applying the annotation in the deployment")
 		}
+
 		return r.client.Update(context.TODO(), new)
 	}
 

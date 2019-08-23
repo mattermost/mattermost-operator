@@ -10,8 +10,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
@@ -148,13 +150,111 @@ func TestReconcile(t *testing.T) {
 			require.Equal(t, res, reconcile.Result{})
 		})
 		t.Run("correct status", func(t *testing.T) {
-			finalCI := &mattermostv1alpha1.ClusterInstallation{}
-			err = c.Get(context.TODO(), ciKey, finalCI)
+			err = c.Get(context.TODO(), ciKey, ci)
 			require.NoError(t, err)
-			assert.Equal(t, finalCI.Status.State, mattermostv1alpha1.Stable)
-			assert.Equal(t, finalCI.Status.Replicas, ci.Spec.Replicas)
-			assert.Equal(t, finalCI.Status.Version, ci.Spec.Version)
-			assert.Equal(t, finalCI.Status.Image, ci.Spec.Image)
+			assert.Equal(t, ci.Status.State, mattermostv1alpha1.Stable)
+			assert.Equal(t, ci.Status.Replicas, ci.Spec.Replicas)
+			assert.Equal(t, ci.Status.Version, ci.Spec.Version)
+			assert.Equal(t, ci.Status.Image, ci.Spec.Image)
+			assert.Equal(t, ci.Status.Endpoint, ci.Spec.IngressName)
+		})
+	})
+
+	t.Run("bluegreen", func(t *testing.T) {
+		ci.Spec.BlueGreen = mattermostv1alpha1.BlueGreen{
+			Enable:               true,
+			ProductionDeployment: mattermostv1alpha1.BlueName,
+			Blue: mattermostv1alpha1.AppDeployment{
+				Name:        "blue-installation",
+				IngressName: "blue-ingress",
+				Image:       "mattermost/mattermost-blue-edition",
+				Version:     "5.12.0",
+			},
+			Green: mattermostv1alpha1.AppDeployment{
+				Name:        "green-installation",
+				IngressName: "green-ingress",
+				Image:       "mattermost/mattermost-green-edition",
+				Version:     "5.13.0",
+			},
+		}
+
+		err = c.Update(context.TODO(), ci)
+		require.NoError(t, err)
+
+		blueGreen := []mattermostv1alpha1.AppDeployment{ci.Spec.BlueGreen.Blue, ci.Spec.BlueGreen.Green}
+		for _, deployment := range blueGreen {
+			podTemplate := corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: ciNamespace,
+					Labels:    mattermostv1alpha1.ClusterInstallationLabels(deployment.Name),
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Image: deployment.GetDeploymentImageName(),
+						},
+					},
+				},
+				Status: corev1.PodStatus{
+					Phase: corev1.PodRunning,
+				},
+			}
+
+			for i := 0; i < int(replicas); i++ {
+				podTemplate.ObjectMeta.Name = fmt.Sprintf("%s-pod-%d", deployment.Name, i)
+				err = c.Create(context.TODO(), podTemplate.DeepCopy())
+				require.NoError(t, err)
+			}
+
+			podList := &corev1.PodList{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Pod",
+					APIVersion: "v1",
+				},
+			}
+			sel := mattermostv1alpha1.ClusterInstallationLabels(deployment.Name)
+			opts := &client.ListOptions{LabelSelector: labels.SelectorFromSet(sel)}
+			err = c.List(context.TODO(), opts, podList)
+			require.NoError(t, err)
+			require.Equal(t, int(replicas), len(podList.Items))
+		}
+
+		t.Run("blue", func(t *testing.T) {
+			t.Run("no reconcile errors", func(t *testing.T) {
+				res, err = r.Reconcile(req)
+				require.NoError(t, err)
+				require.Equal(t, res, reconcile.Result{})
+			})
+			t.Run("correct status", func(t *testing.T) {
+				err = c.Get(context.TODO(), ciKey, ci)
+				require.NoError(t, err)
+				assert.Equal(t, ci.Status.State, mattermostv1alpha1.Stable)
+				assert.Equal(t, ci.Status.Replicas, ci.Spec.Replicas)
+				assert.Equal(t, ci.Status.Version, ci.Spec.BlueGreen.Blue.Version)
+				assert.Equal(t, ci.Status.Image, ci.Spec.BlueGreen.Blue.Image)
+				assert.Equal(t, ci.Status.Endpoint, ci.Spec.BlueGreen.Blue.IngressName)
+			})
+		})
+
+		t.Run("green", func(t *testing.T) {
+			ci.Spec.BlueGreen.ProductionDeployment = mattermostv1alpha1.GreenName
+			err = c.Update(context.TODO(), ci)
+			require.NoError(t, err)
+
+			t.Run("no reconcile errors", func(t *testing.T) {
+				res, err = r.Reconcile(req)
+				require.NoError(t, err)
+				require.Equal(t, res, reconcile.Result{})
+			})
+			t.Run("correct status", func(t *testing.T) {
+				err = c.Get(context.TODO(), ciKey, ci)
+				require.NoError(t, err)
+				assert.Equal(t, ci.Status.State, mattermostv1alpha1.Stable)
+				assert.Equal(t, ci.Status.Replicas, ci.Spec.Replicas)
+				assert.Equal(t, ci.Status.Version, ci.Spec.BlueGreen.Green.Version)
+				assert.Equal(t, ci.Status.Image, ci.Spec.BlueGreen.Green.Image)
+				assert.Equal(t, ci.Status.Endpoint, ci.Spec.BlueGreen.Green.IngressName)
+			})
 		})
 	})
 }

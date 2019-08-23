@@ -70,33 +70,36 @@ type ClusterInstallationSpec struct {
 
 // BlueGreen defines the configuration of BlueGreen deployment for a ClusterInstallation
 type BlueGreen struct {
-	//ProductionDeployment defines if the current production is blue or green
+	// ProductionDeployment defines if the current production is blue or green.
+	// +optional
 	ProductionDeployment string `json:"productionDeployment,omitempty"`
-	// Enable defines if BlueGreen deployment will be applied
+	// Enable defines if BlueGreen deployment will be applied.
 	// +optional
 	Enable bool `json:"enable,omitempty"`
-	// GreenIngressName defines the ingress name that will be used by the BlueGreen deployment.
-	// Required when BlueGreen boolean is set to true.
+	// Blue defines the blue deployement.
 	// +optional
-	GreenIngressName string `json:"greenIngressName,omitempty"`
-	// BlueIngressName defines the ingress name that will be used by the BlueGreen deployment.
-	// Required when BlueGreen boolean is set to true.
+	Blue AppDeployment `json:"blue,omitempty"`
+	// Green defines the green deployement.
 	// +optional
-	BlueIngressName string `json:"blueIngressName,omitempty"`
-	// GreenVersion defines the Docker image version that will be used for the Green deployment.
-	// Required when BlueGreen boolean is set to true.
-	GreenVersion string `json:"greenVersion,omitempty"`
-	// BlueVersion defines the Docker image version that will be used for the Blue deployment.
-	// Required when BlueGreen boolean is set to true.
-	BlueVersion string `json:"blueVersion,omitempty"`
-	// GreenInstallationName defines the name of the BlueGreen installation.
-	// GreenInstallationName is the Mattermost name + green
+	Green AppDeployment `json:"green,omitempty"`
+}
+
+// AppDeployment defines the configuration of deployment for a ClusterInstallation.
+type AppDeployment struct {
+	// Name defines the name of the deployment
 	// +optional
-	GreenInstallationName string `json:"greenInstallationName,omitempty"`
-	// BlueInstallationName defines the name of the BlueGreen installation.
-	// BlueInstallationName is the Mattermost name + green
+	Name string `json:"name,omitempty"`
+	// IngressName defines the ingress name that will be used by the deployment.
 	// +optional
-	BlueInstallationName string `json:"blueInstallationName,omitempty"`
+	IngressName string `json:"ingressName,omitempty"`
+	// Image defines the base Docker image that will be used for the deployment.
+	// Required when BlueGreen is enabled.
+	// +optional
+	Image string `json:"image,omitempty"`
+	// Version defines the Docker image version that will be used for the deployment.
+	// Required when BlueGreen is enabled.
+	// +optional
+	Version string `json:"version,omitempty"`
 }
 
 // Minio defines the configuration of Minio for a ClusterInstallation.
