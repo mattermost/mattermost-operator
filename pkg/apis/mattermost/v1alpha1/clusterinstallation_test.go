@@ -5,7 +5,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -20,7 +22,7 @@ func TestClusterInstallation(t *testing.T) {
 		Spec: ClusterInstallationSpec{
 			Replicas:    7,
 			Image:       "mattermost/mattermost-enterprise-edition",
-			Version:     "5.11.0",
+			Version:     "5.14.0",
 			IngressName: "foo.mattermost.dev",
 		},
 	}
@@ -45,14 +47,14 @@ func TestClusterInstallation(t *testing.T) {
 	})
 
 	t.Run("set replicas and resources with user count", func(t *testing.T) {
-		ci := &ClusterInstallation{
+		ci = &ClusterInstallation{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "foo",
 				Namespace: "default",
 			},
 			Spec: ClusterInstallationSpec{
 				Image:       "mattermost/mattermost-enterprise-edition",
-				Version:     "5.11.0",
+				Version:     "5.14.0",
 				IngressName: "foo.mattermost.dev",
 				Size:        "1000users",
 			},
@@ -110,6 +112,47 @@ func TestClusterInstallation(t *testing.T) {
 			assert.Equal(t, defaultSize.Database.Replicas, tci.Spec.Database.Replicas)
 			assert.Equal(t, defaultSize.Database.Resources.String(), tci.Spec.Database.Resources.String())
 		})
+	})
+
+	t.Run("correct image", func(t *testing.T) {
+		assert.Contains(t, ci.GetImageName(), ci.Spec.Image)
+		assert.Contains(t, ci.GetImageName(), ci.Spec.Version)
+		assert.Contains(t, ci.GetImageName(), ":")
+	})
+
+	t.Run("bluegreen", func(t *testing.T) {
+
+		t.Run("correct production deployment name", func(t *testing.T) {
+			ci.Spec.BlueGreen.Blue = AppDeployment{
+				Name: "blue",
+			}
+			ci.Spec.BlueGreen.Green = AppDeployment{
+				Name: "green",
+			}
+			ci.Spec.BlueGreen.ProductionDeployment = BlueName
+
+			assert.Equal(t, ci.GetProductionDeploymentName(), ci.Name)
+
+			ci.Spec.BlueGreen.Enable = true
+			assert.Equal(t, ci.GetProductionDeploymentName(), ci.Spec.BlueGreen.Blue.Name)
+
+			ci.Spec.BlueGreen.ProductionDeployment = GreenName
+			assert.Equal(t, ci.GetProductionDeploymentName(), ci.Spec.BlueGreen.Green.Name)
+		})
+
+	})
+}
+
+func TestDeployment(t *testing.T) {
+	d := AppDeployment{
+		Image:   "mattermost/mattermost-enterprise-edition",
+		Version: "5.13.2",
+	}
+
+	t.Run("correct image", func(t *testing.T) {
+		assert.Contains(t, d.GetDeploymentImageName(), d.Image)
+		assert.Contains(t, d.GetDeploymentImageName(), d.Version)
+		assert.Contains(t, d.GetDeploymentImageName(), ":")
 	})
 }
 
@@ -189,6 +232,122 @@ func TestCalculateResourceMilliRequirementsOnAllValidClusterSizes(t *testing.T) 
 			assert.True(t, memory > 0)
 			assert.Equal(t, cpu, cis.CalculateCPUMilliRequirement(true, true))
 			assert.Equal(t, memory, cis.CalculateMemoryMilliRequirement(true, true))
+		})
+	}
+}
+
+func TestClusterInstallationGenerateDeployment(t *testing.T) {
+	tests := []struct {
+		name string
+		Spec ClusterInstallationSpec
+		want *appsv1.Deployment
+	}{
+		{
+			name: "node selector 1",
+			Spec: ClusterInstallationSpec{
+				NodeSelector: map[string]string{"type": "compute"},
+			},
+			want: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: v1.PodTemplateSpec{
+						Spec: v1.PodSpec{
+							NodeSelector: map[string]string{"type": "compute"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "node selector 2",
+			Spec: ClusterInstallationSpec{
+				NodeSelector: map[string]string{"type": "compute", "size": "big", "region": "iceland"},
+			},
+			want: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: v1.PodTemplateSpec{
+						Spec: v1.PodSpec{
+							NodeSelector: map[string]string{"type": "compute", "size": "big", "region": "iceland"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "node selector nil",
+			Spec: ClusterInstallationSpec{
+				NodeSelector: nil,
+			},
+			want: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: v1.PodTemplateSpec{
+						Spec: v1.PodSpec{
+							NodeSelector: nil,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "affinity 1",
+			Spec: ClusterInstallationSpec{
+				Affinity: &v1.Affinity{
+					PodAffinity: &v1.PodAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+							{
+								LabelSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{"key": "value"},
+								},
+							},
+						},
+					},
+				},
+			},
+			want: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: v1.PodTemplateSpec{
+						Spec: v1.PodSpec{
+							Affinity: &v1.Affinity{
+								PodAffinity: &v1.PodAffinity{
+									RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+										{
+											LabelSelector: &metav1.LabelSelector{
+												MatchLabels: map[string]string{"key": "value"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "affinity nil",
+			Spec: ClusterInstallationSpec{
+				Affinity: nil,
+			},
+			want: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: v1.PodTemplateSpec{
+						Spec: v1.PodSpec{
+							Affinity: nil,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mattermost := &ClusterInstallation{
+				Spec: tt.Spec,
+			}
+
+			deployment := mattermost.GenerateDeployment("", "", "", "", "", false, false, "")
+			require.Equal(t, tt.want.Spec.Template.Spec.NodeSelector, deployment.Spec.Template.Spec.NodeSelector)
+			require.Equal(t, tt.want.Spec.Template.Spec.Affinity, deployment.Spec.Template.Spec.Affinity)
 		})
 	}
 }

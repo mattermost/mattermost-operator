@@ -39,7 +39,7 @@ func TestCheckMattermost(t *testing.T) {
 		Spec: mattermostv1alpha1.ClusterInstallationSpec{
 			Replicas:    replicas,
 			Image:       "mattermost/mattermost-enterprise-edition",
-			Version:     "5.11.0",
+			Version:     "5.14.0",
 			IngressName: "foo.mattermost.dev",
 		},
 	}
@@ -53,7 +53,7 @@ func TestCheckMattermost(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("service", func(t *testing.T) {
-		err = r.checkMattermostService(ci, logger)
+		err = r.checkMattermostService(ci, ci.Name, ci.Name, logger)
 		assert.NoError(t, err)
 
 		found := &corev1.Service{}
@@ -69,7 +69,7 @@ func TestCheckMattermost(t *testing.T) {
 
 		err = r.client.Update(context.TODO(), modified)
 		require.NoError(t, err)
-		err = r.checkMattermostService(ci, logger)
+		err = r.checkMattermostService(ci, ci.Name, ci.Name, logger)
 		require.NoError(t, err)
 		err = r.client.Get(context.TODO(), types.NamespacedName{Name: ciName, Namespace: ciNamespace}, found)
 		require.NoError(t, err)
@@ -77,7 +77,7 @@ func TestCheckMattermost(t *testing.T) {
 	})
 
 	t.Run("ingress", func(t *testing.T) {
-		err = r.checkMattermostIngress(ci, logger)
+		err = r.checkMattermostIngress(ci, ci.Name, ci.Spec.IngressName, logger)
 		assert.NoError(t, err)
 
 		found := &v1beta1.Ingress{}
@@ -93,7 +93,7 @@ func TestCheckMattermost(t *testing.T) {
 
 		err = r.client.Update(context.TODO(), modified)
 		require.NoError(t, err)
-		err = r.checkMattermostIngress(ci, logger)
+		err = r.checkMattermostIngress(ci, ci.Name, ci.Spec.IngressName, logger)
 		require.NoError(t, err)
 		err = r.client.Get(context.TODO(), types.NamespacedName{Name: ciName, Namespace: ciNamespace}, found)
 		require.NoError(t, err)
@@ -101,7 +101,7 @@ func TestCheckMattermost(t *testing.T) {
 	})
 
 	t.Run("deployment", func(t *testing.T) {
-		updateName := "mattermost-image-update-check"
+		updateName := "mattermost-update-check"
 		job := &batchv1.Job{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      updateName,
@@ -114,7 +114,7 @@ func TestCheckMattermost(t *testing.T) {
 		err := r.client.Create(context.TODO(), job)
 		require.NoError(t, err)
 
-		err = r.checkMattermostDeployment(ci, logger)
+		err = r.checkMattermostDeployment(ci, ci.Name, ci.Spec.IngressName, ci.GetImageName(), logger)
 		assert.NoError(t, err)
 
 		found := &appsv1.Deployment{}
@@ -131,7 +131,7 @@ func TestCheckMattermost(t *testing.T) {
 
 		err = r.client.Update(context.TODO(), modified)
 		require.NoError(t, err)
-		err = r.checkMattermostDeployment(ci, logger)
+		err = r.checkMattermostDeployment(ci, ci.Name, ci.Spec.IngressName, ci.GetImageName(), logger)
 		require.NoError(t, err)
 		err = r.client.Get(context.TODO(), types.NamespacedName{Name: ciName, Namespace: ciNamespace}, found)
 		require.NoError(t, err)

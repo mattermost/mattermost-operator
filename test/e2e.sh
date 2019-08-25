@@ -25,7 +25,7 @@ run_kind() {
     chmod +x kind
     sudo mv kind /usr/local/bin/kind
 
-    kind --version
+    kind version
 
     echo "Download kubectl..."
     curl -sSLo kubectl https://storage.googleapis.com/kubernetes-release/release/"${K8S_VERSION}"/bin/linux/amd64/kubectl
@@ -96,16 +96,12 @@ main() {
     docker pull quay.io/presslabs/mysql-operator-sidecar:0.3.2
     docker pull quay.io/presslabs/mysql-operator-orchestrator:0.3.2
     docker pull minio/k8s-operator:1.0.0
-    docker pull mattermost/mattermost-enterprise-edition:5.12.4
-    docker pull mattermost/mattermost-enterprise-edition:5.11.1
 
     kind load docker-image quay.io/presslabs/mysql-operator:0.3.2
     kind load docker-image quay.io/presslabs/mysql-operator-sidecar:0.3.2
     kind load docker-image quay.io/presslabs/mysql-operator-orchestrator:0.3.2
     kind load docker-image mattermost/mattermost-operator:test
     kind load docker-image minio/k8s-operator:1.0.0
-    kind load docker-image mattermost/mattermost-enterprise-edition:5.11.1
-    kind load docker-image mattermost/mattermost-enterprise-edition:5.12.4
 
 
     # Setup a local storage class
@@ -125,12 +121,13 @@ main() {
     kubectl create ns minio-operator
     kubectl apply -n minio-operator -f docs/minio-operator/minio-operator.yaml
 
+    sleep 20
     kubectl get pods --all-namespaces
     # NOTE: Append this test command with `|| true` to debug by inspecting the
     # resource details. Also comment `defer ctx.Cleanup()` in the cluster to
     # avoid resouce cleanup.
     echo "Starting Operator Testing..."
-    docker_exec operator-sdk test local ./test/e2e --namespace mattermost-operator --kubeconfig /root/.kube/config --go-test-flags -timeout=30m
+    docker_exec operator-sdk test local ./test/e2e --debug --verbose --namespace mattermost-operator --kubeconfig /root/.kube/config --go-test-flags -timeout=30m
 
     echo "Done Testing!"
 }

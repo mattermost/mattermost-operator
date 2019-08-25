@@ -20,7 +20,7 @@ const (
 	// DefaultMattermostImage is the default Mattermost docker image
 	DefaultMattermostImage = "mattermost/mattermost-enterprise-edition"
 	// DefaultMattermostVersion is the default Mattermost docker tag
-	DefaultMattermostVersion = "5.12.4"
+	DefaultMattermostVersion = "5.14.0"
 	// DefaultMattermostSize is the default number of users
 	DefaultMattermostSize = "5000users"
 	// DefaultMattermostDatabaseType is the default Mattermost database
@@ -68,26 +68,29 @@ func (mattermost *ClusterInstallation) SetDefaults() error {
 
 // SetDefaults sets the missing values in BlueGreen to the default ones
 func (bg *BlueGreen) SetDefaults(mattermost *ClusterInstallation) error {
-	if bg.Enable == true {
+	if bg.Enable {
 		bg.ProductionDeployment = strings.ToLower(bg.ProductionDeployment)
 		if bg.ProductionDeployment != BlueName && bg.ProductionDeployment != GreenName {
 			return fmt.Errorf("%s is not a valid ProductionDeployment value, must be 'blue' or 'green'", bg.ProductionDeployment)
 		}
-		if bg.GreenVersion == "" || bg.BlueVersion == "" {
+		if bg.Green.Version == "" || bg.Blue.Version == "" {
 			return errors.New("Both Blue and Green deployment versions required, but not set")
 		}
+		if bg.Blue.Image == "" || bg.Green.Image == "" {
+			return errors.New("Both Blue and Green deployment images required, but not set")
+		}
 
-		if bg.GreenInstallationName == "" {
-			bg.GreenInstallationName = fmt.Sprintf("%s-green", mattermost.Name)
+		if bg.Green.Name == "" {
+			bg.Green.Name = fmt.Sprintf("%s-green", mattermost.Name)
 		}
-		if bg.BlueInstallationName == "" {
-			bg.BlueInstallationName = fmt.Sprintf("%s-blue", mattermost.Name)
+		if bg.Blue.Name == "" {
+			bg.Blue.Name = fmt.Sprintf("%s-blue", mattermost.Name)
 		}
-		if bg.GreenIngressName == "" {
-			bg.GreenIngressName = fmt.Sprintf("green.%s", mattermost.Spec.IngressName)
+		if bg.Green.IngressName == "" {
+			bg.Green.IngressName = fmt.Sprintf("green.%s", mattermost.Spec.IngressName)
 		}
-		if bg.BlueIngressName == "" {
-			bg.BlueIngressName = fmt.Sprintf("blue.%s", mattermost.Spec.IngressName)
+		if bg.Blue.IngressName == "" {
+			bg.Blue.IngressName = fmt.Sprintf("blue.%s", mattermost.Spec.IngressName)
 		}
 	}
 
@@ -112,7 +115,7 @@ func (db *Database) SetDefaults() {
 }
 
 // GenerateService returns the service for Mattermost
-func (mattermost *ClusterInstallation) GenerateService() *corev1.Service {
+func (mattermost *ClusterInstallation) GenerateService(serviceName, selectorName string) *corev1.Service {
 	svcAnnotations := map[string]string{
 		"service.alpha.kubernetes.io/tolerate-unready-endpoints": "true",
 	}
@@ -122,8 +125,8 @@ func (mattermost *ClusterInstallation) GenerateService() *corev1.Service {
 		}
 		return &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
-				Labels:    ClusterInstallationLabels(mattermost.Name),
-				Name:      mattermost.Name,
+				Labels:    ClusterInstallationLabels(serviceName),
+				Name:      serviceName,
 				Namespace: mattermost.Namespace,
 				OwnerReferences: []metav1.OwnerReference{
 					*metav1.NewControllerRef(mattermost, schema.GroupVersionKind{
@@ -147,7 +150,7 @@ func (mattermost *ClusterInstallation) GenerateService() *corev1.Service {
 						TargetPort: intstr.FromString("app"),
 					},
 				},
-				Selector: GetSelector(mattermost),
+				Selector: ClusterInstallationLabels(selectorName),
 				Type:     corev1.ServiceTypeLoadBalancer,
 			},
 		}
@@ -155,8 +158,8 @@ func (mattermost *ClusterInstallation) GenerateService() *corev1.Service {
 
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:    ClusterInstallationLabels(mattermost.Name),
-			Name:      mattermost.Name,
+			Labels:    ClusterInstallationLabels(serviceName),
+			Name:      serviceName,
 			Namespace: mattermost.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
 				*metav1.NewControllerRef(mattermost, schema.GroupVersionKind{
@@ -174,19 +177,19 @@ func (mattermost *ClusterInstallation) GenerateService() *corev1.Service {
 					TargetPort: intstr.FromString("app"),
 				},
 			},
-			Selector:  GetSelector(mattermost),
+			Selector:  ClusterInstallationLabels(selectorName),
 			ClusterIP: corev1.ClusterIPNone,
 		},
 	}
 }
 
 // GenerateIngress returns the ingress for Mattermost
-func (mattermost *ClusterInstallation) GenerateIngress() *v1beta1.Ingress {
+func (mattermost *ClusterInstallation) GenerateIngress(name, ingressName string) *v1beta1.Ingress {
 	return &v1beta1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      mattermost.Name,
+			Name:      name,
 			Namespace: mattermost.Namespace,
-			Labels:    ClusterInstallationLabels(mattermost.Name),
+			Labels:    ClusterInstallationLabels(name),
 			OwnerReferences: []metav1.OwnerReference{
 				*metav1.NewControllerRef(mattermost, schema.GroupVersionKind{
 					Group:   SchemeGroupVersion.Group,
@@ -199,14 +202,14 @@ func (mattermost *ClusterInstallation) GenerateIngress() *v1beta1.Ingress {
 		Spec: v1beta1.IngressSpec{
 			Rules: []v1beta1.IngressRule{
 				{
-					Host: mattermost.Spec.IngressName,
+					Host: ingressName,
 					IngressRuleValue: v1beta1.IngressRuleValue{
 						HTTP: &v1beta1.HTTPIngressRuleValue{
 							Paths: []v1beta1.HTTPIngressPath{
 								{
 									Path: "/",
 									Backend: v1beta1.IngressBackend{
-										ServiceName: mattermost.Name,
+										ServiceName: name,
 										ServicePort: intstr.FromInt(8065),
 									},
 								},
@@ -220,7 +223,7 @@ func (mattermost *ClusterInstallation) GenerateIngress() *v1beta1.Ingress {
 }
 
 // GenerateDeployment returns the deployment spec for Mattermost
-func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword string, externalDB, isLicensed bool, minioService string) *appsv1.Deployment {
+func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingressName, containerImage, dbUser, dbPassword string, externalDB, isLicensed bool, minioService string) *appsv1.Deployment {
 	envVarDB := []corev1.EnvVar{}
 
 	masterDBEnvVar := corev1.EnvVar{
@@ -376,7 +379,7 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 		}
 	}
 
-	siteURL := fmt.Sprintf("https://%s", mattermost.Spec.IngressName)
+	siteURL := fmt.Sprintf("https://%s", ingressName)
 	envVarGeneral := []corev1.EnvVar{
 		{
 			Name:  "MM_SERVICESETTINGS_SITEURL",
@@ -441,9 +444,9 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      mattermost.Name,
+			Name:      deploymentName,
 			Namespace: mattermost.Namespace,
-			Labels:    ClusterInstallationLabels(mattermost.Name),
+			Labels:    ClusterInstallationLabels(deploymentName),
 			OwnerReferences: []metav1.OwnerReference{
 				*metav1.NewControllerRef(mattermost, schema.GroupVersionKind{
 					Group:   SchemeGroupVersion.Group,
@@ -462,18 +465,18 @@ func (mattermost *ClusterInstallation) GenerateDeployment(dbUser, dbPassword str
 			RevisionHistoryLimit: &revHistoryLimit,
 			Replicas:             &mattermost.Spec.Replicas,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: ClusterInstallationLabels(mattermost.Name),
+				MatchLabels: ClusterInstallationLabels(deploymentName),
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: ClusterInstallationLabels(mattermost.Name),
+					Labels: ClusterInstallationLabels(deploymentName),
 				},
 				Spec: corev1.PodSpec{
 					InitContainers: initContainers,
 					Containers: []corev1.Container{
 						{
-							Image:                    mattermost.GetImageName(),
-							Name:                     mattermost.Name,
+							Name:                     deploymentName,
+							Image:                    containerImage,
 							ImagePullPolicy:          corev1.PullAlways,
 							TerminationMessagePolicy: corev1.TerminationMessageFallbackToLogsOnError,
 							Command:                  []string{"mattermost"},
@@ -544,6 +547,27 @@ func (mattermost *ClusterInstallation) GetImageName() string {
 	return fmt.Sprintf("%s:%s", mattermost.Spec.Image, mattermost.Spec.Version)
 }
 
+// GetProductionDeploymentName returns the name of the deployment that is
+// currently designated as production.
+func (mattermost *ClusterInstallation) GetProductionDeploymentName() string {
+	if mattermost.Spec.BlueGreen.Enable {
+		if mattermost.Spec.BlueGreen.ProductionDeployment == BlueName {
+			return mattermost.Spec.BlueGreen.Blue.Name
+		}
+		if mattermost.Spec.BlueGreen.ProductionDeployment == GreenName {
+			return mattermost.Spec.BlueGreen.Green.Name
+		}
+	}
+
+	return mattermost.Name
+}
+
+// GetDeploymentImageName returns the container image name that matches the spec
+// of the deployment.
+func (d *AppDeployment) GetDeploymentImageName() string {
+	return fmt.Sprintf("%s:%s", d.Image, d.Version)
+}
+
 // ClusterInstallationLabels returns the labels for selecting the resources
 // belonging to the given mattermost clusterinstallation.
 func ClusterInstallationLabels(name string) map[string]string {
@@ -559,19 +583,4 @@ func ClusterInstallationLabels(name string) map[string]string {
 // created for the installation.
 func ClusterInstallationResourceLabels(name string) map[string]string {
 	return map[string]string{ClusterResourceLabel: name}
-}
-
-// GetSelector returns the selector that should be used depending on whether
-// blue-green is enabled or not.
-func GetSelector(mattermost *ClusterInstallation) map[string]string {
-	if mattermost.Spec.BlueGreen.Enable {
-		if mattermost.Spec.BlueGreen.ProductionDeployment == BlueName {
-			return ClusterInstallationLabels(mattermost.Spec.BlueGreen.BlueInstallationName)
-		}
-		if mattermost.Spec.BlueGreen.ProductionDeployment == GreenName {
-			return ClusterInstallationLabels(mattermost.Spec.BlueGreen.GreenInstallationName)
-		}
-	}
-
-	return ClusterInstallationLabels(mattermost.Name)
 }
