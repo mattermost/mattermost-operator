@@ -46,6 +46,10 @@ func Cluster(mattermost *mattermostv1alpha1.ClusterInstallation) *mysqlOperator.
 					},
 				},
 			},
+			BackupSchedule:           mattermost.Spec.Database.BackupSchedule,
+			BackupURL:                mattermost.Spec.Database.BackupURL,
+			BackupSecretName:         mattermost.Spec.Database.BackupSecret,
+			BackupRemoteDeletePolicy: mysqlOperator.DeletePolicy(mattermost.Spec.Database.BackupRemoteDeletePolicy),
 		},
 	}
 }
