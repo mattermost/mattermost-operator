@@ -289,5 +289,6 @@ func (r *ReconcileClusterInstallation) updateMattermostDeployment(mattermost *ma
 			}
 		}
 	}
+	reqLogger.Info("Upgrade image job ran successfully")
 	return r.Update(current, desired, reqLogger)
 }

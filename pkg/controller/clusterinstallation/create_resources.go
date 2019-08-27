@@ -7,7 +7,7 @@ import (
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	v1beta1 "k8s.io/api/extensions/v1beta1"
+	"k8s.io/api/extensions/v1beta1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -60,7 +60,7 @@ func (r *ReconcileClusterInstallation) createServiceAccountIfNotExists(owner v1.
 	foundServiceAccount := &corev1.ServiceAccount{}
 
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: serviceAccount.Name, Namespace: serviceAccount.Namespace}, foundServiceAccount)
-	if err != nil && kerrors.IsNotFound(err) {
+	if err != nil && errors.IsNotFound(err) {
 		reqLogger.Info("Creating service account", "name", serviceAccount.Name)
 		return r.Create(owner, serviceAccount, reqLogger)
 	} else if err != nil {
