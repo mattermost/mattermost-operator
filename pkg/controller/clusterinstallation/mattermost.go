@@ -6,13 +6,12 @@ import (
 	"reflect"
 	"time"
 
-	objectMatcher "github.com/banzaicloud/k8s-objectmatcher/patch"
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	v1beta1 "k8s.io/api/extensions/v1beta1"
+	"k8s.io/api/extensions/v1beta1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -188,7 +187,7 @@ func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mat
 		return err
 	}
 
-	err = r.updateMattermostDeployment(mattermost, deployment, foundDeployment, imageName, reqLogger)
+	err = r.updateMattermostDeployment(mattermost, foundDeployment, deployment, imageName, reqLogger)
 	if err != nil {
 		reqLogger.Error(err, "Failed to update mattermost deployment")
 		return err
@@ -201,13 +200,13 @@ func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mat
 // If an update is required then the deployment spec is set to:
 // - roll forward version
 // - keep active MattermostInstallation available by setting maxUnavailable=N-1
-func (r *ReconcileClusterInstallation) updateMattermostDeployment(mi *mattermostv1alpha1.ClusterInstallation, new, original *appsv1.Deployment, imageName string, reqLogger logr.Logger) error {
+func (r *ReconcileClusterInstallation) updateMattermostDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, current, desired *appsv1.Deployment, imageName string, reqLogger logr.Logger) error {
 	var update bool
 
 	// Look for mattermost container in pod spec and determine if the image
 	// needs to be updated.
-	for _, container := range original.Spec.Template.Spec.Containers {
-		if container.Name == new.Spec.Template.Spec.Containers[0].Name {
+	for _, container := range current.Spec.Template.Spec.Containers {
+		if container.Name == desired.Spec.Template.Spec.Containers[0].Name {
 			if container.Image != imageName {
 				reqLogger.Info("Current image is not the same as the requested, will upgrade the Mattermost installation")
 				update = true
@@ -228,14 +227,14 @@ func (r *ReconcileClusterInstallation) updateMattermostDeployment(mi *mattermost
 		job := &batchv1.Job{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      updateName,
-				Namespace: mi.GetNamespace(),
+				Namespace: mattermost.GetNamespace(),
 			},
 			Spec: batchv1.JobSpec{
 				Template: corev1.PodTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{"app": updateName},
 					},
-					Spec: *new.Spec.Template.Spec.DeepCopy(),
+					Spec: *desired.Spec.Template.Spec.DeepCopy(),
 				},
 			},
 		}
@@ -272,7 +271,7 @@ func (r *ReconcileClusterInstallation) updateMattermostDeployment(mi *mattermost
 					context.TODO(),
 					types.NamespacedName{
 						Name:      updateName,
-						Namespace: mi.GetNamespace(),
+						Namespace: mattermost.GetNamespace(),
 					},
 					foundJob,
 				)
@@ -290,22 +289,5 @@ func (r *ReconcileClusterInstallation) updateMattermostDeployment(mi *mattermost
 			}
 		}
 	}
-
-	reqLogger.Info("Upgrade image job ran successfully")
-
-	patchResult, err := objectMatcher.DefaultPatchMaker.Calculate(original, new)
-	if err != nil {
-		return errors.Wrap(err, "error checking the difference in the deployment")
-	}
-
-	if !patchResult.IsEmpty() {
-		err := objectMatcher.DefaultAnnotator.SetLastAppliedAnnotation(new)
-		if err != nil {
-			return errors.Wrap(err, "error applying the annotation in the deployment")
-		}
-
-		return r.client.Update(context.TODO(), new)
-	}
-
-	return nil
+	return r.Update(current, desired, reqLogger)
 }

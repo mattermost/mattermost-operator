@@ -58,7 +58,7 @@ func (r *ReconcileClusterInstallation) createMySQLClusterIfNotExists(mattermost 
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: cluster.Name, Namespace: cluster.Namespace}, foundCluster)
 	if err != nil && errors.IsNotFound(err) {
 		reqLogger.Info("Creating mysql cluster")
-		return r.createResource(mattermost, cluster, reqLogger)
+		return r.Create(mattermost, cluster, reqLogger)
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to check if mysql cluster exists")
 		return err
@@ -86,7 +86,7 @@ func (r *ReconcileClusterInstallation) getOrCreateMySQLSecrets(mattermost *matte
 			"DATABASE":      []byte("mattermost"),
 		}
 
-		return userPassword, r.createResource(mattermost, dbSecret, reqLogger)
+		return userPassword, r.Create(mattermost, dbSecret, reqLogger)
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to check if mysql secret exists")
 		return "", err

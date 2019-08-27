@@ -28,50 +28,54 @@ func (r *ReconcileClusterInstallation) checkMinio(mattermost *mattermostv1alpha1
 	return r.checkMinioInstance(mattermost, reqLogger)
 }
 
-func (r *ReconcileClusterInstallation) checkMinioSecret(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
-	// Check if custom secret was specified
-	if mattermost.Spec.Minio.Secret != "" {
-		// Check if the Secret exists
-		var secret *corev1.Secret
-		err := r.client.Get(context.TODO(), types.NamespacedName{Name: mattermost.Spec.Minio.Secret, Namespace: mattermost.Namespace}, secret)
-		if err != nil {
-			// Secret does not exist
-			return errors.Wrap(err, "unable to locate custom minio secret")
-		}
-
-		// Check if the Secret has required fields
-		if _, ok := secret.Data["accesskey"]; !ok {
-			return fmt.Errorf("custom Minio Secret %s does not have an 'accesskey' value", mattermost.Spec.Minio.Secret)
-		}
-		if _, ok := secret.Data["secretkey"]; !ok {
-			return fmt.Errorf("custom Minio Secret %s does not have an 'secretkey' value", mattermost.Spec.Minio.Secret)
-		}
-
-		reqLogger.Info("Skipping minio secret creation, using custom secret")
-		return nil
-	}
-
-	secret := mattermostMinio.Secret(mattermost)
-
-	err := r.createSecretIfNotExists(mattermost, secret, reqLogger)
+func (r *ReconcileClusterInstallation) checkCustomMinioSecret(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
+	var secret *corev1.Secret
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: mattermost.Spec.Minio.Secret, Namespace: mattermost.Namespace}, secret)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "unable to locate custom minio secret")
 	}
-
-	foundSecret := &corev1.Secret{}
-	err = r.client.Get(context.TODO(), types.NamespacedName{Name: secret.Name, Namespace: secret.Namespace}, foundSecret)
-	if err != nil {
-		return err
+	// Validate custom secret required fields
+	if _, ok := secret.Data["accesskey"]; !ok {
+		return fmt.Errorf("custom Minio Secret %s does not have an 'accesskey' value", mattermost.Spec.Minio.Secret)
 	}
-
-	updatedLabels := ensureLabels(secret.Labels, foundSecret.Labels)
-	if !reflect.DeepEqual(updatedLabels, foundSecret.Labels) {
-		reqLogger.Info("Updating minio secret labels")
-		foundSecret.Labels = updatedLabels
-		return r.client.Update(context.TODO(), foundSecret)
+	if _, ok := secret.Data["secretkey"]; !ok {
+		return fmt.Errorf("custom Minio Secret %s does not have an 'secretkey' value", mattermost.Spec.Minio.Secret)
 	}
-
+	reqLogger.Info("skipping minio secret creation, using custom secret")
 	return nil
+}
+
+func (r *ReconcileClusterInstallation) checkMattermostMinioSecret(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
+	var current *corev1.Secret
+	desired := mattermostMinio.Secret(mattermost)
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: desired.Name, Namespace: desired.Namespace}, current)
+	switch {
+	case err != nil && kerrors.IsNotFound(err):
+		// Create new secret
+		reqLogger.Info("creating secret", "name", current.Name)
+		return r.Create(mattermost, current, reqLogger)
+	case err != nil:
+		// Something go wrong badly
+		reqLogger.Error(err, "failed to check if secret exists")
+		return err
+	}
+	// Validate secret required fields
+	if _, ok := current.Data["accesskey"]; !ok {
+		return fmt.Errorf("minio secret %s does not have an 'accesskey' value", desired.Name)
+	}
+	if _, ok := current.Data["secretkey"]; !ok {
+		return fmt.Errorf("minio secret %s does not have an 'secretkey' value", desired.Name)
+	}
+	// Preserve data fields
+	desired.Data = current.Data
+	return r.Update(current, desired, reqLogger)
+}
+
+func (r *ReconcileClusterInstallation) checkMinioSecret(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
+	if mattermost.Spec.Minio.Secret != "" {
+		return r.checkCustomMinioSecret(mattermost, reqLogger)
+	}
+	return r.checkMattermostMinioSecret(mattermost, reqLogger)
 }
 
 func (r *ReconcileClusterInstallation) checkMinioInstance(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
@@ -119,7 +123,7 @@ func (r *ReconcileClusterInstallation) createMinioInstanceIfNotExists(mattermost
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: instance.Name, Namespace: instance.Namespace}, foundInstance)
 	if err != nil && kerrors.IsNotFound(err) {
 		reqLogger.Info("Creating minio instance")
-		return r.createResource(mattermost, instance, reqLogger)
+		return r.Create(mattermost, instance, reqLogger)
 	} else if err != nil {
 		reqLogger.Error(err, "Unable to get minio instance")
 		return err
