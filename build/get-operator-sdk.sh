@@ -19,13 +19,21 @@ then
 	exit 0
 fi
 
-# Download Operator SDK
+# Choose the version suitable for platform
 if [[ "$OSTYPE" == "darwin"* ]]
 then
-	curl -Lo operator-sdk "$BASE_URL/$VERSION/operator-sdk-$VERSION-$(uname -m)-apple-darwin"
+	URL="$BASE_URL/$VERSION/operator-sdk-$VERSION-$(uname -m)-apple-darwin"
 elif [[ "$OSTYPE" == "linux-gnu"* ]]
 then
-	curl -Lo operator-sdk "$BASE_URL/$VERSION/operator-sdk-$VERSION-$(uname -m)-linux-gnu"
+	URL="$BASE_URL/$VERSION/operator-sdk-$VERSION-$(uname -m)-linux-gnu"
 fi
+
+# Fetch the binary
+curl -Lo operator-sdk "$URL"
+curl -Lo operator-sdk.asc "$URL.asc"
+
+# Verify
+gpg --keyserver keyserver.ubuntu.com --recv-key "$(gpg --verify operator-sdk.asc operator-sdk 2>&1 /dev/null | grep RSA | awk '{ print $NF }')"
+gpg --verify operator-sdk.asc operator-sdk
 
 chmod +x ./operator-sdk
