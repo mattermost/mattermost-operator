@@ -62,9 +62,9 @@ govet: ## Runs govet against all packages.
 	$(GO) vet -vettool=$(GOPATH)/bin/shadow $(PACKAGES)
 	@echo "govet success";
 
-generate: ## Runs the kubernetes code-generators and openapi
-	operator-sdk generate k8s
-	operator-sdk generate openapi
+generate: operator-sdk ## Runs the kubernetes code-generators and openapi
+	build/operator-sdk generate k8s
+	build/operator-sdk generate openapi
 	vendor/k8s.io/code-generator/generate-groups.sh all github.com/mattermost/mattermost-operator/pkg/client github.com/mattermost/mattermost-operator/pkg/apis mattermost:v1alpha1
 
 yaml: ## Generate the YAML file for easy operator installation
