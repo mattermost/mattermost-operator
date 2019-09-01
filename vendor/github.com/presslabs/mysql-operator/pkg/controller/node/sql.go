@@ -42,6 +42,7 @@ type SQLInterface interface {
 	MarkConfigurationDone(ctx context.Context) error
 	IsConfigured(ctx context.Context) (bool, error)
 	SetPurgedGTID(ctx context.Context) error
+	MarkSetGTIDPurged(ctx context.Context) error
 	Host() string
 }
 
@@ -135,6 +136,10 @@ func (r *nodeSQLRunner) IsConfigured(ctx context.Context) (bool, error) {
 	return val == "1", err
 }
 
+func (r *nodeSQLRunner) MarkSetGTIDPurged(ctx context.Context) error {
+	return r.writeStatusValue(ctx, "set_gtid_purged", "skipped")
+}
+
 func (r *nodeSQLRunner) Host() string {
 	return r.host
 }
@@ -225,10 +230,10 @@ func (r *nodeSQLRunner) SetPurgedGTID(ctx context.Context) error {
 	query := fmt.Sprintf(`
 	  SET @@SESSION.SQL_LOG_BIN = 0;
 	  START TRANSACTION;
-		SELECT value INTO @gtid FROM %[1]s.%[2]s WHERE name='%s';
+		SELECT value INTO @gtid FROM %[1]s.%[2]s WHERE name='%[3]s';
 		RESET MASTER;
 		SET @@GLOBAL.GTID_PURGED = @gtid;
-		REPLACE INTO %[1]s.%[2]s VALUES ('%s', @gtid);
+		REPLACE INTO %[1]s.%[2]s VALUES ('%[4]s', @gtid);
 	  COMMIT;
     `, constants.OperatorDbName, constants.OperatorStatusTableName, "backup_gtid_purged", "set_gtid_purged")
 
