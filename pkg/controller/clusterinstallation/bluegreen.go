@@ -16,9 +16,11 @@ func (r *ReconcileClusterInstallation) checkBlueGreen(mattermost *mattermostv1al
 			if err != nil {
 				return err
 			}
-			err = r.checkMattermostIngress(mattermost, deployment.Name, deployment.IngressName, reqLogger)
-			if err != nil {
-				return err
+			if !mattermost.Spec.UseServiceLoadBalancer {
+				err = r.checkMattermostIngress(mattermost, deployment.Name, deployment.IngressName, reqLogger)
+				if err != nil {
+					return err
+				}
 			}
 			err = r.checkMattermostDeployment(mattermost, deployment.Name, deployment.IngressName, deployment.GetDeploymentImageName(), reqLogger)
 			if err != nil {
