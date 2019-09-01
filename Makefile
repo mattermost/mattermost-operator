@@ -84,10 +84,7 @@ dep: ## Get dependencies
 	dep ensure -v
 
 operator-sdk: ## Download sdk only if it's not available. Used in the docker build
-	@if [ ! -f build/operator-sdk ]; then \
-		curl -Lo build/operator-sdk https://github.com/operator-framework/operator-sdk/releases/download/$(SDK_VERSION)/operator-sdk-$(SDK_VERSION)-$(MACHINE)-linux-gnu && \
-		chmod +x build/operator-sdk; \
-	fi
+	build/get-operator-sdk.sh $(SDK_VERSION)
 
 clean: ## Clean up everything
 	rm -Rf build/_output
