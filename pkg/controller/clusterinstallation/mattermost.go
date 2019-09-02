@@ -28,9 +28,11 @@ func (r *ReconcileClusterInstallation) checkMattermost(mattermost *mattermostv1a
 		return err
 	}
 
-	err = r.checkMattermostIngress(mattermost, mattermost.Name, mattermost.Spec.IngressName, reqLogger)
-	if err != nil {
-		return err
+	if !mattermost.Spec.UseServiceLoadBalancer {
+		err = r.checkMattermostIngress(mattermost, mattermost.Name, mattermost.Spec.IngressName, reqLogger)
+		if err != nil {
+			return err
+		}
 	}
 
 	if !mattermost.Spec.BlueGreen.Enable {
