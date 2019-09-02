@@ -61,7 +61,7 @@ This will show you something similar to:
 
 ```
 NAME                              STATE    IMAGE                                      VERSION   ENDPOINT
-example-mattermost-installation   stable   mattermost/mattermost-enterprise-edition   5.11.0    ab8679c3387b311e9ac2a02c03e3d674-230738344.us-east-1.elb.amazonaws.com
+example-mattermost-installation   stable   mattermost/mattermost-enterprise-edition   5.14.0    ab8679c3387b311e9ac2a02c03e3d674-230738344.us-east-1.elb.amazonaws.com
 ```
 
 Go to the endpoint listed to access your Mattermost instance.

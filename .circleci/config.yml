@@ -48,12 +48,12 @@ jobs:
   e2e:
     environment:
       - CHANGE_MINIKUBE_NONE_USER=true
-      - K8S_VERSION=v1.13.2
+      - K8S_VERSION=v1.15.0
       - MINIKUBE_VERSION=v0.28.2
       - IMAGE_NAME=mattermost/mattermost-operator
       - IMAGE_TAG=test
-      - KIND_VERSION=0.2.1
-      - SDK_VERSION=v0.8.0
+      - KIND_VERSION=v0.4.0
+      - SDK_VERSION=v0.10.0
     machine: true
     working_directory: /home/circleci/.go_workspace/src/github.com/mattermost/mattermost-operator
     steps:

@@ -4,6 +4,7 @@ metadata:
   labels:
     app: 'mysql-operator'
     controller-tools.k8s.io: "1.0"
+    release: 'mysql-operator'
   name: mysqlbackups.mysql.presslabs.org
   namespace: mysql-operator
 spec:
@@ -20,9 +21,22 @@ metadata:
   labels:
     app: 'mysql-operator'
     controller-tools.k8s.io: "1.0"
+    release: 'mysql-operator'
   name: mysqlclusters.mysql.presslabs.org
   namespace: mysql-operator
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .status.conditions[?(@.type == "Ready")].status
+    description: The cluster status
+    name: Ready
+    type: string
+  - JSONPath: .spec.replicas
+    description: The number of desired nodes
+    name: Replicas
+    type: integer
+  - JSONPath: .metadata.creationTimestamp
+    name: Age
+    type: date
   group: mysql.presslabs.org
   names:
     kind: MysqlCluster
