@@ -117,6 +117,20 @@ For the customized install options example:
 $ kubectl delete -f mm_clusterinstallation.yaml
 ```
 
+### 2.5 Restore an existing Mattermost MySQL Database
+To restore an existing Mattermost MySQL Database into a new Mattermost installation using the Mattermost Operator you will need to do a few steps.
+
+Use Case: An existing AWS RDS Database
+  - First you need to dump the data using mysqldump
+  - Create an EC2 instance and install MySQL
+  - Restore the dump in this new database
+  - Install `Percona XtraBackup`
+  - Perform the backup using the `Percona XtraBackup`
+    - `xtrabackup --innodb_file_per_table=1 --innodb_flush_log_at_trx_commit=2 --innodb_flush_method=O_DIRECT --innodb_log_files_in_group=2 --log_bin=/var/lib/mysql/mysql-bin --open_files_limit=65535 --innodb_buffer_pool_size=512M --innodb_log_file_size=128M --server-id=100 --backup=1 --slave-info=1 --stream=xbstream --host=127.0.0.1 --user=USER --password=PASSWORD --target-dir=~/xtrabackup_backupfiles/ | gzip - > BACKNAME.gz`
+  - Upload to an AWS S3 bucket
+
+If you have an machine running MySQL you just need to perform the `Percona XtraBackup` step
+
 ## 3. Developer flow
 To test the operator locally. We recommend [Kind](https://kind.sigs.k8s.io/), however, you can use Minikube or Minishift as well.
 
