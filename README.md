@@ -128,6 +128,31 @@ Use Case: An existing AWS RDS Database
   - Perform the backup using the `Percona XtraBackup`
     - `xtrabackup --innodb_file_per_table=1 --innodb_flush_log_at_trx_commit=2 --innodb_flush_method=O_DIRECT --innodb_log_files_in_group=2 --log_bin=/var/lib/mysql/mysql-bin --open_files_limit=65535 --innodb_buffer_pool_size=512M --innodb_log_file_size=128M --server-id=100 --backup=1 --slave-info=1 --stream=xbstream --host=127.0.0.1 --user=USER --password=PASSWORD --target-dir=~/xtrabackup_backupfiles/ | gzip - > BACKNAME.gz`
   - Upload to an AWS S3 bucket
+  - Create the Restore/Backup secret with the AWS credentials
+  ```
+  apiVersion: v1
+  kind: Secret
+  metadata:
+    name: test-restore
+  type: Opaque
+  stringData:
+    AWS_ACCESS_KEY_ID: XXXXXXXXXXXX
+    AWS_SECRET_ACCESS_KEY: XXXXXXXXXXXX/XXXXXXXXXXXX
+    AWS_REGION: us-east-1
+    S3_PROVIDER: AWS
+  ```
+  - Create the mattermost manifest to deploy
+  ```
+  apiVersion: mattermost.com/v1alpha1
+  kind: ClusterInstallation
+  metadata:
+    name: example-clusterinstallation
+  spec:
+    ingressName: example.mattermost-example.dev
+    database:
+      backupRestoreSecret: test-restore
+      initBucketURL: s3://my-backup-bucket/my-backup.gz
+  ```
 
 If you have an machine running MySQL you just need to perform the `Percona XtraBackup` step
 
