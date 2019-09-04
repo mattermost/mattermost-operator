@@ -39,7 +39,7 @@ func (r *ReconcileClusterInstallation) create(owner v1.Object, desired Object, r
 	return controllerutil.SetControllerReference(owner, desired, r.scheme)
 }
 
-func (r *ReconcileClusterInstallation) Update(current, desired Object, reqLogger logr.Logger) error {
+func (r *ReconcileClusterInstallation) update(current, desired Object, reqLogger logr.Logger) error {
 	patchResult, err := objectMatcher.DefaultPatchMaker.Calculate(current, desired)
 	if err != nil {
 		reqLogger.Error(err, "error checking the difference in the deployment")

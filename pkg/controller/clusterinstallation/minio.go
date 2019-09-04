@@ -29,7 +29,7 @@ func (r *ReconcileClusterInstallation) checkMinio(mattermost *mattermostv1alpha1
 }
 
 func (r *ReconcileClusterInstallation) checkCustomMinioSecret(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
-	var secret *corev1.Secret
+	secret := &corev1.Secret{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: mattermost.Spec.Minio.Secret, Namespace: mattermost.Namespace}, secret)
 	if err != nil {
 		return errors.Wrap(err, "unable to locate custom minio secret")
@@ -46,7 +46,7 @@ func (r *ReconcileClusterInstallation) checkCustomMinioSecret(mattermost *matter
 }
 
 func (r *ReconcileClusterInstallation) checkMattermostMinioSecret(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
-	var current *corev1.Secret
+	current := &corev1.Secret{}
 	desired := mattermostMinio.Secret(mattermost)
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: desired.Name, Namespace: desired.Namespace}, current)
 	switch {
@@ -59,16 +59,18 @@ func (r *ReconcileClusterInstallation) checkMattermostMinioSecret(mattermost *ma
 		reqLogger.Error(err, "failed to check if secret exists")
 		return err
 	}
-	// Validate secret required fields
+	// Validate secret required fields, if not exist recreate.
 	if _, ok := current.Data["accesskey"]; !ok {
-		return fmt.Errorf("minio secret %s does not have an 'accesskey' value", desired.Name)
+		reqLogger.Info("minio secret does not have an 'accesskey' value, overriding", "secret", desired.Name)
+		return r.update(current, desired, reqLogger)
 	}
 	if _, ok := current.Data["secretkey"]; !ok {
-		return fmt.Errorf("minio secret %s does not have an 'secretkey' value", desired.Name)
+		reqLogger.Info("minio secret does not have an 'secretkey' value, overriding", "secret", desired.Name)
+		return r.update(current, desired, reqLogger)
 	}
 	// Preserve data fields
 	desired.Data = current.Data
-	return r.Update(current, desired, reqLogger)
+	return r.update(current, desired, reqLogger)
 }
 
 func (r *ReconcileClusterInstallation) checkMinioSecret(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
