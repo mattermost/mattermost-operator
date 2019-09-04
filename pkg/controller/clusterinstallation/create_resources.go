@@ -22,8 +22,8 @@ type Object interface {
 	v1.Object
 }
 
-// Create creates the provided resource and sets the owner
-func (r *ReconcileClusterInstallation) Create(owner v1.Object, desired Object, reqLogger logr.Logger) error {
+// create creates the provided resource and sets the owner
+func (r *ReconcileClusterInstallation) create(owner v1.Object, desired Object, reqLogger logr.Logger) error {
 	// adding the last applied annotation to use the object matcher later
 	// see: https://github.com/banzaicloud/k8s-objectmatcher
 	err := objectMatcher.DefaultAnnotator.SetLastAppliedAnnotation(desired)
@@ -62,7 +62,7 @@ func (r *ReconcileClusterInstallation) createServiceAccountIfNotExists(owner v1.
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: serviceAccount.Name, Namespace: serviceAccount.Namespace}, foundServiceAccount)
 	if err != nil && errors.IsNotFound(err) {
 		reqLogger.Info("Creating service account", "name", serviceAccount.Name)
-		return r.Create(owner, serviceAccount, reqLogger)
+		return r.create(owner, serviceAccount, reqLogger)
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to check if service account exists")
 		return err
@@ -76,7 +76,7 @@ func (r *ReconcileClusterInstallation) createRoleBindingIfNotExists(owner v1.Obj
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: roleBinding.Name, Namespace: roleBinding.Namespace}, foundRoleBinding)
 	if err != nil && errors.IsNotFound(err) {
 		reqLogger.Info("Creating role binding", "name", roleBinding.Name)
-		return r.Create(owner, roleBinding, reqLogger)
+		return r.create(owner, roleBinding, reqLogger)
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to check if role binding exists")
 		return err
@@ -90,7 +90,7 @@ func (r *ReconcileClusterInstallation) createServiceIfNotExists(owner v1.Object,
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: service.Name, Namespace: service.Namespace}, foundService)
 	if err != nil && errors.IsNotFound(err) {
 		reqLogger.Info("Creating service", "name", service.Name)
-		return r.Create(owner, service, reqLogger)
+		return r.create(owner, service, reqLogger)
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to check if service exists")
 		return err
@@ -104,7 +104,7 @@ func (r *ReconcileClusterInstallation) createIngressIfNotExists(owner v1.Object,
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: ingress.Name, Namespace: ingress.Namespace}, foundIngress)
 	if err != nil && errors.IsNotFound(err) {
 		reqLogger.Info("Creating ingress", "name", ingress.Name)
-		return r.Create(owner, ingress, reqLogger)
+		return r.create(owner, ingress, reqLogger)
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to check if ingress exists")
 		return err
@@ -118,7 +118,7 @@ func (r *ReconcileClusterInstallation) createDeploymentIfNotExists(owner v1.Obje
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: deployment.Name, Namespace: deployment.Namespace}, foundDeployment)
 	if err != nil && errors.IsNotFound(err) {
 		reqLogger.Info("Creating deployment", "name", deployment.Name)
-		return r.Create(owner, deployment, reqLogger)
+		return r.create(owner, deployment, reqLogger)
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to check if deployment exists")
 		return err
@@ -132,7 +132,7 @@ func (r *ReconcileClusterInstallation) createSecretIfNotExists(owner v1.Object, 
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: secret.Name, Namespace: secret.Namespace}, foundSecret)
 	if err != nil && errors.IsNotFound(err) {
 		reqLogger.Info("Creating secret", "name", secret.Name)
-		return r.Create(owner, secret, reqLogger)
+		return r.create(owner, secret, reqLogger)
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to check if secret exists")
 		return err

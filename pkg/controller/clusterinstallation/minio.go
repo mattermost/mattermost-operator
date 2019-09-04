@@ -53,7 +53,7 @@ func (r *ReconcileClusterInstallation) checkMattermostMinioSecret(mattermost *ma
 	case err != nil && kerrors.IsNotFound(err):
 		// Create new secret
 		reqLogger.Info("creating secret", "name", current.Name)
-		return r.Create(mattermost, current, reqLogger)
+		return r.create(mattermost, current, reqLogger)
 	case err != nil:
 		// Something go wrong badly
 		reqLogger.Error(err, "failed to check if secret exists")
@@ -123,7 +123,7 @@ func (r *ReconcileClusterInstallation) createMinioInstanceIfNotExists(mattermost
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: instance.Name, Namespace: instance.Namespace}, foundInstance)
 	if err != nil && kerrors.IsNotFound(err) {
 		reqLogger.Info("Creating minio instance")
-		return r.Create(mattermost, instance, reqLogger)
+		return r.create(mattermost, instance, reqLogger)
 	} else if err != nil {
 		reqLogger.Error(err, "Unable to get minio instance")
 		return err
