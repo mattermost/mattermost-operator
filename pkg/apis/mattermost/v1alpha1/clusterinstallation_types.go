@@ -56,6 +56,9 @@ type ClusterInstallationSpec struct {
 	BlueGreen BlueGreen `json:"blueGreen,omitempty"`
 
 	// +optional
+	Canary Canary `json:"canary,omitempty"`
+
+	// +optional
 	ElasticSearch ElasticSearch `json:"elasticSearch,omitempty"`
 
 	// +optional
@@ -68,6 +71,26 @@ type ClusterInstallationSpec struct {
 	IngressAnnotations map[string]string `json:"ingressAnnotations,omitempty"`
 }
 
+// Canary defines the configuration of Canary deployment for a ClusterInstallation
+type Canary struct {
+	// Name defines the name of the deployment
+	// +optional
+	Name string `json:"name,omitempty"`
+	// Enable defines if Canary deployment will be applied.
+	// +optional
+	Enable bool `json:"enable,omitempty"`
+	// Image defines the base Docker image that will be used for the deployment.
+	// Required when Canary is enabled.
+	// +optional
+	Image string `json:"image,omitempty"`
+	// Version defines the Docker image version that will be used for the deployment.
+	// Required when Canary is enabled.
+	// +optional
+	Version string `json:"version,omitempty"`
+	// +optional
+	IngressAnnotations map[string]string `json:"ingressAnnotations,omitempty"`
+}
+
 // BlueGreen defines the configuration of BlueGreen deployment for a ClusterInstallation
 type BlueGreen struct {
 	// ProductionDeployment defines if the current production is blue or green.
@@ -76,10 +99,10 @@ type BlueGreen struct {
 	// Enable defines if BlueGreen deployment will be applied.
 	// +optional
 	Enable bool `json:"enable,omitempty"`
-	// Blue defines the blue deployement.
+	// Blue defines the blue deployment.
 	// +optional
 	Blue AppDeployment `json:"blue,omitempty"`
-	// Green defines the green deployement.
+	// Green defines the green deployment.
 	// +optional
 	Green AppDeployment `json:"green,omitempty"`
 }

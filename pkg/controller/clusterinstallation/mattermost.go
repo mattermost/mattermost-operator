@@ -29,7 +29,7 @@ func (r *ReconcileClusterInstallation) checkMattermost(mattermost *mattermostv1a
 	}
 
 	if !mattermost.Spec.UseServiceLoadBalancer {
-		err = r.checkMattermostIngress(mattermost, mattermost.Name, mattermost.Spec.IngressName, reqLogger)
+		err = r.checkMattermostIngress(mattermost, mattermost.Name, mattermost.Spec.IngressName, mattermost.Spec.IngressAnnotations, reqLogger)
 		if err != nil {
 			return err
 		}
@@ -102,8 +102,8 @@ func (r *ReconcileClusterInstallation) checkMattermostService(mattermost *matter
 	return nil
 }
 
-func (r *ReconcileClusterInstallation) checkMattermostIngress(mattermost *mattermostv1alpha1.ClusterInstallation, resourceName, ingressName string, reqLogger logr.Logger) error {
-	ingress := mattermost.GenerateIngress(resourceName, ingressName)
+func (r *ReconcileClusterInstallation) checkMattermostIngress(mattermost *mattermostv1alpha1.ClusterInstallation, resourceName, ingressName string, ingressAnnotations map[string]string, reqLogger logr.Logger) error {
+	ingress := mattermost.GenerateIngress(resourceName, ingressName, ingressAnnotations)
 
 	err := r.createIngressIfNotExists(mattermost, ingress, reqLogger)
 	if err != nil {

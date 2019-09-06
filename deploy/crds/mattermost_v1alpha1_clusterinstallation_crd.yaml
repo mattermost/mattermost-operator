@@ -57,7 +57,7 @@ spec:
             blueGreen:
               properties:
                 blue:
-                  description: Blue defines the blue deployement.
+                  description: Blue defines the blue deployment.
                   properties:
                     image:
                       description: Image defines the base Docker image that will be
@@ -79,7 +79,7 @@ spec:
                   description: Enable defines if BlueGreen deployment will be applied.
                   type: boolean
                 green:
-                  description: Green defines the green deployement.
+                  description: Green defines the green deployment.
                   properties:
                     image:
                       description: Image defines the base Docker image that will be
@@ -100,6 +100,27 @@ spec:
                 productionDeployment:
                   description: ProductionDeployment defines if the current production
                     is blue or green.
+                  type: string
+              type: object
+            canary:
+              properties:
+                enable:
+                  description: Enable defines if Canary deployment will be applied.
+                  type: boolean
+                image:
+                  description: Image defines the base Docker image that will be used
+                    for the deployment. Required when Canary is enabled.
+                  type: string
+                ingressAnnotations:
+                  additionalProperties:
+                    type: string
+                  type: object
+                name:
+                  description: Name defines the name of the deployment
+                  type: string
+                version:
+                  description: Version defines the Docker image version that will
+                    be used for the deployment. Required when Canary is enabled.
                   type: string
               type: object
             database:

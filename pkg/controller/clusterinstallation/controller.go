@@ -192,6 +192,12 @@ func (r *ReconcileClusterInstallation) Reconcile(request reconcile.Request) (rec
 		return reconcile.Result{}, err
 	}
 
+	err = r.checkCanary(mattermost, reqLogger)
+	if err != nil {
+		r.setReconciling()
+		return reconcile.Result{}, err
+	}
+
 	status, err := r.handleCheckClusterInstallation(mattermost)
 	if err != nil {
 		r.setReconciling()
