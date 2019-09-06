@@ -77,7 +77,7 @@ func TestCheckMattermost(t *testing.T) {
 	})
 
 	t.Run("ingress", func(t *testing.T) {
-		err = r.checkMattermostIngress(ci, ci.Name, ci.Spec.IngressName, logger)
+		err = r.checkMattermostIngress(ci, ci.Name, ci.Spec.IngressName, ci.Spec.IngressAnnotations, logger)
 		assert.NoError(t, err)
 
 		found := &v1beta1.Ingress{}
@@ -93,7 +93,7 @@ func TestCheckMattermost(t *testing.T) {
 
 		err = r.client.Update(context.TODO(), modified)
 		require.NoError(t, err)
-		err = r.checkMattermostIngress(ci, ci.Name, ci.Spec.IngressName, logger)
+		err = r.checkMattermostIngress(ci, ci.Name, ci.Spec.IngressName, ci.Spec.IngressAnnotations, logger)
 		require.NoError(t, err)
 		err = r.client.Get(context.TODO(), types.NamespacedName{Name: ciName, Namespace: ciNamespace}, found)
 		require.NoError(t, err)
