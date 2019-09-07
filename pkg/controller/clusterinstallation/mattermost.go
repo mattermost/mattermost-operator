@@ -124,20 +124,20 @@ func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mat
 		isLicensed = true
 	}
 
-	deployment := mattermost.GenerateDeployment(resourceName, ingressName, imageName, dbUser, dbPassword, externalDB, isLicensed, minioService)
-	err = r.createDeploymentIfNotExists(mattermost, deployment, reqLogger)
+	desired := mattermost.GenerateDeployment(resourceName, ingressName, imageName, dbUser, dbPassword, externalDB, isLicensed, minioService)
+	err = r.createDeploymentIfNotExists(mattermost, desired, reqLogger)
 	if err != nil {
 		return err
 	}
 
-	foundDeployment := &appsv1.Deployment{}
-	err = r.client.Get(context.TODO(), types.NamespacedName{Name: deployment.Name, Namespace: deployment.Namespace}, foundDeployment)
+	current := &appsv1.Deployment{}
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: desired.Name, Namespace: desired.Namespace}, current)
 	if err != nil {
 		reqLogger.Error(err, "Failed to get mattermost deployment")
 		return err
 	}
 
-	err = r.updateMattermostDeployment(mattermost, foundDeployment, deployment, imageName, reqLogger)
+	err = r.updateMattermostDeployment(mattermost, current, desired, imageName, reqLogger)
 	if err != nil {
 		reqLogger.Error(err, "Failed to update mattermost deployment")
 		return err
