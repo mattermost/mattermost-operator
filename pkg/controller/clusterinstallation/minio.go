@@ -52,8 +52,8 @@ func (r *ReconcileClusterInstallation) checkMattermostMinioSecret(mattermost *ma
 	switch {
 	case err != nil && kerrors.IsNotFound(err):
 		// Create new secret
-		reqLogger.Info("creating secret", "name", current.Name)
-		return r.create(mattermost, current, reqLogger)
+		reqLogger.Info("creating minio secret", "name", desired.Name, "namespace", desired.Namespace)
+		return r.create(mattermost, desired, reqLogger)
 	case err != nil:
 		// Something go wrong badly
 		reqLogger.Error(err, "failed to check if secret exists")
@@ -61,11 +61,11 @@ func (r *ReconcileClusterInstallation) checkMattermostMinioSecret(mattermost *ma
 	}
 	// Validate secret required fields, if not exist recreate.
 	if _, ok := current.Data["accesskey"]; !ok {
-		reqLogger.Info("minio secret does not have an 'accesskey' value, overriding", "secret", desired.Name)
+		reqLogger.Info("minio secret does not have an 'accesskey' value, overriding", "name", desired.Name)
 		return r.update(current, desired, reqLogger)
 	}
 	if _, ok := current.Data["secretkey"]; !ok {
-		reqLogger.Info("minio secret does not have an 'secretkey' value, overriding", "secret", desired.Name)
+		reqLogger.Info("minio secret does not have an 'secretkey' value, overriding", "name", desired.Name)
 		return r.update(current, desired, reqLogger)
 	}
 	// Preserve data fields
