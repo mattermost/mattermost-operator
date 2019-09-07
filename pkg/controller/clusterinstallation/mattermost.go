@@ -3,7 +3,6 @@ package clusterinstallation
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -45,102 +44,53 @@ func (r *ReconcileClusterInstallation) checkMattermost(mattermost *mattermostv1a
 }
 
 func (r *ReconcileClusterInstallation) checkMattermostService(mattermost *mattermostv1alpha1.ClusterInstallation, resourceName, selectorName string, reqLogger logr.Logger) error {
-	service := mattermost.GenerateService(resourceName, selectorName)
+	desired := mattermost.GenerateService(resourceName, selectorName)
 
-	err := r.createServiceIfNotExists(mattermost, service, reqLogger)
+	err := r.createServiceIfNotExists(mattermost, desired, reqLogger)
 	if err != nil {
 		return err
 	}
 
-	foundService := &corev1.Service{}
-	err = r.client.Get(context.TODO(), types.NamespacedName{Name: service.Name, Namespace: service.Namespace}, foundService)
+	current := &corev1.Service{}
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: desired.Name, Namespace: desired.Namespace}, current)
 	if err != nil {
 		return err
-	}
-
-	var update bool
-
-	updatedLabels := ensureLabels(service.Labels, foundService.Labels)
-	if !reflect.DeepEqual(updatedLabels, foundService.Labels) {
-		reqLogger.Info("Updating mattermost service labels")
-		foundService.Labels = updatedLabels
-		update = true
-	}
-
-	if !reflect.DeepEqual(service.Annotations, foundService.Annotations) {
-		reqLogger.Info("Updating mattermost service annotations")
-		foundService.Annotations = service.Annotations
-		update = true
 	}
 
 	// If we are using the loadBalancer the ClusterIp is immutable
 	// and other fields are created in the first time
 	if mattermost.Spec.UseServiceLoadBalancer {
-		service.Spec.ClusterIP = foundService.Spec.ClusterIP
-		service.Spec.ExternalTrafficPolicy = foundService.Spec.ExternalTrafficPolicy
-		service.Spec.SessionAffinity = foundService.Spec.SessionAffinity
-		for _, foundPort := range foundService.Spec.Ports {
-			for i, servicePort := range service.Spec.Ports {
-				if foundPort.Name == servicePort.Name {
-					service.Spec.Ports[i].NodePort = foundPort.NodePort
-					service.Spec.Ports[i].Protocol = foundPort.Protocol
+		desired.Spec.ClusterIP = current.Spec.ClusterIP
+		desired.Spec.ExternalTrafficPolicy = current.Spec.ExternalTrafficPolicy
+		desired.Spec.SessionAffinity = current.Spec.SessionAffinity
+		for _, currentPort := range current.Spec.Ports {
+			for i, servicePort := range desired.Spec.Ports {
+				if currentPort.Name == servicePort.Name {
+					desired.Spec.Ports[i].NodePort = currentPort.NodePort
+					desired.Spec.Ports[i].Protocol = currentPort.Protocol
 				}
 			}
 		}
 	}
-	if !reflect.DeepEqual(service.Spec, foundService.Spec) {
-		reqLogger.Info("Updating mattermost service spec")
-		foundService.Spec = service.Spec
-		update = true
-	}
 
-	if update {
-		return r.client.Update(context.TODO(), foundService)
-	}
-
-	return nil
+	return r.update(current, desired, reqLogger)
 }
 
 func (r *ReconcileClusterInstallation) checkMattermostIngress(mattermost *mattermostv1alpha1.ClusterInstallation, resourceName, ingressName string, reqLogger logr.Logger) error {
-	ingress := mattermost.GenerateIngress(resourceName, ingressName)
+	desired := mattermost.GenerateIngress(resourceName, ingressName)
 
-	err := r.createIngressIfNotExists(mattermost, ingress, reqLogger)
+	err := r.createIngressIfNotExists(mattermost, desired, reqLogger)
 	if err != nil {
 		return err
 	}
 
-	foundIngress := &v1beta1.Ingress{}
-	err = r.client.Get(context.TODO(), types.NamespacedName{Name: ingress.Name, Namespace: ingress.Namespace}, foundIngress)
+	current := &v1beta1.Ingress{}
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: desired.Name, Namespace: desired.Namespace}, current)
 	if err != nil {
 		return err
 	}
 
-	var update bool
-
-	updatedLabels := ensureLabels(ingress.Labels, foundIngress.Labels)
-	if !reflect.DeepEqual(updatedLabels, foundIngress.Labels) {
-		reqLogger.Info("Updating mattermost ingress labels")
-		foundIngress.Labels = updatedLabels
-		update = true
-	}
-
-	if !reflect.DeepEqual(ingress.Annotations, foundIngress.Annotations) {
-		reqLogger.Info("Updating mattermost ingress annotations")
-		foundIngress.Annotations = ingress.Annotations
-		update = true
-	}
-
-	if !reflect.DeepEqual(ingress.Spec, foundIngress.Spec) {
-		reqLogger.Info("Updating mattermost ingress spec")
-		foundIngress.Spec = ingress.Spec
-		update = true
-	}
-
-	if update {
-		return r.client.Update(context.TODO(), foundIngress)
-	}
-
-	return nil
+	return r.update(current, desired, reqLogger)
 }
 
 func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, resourceName, ingressName, imageName string, reqLogger logr.Logger) error {
