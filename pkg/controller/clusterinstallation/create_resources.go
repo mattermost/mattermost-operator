@@ -52,6 +52,9 @@ func (r *ReconcileClusterInstallation) update(current, desired Object, reqLogger
 			return err
 		}
 		reqLogger.Info("updating resource", "name", desired.GetName(), "namespace", desired.GetNamespace())
+		// Resource version is required for the update, but need to be set after
+		// the last applied annotation to avoid unnecessary diffs
+		desired.SetResourceVersion(current.GetResourceVersion())
 		return r.client.Update(context.TODO(), desired)
 	}
 	return nil
