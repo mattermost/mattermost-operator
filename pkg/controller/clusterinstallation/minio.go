@@ -3,7 +3,6 @@ package clusterinstallation
 import (
 	"context"
 	"fmt"
-	"reflect"
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
@@ -81,43 +80,24 @@ func (r *ReconcileClusterInstallation) checkMinioSecret(mattermost *mattermostv1
 }
 
 func (r *ReconcileClusterInstallation) checkMinioInstance(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
-	instance := mattermostMinio.Instance(mattermost)
+	desired := mattermostMinio.Instance(mattermost)
 
-	err := r.createMinioInstanceIfNotExists(mattermost, instance, reqLogger)
+	err := r.createMinioInstanceIfNotExists(mattermost, desired, reqLogger)
 	if err != nil {
 		return err
 	}
 
-	foundInstance := &minioOperator.MinIOInstance{}
-	err = r.client.Get(context.TODO(), types.NamespacedName{Name: instance.Name, Namespace: instance.Namespace}, foundInstance)
+	current := &minioOperator.MinIOInstance{}
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: desired.Name, Namespace: desired.Namespace}, current)
 	if err != nil {
 		return err
 	}
-
-	var update bool
 
 	// Note:
 	// For some reason, our current minio operator seems to remove labels on
 	// the instance resource when we add them. For that reason, trying to
 	// ensure the labels are correct doesn't work.
-	updatedLabels := ensureLabels(instance.Labels, foundInstance.Labels)
-	if !reflect.DeepEqual(updatedLabels, foundInstance.Labels) {
-		reqLogger.Info("Updating minio instance labels")
-		foundInstance.Labels = updatedLabels
-		update = true
-	}
-
-	if !reflect.DeepEqual(instance.Spec, foundInstance.Spec) {
-		reqLogger.Info("Updating minio instance spec")
-		foundInstance.Spec = instance.Spec
-		update = true
-	}
-
-	if update {
-		return r.client.Update(context.TODO(), foundInstance)
-	}
-
-	return nil
+	return r.update(current, desired, reqLogger)
 }
 
 func (r *ReconcileClusterInstallation) createMinioInstanceIfNotExists(mattermost *mattermostv1alpha1.ClusterInstallation, instance *minioOperator.MinIOInstance, reqLogger logr.Logger) error {
