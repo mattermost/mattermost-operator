@@ -42,15 +42,16 @@ func (r *ReconcileClusterInstallation) create(owner v1.Object, desired Object, r
 func (r *ReconcileClusterInstallation) update(current, desired Object, reqLogger logr.Logger) error {
 	patchResult, err := objectMatcher.DefaultPatchMaker.Calculate(current, desired)
 	if err != nil {
-		reqLogger.Error(err, "error checking the difference in the deployment")
+		reqLogger.Error(err, "error checking the difference in the resource")
 		return err
 	}
 	if !patchResult.IsEmpty() {
 		err := objectMatcher.DefaultAnnotator.SetLastAppliedAnnotation(desired)
 		if err != nil {
-			reqLogger.Error(err, "error applying the annotation in the deployment")
+			reqLogger.Error(err, "error applying the annotation in the resource")
 			return err
 		}
+		reqLogger.Info("updating resource", "name", desired.GetName(), "namespace", desired.GetNamespace())
 		return r.client.Update(context.TODO(), desired)
 	}
 	return nil
@@ -121,20 +122,6 @@ func (r *ReconcileClusterInstallation) createDeploymentIfNotExists(owner v1.Obje
 		return r.create(owner, deployment, reqLogger)
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to check if deployment exists")
-		return err
-	}
-
-	return nil
-}
-
-func (r *ReconcileClusterInstallation) createSecretIfNotExists(owner v1.Object, secret *corev1.Secret, reqLogger logr.Logger) error {
-	foundSecret := &corev1.Secret{}
-	err := r.client.Get(context.TODO(), types.NamespacedName{Name: secret.Name, Namespace: secret.Namespace}, foundSecret)
-	if err != nil && errors.IsNotFound(err) {
-		reqLogger.Info("Creating secret", "name", secret.Name)
-		return r.create(owner, secret, reqLogger)
-	} else if err != nil {
-		reqLogger.Error(err, "Failed to check if secret exists")
 		return err
 	}
 
