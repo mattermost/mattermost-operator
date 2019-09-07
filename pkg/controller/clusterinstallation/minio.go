@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -31,7 +30,8 @@ func (r *ReconcileClusterInstallation) checkCustomMinioSecret(mattermost *matter
 	secret := &corev1.Secret{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: mattermost.Spec.Minio.Secret, Namespace: mattermost.Namespace}, secret)
 	if err != nil {
-		return errors.Wrap(err, "unable to locate custom minio secret")
+		reqLogger.Error(err, "failed to check if custom minio secret exists")
+		return err
 	}
 	// Validate custom secret required fields
 	if _, ok := secret.Data["accesskey"]; !ok {
@@ -40,7 +40,6 @@ func (r *ReconcileClusterInstallation) checkCustomMinioSecret(mattermost *matter
 	if _, ok := secret.Data["secretkey"]; !ok {
 		return fmt.Errorf("custom Minio Secret %s does not have an 'secretkey' value", mattermost.Spec.Minio.Secret)
 	}
-	reqLogger.Info("skipping minio secret creation, using custom secret")
 	return nil
 }
 
@@ -74,6 +73,7 @@ func (r *ReconcileClusterInstallation) checkMattermostMinioSecret(mattermost *ma
 
 func (r *ReconcileClusterInstallation) checkMinioSecret(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
 	if mattermost.Spec.Minio.Secret != "" {
+		reqLogger.Info("skipping minio secret creation, using custom secret")
 		return r.checkCustomMinioSecret(mattermost, reqLogger)
 	}
 	return r.checkMattermostMinioSecret(mattermost, reqLogger)
