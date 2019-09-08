@@ -16,6 +16,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
+const LastAppliedConfig = "mattermost.com/last-applied"
+
+var DefaultAnnotator = objectMatcher.NewAnnotator(LastAppliedConfig)
+
 // Object combines the interfaces that all Kubernetes objects must implement.
 type Object interface {
 	runtime.Object
@@ -26,7 +30,7 @@ type Object interface {
 func (r *ReconcileClusterInstallation) create(owner v1.Object, desired Object, reqLogger logr.Logger) error {
 	// adding the last applied annotation to use the object matcher later
 	// see: https://github.com/banzaicloud/k8s-objectmatcher
-	err := objectMatcher.DefaultAnnotator.SetLastAppliedAnnotation(desired)
+	err := DefaultAnnotator.SetLastAppliedAnnotation(desired)
 	if err != nil {
 		reqLogger.Error(err, "Error applying the annotation in the resource")
 		return err
@@ -40,14 +44,13 @@ func (r *ReconcileClusterInstallation) create(owner v1.Object, desired Object, r
 }
 
 func (r *ReconcileClusterInstallation) update(current, desired Object, reqLogger logr.Logger) error {
-	patchResult, err := objectMatcher.DefaultPatchMaker.Calculate(current, desired)
+	patchResult, err := objectMatcher.NewPatchMaker(DefaultAnnotator).Calculate(current, desired)
 	if err != nil {
 		reqLogger.Error(err, "error checking the difference in the resource")
 		return err
 	}
 	if !patchResult.IsEmpty() {
-		err := objectMatcher.DefaultAnnotator.SetLastAppliedAnnotation(desired)
-		if err != nil {
+		if err := DefaultAnnotator.SetLastAppliedAnnotation(desired); err != nil {
 			reqLogger.Error(err, "error applying the annotation in the resource")
 			return err
 		}
