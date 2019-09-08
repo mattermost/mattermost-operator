@@ -31,6 +31,8 @@ func (r *ReconcileClusterInstallation) checkMySQLCluster(mattermost *mattermostv
 		return err
 	}
 
+	// Updating mysql.cluster with objectMatcher breaks mysql operator.
+	// Only fields that are expected to be changed by mattermost-operator should be included here.
 	var update bool
 
 	updatedLabels := ensureLabels(desired.Labels, current.Labels)
