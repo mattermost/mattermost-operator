@@ -3,6 +3,7 @@ package clusterinstallation
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	"github.com/go-logr/logr"
 	mysqlOperator "github.com/presslabs/mysql-operator/pkg/apis/mysql/v1alpha1"
@@ -30,7 +31,26 @@ func (r *ReconcileClusterInstallation) checkMySQLCluster(mattermost *mattermostv
 		return err
 	}
 
-	return r.update(current, desired, reqLogger)
+	var update bool
+
+	updatedLabels := ensureLabels(desired.Labels, current.Labels)
+	if !reflect.DeepEqual(updatedLabels, current.Labels) {
+		reqLogger.Info("Updating mysql cluster labels")
+		current.Labels = updatedLabels
+		update = true
+	}
+
+	if !reflect.DeepEqual(desired.Spec, current.Spec) {
+		reqLogger.Info("Updating mysql cluster spec")
+		current.Spec = desired.Spec
+		update = true
+	}
+
+	if update {
+		return r.client.Update(context.TODO(), current)
+	}
+
+	return nil
 }
 
 func (r *ReconcileClusterInstallation) createMySQLClusterIfNotExists(mattermost *mattermostv1alpha1.ClusterInstallation, cluster *mysqlOperator.MysqlCluster, reqLogger logr.Logger) error {
