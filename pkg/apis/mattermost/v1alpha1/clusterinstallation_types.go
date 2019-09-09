@@ -73,22 +73,12 @@ type ClusterInstallationSpec struct {
 
 // Canary defines the configuration of Canary deployment for a ClusterInstallation
 type Canary struct {
-	// Name defines the name of the deployment
-	// +optional
-	Name string `json:"name,omitempty"`
 	// Enable defines if Canary deployment will be applied.
 	// +optional
 	Enable bool `json:"enable,omitempty"`
-	// Image defines the base Docker image that will be used for the deployment.
-	// Required when Canary is enabled.
+	// CanaryDeployment defines the canary deployment.
 	// +optional
-	Image string `json:"image,omitempty"`
-	// Version defines the Docker image version that will be used for the deployment.
-	// Required when Canary is enabled.
-	// +optional
-	Version string `json:"version,omitempty"`
-	// +optional
-	IngressAnnotations map[string]string `json:"ingressAnnotations,omitempty"`
+	CanaryDeployment AppDeployment `json:"canaryDeployment,omitempty"`
 }
 
 // BlueGreen defines the configuration of BlueGreen deployment for a ClusterInstallation
