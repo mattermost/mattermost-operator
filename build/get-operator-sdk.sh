@@ -19,13 +19,13 @@ then
 	exit 0
 fi
 
-# Choose the version suitable for platform
+# Linux binary is set as default, if Mac OS is detected the URL will
+# be overwritten
+URL="$BASE_URL/$VERSION/operator-sdk-$VERSION-$(uname -m)-linux-gnu"
+
 if [[ "$OSTYPE" == "darwin"* ]]
 then
-	URL="$BASE_URL/$VERSION/operator-sdk-$VERSION-$(uname -m)-apple-darwin"
-elif [[ "$OSTYPE" == "linux-gnu"* ]]
-then
-	URL="$BASE_URL/$VERSION/operator-sdk-$VERSION-$(uname -m)-linux-gnu"
+	URL="${URL%-linux-gnu}-apple-darwin"
 fi
 
 # Fetch the binary
