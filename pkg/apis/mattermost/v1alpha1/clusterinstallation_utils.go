@@ -62,6 +62,10 @@ func (mattermost *ClusterInstallation) SetDefaults() error {
 	mattermost.Spec.Minio.SetDefaults()
 	mattermost.Spec.Database.SetDefaults()
 	err := mattermost.Spec.BlueGreen.SetDefaults(mattermost)
+	if err != nil {
+		return err
+	}
+
 	err = mattermost.Spec.Canary.SetDefaults(mattermost)
 
 	return err
@@ -70,14 +74,14 @@ func (mattermost *ClusterInstallation) SetDefaults() error {
 // SetDefaults sets the missing values in Canary to the default ones
 func (canary *Canary) SetDefaults(mattermost *ClusterInstallation) error {
 	if canary.Enable {
-		if canary.CanaryDeployment.Version == "" {
+		if canary.Deployment.Version == "" {
 			return errors.New("Canary version required, but not set")
 		}
-		if canary.CanaryDeployment.Image == "" {
+		if canary.Deployment.Image == "" {
 			return errors.New("Canary deployment image required, but not set")
 		}
-		if canary.CanaryDeployment.Name == "" {
-			canary.CanaryDeployment.Name = fmt.Sprintf("%s-canary", mattermost.Name)
+		if canary.Deployment.Name == "" {
+			canary.Deployment.Name = fmt.Sprintf("%s-canary", mattermost.Name)
 		}
 	}
 

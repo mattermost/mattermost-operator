@@ -7,14 +7,14 @@ import (
 )
 
 func (r *ReconcileClusterInstallation) checkCanary(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
+	reqLogger = reqLogger.WithValues("Reconcile", "mattermost")
 	if mattermost.Spec.Canary.Enable {
 		ingressAnnotations := map[string]string{
 			"kubernetes.io/ingress.class":                  "nginx",
 			"nginx.ingress.kubernetes.io/canary":           "true",
 			"nginx.ingress.kubernetes.io/canary-by-cookie": "canary",
 		}
-		reqLogger = reqLogger.WithValues("Reconcile", "mattermost")
-		c := mattermostv1alpha1.AppDeployment(mattermost.Spec.Canary.CanaryDeployment)
+		c := mattermostv1alpha1.AppDeployment(mattermost.Spec.Canary.Deployment)
 		err := r.checkMattermostService(mattermost, c.Name, c.Name, reqLogger)
 		if err != nil {
 			return err

@@ -61,18 +61,21 @@ spec:
                   properties:
                     image:
                       description: Image defines the base Docker image that will be
-                        used for the deployment. Required when BlueGreen is enabled.
+                        used for the deployment. Required when BlueGreen or Canary
+                        is enabled.
                       type: string
                     ingressName:
                       description: IngressName defines the ingress name that will
-                        be used by the deployment.
+                        be used by the deployment. This option is not used for Canary
+                        builds.
                       type: string
                     name:
                       description: Name defines the name of the deployment
                       type: string
                     version:
                       description: Version defines the Docker image version that will
-                        be used for the deployment. Required when BlueGreen is enabled.
+                        be used for the deployment. Required when BlueGreen or Canary
+                        is enabled.
                       type: string
                   type: object
                 enable:
@@ -83,18 +86,21 @@ spec:
                   properties:
                     image:
                       description: Image defines the base Docker image that will be
-                        used for the deployment. Required when BlueGreen is enabled.
+                        used for the deployment. Required when BlueGreen or Canary
+                        is enabled.
                       type: string
                     ingressName:
                       description: IngressName defines the ingress name that will
-                        be used by the deployment.
+                        be used by the deployment. This option is not used for Canary
+                        builds.
                       type: string
                     name:
                       description: Name defines the name of the deployment
                       type: string
                     version:
                       description: Version defines the Docker image version that will
-                        be used for the deployment. Required when BlueGreen is enabled.
+                        be used for the deployment. Required when BlueGreen or Canary
+                        is enabled.
                       type: string
                   type: object
                 productionDeployment:
@@ -104,27 +110,30 @@ spec:
               type: object
             canary:
               properties:
-                canaryDeployment:
-                  description: CanaryDeployment defines the canary deployment.
+                deployment:
+                  description: Deployment defines the canary deployment.
                   properties:
                     image:
                       description: Image defines the base Docker image that will be
-                        used for the deployment. Required when BlueGreen is enabled.
+                        used for the deployment. Required when BlueGreen or Canary
+                        is enabled.
                       type: string
                     ingressName:
                       description: IngressName defines the ingress name that will
-                        be used by the deployment.
+                        be used by the deployment. This option is not used for Canary
+                        builds.
                       type: string
                     name:
                       description: Name defines the name of the deployment
                       type: string
                     version:
                       description: Version defines the Docker image version that will
-                        be used for the deployment. Required when BlueGreen is enabled.
+                        be used for the deployment. Required when BlueGreen or Canary
+                        is enabled.
                       type: string
                   type: object
                 enable:
-                  description: Enable defines if Canary deployment will be applied.
+                  description: Enable defines if a canary build will be deployed.
                   type: boolean
               type: object
             database:
