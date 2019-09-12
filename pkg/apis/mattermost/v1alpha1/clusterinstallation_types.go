@@ -154,7 +154,7 @@ type Database struct {
 	BackupRemoteDeletePolicy string `json:"backupRemoteDeletePolicy,omitempty"`
 	// Defines the secret to be used for uploading backup.
 	// +optional
-	BackupSecretName string `json:"backupSecret,omitempty"`
+	BackupSecretName string `json:"backupSecretName,omitempty"`
 }
 
 // ElasticSearch defines the ElasticSearch configuration for a ClusterInstallation.

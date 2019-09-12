@@ -111,7 +111,7 @@ spec:
                   description: Defines the interval for backups in cron expression
                     format.
                   type: string
-                backupSecret:
+                backupSecretName:
                   description: Defines the secret to be used for uploading backup.
                   type: string
                 backupURL:
