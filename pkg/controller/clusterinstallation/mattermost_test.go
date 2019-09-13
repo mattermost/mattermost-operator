@@ -102,13 +102,15 @@ func TestCheckMattermost(t *testing.T) {
 
 	t.Run("deployment", func(t *testing.T) {
 		updateName := "mattermost-update-check"
+		now := metav1.Now()
 		job := &batchv1.Job{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      updateName,
 				Namespace: ci.GetNamespace(),
 			},
 			Status: batchv1.JobStatus{
-				Succeeded: 1,
+				Succeeded:      1,
+				CompletionTime: &now,
 			},
 		}
 		err := r.client.Create(context.TODO(), job)
