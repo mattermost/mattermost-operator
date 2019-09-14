@@ -259,9 +259,9 @@ func (r *ReconcileClusterInstallation) updateMattermostDeployment(mi *mattermost
 		alreadyRunning, err := r.fetchRunningUpdateJob(mi, reqLogger)
 		if err != nil && k8sErrors.IsNotFound(err) {
 			reqLogger.Info("Launching update job")
-			if err := r.launchUpdateJob(mi, new, imageName, reqLogger); err != nil {
+			if er := r.launchUpdateJob(mi, new, imageName, reqLogger); er != nil {
 				reqLogger.Error(err, "Launching update job failed")
-				return err
+				return er
 			} else {
 				return errors.New("Began update job")
 			}
