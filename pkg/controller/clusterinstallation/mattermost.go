@@ -259,12 +259,11 @@ func (r *ReconcileClusterInstallation) updateMattermostDeployment(mi *mattermost
 		alreadyRunning, err := r.fetchRunningUpdateJob(mi, reqLogger)
 		if err != nil && k8sErrors.IsNotFound(err) {
 			reqLogger.Info("Launching update job")
-			if er := r.launchUpdateJob(mi, new, imageName, reqLogger); er != nil {
+			if err = r.launchUpdateJob(mi, new, imageName, reqLogger); err != nil {
 				reqLogger.Error(err, "Launching update job failed")
-				return er
-			} else {
-				return errors.New("Began update job")
+				return err
 			}
+			return errors.New("Began update job")
 		}
 
 		if err != nil {
@@ -307,8 +306,7 @@ func (r *ReconcileClusterInstallation) updateMattermostDeployment(mi *mattermost
 		// it's done, it either failed or succeded
 
 		if alreadyRunning.Status.Failed > 0 {
-			err = errors.New("Upgrade job failed")
-			return err
+			return errors.New("Upgrade job failed")
 		}
 
 		reqLogger.Info("Upgrade image job ran successfully")
@@ -330,9 +328,9 @@ func (r *ReconcileClusterInstallation) updateMattermostDeployment(mi *mattermost
 	return nil
 }
 
-func (r *ReconcileClusterInstallation) fetchRunningUpdateJob(mi *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) (job *batchv1.Job, err error) {
+func (r *ReconcileClusterInstallation) fetchRunningUpdateJob(mi *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) (*batchv1.Job, error) {
 	foundJob := &batchv1.Job{}
-	err = r.client.Get(
+	err := r.client.Get(
 		context.TODO(),
 		types.NamespacedName{
 			Name:      updateName,
