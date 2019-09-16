@@ -67,7 +67,7 @@ func (r *ReconcileClusterInstallation) createMySQLClusterIfNotExists(mattermost 
 	return nil
 }
 
-func (r *ReconcileClusterInstallation) getOrCreateMySQLSecrets(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) (string, error) {
+func (r *ReconcileClusterInstallation) getOrCreateMySQLSecrets(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) ([]string, error) {
 	dbSecretName := fmt.Sprintf("%s-mysql-root-password", mattermost.Name)
 	dbSecret := &corev1.Secret{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: dbSecretName, Namespace: mattermost.Namespace}, dbSecret)
@@ -86,10 +86,13 @@ func (r *ReconcileClusterInstallation) getOrCreateMySQLSecrets(mattermost *matte
 			"DATABASE":      []byte("mattermost"),
 		}
 
-		return userPassword, r.createResource(mattermost, dbSecret, reqLogger)
+		return []string{"mmuser", userPassword, "mattermost"}, r.createResource(mattermost, dbSecret, reqLogger)
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to check if mysql secret exists")
-		return "", err
+		return []string{}, err
 	}
-	return string(dbSecret.Data["PASSWORD"]), nil
+
+	dbData := []string{string(dbSecret.Data["USER"]), string(dbSecret.Data["PASSWORD"]), string(dbSecret.Data["DATABASE"])}
+
+	return dbData, nil
 }

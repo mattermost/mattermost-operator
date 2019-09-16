@@ -14,8 +14,11 @@ import (
 
 func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
 	return map[string]common.OpenAPIDefinition{
-		"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.ClusterInstallation":     schema_pkg_apis_mattermost_v1alpha1_ClusterInstallation(ref),
-		"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.ClusterInstallationSpec": schema_pkg_apis_mattermost_v1alpha1_ClusterInstallationSpec(ref),
+		"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.ClusterInstallation":       schema_pkg_apis_mattermost_v1alpha1_ClusterInstallation(ref),
+		"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.ClusterInstallationSpec":   schema_pkg_apis_mattermost_v1alpha1_ClusterInstallationSpec(ref),
+		"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.MattermostRestoreDB":       schema_pkg_apis_mattermost_v1alpha1_MattermostRestoreDB(ref),
+		"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.MattermostRestoreDBSpec":   schema_pkg_apis_mattermost_v1alpha1_MattermostRestoreDBSpec(ref),
+		"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.MattermostRestoreDBStatus": schema_pkg_apis_mattermost_v1alpha1_MattermostRestoreDBStatus(ref),
 	}
 }
 
@@ -192,5 +195,130 @@ func schema_pkg_apis_mattermost_v1alpha1_ClusterInstallationSpec(ref common.Refe
 		},
 		Dependencies: []string{
 			"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.BlueGreen", "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.Database", "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.ElasticSearch", "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.Minio", "k8s.io/api/core/v1.Affinity", "k8s.io/api/core/v1.ResourceRequirements"},
+	}
+}
+
+func schema_pkg_apis_mattermost_v1alpha1_MattermostRestoreDB(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "MattermostRestoreDB is the Schema for the mattermostrestoredbs API",
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.MattermostRestoreDBSpec"),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.MattermostRestoreDBStatus"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.MattermostRestoreDBSpec", "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.MattermostRestoreDBStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+	}
+}
+
+func schema_pkg_apis_mattermost_v1alpha1_MattermostRestoreDBSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "MattermostRestoreDBSpec defines the desired state of MattermostRestoreDB",
+				Properties: map[string]spec.Schema{
+					"mattermostClusterName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "MattermostClusterName defines the ClusterInstallation name.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"restoreSecret": {
+						SchemaProps: spec.SchemaProps{
+							Description: "RestoreSecret defines the secret that holds the credentials to MySQL Operator be able to download the DB backup file",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"initBucketURL": {
+						SchemaProps: spec.SchemaProps{
+							Description: "InitBucketURL defines where the DB backup file is located.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"mattermostDBUser": {
+						SchemaProps: spec.SchemaProps{
+							Description: "MattermostDBUser defines the user to access the database. Need to set if the user is different from `mmuser`.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"mattermostDBPassword": {
+						SchemaProps: spec.SchemaProps{
+							Description: "MattermostDBPassword defines the user password to access the database. Need to set if the user is different from the one created by the operator.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"mattermostDBName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "MattermostDBName defines the database name. Need to set if different from `mattermost`.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{},
+	}
+}
+
+func schema_pkg_apis_mattermost_v1alpha1_MattermostRestoreDBStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "MattermostRestoreDBStatus defines the observed state of MattermostRestoreDB",
+				Properties: map[string]spec.Schema{
+					"state": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Represents the state of the Mattermost restore Database",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"originalDBReplicas": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The original number of database replicas. will be used to restore after applying the db restore process.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{},
 	}
 }

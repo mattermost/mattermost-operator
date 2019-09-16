@@ -104,9 +104,18 @@ spec:
               type: object
             database:
               properties:
+                backupRestoreSecret:
+                  description: Defines the secret to be used for uploading backup
+                    or to restore the backup.
+                  type: string
                 externalSecret:
                   description: If the user want to use an external DB. This can be
                     inside the same k8s cluster or outside like AWS RDS.
+                  type: string
+                initBucketURL:
+                  description: Defines the AWS S3 bucket where the Database Backup
+                    is stored. The operator will download the file to restore the
+                    data.
                   type: string
                 replicas:
                   description: Defines the number of database replicas. For redundancy

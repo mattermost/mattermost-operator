@@ -355,9 +355,6 @@ func (mattermost *ClusterInstallation) SetReplicasAndResourcesFromSize() error {
 		mattermost.Spec.Minio.Resources = size.Minio.Resources
 	}
 
-	if mattermost.Spec.Database.Replicas == 0 {
-		mattermost.Spec.Database.Replicas = size.Database.Replicas
-	}
 	if mattermost.Spec.Database.Resources.Size() == 0 {
 		mattermost.Spec.Database.Resources = size.Database.Resources
 	}
