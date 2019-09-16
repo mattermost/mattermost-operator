@@ -6,6 +6,7 @@ package mattermostrestoredb
 import (
 	"context"
 	"fmt"
+	"time"
 
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
 	mattermostmysql "github.com/mattermost/mattermost-operator/pkg/components/mysql"
@@ -34,7 +35,7 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileMattermostRestoreDB{client: mgr.GetClient(), scheme: mgr.GetScheme()}
+	return &ReconcileMattermostRestoreDB{client: mgr.GetClient(), scheme: mgr.GetScheme(), state: mattermostv1alpha1.Restoring}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -47,16 +48,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// Watch for changes to primary resource MattermostRestoreDB
 	err = c.Watch(&source.Kind{Type: &mattermostv1alpha1.MattermostRestoreDB{}}, &handler.EnqueueRequestForObject{})
-	if err != nil {
-		return err
-	}
-
-	// TODO(user): Modify this to be the types you create that are owned by the primary resource
-	// Watch for changes to secondary resource Pods and requeue the owner MattermostRestoreDB
-	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &mattermostv1alpha1.MattermostRestoreDB{},
-	})
 	if err != nil {
 		return err
 	}
@@ -96,7 +87,6 @@ func (r *ReconcileMattermostRestoreDB) setFailed() {
 func (r *ReconcileMattermostRestoreDB) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	reqLogger.Info("Reconciling MattermostRestoreDB")
-
 	// Fetch the MattermostRestoreDB instance
 	restoreMM := &mattermostv1alpha1.MattermostRestoreDB{}
 	err := r.client.Get(context.TODO(), request.NamespacedName, restoreMM)
@@ -118,15 +108,23 @@ func (r *ReconcileMattermostRestoreDB) Reconcile(request reconcile.Request) (rec
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: restoreMM.Spec.MattermostClusterName, Namespace: restoreMM.Namespace}, clusterInstallation)
 	if err != nil && errors.IsNotFound(err) {
 		r.setFailed()
+		status := restoreMM.Status
+		status.State = r.state
+		//TODO: add reason and inform need to delete/apply when a clusterinstallation is ready.
+		err = r.updateStatus(restoreMM, status, reqLogger)
 		reqLogger.Error(err, "Mattermost Installation not found. Create a ClusterInstallation first", "Namespace", restoreMM.Namespace, "ClusterInstallation.Name", restoreMM.Spec.MattermostClusterName, "RestoreDB.name", restoreMM.Name)
-		return reconcile.Result{}, err
+		return reconcile.Result{}, nil
 	} else if err != nil {
 		r.setFailed()
-		return reconcile.Result{}, err
+		status := restoreMM.Status
+		status.State = r.state
+		err = r.updateStatus(restoreMM, status, reqLogger)
+		return reconcile.Result{}, nil
 	}
 
 	// Set the Status and save the DB Replicas in the Status
 	if restoreMM.Status.State != r.state {
+		reqLogger.Info("Setting restore controller status", "State", r.state, "OriginalReplicas", clusterInstallation.Spec.Database.Replicas)
 		status := restoreMM.Status
 		status.State = r.state
 		status.OriginalDBReplicas = clusterInstallation.Spec.Database.Replicas
@@ -138,11 +136,16 @@ func (r *ReconcileMattermostRestoreDB) Reconcile(request reconcile.Request) (rec
 	}
 
 	// Scaling down to apply the restore later
-	clusterInstallation.Spec.Database.Replicas = 0
-	err = r.client.Update(context.TODO(), clusterInstallation)
-	if err != nil {
-		reqLogger.Error(err, "failed to update the clusterinstallation spec")
-		return reconcile.Result{}, err
+	if clusterInstallation.Spec.Database.Replicas != 0 {
+		clusterInstallation.Spec.Database.Replicas = 0
+		clusterInstallation.Spec.Database.InitBucketURL = restoreMM.Spec.InitBucketURL
+		clusterInstallation.Spec.Database.BackupRestoreSecret = restoreMM.Spec.RestoreSecret
+
+		err = r.client.Update(context.TODO(), clusterInstallation)
+		if err != nil {
+			reqLogger.Error(err, "failed to update the clusterinstallation spec")
+			return reconcile.Result{}, err
+		}
 	}
 
 	// Update the mysql secret to use the existing users
@@ -150,17 +153,6 @@ func (r *ReconcileMattermostRestoreDB) Reconcile(request reconcile.Request) (rec
 		err = r.updateMySQLSecrets(restoreMM, reqLogger)
 		if err != nil {
 			reqLogger.Error(err, "failed to update the mysql secret")
-			return reconcile.Result{}, err
-		}
-	}
-
-	// Set the Init Bucket for DB
-	if clusterInstallation.Spec.Database.InitBucketURL == "" {
-		clusterInstallation.Spec.Database.InitBucketURL = restoreMM.Spec.InitBucketURL
-		clusterInstallation.Spec.Database.BackupRestoreSecret = restoreMM.Spec.RestoreSecret
-		err = r.client.Update(context.TODO(), clusterInstallation)
-		if err != nil {
-			reqLogger.Error(err, "failed to update the clusterinstallation spec")
 			return reconcile.Result{}, err
 		}
 	}
@@ -175,10 +167,10 @@ func (r *ReconcileMattermostRestoreDB) Reconcile(request reconcile.Request) (rec
 		return reconcile.Result{}, err
 	}
 	if statefulset.Status.ReadyReplicas != 0 {
-		return reconcile.Result{}, fmt.Errorf("Waiting for MySQL Statefulset scale to 0")
+		return reconcile.Result{RequeueAfter: time.Second * 3}, fmt.Errorf("Waiting for MySQL Statefulset scale to 0")
 	}
 
-	reqLogger.Info("MySQL Statefulset are scaled down. Will continue the restore process", "ReadyReplicas", statefulset.Status.ReadyReplicas, "CurrentReplicas", statefulset.Status.CurrentReplicas)
+	reqLogger.Info("MySQL Statefulset are scaled down. Will continue the restore process", "ReadyReplicas", statefulset.Status.ReadyReplicas, "CurrentReplicas", statefulset.Status.CurrentReplicas, "OriginalReplicas", restoreMM.Status.OriginalDBReplicas)
 
 	// Removing all the PVC for MySQL to be able to apply the restore
 	for i := 0; i < int(restoreMM.Status.OriginalDBReplicas); i++ {
@@ -204,6 +196,10 @@ func (r *ReconcileMattermostRestoreDB) Reconcile(request reconcile.Request) (rec
 
 	// Scale up again to apply the restore
 	clusterInstallation.Spec.Database.Replicas = restoreMM.Status.OriginalDBReplicas
+	if restoreMM.Status.OriginalDBReplicas == 0 {
+		// at least set to one replica
+		clusterInstallation.Spec.Database.Replicas = 1
+	}
 	err = r.client.Update(context.TODO(), clusterInstallation)
 	if err != nil {
 		reqLogger.Error(err, "failed to update the clusterinstallation spec")
