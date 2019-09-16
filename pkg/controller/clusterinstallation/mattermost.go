@@ -271,59 +271,58 @@ func (r *ReconcileClusterInstallation) updateMattermostDeployment(mi *mattermost
 			return err
 		}
 
-		// job is done, schedule cleanup
-		if alreadyRunning.Status.CompletionTime != nil {
-			defer func() {
-				reqLogger.Info(fmt.Sprintf("Deleting job %s/%s",
-					alreadyRunning.GetNamespace(), alreadyRunning.GetName()))
-
-				err = r.client.Delete(context.TODO(), alreadyRunning)
-				if err != nil {
-					reqLogger.Error(err, "Unable to cleanup image update check job")
-				}
-
-				podList := &corev1.PodList{}
-				listOptions := k8sClient.ListOptions{
-					LabelSelector: labels.SelectorFromSet(
-						labels.Set(map[string]string{"app": updateName})),
-					Namespace: alreadyRunning.GetNamespace(),
-				}
-
-				err = r.client.List(context.Background(), &listOptions, podList)
-				reqLogger.Info(fmt.Sprintf("Deleting %d pods", len(podList.Items)))
-				for _, p := range podList.Items {
-					reqLogger.Info(fmt.Sprintf("Deleting pod %s/%s", p.Namespace, p.Name))
-					err = r.client.Delete(context.TODO(), &p)
-					if err != nil {
-						reqLogger.Error(err, "Problem deleting pod %s", p)
-					}
-				}
-			}()
-		} else {
-			return errors.New("Update image job still running...")
+		if alreadyRunning.Status.CompletionTime == nil {
+			return errors.New("Update image job still running..")
 		}
 
-		// it's done, it either failed or succeded
+		// job is done, schedule cleanup
+		defer func() {
+			reqLogger.Info(fmt.Sprintf("Deleting job %s/%s",
+				alreadyRunning.GetNamespace(), alreadyRunning.GetName()))
 
+			err = r.client.Delete(context.TODO(), alreadyRunning)
+			if err != nil {
+				reqLogger.Error(err, "Unable to cleanup image update check job")
+			}
+
+			podList := &corev1.PodList{}
+			listOptions := k8sClient.ListOptions{
+				LabelSelector: labels.SelectorFromSet(
+					labels.Set(map[string]string{"app": updateName})),
+				Namespace: alreadyRunning.GetNamespace(),
+			}
+
+			err = r.client.List(context.Background(), &listOptions, podList)
+			reqLogger.Info(fmt.Sprintf("Deleting %d pods", len(podList.Items)))
+			for _, p := range podList.Items {
+				reqLogger.Info(fmt.Sprintf("Deleting pod %s/%s", p.Namespace, p.Name))
+				err = r.client.Delete(context.TODO(), &p)
+				if err != nil {
+					reqLogger.Error(err, "Problem deleting pod %s", p)
+				}
+			}
+		}()
+
+		// it's done, it either failed or succeded
 		if alreadyRunning.Status.Failed > 0 {
 			return errors.New("Upgrade job failed")
 		}
 
 		reqLogger.Info("Upgrade image job ran successfully")
+	}
 
-		patchResult, err := objectMatcher.DefaultPatchMaker.Calculate(original, new)
+	patchResult, err := objectMatcher.DefaultPatchMaker.Calculate(original, new)
+	if err != nil {
+		return errors.Wrap(err, "error checking the difference in the deployment")
+	}
+
+	if !patchResult.IsEmpty() {
+		err := objectMatcher.DefaultAnnotator.SetLastAppliedAnnotation(new)
 		if err != nil {
-			return errors.Wrap(err, "error checking the difference in the deployment")
+			return errors.Wrap(err, "error applying the annotation in the deployment")
 		}
 
-		if !patchResult.IsEmpty() {
-			err := objectMatcher.DefaultAnnotator.SetLastAppliedAnnotation(new)
-			if err != nil {
-				return errors.Wrap(err, "error applying the annotation in the deployment")
-			}
-
-			return r.client.Update(context.TODO(), new)
-		}
+		return r.client.Update(context.TODO(), new)
 	}
 	return nil
 }
