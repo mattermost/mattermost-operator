@@ -154,6 +154,17 @@ func (r *ReconcileMattermostRestoreDB) Reconcile(request reconcile.Request) (rec
 		}
 	}
 
+	// Set the Init Bucket for DB
+	if clusterInstallation.Spec.Database.InitBucketURL == "" {
+		clusterInstallation.Spec.Database.InitBucketURL = restoreMM.Spec.InitBucketURL
+		clusterInstallation.Spec.Database.BackupRestoreSecret = restoreMM.Spec.RestoreSecret
+		err = r.client.Update(context.TODO(), clusterInstallation)
+		if err != nil {
+			reqLogger.Error(err, "failed to update the clusterinstallation spec")
+			return reconcile.Result{}, err
+		}
+	}
+
 	// Checking if the MySQL Cluster is scaled down to 0
 	mySQLCluster := mattermostmysql.Cluster(clusterInstallation)
 	statefulsetMySQLName := fmt.Sprintf("%s-mysql", mySQLCluster.Name)
@@ -174,25 +185,24 @@ func (r *ReconcileMattermostRestoreDB) Reconcile(request reconcile.Request) (rec
 		persistentVolumeClaim := &corev1.PersistentVolumeClaim{}
 		dbPersistenVolClaim := fmt.Sprintf("data-db-mysql-%d", i)
 		reqLogger.Info("Deleting PVC...", "PersistentVolumeClaimName", dbPersistenVolClaim)
-		err = r.client.Get(context.TODO(), types.NamespacedName{Name: dbPersistenVolClaim, Namespace: restoreMM.Namespace}, persistentVolumeClaim)
-		if err != nil && errors.IsNotFound(err) {
+		errGet := r.client.Get(context.TODO(), types.NamespacedName{Name: dbPersistenVolClaim, Namespace: restoreMM.Namespace}, persistentVolumeClaim)
+		if errGet != nil && errors.IsNotFound(errGet) {
 			reqLogger.Info("PVC not found maybe already deleted, skipping", "PersistentVolumeClaimName", dbPersistenVolClaim)
 			continue
 		}
-		if err != nil {
-			return reconcile.Result{}, err
+		if errGet != nil {
+			return reconcile.Result{}, errGet
 		}
 
-		err := r.client.Delete(context.TODO(), persistentVolumeClaim, client.GracePeriodSeconds(0))
-		if err != nil {
-			reqLogger.Error(err, "error deleting the DB PVC", "ClusterInstallation.Namespace", clusterInstallation.Namespace, "ClusterInstallation.Name", clusterInstallation.Name)
-			return reconcile.Result{}, err
+		errDelete := r.client.Delete(context.TODO(), persistentVolumeClaim, client.GracePeriodSeconds(0))
+		if errDelete != nil {
+			reqLogger.Error(errDelete, "error deleting the DB PVC", "ClusterInstallation.Namespace", clusterInstallation.Namespace, "ClusterInstallation.Name", clusterInstallation.Name)
+			return reconcile.Result{}, errDelete
 		}
 		reqLogger.Info("PVC deleted", "PersistentVolumeClaimName", dbPersistenVolClaim)
 	}
 
-	clusterInstallation.Spec.Database.BackupRestoreSecret = restoreMM.Spec.RestoreSecret
-	clusterInstallation.Spec.Database.InitBucketURL = restoreMM.Spec.InitBucketURL
+	// Scale up again to apply the restore
 	clusterInstallation.Spec.Database.Replicas = restoreMM.Status.OriginalDBReplicas
 	err = r.client.Update(context.TODO(), clusterInstallation)
 	if err != nil {
