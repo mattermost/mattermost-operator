@@ -550,12 +550,12 @@
   version = "v1.0.0"
 
 [[projects]]
-  digest = "1:752482fc318d9953463ab59a0fb370bf9924fadc2d69591de04ac53e0b492894"
+  digest = "1:2c62d4f37b23c6fc35fc20f8b1bf2f164df2b18e4255de817d1327cbb3cd2c38"
   name = "github.com/presslabs/mysql-operator"
   packages = ["pkg/apis/mysql/v1alpha1"]
   pruneopts = "NT"
-  revision = "80e8f35dbac0d9dfa9ab2c77aa2d8a8cab4dbfa4"
-  version = "v0.3.0"
+  revision = "5bd2f20509657d51543bf969c6f389949c132fab"
+  version = "v0.3.2"
 
 [[projects]]
   digest = "1:ec2a29e3bd141038ae5c3d3a4f57db0c341fcc1d98055a607aedd683aed124ee"
