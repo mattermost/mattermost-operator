@@ -260,15 +260,13 @@ func (r *ReconcileClusterInstallation) updateMattermostDeployment(mi *mattermost
 		if err != nil && k8sErrors.IsNotFound(err) {
 			reqLogger.Info("Launching update job")
 			if err = r.launchUpdateJob(mi, new, imageName, reqLogger); err != nil {
-				reqLogger.Error(err, "Launching update job failed")
-				return err
+				return errors.Wrap(err, "Launching update job failed")
 			}
 			return errors.New("Began update job")
 		}
 
 		if err != nil {
-			reqLogger.Error(err, "Error trying to determine if an update job already is running")
-			return err
+			return errors.Wrap(err, "Error trying to determine if an update job already is running")
 		}
 
 		if alreadyRunning.Status.CompletionTime == nil {
@@ -298,7 +296,7 @@ func (r *ReconcileClusterInstallation) updateMattermostDeployment(mi *mattermost
 				reqLogger.Info(fmt.Sprintf("Deleting pod %s/%s", p.Namespace, p.Name))
 				err = r.client.Delete(context.TODO(), &p)
 				if err != nil {
-					reqLogger.Error(err, "Problem deleting pod %s", p)
+					reqLogger.Error(err, fmt.Sprintf("Problem deleting pod %s/%s", p.Namespace, p.Name))
 				}
 			}
 		}()
