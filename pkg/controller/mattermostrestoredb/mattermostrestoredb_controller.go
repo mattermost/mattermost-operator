@@ -11,9 +11,11 @@ import (
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
 	mattermostmysql "github.com/mattermost/mattermost-operator/pkg/components/mysql"
 
+	errrors "github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -113,13 +115,13 @@ func (r *ReconcileMattermostRestoreDB) Reconcile(request reconcile.Request) (rec
 		//TODO: add reason and inform need to delete/apply when a clusterinstallation is ready.
 		err = r.updateStatus(restoreMM, status, reqLogger)
 		reqLogger.Error(err, "Mattermost Installation not found. Create a ClusterInstallation first", "Namespace", restoreMM.Namespace, "ClusterInstallation.Name", restoreMM.Spec.MattermostClusterName, "RestoreDB.name", restoreMM.Name)
-		return reconcile.Result{}, nil
+		return reconcile.Result{Requeue: false}, err
 	} else if err != nil {
 		r.setFailed()
 		status := restoreMM.Status
 		status.State = r.state
 		err = r.updateStatus(restoreMM, status, reqLogger)
-		return reconcile.Result{}, nil
+		return reconcile.Result{Requeue: false}, err
 	}
 
 	// Set the Status and save the DB Replicas in the Status
@@ -161,13 +163,26 @@ func (r *ReconcileMattermostRestoreDB) Reconcile(request reconcile.Request) (rec
 	mySQLCluster := mattermostmysql.Cluster(clusterInstallation)
 	statefulsetMySQLName := fmt.Sprintf("%s-mysql", mySQLCluster.Name)
 	statefulset := &appsv1.StatefulSet{}
-	err = r.client.Get(context.TODO(), types.NamespacedName{Name: statefulsetMySQLName, Namespace: clusterInstallation.Namespace}, statefulset)
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: statefulsetMySQLName, Namespace: restoreMM.Namespace}, statefulset)
 	if err != nil {
 		reqLogger.Error(err, "error getting the MySQL Statefulset")
-		return reconcile.Result{}, err
+		return reconcile.Result{}, errrors.Wrap(err, "unable to get the statefulset")
 	}
 	if statefulset.Status.ReadyReplicas != 0 {
 		return reconcile.Result{RequeueAfter: time.Second * 3}, fmt.Errorf("Waiting for MySQL Statefulset scale to 0")
+	}
+
+	sel := mattermostv1alpha1.MySQLLabels()
+	opts := &client.ListOptions{LabelSelector: labels.SelectorFromSet(sel)}
+
+	pods := &corev1.PodList{}
+
+	err = r.client.List(context.TODO(), opts, pods)
+	if err != nil && !errors.IsNotFound(err) {
+		return reconcile.Result{}, errrors.Wrap(err, "unable to get pod list")
+	}
+	if len(pods.Items) != 0 {
+		return reconcile.Result{RequeueAfter: time.Second * 3}, fmt.Errorf("Waiting for MySQL Statefulset pods scale to 0")
 	}
 
 	reqLogger.Info("MySQL Statefulset are scaled down. Will continue the restore process", "ReadyReplicas", statefulset.Status.ReadyReplicas, "CurrentReplicas", statefulset.Status.CurrentReplicas, "OriginalReplicas", restoreMM.Status.OriginalDBReplicas)

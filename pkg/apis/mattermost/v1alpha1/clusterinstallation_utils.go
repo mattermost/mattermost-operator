@@ -578,6 +578,18 @@ func ClusterInstallationLabels(name string) map[string]string {
 	return l
 }
 
+// MySQLLabels returns the labels for selecting the resources
+// belonging to the given mysql cluster.
+func MySQLLabels() map[string]string {
+	l := map[string]string{}
+
+	l["app.kubernetes.io/component"] = "database"
+	l["app.kubernetes.io/instance"] = "db"
+	l["app.kubernetes.io/managed-by"] = "mysql.presslabs.org"
+	l["app.kubernetes.io/name"] = "mysql"
+	return l
+}
+
 // ClusterInstallationResourceLabels returns the labels for selecting a given
 // ClusterInstallation as well as any external dependency resources that were
 // created for the installation.
