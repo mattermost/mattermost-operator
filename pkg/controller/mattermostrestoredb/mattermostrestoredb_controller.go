@@ -112,7 +112,7 @@ func (r *ReconcileMattermostRestoreDB) Reconcile(request reconcile.Request) (rec
 		r.setFailed()
 		status := restoreMM.Status
 		status.State = r.state
-		//TODO: add reason and inform need to delete/apply when a clusterinstallation is ready.
+		//TODO: add reason and inform need to delete/apply when a clusterinstallation is ready. JIRA MM-18633
 		err = r.updateStatus(restoreMM, status, reqLogger)
 		reqLogger.Error(err, "Mattermost Installation not found. Create a ClusterInstallation first", "Namespace", restoreMM.Namespace, "ClusterInstallation.Name", restoreMM.Spec.MattermostClusterName, "RestoreDB.name", restoreMM.Name)
 		return reconcile.Result{Requeue: false}, err
@@ -190,11 +190,11 @@ func (r *ReconcileMattermostRestoreDB) Reconcile(request reconcile.Request) (rec
 	// Removing all the PVC for MySQL to be able to apply the restore
 	for i := 0; i < int(restoreMM.Status.OriginalDBReplicas); i++ {
 		persistentVolumeClaim := &corev1.PersistentVolumeClaim{}
-		dbPersistenVolClaim := fmt.Sprintf("data-db-mysql-%d", i)
-		reqLogger.Info("Deleting PVC...", "PersistentVolumeClaimName", dbPersistenVolClaim)
-		errGet := r.client.Get(context.TODO(), types.NamespacedName{Name: dbPersistenVolClaim, Namespace: restoreMM.Namespace}, persistentVolumeClaim)
+		dbPersistentVolClaim := fmt.Sprintf("data-db-mysql-%d", i)
+		reqLogger.Info("Deleting PVC...", "PersistentVolumeClaimName", dbPersistentVolClaim)
+		errGet := r.client.Get(context.TODO(), types.NamespacedName{Name: dbPersistentVolClaim, Namespace: restoreMM.Namespace}, persistentVolumeClaim)
 		if errGet != nil && errors.IsNotFound(errGet) {
-			reqLogger.Info("PVC not found maybe already deleted, skipping", "PersistentVolumeClaimName", dbPersistenVolClaim)
+			reqLogger.Info("PVC not found maybe already deleted, skipping", "PersistentVolumeClaimName", dbPersistentVolClaim)
 			continue
 		}
 		if errGet != nil {
@@ -206,7 +206,7 @@ func (r *ReconcileMattermostRestoreDB) Reconcile(request reconcile.Request) (rec
 			reqLogger.Error(errDelete, "error deleting the DB PVC", "ClusterInstallation.Namespace", clusterInstallation.Namespace, "ClusterInstallation.Name", clusterInstallation.Name)
 			return reconcile.Result{}, errDelete
 		}
-		reqLogger.Info("PVC deleted", "PersistentVolumeClaimName", dbPersistenVolClaim)
+		reqLogger.Info("PVC deleted", "PersistentVolumeClaimName", dbPersistentVolClaim)
 	}
 
 	// Scale up again to apply the restore

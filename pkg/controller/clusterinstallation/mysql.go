@@ -67,6 +67,9 @@ func (r *ReconcileClusterInstallation) createMySQLClusterIfNotExists(mattermost 
 	return nil
 }
 
+// getOrCreateMySQLSecrets get or create the MySQL secrets used by MySQL Operator to spin the cluster and
+// also used by mattermost to get the credentials to use to access the DB.
+// dbData is a []string -> { DBUserName, DBUserPassword, DBName }
 func (r *ReconcileClusterInstallation) getOrCreateMySQLSecrets(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) ([]string, error) {
 	dbSecretName := fmt.Sprintf("%s-mysql-root-password", mattermost.Name)
 	dbSecret := &corev1.Secret{}
@@ -89,7 +92,7 @@ func (r *ReconcileClusterInstallation) getOrCreateMySQLSecrets(mattermost *matte
 		return []string{"mmuser", userPassword, "mattermost"}, r.createResource(mattermost, dbSecret, reqLogger)
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to check if mysql secret exists")
-		return []string{}, err
+		return []string{"", "", ""}, err
 	}
 
 	dbData := []string{string(dbSecret.Data["USER"]), string(dbSecret.Data["PASSWORD"]), string(dbSecret.Data["DATABASE"])}

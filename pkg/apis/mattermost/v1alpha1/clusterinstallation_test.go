@@ -345,7 +345,7 @@ func TestClusterInstallationGenerateDeployment(t *testing.T) {
 				Spec: tt.Spec,
 			}
 
-			deployment := mattermost.GenerateDeployment("", "", "", []string{"", "", ""}, false, false, "")
+			deployment := mattermost.GenerateDeployment("", "", "", "", "", "", false, false, "")
 			require.Equal(t, tt.want.Spec.Template.Spec.NodeSelector, deployment.Spec.Template.Spec.NodeSelector)
 			require.Equal(t, tt.want.Spec.Template.Spec.Affinity, deployment.Spec.Template.Spec.Affinity)
 		})
