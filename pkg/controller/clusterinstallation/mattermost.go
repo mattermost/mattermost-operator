@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"time"
 
 	objectMatcher "github.com/banzaicloud/k8s-objectmatcher/patch"
 	"github.com/go-logr/logr"
@@ -15,10 +14,14 @@ import (
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	k8sClient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
 )
+
+const updateName = "mattermost-update-check"
 
 func (r *ReconcileClusterInstallation) checkMattermost(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
 	reqLogger = reqLogger.WithValues("Reconcile", "mattermost")
@@ -197,6 +200,36 @@ func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mat
 	return nil
 }
 
+func (r *ReconcileClusterInstallation) launchUpdateJob(mi *mattermostv1alpha1.ClusterInstallation, new *appsv1.Deployment, imageName string, reqLogger logr.Logger) error {
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      updateName,
+			Namespace: mi.GetNamespace(),
+		},
+		Spec: batchv1.JobSpec{
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"app": updateName},
+				},
+				Spec: *new.Spec.Template.Spec.DeepCopy(),
+			},
+		},
+	}
+
+	// Override values for job-specific behavior.
+	job.Spec.Template.Spec.RestartPolicy = corev1.RestartPolicyNever
+	for i := range job.Spec.Template.Spec.Containers {
+		job.Spec.Template.Spec.Containers[i].Command = []string{"mattermost", "version"}
+	}
+
+	err := r.client.Create(context.TODO(), job)
+	if err != nil && !k8sErrors.IsAlreadyExists(err) {
+		return err
+	}
+
+	return nil
+}
+
 // updateMattermostDeployment checks if the deployment should be updated.
 // If an update is required then the deployment spec is set to:
 // - roll forward version
@@ -223,75 +256,58 @@ func (r *ReconcileClusterInstallation) updateMattermostDeployment(mi *mattermost
 	// we will return and not upgrade the deployment.
 	if update {
 		reqLogger.Info(fmt.Sprintf("Running Mattermost image %s upgrade job check", imageName))
-
-		updateName := "mattermost-update-check"
-		job := &batchv1.Job{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      updateName,
-				Namespace: mi.GetNamespace(),
-			},
-			Spec: batchv1.JobSpec{
-				Template: corev1.PodTemplateSpec{
-					ObjectMeta: metav1.ObjectMeta{
-						Labels: map[string]string{"app": updateName},
-					},
-					Spec: *new.Spec.Template.Spec.DeepCopy(),
-				},
-			},
+		alreadyRunning, err := r.fetchRunningUpdateJob(mi, reqLogger)
+		if err != nil && k8sErrors.IsNotFound(err) {
+			reqLogger.Info("Launching update job")
+			if err = r.launchUpdateJob(mi, new, imageName, reqLogger); err != nil {
+				return errors.Wrap(err, "Launching update job failed")
+			}
+			return errors.New("Began update job")
 		}
 
-		// Override values for job-specific behavior.
-		job.Spec.Template.Spec.RestartPolicy = corev1.RestartPolicyNever
-		for i := range job.Spec.Template.Spec.Containers {
-			job.Spec.Template.Spec.Containers[i].Command = []string{"mattermost", "version"}
+		if err != nil {
+			return errors.Wrap(err, "Error trying to determine if an update job already is running")
 		}
 
-		err := r.client.Create(context.TODO(), job)
-		if err != nil && !k8sErrors.IsAlreadyExists(err) {
-			return err
+		if alreadyRunning.Status.CompletionTime == nil {
+			return errors.New("Update image job still running..")
 		}
+
+		// job is done, schedule cleanup
 		defer func() {
-			err = r.client.Delete(context.TODO(), job)
+			reqLogger.Info(fmt.Sprintf("Deleting job %s/%s",
+				alreadyRunning.GetNamespace(), alreadyRunning.GetName()))
+
+			err = r.client.Delete(context.TODO(), alreadyRunning)
 			if err != nil {
 				reqLogger.Error(err, "Unable to cleanup image update check job")
 			}
+
+			podList := &corev1.PodList{}
+			listOptions := k8sClient.ListOptions{
+				LabelSelector: labels.SelectorFromSet(
+					labels.Set(map[string]string{"app": updateName})),
+				Namespace: alreadyRunning.GetNamespace(),
+			}
+
+			err = r.client.List(context.Background(), &listOptions, podList)
+			reqLogger.Info(fmt.Sprintf("Deleting %d pods", len(podList.Items)))
+			for _, p := range podList.Items {
+				reqLogger.Info(fmt.Sprintf("Deleting pod %s/%s", p.Namespace, p.Name))
+				err = r.client.Delete(context.TODO(), &p)
+				if err != nil {
+					reqLogger.Error(err, fmt.Sprintf("Problem deleting pod %s/%s", p.Namespace, p.Name))
+				}
+			}
 		}()
 
-		// Wait up to 60 seconds for the update check job to return successfully.
-		timer := time.NewTimer(60 * time.Second)
-		defer timer.Stop()
-
-	upgradeJobCheck:
-		for {
-			select {
-			case <-timer.C:
-				return errors.New("timed out waiting for mattermost image update check job to succeed")
-			default:
-				foundJob := &batchv1.Job{}
-				err = r.client.Get(
-					context.TODO(),
-					types.NamespacedName{
-						Name:      updateName,
-						Namespace: mi.GetNamespace(),
-					},
-					foundJob,
-				)
-				if err != nil {
-					continue
-				}
-				if foundJob.Status.Failed > 0 {
-					return errors.New("Upgrade image job check failed")
-				}
-				if foundJob.Status.Succeeded > 0 {
-					break upgradeJobCheck
-				}
-
-				time.Sleep(1 * time.Second)
-			}
+		// it's done, it either failed or succeded
+		if alreadyRunning.Status.Failed > 0 {
+			return errors.New("Upgrade job failed")
 		}
-	}
 
-	reqLogger.Info("Upgrade image job ran successfully")
+		reqLogger.Info("Upgrade image job ran successfully")
+	}
 
 	patchResult, err := objectMatcher.DefaultPatchMaker.Calculate(original, new)
 	if err != nil {
@@ -306,6 +322,18 @@ func (r *ReconcileClusterInstallation) updateMattermostDeployment(mi *mattermost
 
 		return r.client.Update(context.TODO(), new)
 	}
-
 	return nil
+}
+
+func (r *ReconcileClusterInstallation) fetchRunningUpdateJob(mi *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) (*batchv1.Job, error) {
+	foundJob := &batchv1.Job{}
+	err := r.client.Get(
+		context.TODO(),
+		types.NamespacedName{
+			Name:      updateName,
+			Namespace: mi.GetNamespace(),
+		},
+		foundJob,
+	)
+	return foundJob, err
 }
