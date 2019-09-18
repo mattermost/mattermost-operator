@@ -243,14 +243,14 @@ func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingres
 	} else {
 		masterDBEnvVar.Value = fmt.Sprintf(
 			"mysql://%s:%s@tcp(db-mysql-master.%s:3306)/%s?charset=utf8mb4,utf8&readTimeout=30s&writeTimeout=30s",
-			dbUser, dbPassword, mattermost.Namespace, dbPassword,
+			dbUser, dbPassword, mattermost.Namespace, dbName,
 		)
 
 		envVarDB = append(envVarDB, corev1.EnvVar{
 			Name: "MM_SQLSETTINGS_DATASOURCEREPLICAS",
 			Value: fmt.Sprintf(
 				"%s:%s@tcp(db-mysql.%s:3306)/%s?readTimeout=30s&writeTimeout=30s",
-				dbUser, dbPassword, mattermost.Namespace, dbPassword,
+				dbUser, dbPassword, mattermost.Namespace, dbName,
 			),
 		})
 
