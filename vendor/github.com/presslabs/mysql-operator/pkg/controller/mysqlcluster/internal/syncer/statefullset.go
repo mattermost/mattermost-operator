@@ -18,12 +18,12 @@ package mysqlcluster
 
 import (
 	"fmt"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"strings"
 
 	"github.com/imdario/mergo"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -47,12 +47,16 @@ const (
 
 // containers names
 const (
-	containerCloneAndInitName = "init-mysql"
-	containerSidecarName      = "sidecar"
-	containerMysqlName        = "mysql"
-	containerExporterName     = "metrics-exporter"
-	containerHeartBeatName    = "pt-heartbeat"
-	containerKillerName       = "pt-kill"
+	// init containers
+	containerCloneAndInitName = "init"
+	containerMySQLInitName    = "mysql-init-only"
+
+	// containers
+	containerSidecarName   = "sidecar"
+	containerMysqlName     = "mysql"
+	containerExporterName  = "metrics-exporter"
+	containerHeartBeatName = "pt-heartbeat"
+	containerKillerName    = "pt-kill"
 )
 
 type sfsSyncer struct {
@@ -133,12 +137,6 @@ func (s *sfsSyncer) ensurePodSpec() core.PodSpec {
 		PriorityClassName:  s.cluster.Spec.PodSpec.PriorityClassName,
 		Tolerations:        s.cluster.Spec.PodSpec.Tolerations,
 		ServiceAccountName: s.cluster.Spec.PodSpec.ServiceAccountName,
-		// TODO: uncomment this when limiting operator for k8s version > 1.13
-		// ReadinessGates: []core.PodReadinessGate{
-		// 	{
-		// 		ConditionType: mysqlcluster.NodeInitializedConditionType,
-		// 	},
-		// },
 	}
 }
 
@@ -230,27 +228,47 @@ func (s *sfsSyncer) getEnvFor(name string) []core.EnvVar {
 			Name:  "DATA_SOURCE_NAME",
 			Value: fmt.Sprintf("$(USER):$(PASSWORD)@(127.0.0.1:%d)/", MysqlPort),
 		})
-	case containerMysqlName:
+	case containerMySQLInitName:
+		// set MySQL init only flag for init container
+		env = append(env, core.EnvVar{
+			Name:  "MYSQL_INIT_ONLY",
+			Value: "1",
+		})
+	case containerCloneAndInitName:
+		env = append(env, s.envVarFromSecret(sctOpName, "BACKUP_USER", "BACKUP_USER", true))
+		env = append(env, s.envVarFromSecret(sctOpName, "BACKUP_PASSWORD", "BACKUP_PASSWORD", true))
+	}
+
+	// set MySQL root and application credentials
+	if name == containerMySQLInitName || !s.cluster.ShouldHaveInitContainerForMysql() && name == containerMySQLInitName {
 		env = append(env, s.envVarFromSecret(sctName, "MYSQL_ROOT_PASSWORD", "ROOT_PASSWORD", false))
 		env = append(env, s.envVarFromSecret(sctName, "MYSQL_USER", "USER", true))
 		env = append(env, s.envVarFromSecret(sctName, "MYSQL_PASSWORD", "PASSWORD", true))
 		env = append(env, s.envVarFromSecret(sctName, "MYSQL_DATABASE", "DATABASE", true))
-	case containerCloneAndInitName:
-		env = append(env, s.envVarFromSecret(sctOpName, "BACKUP_USER", "BACKUP_USER", true))
-		env = append(env, s.envVarFromSecret(sctOpName, "BACKUP_PASSWORD", "BACKUP_PASSWORD", true))
 	}
 
 	return env
 }
 
 func (s *sfsSyncer) ensureInitContainersSpec() []core.Container {
-	return []core.Container{
+	initCs := []core.Container{
 		// clone and init container
 		s.ensureContainer(containerCloneAndInitName,
 			s.opt.SidecarImage,
 			[]string{"clone-and-init"},
 		),
 	}
+
+	// add init container for MySQL if docker image supports this
+	if s.cluster.ShouldHaveInitContainerForMysql() {
+		mysqlInit := s.ensureContainer(containerMySQLInitName,
+			s.cluster.GetMysqlImage(),
+			[]string{})
+		mysqlInit.Resources = s.ensureResources(containerMySQLInitName)
+		initCs = append(initCs, mysqlInit)
+	}
+
+	return initCs
 }
 
 func (s *sfsSyncer) ensureContainersSpec() []core.Container {
@@ -263,7 +281,7 @@ func (s *sfsSyncer) ensureContainersSpec() []core.Container {
 		Name:          MysqlPortName,
 		ContainerPort: MysqlPort,
 	})
-	mysql.Resources = s.cluster.Spec.PodSpec.Resources
+	mysql.Resources = s.ensureResources(containerMysqlName)
 	mysql.LivenessProbe = ensureProbe(60, 5, 5, core.Handler{
 		Exec: &core.ExecAction{
 			Command: []string{
@@ -274,16 +292,16 @@ func (s *sfsSyncer) ensureContainersSpec() []core.Container {
 		},
 	})
 
+	// nolint: gosec
+	mysqlTestCmd := fmt.Sprintf(`mysql --defaults-file=%s -NB -e 'SELECT COUNT(*) FROM %s.%s WHERE name="configured" AND value="1"'`,
+		confClientPath, constants.OperatorDbName, constants.OperatorStatusTableName)
+
 	// we have to know ASAP when server is not ready to remove it from endpoints
 	mysql.ReadinessProbe = ensureProbe(5, 5, 2, core.Handler{
 		Exec: &core.ExecAction{
 			Command: []string{
-				"mysql",
-				fmt.Sprintf("--defaults-file=%s", confClientPath),
-				"-e",
-				// nolint: gosec
-				fmt.Sprintf("SELECT true as 'ready' FROM %s.%s WHERE name='configured' AND value='1'",
-					constants.OperatorDbName, constants.OperatorStatusTableName),
+				"/bin/sh", "-c",
+				fmt.Sprintf(`test $(%s) -eq 1`, mysqlTestCmd),
 			},
 		},
 	})
@@ -297,7 +315,7 @@ func (s *sfsSyncer) ensureContainersSpec() []core.Container {
 		Name:          SidecarServerPortName,
 		ContainerPort: SidecarServerPort,
 	})
-	sidecar.Resources = ensureResources(containerSidecarName)
+	sidecar.Resources = s.ensureResources(containerSidecarName)
 	sidecar.ReadinessProbe = ensureProbe(30, 5, 5, core.Handler{
 		HTTPGet: &core.HTTPGetAction{
 			Path:   SidecarServerProbePath,
@@ -321,7 +339,7 @@ func (s *sfsSyncer) ensureContainersSpec() []core.Container {
 		ContainerPort: ExporterPort,
 	})
 
-	exporter.Resources = ensureResources(containerExporterName)
+	exporter.Resources = s.ensureResources(containerExporterName)
 
 	exporter.LivenessProbe = ensureProbe(30, 30, 30, core.Handler{
 		HTTPGet: &core.HTTPGetAction{
@@ -347,7 +365,7 @@ func (s *sfsSyncer) ensureContainersSpec() []core.Container {
 			"--fail-successive-errors=20",
 		},
 	)
-	heartbeat.Resources = ensureResources(containerHeartBeatName)
+	heartbeat.Resources = s.ensureResources(containerHeartBeatName)
 
 	containers := []core.Container{
 		mysql,
@@ -371,7 +389,7 @@ func (s *sfsSyncer) ensureContainersSpec() []core.Container {
 			command,
 		)
 
-		killer.Resources = ensureResources(containerKillerName)
+		killer.Resources = s.ensureResources(containerKillerName)
 
 		containers = append(containers, killer)
 	}
@@ -393,7 +411,7 @@ func (s *sfsSyncer) ensureVolumes() []core.Volume {
 	} else if s.cluster.Spec.VolumeSpec.EmptyDir != nil {
 		dataVolume.EmptyDir = s.cluster.Spec.VolumeSpec.EmptyDir
 	} else {
-		log.Error(nil, "no volume spec is specified", ".spec.volumeSpec", s.cluster.Spec.VolumeSpec)
+		log.Info("no volume spec is specified", ".spec.volumeSpec", s.cluster.Spec.VolumeSpec)
 	}
 
 	return []core.Volume{
@@ -481,49 +499,24 @@ func (s *sfsSyncer) getVolumeMountsFor(name string) []core.VolumeMount {
 	switch name {
 	case containerCloneAndInitName:
 		return []core.VolumeMount{
-			{
-				Name:      confVolumeName,
-				MountPath: ConfVolumeMountPath,
-			},
-			{
-				Name:      confMapVolumeName,
-				MountPath: ConfMapVolumeMountPath,
-			},
-			{
-				Name:      dataVolumeName,
-				MountPath: DataVolumeMountPath,
-			},
+			{Name: confVolumeName, MountPath: ConfVolumeMountPath},
+			{Name: confMapVolumeName, MountPath: ConfMapVolumeMountPath},
+			{Name: dataVolumeName, MountPath: DataVolumeMountPath},
 		}
 
-	case containerMysqlName, containerSidecarName:
+	case containerMysqlName, containerSidecarName, containerMySQLInitName:
 		return []core.VolumeMount{
-			{
-				Name:      confVolumeName,
-				MountPath: ConfVolumeMountPath,
-			},
-			{
-				Name:      dataVolumeName,
-				MountPath: DataVolumeMountPath,
-			},
+			{Name: confVolumeName, MountPath: ConfVolumeMountPath},
+			{Name: dataVolumeName, MountPath: DataVolumeMountPath},
 		}
 
 	case containerHeartBeatName, containerKillerName:
 		return []core.VolumeMount{
-			{
-				Name:      confVolumeName,
-				MountPath: ConfVolumeMountPath,
-			},
+			{Name: confVolumeName, MountPath: ConfVolumeMountPath},
 		}
 	}
 
 	return nil
-}
-
-func ensureVolume(name string, source core.VolumeSource) core.Volume {
-	return core.Volume{
-		Name:         name,
-		VolumeSource: source,
-	}
 }
 
 func (s *sfsSyncer) getLabels(extra map[string]string) map[string]string {
@@ -532,6 +525,36 @@ func (s *sfsSyncer) getLabels(extra map[string]string) map[string]string {
 		defaultsLabels[k] = v
 	}
 	return defaultsLabels
+}
+
+func (s *sfsSyncer) ensureResources(name string) core.ResourceRequirements {
+	limits := core.ResourceList{
+		core.ResourceCPU: resource.MustParse("100m"),
+	}
+	requests := core.ResourceList{
+		core.ResourceCPU: resource.MustParse("30m"),
+	}
+
+	switch name {
+	case containerExporterName:
+		limits = core.ResourceList{
+			core.ResourceCPU: resource.MustParse("100m"),
+		}
+	case containerMySQLInitName, containerMysqlName:
+		return s.cluster.Spec.PodSpec.Resources
+	}
+
+	return core.ResourceRequirements{
+		Limits:   limits,
+		Requests: requests,
+	}
+}
+
+func ensureVolume(name string, source core.VolumeSource) core.Volume {
+	return core.Volume{
+		Name:         name,
+		VolumeSource: source,
+	}
 }
 
 func getCliOptionsFromQueryLimits(ql *api.QueryLimits) []string {
@@ -589,25 +612,4 @@ func ensureProbe(delay, timeout, period int32, handler core.Handler) *core.Probe
 
 func ensurePorts(ports ...core.ContainerPort) []core.ContainerPort {
 	return ports
-}
-
-func ensureResources(name string) core.ResourceRequirements {
-	limits := core.ResourceList{
-		core.ResourceCPU: resource.MustParse("50m"),
-	}
-	requests := core.ResourceList{
-		core.ResourceCPU: resource.MustParse("10m"),
-	}
-
-	switch name {
-	case containerExporterName:
-		limits = core.ResourceList{
-			core.ResourceCPU: resource.MustParse("100m"),
-		}
-	}
-
-	return core.ResourceRequirements{
-		Limits:   limits,
-		Requests: requests,
-	}
 }

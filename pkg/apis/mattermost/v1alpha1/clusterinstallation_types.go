@@ -157,6 +157,18 @@ type Database struct {
 	// Defines the resource requests and limits for the database pods.
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+	// Defines the interval for backups in cron expression format.
+	// +optional
+	BackupSchedule string `json:"backupSchedule,omitempty"`
+	// Defines the object storage url for uploading backups.
+	// +optional
+	BackupURL string `json:"backupURL,omitempty"`
+	// Defines the backup retention policy.
+	// +optional
+	BackupRemoteDeletePolicy string `json:"backupRemoteDeletePolicy,omitempty"`
+	// Defines the secret to be used for uploading backup.
+	// +optional
+	BackupSecretName string `json:"backupSecretName,omitempty"`
 }
 
 // ElasticSearch defines the ElasticSearch configuration for a ClusterInstallation.

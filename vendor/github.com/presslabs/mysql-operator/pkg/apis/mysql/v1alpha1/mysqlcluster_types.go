@@ -43,13 +43,16 @@ type MysqlClusterSpec struct {
 	// +kubebuilder:validation:MaxLength=63
 	SecretName string `json:"secretName"`
 
-	// Represents the percona image tag.
+	// Represents the MySQL version that will be run. The available version can be found here:
+	// https://github.com/presslabs/mysql-operator/blob/0fd4641ce4f756a0aab9d31c8b1f1c44ee10fcb2/pkg/util/constants/constants.go#L87
+	// This field should be set even if the Image is set to let the operator know which mysql version is running.
+	// Based on this version the operator can take decisions which features can be used.
 	// Defaults to 5.7
 	// +optional
 	MysqlVersion string `json:"mysqlVersion,omitempty"`
 
 	// To specify the image that will be used for mysql server container.
-	// If this is specified then the mysqlVersion is ignored.
+	// If this is specified then the mysqlVersion is used as source for MySQL server version.
 	// +optional
 	Image string `json:"image,omitempty"`
 
@@ -76,6 +79,11 @@ type MysqlClusterSpec struct {
 	// Represents an URL to the location where to put backups.
 	// +optional
 	BackupURL string `json:"backupURL,omitempty"`
+
+	// BackupRemoteDeletePolicy the deletion policy that specify how to treat the data from remote storage. By
+	// default it's used softDelete.
+	// +optional
+	BackupRemoteDeletePolicy DeletePolicy `json:"backupRemoteDeletePolicy,omitempty"`
 
 	// Represents the name of the secret that contains credentials to connect to
 	// the storage provider to store backups.
@@ -215,12 +223,18 @@ const (
 	// ClusterConditionReady represents the readiness of the cluster. This
 	// condition is the same sa statefulset Ready condition.
 	ClusterConditionReady ClusterConditionType = "Ready"
+
 	// ClusterConditionFailoverAck represents if the cluster has pending ack in
 	// orchestrator or not.
 	ClusterConditionFailoverAck ClusterConditionType = "PendingFailoverAck"
+
 	// ClusterConditionReadOnly describe cluster state if it's in read only or
 	// writable.
 	ClusterConditionReadOnly ClusterConditionType = "ReadOnly"
+
+	// ClusterConditionFailoverInProgress indicates if there is a current failover in progress
+	// done by the Orchestrator
+	ClusterConditionFailoverInProgress ClusterConditionType = "FailoverInProgress"
 )
 
 // NodeStatus defines type for status of a node into cluster.
@@ -268,6 +282,9 @@ type MysqlClusterStatus struct {
 // +k8s:openapi-gen=true
 // +kubebuilder:subresource:status
 // +kubebuilder:subresource:scale:specpath=.spec.replicas,statuspath=.status.readyNodes
+// +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.conditions[?(@.type == "Ready")].status",description="The cluster status"
+// +kubebuilder:printcolumn:name="Replicas",type="integer",JSONPath=".spec.replicas",description="The number of desired nodes"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 type MysqlCluster struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
