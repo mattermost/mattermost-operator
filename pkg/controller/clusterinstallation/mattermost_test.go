@@ -77,7 +77,7 @@ func TestCheckMattermost(t *testing.T) {
 	})
 
 	t.Run("ingress", func(t *testing.T) {
-		err = r.checkMattermostIngress(ci, ci.Name, ci.Spec.IngressName, logger)
+		err = r.checkMattermostIngress(ci, ci.Name, ci.Spec.IngressName, ci.Spec.IngressAnnotations, logger)
 		assert.NoError(t, err)
 
 		found := &v1beta1.Ingress{}
@@ -93,7 +93,7 @@ func TestCheckMattermost(t *testing.T) {
 
 		err = r.client.Update(context.TODO(), modified)
 		require.NoError(t, err)
-		err = r.checkMattermostIngress(ci, ci.Name, ci.Spec.IngressName, logger)
+		err = r.checkMattermostIngress(ci, ci.Name, ci.Spec.IngressName, ci.Spec.IngressAnnotations, logger)
 		require.NoError(t, err)
 		err = r.client.Get(context.TODO(), types.NamespacedName{Name: ciName, Namespace: ciNamespace}, found)
 		require.NoError(t, err)
@@ -102,13 +102,15 @@ func TestCheckMattermost(t *testing.T) {
 
 	t.Run("deployment", func(t *testing.T) {
 		updateName := "mattermost-update-check"
+		now := metav1.Now()
 		job := &batchv1.Job{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      updateName,
 				Namespace: ci.GetNamespace(),
 			},
 			Status: batchv1.JobStatus{
-				Succeeded: 1,
+				Succeeded:      1,
+				CompletionTime: &now,
 			},
 		}
 		err := r.client.Create(context.TODO(), job)

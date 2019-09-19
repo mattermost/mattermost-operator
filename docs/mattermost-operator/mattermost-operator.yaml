@@ -61,6 +61,19 @@ spec:
               type: object
             database:
               properties:
+                backupRemoteDeletePolicy:
+                  description: Defines the backup retention policy.
+                  type: string
+                backupSchedule:
+                  description: Defines the interval for backups in cron expression
+                    format.
+                  type: string
+                backupSecret:
+                  description: Defines the secret to be used for uploading backup.
+                  type: string
+                backupURL:
+                  description: Defines the object storage url for uploading backups.
+                  type: string
                 externalSecret:
                   description: If the user want to use an external DB. This can be
                     inside the same k8s cluster or outside like AWS RDS.

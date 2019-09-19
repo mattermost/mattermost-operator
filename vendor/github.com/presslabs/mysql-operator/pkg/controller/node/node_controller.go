@@ -50,7 +50,11 @@ var log = logf.Log.WithName(controllerName)
 const controllerName = "controller.mysqlNode"
 
 // mysqlReconciliationTimeout the time that should last a reconciliation (this is used as a MySQL timout too)
-const mysqlReconciliationTimeout = 10 * time.Second
+const mysqlReconciliationTimeout = 5 * time.Second
+
+// skipGTIDPurgedAnnotations, if this annotations is set on the cluster then the node controller skip setting GTID_PURGED variable.
+// this is the case for the upgrade when the old cluster has already set GTID_PURGED
+const skipGTIDPurgedAnnotation = "mysql.presslabs.org/skip-gtid-purged"
 
 // Add creates a new MysqlCluster Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -61,12 +65,18 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager, sqlI sqlFactoryFunc) reconcile.Reconciler {
+	newClient, err := client.New(mgr.GetConfig(), client.Options{Scheme: mgr.GetScheme()})
+	if err != nil {
+		panic(err)
+	}
+
 	return &ReconcileMysqlNode{
-		Client:     mgr.GetClient(),
-		scheme:     mgr.GetScheme(),
-		recorder:   mgr.GetRecorder(controllerName),
-		opt:        options.GetOptions(),
-		sqlFactory: sqlI,
+		Client:         mgr.GetClient(),
+		unCachedClient: newClient,
+		scheme:         mgr.GetScheme(),
+		recorder:       mgr.GetRecorder(controllerName),
+		opt:            options.GetOptions(),
+		sqlFactory:     sqlI,
 	}
 }
 
@@ -83,15 +93,21 @@ func isOwnedByMySQL(meta metav1.Object) bool {
 	return false
 }
 
-func isInitialized(obj runtime.Object) bool {
+func isReady(obj runtime.Object) bool {
 	pod := obj.(*corev1.Pod)
 
 	for _, cond := range pod.Status.Conditions {
-		if cond.Type == mysqlcluster.NodeInitializedConditionType {
+		if cond.Type == corev1.PodReady {
 			return cond.Status == corev1.ConditionTrue
 		}
 	}
 	return false
+}
+
+func isRunning(obj runtime.Object) bool {
+	pod := obj.(*corev1.Pod)
+
+	return pod.Status.Phase == corev1.PodRunning
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -104,12 +120,18 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// Watch for changes to MysqlCluster
 	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &handler.EnqueueRequestForObject{}, predicate.Funcs{
+		// no need to init nodes when are created
 		CreateFunc: func(evt event.CreateEvent) bool {
-			return isOwnedByMySQL(evt.Meta) && !isInitialized(evt.Object)
+			return false
 		},
+
+		// trigger node initialization only on pod update, after pod is created for a while
+		// also the pod should not be initialized before and should be running because the init
+		// timeout is ~5s (see above) and the cluster status can become obsolete
 		UpdateFunc: func(evt event.UpdateEvent) bool {
-			return isOwnedByMySQL(evt.MetaNew) && !isInitialized(evt.ObjectNew)
+			return isOwnedByMySQL(evt.MetaNew) && isRunning(evt.ObjectNew) && !isReady(evt.ObjectNew)
 		},
+
 		DeleteFunc: func(evt event.DeleteEvent) bool {
 			return false
 		},
@@ -126,9 +148,11 @@ var _ reconcile.Reconciler = &ReconcileMysqlNode{}
 // ReconcileMysqlNode reconciles a MysqlCluster object
 type ReconcileMysqlNode struct {
 	client.Client
-	scheme   *runtime.Scheme
-	recorder record.EventRecorder
-	opt      *options.Options
+
+	unCachedClient client.Client
+	scheme         *runtime.Scheme
+	recorder       record.EventRecorder
+	opt            *options.Options
 
 	sqlFactory sqlFactoryFunc
 }
@@ -137,6 +161,7 @@ type ReconcileMysqlNode struct {
 // and what is in the MysqlCluster.Spec
 // Automatically generate RBAC rules to allow the Controller to read and write Deployments
 // +kubebuilder:rbac:groups=core,resources=pods/status,verbs=get;list;watch;create;update;patch;delete
+// nolint: gocyclo
 func (r *ReconcileMysqlNode) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	ctx, cancel := context.WithTimeout(context.TODO(), mysqlReconciliationTimeout)
 	defer cancel()
@@ -159,7 +184,7 @@ func (r *ReconcileMysqlNode) Reconcile(request reconcile.Request) (reconcile.Res
 	var cluster *mysqlcluster.MysqlCluster
 	cluster, err = r.getNodeCluster(ctx, pod)
 	if err != nil {
-		log.Info("cluster is not found")
+		log.Info("cluster is not found", "pod", pod)
 		return reconcile.Result{}, err
 	}
 
@@ -173,7 +198,10 @@ func (r *ReconcileMysqlNode) Reconcile(request reconcile.Request) (reconcile.Res
 	if shouldUpdateToVersion(cluster, 300) {
 		// if the cluster is upgraded then set on the cluster an annotations that skips the GTID configuration
 		// TODO: this should be removed in the next versions
-		cluster.Annotations["mysql.presslabs.org/SkipGTIDPurged"] = "true"
+		if cluster.Annotations == nil {
+			cluster.Annotations = make(map[string]string)
+		}
+		cluster.Annotations[skipGTIDPurgedAnnotation] = "true"
 		return reconcile.Result{}, r.Update(ctx, cluster.Unwrap())
 	}
 
@@ -185,6 +213,23 @@ func (r *ReconcileMysqlNode) Reconcile(request reconcile.Request) (reconcile.Res
 
 	// initialize SQL interface
 	sql := r.getMySQLConnection(cluster, pod, creds)
+
+	// wait for mysql to be ready
+	if err = sql.Wait(ctx); err != nil {
+		return reconcile.Result{}, err
+	}
+
+	// get fresh information about the cluster, cluster might have an in progress failover
+	if err = refreshCluster(ctx, r.unCachedClient, cluster.Unwrap()); err != nil {
+		return reconcile.Result{}, err
+	}
+
+	// check if there is an in progress failover. K8s cluster resource may be inconsistent with what exists in k8s
+	fip := cluster.GetClusterCondition(api.ClusterConditionFailoverInProgress)
+	if fip != nil && fip.Status == corev1.ConditionTrue {
+		log.Info("cluster has a failover in progress, delaying new node sync", "pod", pod.Spec.Hostname, "since", fip.LastTransitionTime)
+		return reconcile.Result{}, fmt.Errorf("delay node sync because a failover is in progress")
+	}
 
 	// run the initializer, this will connect to MySQL server and run init queries
 	if err = r.initializeMySQL(ctx, sql, cluster, creds); err != nil {
@@ -206,12 +251,8 @@ func (r *ReconcileMysqlNode) Reconcile(request reconcile.Request) (reconcile.Res
 	return reconcile.Result{}, r.updatePod(ctx, pod)
 }
 
+// nolint: gocyclo
 func (r *ReconcileMysqlNode) initializeMySQL(ctx context.Context, sql SQLInterface, cluster *mysqlcluster.MysqlCluster, c *credentials) error {
-	// wait for mysql to be ready
-	if err := sql.Wait(ctx); err != nil {
-		return err
-	}
-
 	// check if MySQL was configured before to avoid multiple times reconfiguration
 	if configured, err := sql.IsConfigured(ctx); err != nil {
 		return err
@@ -228,16 +269,22 @@ func (r *ReconcileMysqlNode) initializeMySQL(ctx context.Context, sql SQLInterfa
 	}
 	defer enableSuperReadOnly()
 
-	// is slave node?
-	if cluster.GetMasterHost() != sql.Host() {
-		log.Info("configure pod as slave", "pod", sql.Host(), "master", cluster.GetMasterHost())
-
-		// check if the skip annotation is set on the cluster first
-		if _, ok := cluster.Annotations["mysql.presslabs.org/SkipGTIDPurged"]; !ok {
-			if err := sql.SetPurgedGTID(ctx); err != nil {
-				return err
-			}
+	// check if the skip GTID_PURGED annotation is set on the cluster first
+	// and if it's set then mark the GTID_PURGED set in status table
+	if _, ok := cluster.Annotations[skipGTIDPurgedAnnotation]; ok {
+		if err := sql.MarkSetGTIDPurged(ctx); err != nil {
+			return err
 		}
+	}
+
+	// set GTID_PURGED if the the node is initialized from a backup
+	if err := sql.SetPurgedGTID(ctx); err != nil {
+		return err
+	}
+
+	// is this a slave node?
+	if cluster.GetMasterHost() != sql.Host() {
+		log.Info("run CHANGE MASTER TO on pod", "pod", sql.Host(), "master", cluster.GetMasterHost())
 
 		if err := sql.ChangeMasterTo(ctx, cluster.GetMasterHost(), c.ReplicationUser, c.ReplicationPassword); err != nil {
 			return err
@@ -386,4 +433,16 @@ func shouldUpdateToVersion(cluster *mysqlcluster.MysqlCluster, targetVersion int
 	}
 
 	return int(ver) < targetVersion
+}
+
+func refreshCluster(ctx context.Context, c client.Client, cluster *api.MysqlCluster) error {
+	cKey := types.NamespacedName{
+		Name:      cluster.Name,
+		Namespace: cluster.Namespace,
+	}
+	if err := c.Get(ctx, cKey, cluster); err != nil {
+		return err
+	}
+
+	return nil
 }

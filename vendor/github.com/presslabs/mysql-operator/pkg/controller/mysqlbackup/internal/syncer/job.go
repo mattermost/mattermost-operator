@@ -133,6 +133,14 @@ func (s *jobSyncer) ensurePodSpec(in core.PodSpec) core.PodSpec {
 		s.backup.GetBackupURL(s.cluster),
 	}
 
+	in.ServiceAccountName = s.cluster.Spec.PodSpec.ServiceAccountName
+
+	in.Affinity = s.cluster.Spec.PodSpec.Affinity
+	in.ImagePullSecrets = s.cluster.Spec.PodSpec.ImagePullSecrets
+	in.NodeSelector = s.cluster.Spec.PodSpec.NodeSelector
+	in.PriorityClassName = s.cluster.Spec.PodSpec.PriorityClassName
+	in.Tolerations = s.cluster.Spec.PodSpec.Tolerations
+
 	boolTrue := true
 	in.Containers[0].Env = []core.EnvVar{
 		{
@@ -188,6 +196,10 @@ func (s *jobSyncer) updateStatus(job *batch.Job) {
 	// check for failed condition
 	if cond := jobCondition(batch.JobFailed, job); cond != nil {
 		s.backup.UpdateStatusCondition(api.BackupFailed, cond.Status, cond.Reason, cond.Message)
+
+		if cond.Status == core.ConditionTrue {
+			s.backup.Status.Completed = true
+		}
 	}
 }
 
