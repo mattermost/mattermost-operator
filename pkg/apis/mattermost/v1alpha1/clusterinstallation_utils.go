@@ -3,6 +3,7 @@ package v1alpha1
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -411,6 +412,21 @@ func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingres
 			Name:  "MM_PLUGINSETTINGS_ENABLEUPLOADS",
 			Value: "true",
 		},
+	}
+
+	if !mattermost.Spec.UseServiceLoadBalancer {
+		if _, ok := mattermost.Spec.IngressAnnotations["nginx.ingress.kubernetes.io/proxy-body-size"]; ok {
+			size, _ := strconv.Atoi(mattermost.Spec.IngressAnnotations["nginx.ingress.kubernetes.io/proxy-body-size"])
+			envVarGeneral = append(envVarGeneral, corev1.EnvVar{
+				Name:  "MM_FILESETTINGS_MAXFILESIZE",
+				Value: strconv.Itoa(size * 1048576),
+			})
+		} else {
+			envVarGeneral = append(envVarGeneral, corev1.EnvVar{
+				Name:  "MM_FILESETTINGS_MAXFILESIZE",
+				Value: strconv.Itoa(1000 * 1048576),
+			})
+		}
 	}
 
 	// Mattermost License
