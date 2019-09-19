@@ -189,7 +189,6 @@ func (r *ReconcileClusterInstallation) updateMattermostDeployment(mattermost *ma
 	// we will return and not upgrade the deployment.
 	if update {
 		reqLogger.Info(fmt.Sprintf("Running Mattermost image %s upgrade job check", imageName))
-
 		alreadyRunning, err := r.fetchRunningUpdateJob(mattermost, reqLogger)
 		if err != nil && k8sErrors.IsNotFound(err) {
 			reqLogger.Info("Launching update job")
