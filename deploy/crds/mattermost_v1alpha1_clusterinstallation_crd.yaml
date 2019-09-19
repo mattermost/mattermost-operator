@@ -57,44 +57,50 @@ spec:
             blueGreen:
               properties:
                 blue:
-                  description: Blue defines the blue deployement.
+                  description: Blue defines the blue deployment.
                   properties:
                     image:
                       description: Image defines the base Docker image that will be
-                        used for the deployment. Required when BlueGreen is enabled.
+                        used for the deployment. Required when BlueGreen or Canary
+                        is enabled.
                       type: string
                     ingressName:
                       description: IngressName defines the ingress name that will
-                        be used by the deployment.
+                        be used by the deployment. This option is not used for Canary
+                        builds.
                       type: string
                     name:
                       description: Name defines the name of the deployment
                       type: string
                     version:
                       description: Version defines the Docker image version that will
-                        be used for the deployment. Required when BlueGreen is enabled.
+                        be used for the deployment. Required when BlueGreen or Canary
+                        is enabled.
                       type: string
                   type: object
                 enable:
                   description: Enable defines if BlueGreen deployment will be applied.
                   type: boolean
                 green:
-                  description: Green defines the green deployement.
+                  description: Green defines the green deployment.
                   properties:
                     image:
                       description: Image defines the base Docker image that will be
-                        used for the deployment. Required when BlueGreen is enabled.
+                        used for the deployment. Required when BlueGreen or Canary
+                        is enabled.
                       type: string
                     ingressName:
                       description: IngressName defines the ingress name that will
-                        be used by the deployment.
+                        be used by the deployment. This option is not used for Canary
+                        builds.
                       type: string
                     name:
                       description: Name defines the name of the deployment
                       type: string
                     version:
                       description: Version defines the Docker image version that will
-                        be used for the deployment. Required when BlueGreen is enabled.
+                        be used for the deployment. Required when BlueGreen or Canary
+                        is enabled.
                       type: string
                   type: object
                 productionDeployment:
@@ -102,11 +108,49 @@ spec:
                     is blue or green.
                   type: string
               type: object
+            canary:
+              properties:
+                deployment:
+                  description: Deployment defines the canary deployment.
+                  properties:
+                    image:
+                      description: Image defines the base Docker image that will be
+                        used for the deployment. Required when BlueGreen or Canary
+                        is enabled.
+                      type: string
+                    ingressName:
+                      description: IngressName defines the ingress name that will
+                        be used by the deployment. This option is not used for Canary
+                        builds.
+                      type: string
+                    name:
+                      description: Name defines the name of the deployment
+                      type: string
+                    version:
+                      description: Version defines the Docker image version that will
+                        be used for the deployment. Required when BlueGreen or Canary
+                        is enabled.
+                      type: string
+                  type: object
+                enable:
+                  description: Enable defines if a canary build will be deployed.
+                  type: boolean
+              type: object
             database:
               properties:
-                backupRestoreSecret:
-                  description: Defines the secret to be used for uploading backup
-                    or to restore the backup.
+                backupRemoteDeletePolicy:
+                  description: Defines the backup retention policy.
+                  type: string
+                backupRestoreSecretName:
+                  description: Defines the secret to be used for uploading/restoring
+                    backup.
+                  type: string
+                backupSchedule:
+                  description: Defines the interval for backups in cron expression
+                    format.
+                  type: string
+                backupURL:
+                  description: Defines the object storage url for uploading backups.
                   type: string
                 externalSecret:
                   description: If the user want to use an external DB. This can be

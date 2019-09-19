@@ -141,7 +141,7 @@ func (r *ReconcileMattermostRestoreDB) Reconcile(request reconcile.Request) (rec
 	if clusterInstallation.Spec.Database.Replicas != 0 {
 		clusterInstallation.Spec.Database.Replicas = 0
 		clusterInstallation.Spec.Database.InitBucketURL = restoreMM.Spec.InitBucketURL
-		clusterInstallation.Spec.Database.BackupRestoreSecret = restoreMM.Spec.RestoreSecret
+		clusterInstallation.Spec.Database.BackupRestoreSecretName = restoreMM.Spec.RestoreSecret
 
 		err = r.client.Update(context.TODO(), clusterInstallation)
 		if err != nil {

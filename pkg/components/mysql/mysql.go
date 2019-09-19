@@ -46,12 +46,16 @@ func Cluster(mattermost *mattermostv1alpha1.ClusterInstallation) *mysqlOperator.
 					},
 				},
 			},
+			BackupSchedule:           mattermost.Spec.Database.BackupSchedule,
+			BackupURL:                mattermost.Spec.Database.BackupURL,
+			BackupSecretName:         mattermost.Spec.Database.BackupRestoreSecretName,
+			BackupRemoteDeletePolicy: mysqlOperator.DeletePolicy(mattermost.Spec.Database.BackupRemoteDeletePolicy),
 		},
 	}
 
-	if mattermost.Spec.Database.InitBucketURL != "" && mattermost.Spec.Database.BackupRestoreSecret != "" {
+	if mattermost.Spec.Database.InitBucketURL != "" && mattermost.Spec.Database.BackupRestoreSecretName != "" {
 		mysql.Spec.InitBucketURL = mattermost.Spec.Database.InitBucketURL
-		mysql.Spec.InitBucketSecretName = mattermost.Spec.Database.BackupRestoreSecret
+		mysql.Spec.InitBucketSecretName = mattermost.Spec.Database.BackupRestoreSecretName
 	}
 
 	return mysql

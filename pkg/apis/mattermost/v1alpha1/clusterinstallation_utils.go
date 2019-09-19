@@ -62,8 +62,30 @@ func (mattermost *ClusterInstallation) SetDefaults() error {
 	mattermost.Spec.Minio.SetDefaults()
 	mattermost.Spec.Database.SetDefaults()
 	err := mattermost.Spec.BlueGreen.SetDefaults(mattermost)
+	if err != nil {
+		return err
+	}
+
+	err = mattermost.Spec.Canary.SetDefaults(mattermost)
 
 	return err
+}
+
+// SetDefaults sets the missing values in Canary to the default ones
+func (canary *Canary) SetDefaults(mattermost *ClusterInstallation) error {
+	if canary.Enable {
+		if canary.Deployment.Version == "" {
+			return errors.New("Canary version required, but not set")
+		}
+		if canary.Deployment.Image == "" {
+			return errors.New("Canary deployment image required, but not set")
+		}
+		if canary.Deployment.Name == "" {
+			canary.Deployment.Name = fmt.Sprintf("%s-canary", mattermost.Name)
+		}
+	}
+
+	return nil
 }
 
 // SetDefaults sets the missing values in BlueGreen to the default ones
@@ -184,7 +206,7 @@ func (mattermost *ClusterInstallation) GenerateService(serviceName, selectorName
 }
 
 // GenerateIngress returns the ingress for Mattermost
-func (mattermost *ClusterInstallation) GenerateIngress(name, ingressName string) *v1beta1.Ingress {
+func (mattermost *ClusterInstallation) GenerateIngress(name, ingressName string, ingressAnnotations map[string]string) *v1beta1.Ingress {
 	return &v1beta1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -197,7 +219,7 @@ func (mattermost *ClusterInstallation) GenerateIngress(name, ingressName string)
 					Kind:    "ClusterInstallation",
 				}),
 			},
-			Annotations: mattermost.Spec.IngressAnnotations,
+			Annotations: ingressAnnotations,
 		},
 		Spec: v1beta1.IngressSpec{
 			Rules: []v1beta1.IngressRule{

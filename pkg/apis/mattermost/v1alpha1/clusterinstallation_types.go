@@ -56,6 +56,9 @@ type ClusterInstallationSpec struct {
 	BlueGreen BlueGreen `json:"blueGreen,omitempty"`
 
 	// +optional
+	Canary Canary `json:"canary,omitempty"`
+
+	// +optional
 	ElasticSearch ElasticSearch `json:"elasticSearch,omitempty"`
 
 	// +optional
@@ -68,6 +71,16 @@ type ClusterInstallationSpec struct {
 	IngressAnnotations map[string]string `json:"ingressAnnotations,omitempty"`
 }
 
+// Canary defines the configuration of Canary deployment for a ClusterInstallation
+type Canary struct {
+	// Enable defines if a canary build will be deployed.
+	// +optional
+	Enable bool `json:"enable,omitempty"`
+	// Deployment defines the canary deployment.
+	// +optional
+	Deployment AppDeployment `json:"deployment,omitempty"`
+}
+
 // BlueGreen defines the configuration of BlueGreen deployment for a ClusterInstallation
 type BlueGreen struct {
 	// ProductionDeployment defines if the current production is blue or green.
@@ -76,10 +89,10 @@ type BlueGreen struct {
 	// Enable defines if BlueGreen deployment will be applied.
 	// +optional
 	Enable bool `json:"enable,omitempty"`
-	// Blue defines the blue deployement.
+	// Blue defines the blue deployment.
 	// +optional
 	Blue AppDeployment `json:"blue,omitempty"`
-	// Green defines the green deployement.
+	// Green defines the green deployment.
 	// +optional
 	Green AppDeployment `json:"green,omitempty"`
 }
@@ -90,14 +103,15 @@ type AppDeployment struct {
 	// +optional
 	Name string `json:"name,omitempty"`
 	// IngressName defines the ingress name that will be used by the deployment.
+	// This option is not used for Canary builds.
 	// +optional
 	IngressName string `json:"ingressName,omitempty"`
 	// Image defines the base Docker image that will be used for the deployment.
-	// Required when BlueGreen is enabled.
+	// Required when BlueGreen or Canary is enabled.
 	// +optional
 	Image string `json:"image,omitempty"`
 	// Version defines the Docker image version that will be used for the deployment.
-	// Required when BlueGreen is enabled.
+	// Required when BlueGreen or Canary is enabled.
 	// +optional
 	Version string `json:"version,omitempty"`
 }
@@ -143,13 +157,22 @@ type Database struct {
 	// Defines the resource requests and limits for the database pods.
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
-	// Defines the secret to be used for uploading backup or to restore the backup.
-	// +optional
-	BackupRestoreSecret string `json:"backupRestoreSecret,omitempty"`
 	// Defines the AWS S3 bucket where the Database Backup is stored.
 	// The operator will download the file to restore the data.
 	// +optional
 	InitBucketURL string `json:"initBucketURL,omitempty"`
+	// Defines the interval for backups in cron expression format.
+	// +optional
+	BackupSchedule string `json:"backupSchedule,omitempty"`
+	// Defines the object storage url for uploading backups.
+	// +optional
+	BackupURL string `json:"backupURL,omitempty"`
+	// Defines the backup retention policy.
+	// +optional
+	BackupRemoteDeletePolicy string `json:"backupRemoteDeletePolicy,omitempty"`
+	// Defines the secret to be used for uploading/restoring backup.
+	// +optional
+	BackupRestoreSecretName string `json:"backupRestoreSecretName,omitempty"`
 }
 
 // ElasticSearch defines the ElasticSearch configuration for a ClusterInstallation.
