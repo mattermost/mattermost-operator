@@ -45,7 +45,7 @@ func TestReconcile(t *testing.T) {
 		Spec: mattermostv1alpha1.ClusterInstallationSpec{
 			Replicas:    replicas,
 			Image:       "mattermost/mattermost-enterprise-edition",
-			Version:     "5.14.0",
+			Version:     "5.15.0",
 			IngressName: "foo.mattermost.dev",
 		},
 	}
@@ -168,13 +168,13 @@ func TestReconcile(t *testing.T) {
 				Name:        "blue-installation",
 				IngressName: "blue-ingress",
 				Image:       "mattermost/mattermost-blue-edition",
-				Version:     "5.12.0",
+				Version:     "5.14.3",
 			},
 			Green: mattermostv1alpha1.AppDeployment{
 				Name:        "green-installation",
 				IngressName: "green-ingress",
 				Image:       "mattermost/mattermost-green-edition",
-				Version:     "5.13.0",
+				Version:     "5.15.0",
 			},
 		}
 
