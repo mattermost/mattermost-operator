@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
+	componentUtils "github.com/mattermost/mattermost-operator/pkg/components/utils"
 	"github.com/mattermost/mattermost-operator/pkg/utils"
-
 	mysqlOperator "github.com/presslabs/mysql-operator/pkg/apis/mysql/v1alpha1"
 
 	corev1 "k8s.io/api/core/v1"
@@ -17,6 +17,11 @@ import (
 
 // Cluster returns the MySQL cluster to deploy
 func Cluster(mattermost *mattermostv1alpha1.ClusterInstallation) *mysqlOperator.MysqlCluster {
+	mysqlSecretName := fmt.Sprintf("%s-mysql-root-password", mattermost.Name)
+
+	if mattermost.Spec.Database.Secret != "" {
+		mysqlSecretName = mattermost.Spec.Database.Secret
+	}
 	return &mysqlOperator.MysqlCluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "db",
@@ -33,7 +38,7 @@ func Cluster(mattermost *mattermostv1alpha1.ClusterInstallation) *mysqlOperator.
 		Spec: mysqlOperator.MysqlClusterSpec{
 			MysqlVersion: "5.7",
 			Replicas:     utils.NewInt32(mattermost.Spec.Database.Replicas),
-			SecretName:   fmt.Sprintf("%s-mysql-root-password", mattermost.Name),
+			SecretName:   mysqlSecretName,
 			VolumeSpec: mysqlOperator.VolumeSpec{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimSpec{
 					AccessModes: []corev1.PersistentVolumeAccessMode{
@@ -52,4 +57,20 @@ func Cluster(mattermost *mattermostv1alpha1.ClusterInstallation) *mysqlOperator.
 			BackupRemoteDeletePolicy: mysqlOperator.DeletePolicy(mattermost.Spec.Database.BackupRemoteDeletePolicy),
 		},
 	}
+}
+
+// Secret returns the secret name created to use together with MySQL deployment
+func Secret(mattermost *mattermostv1alpha1.ClusterInstallation) *corev1.Secret {
+	secretName := fmt.Sprintf("%s-mysql-root-password", mattermost.Name)
+	data := make(map[string][]byte)
+	data["USER"] = []byte("mmuser")
+	data["DATABASE"] = []byte("mattermost")
+	data["ROOT_PASSWORD"] = componentUtils.New16ID()
+	data["PASSWORD"] = componentUtils.New16ID()
+
+	return mattermost.GenerateSecret(
+		secretName,
+		mattermostv1alpha1.ClusterInstallationResourceLabels(mattermost.Name),
+		data,
+	)
 }

@@ -6,14 +6,14 @@ import (
 	"reflect"
 
 	"github.com/go-logr/logr"
+	"github.com/pkg/errors"
 	mysqlOperator "github.com/presslabs/mysql-operator/pkg/apis/mysql/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
 	mattermostmysql "github.com/mattermost/mattermost-operator/pkg/components/mysql"
-	"github.com/mattermost/mattermost-operator/pkg/components/utils"
 )
 
 func (r *ReconcileClusterInstallation) checkMySQLCluster(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
@@ -56,7 +56,7 @@ func (r *ReconcileClusterInstallation) checkMySQLCluster(mattermost *mattermostv
 func (r *ReconcileClusterInstallation) createMySQLClusterIfNotExists(mattermost *mattermostv1alpha1.ClusterInstallation, cluster *mysqlOperator.MysqlCluster, reqLogger logr.Logger) error {
 	foundCluster := &mysqlOperator.MysqlCluster{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: cluster.Name, Namespace: cluster.Namespace}, foundCluster)
-	if err != nil && errors.IsNotFound(err) {
+	if err != nil && kerrors.IsNotFound(err) {
 		reqLogger.Info("Creating mysql cluster")
 		return r.createResource(mattermost, cluster, reqLogger)
 	} else if err != nil {
@@ -68,25 +68,42 @@ func (r *ReconcileClusterInstallation) createMySQLClusterIfNotExists(mattermost 
 }
 
 func (r *ReconcileClusterInstallation) getOrCreateMySQLSecrets(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) (string, error) {
-	dbSecretName := fmt.Sprintf("%s-mysql-root-password", mattermost.Name)
 	dbSecret := &corev1.Secret{}
-	err := r.client.Get(context.TODO(), types.NamespacedName{Name: dbSecretName, Namespace: mattermost.Namespace}, dbSecret)
-	if err != nil && errors.IsNotFound(err) {
-		reqLogger.Info("Creating mysql secret")
-
-		dbSecret.SetName(dbSecretName)
-		dbSecret.SetNamespace(mattermost.Namespace)
-		rootPassword := string(utils.New16ID())
-		userPassword := string(utils.New16ID())
-
-		dbSecret.Data = map[string][]byte{
-			"ROOT_PASSWORD": []byte(rootPassword),
-			"USER":          []byte("mmuser"),
-			"PASSWORD":      []byte(userPassword),
-			"DATABASE":      []byte("mattermost"),
+	// Check if the custom MySQL secret is provided
+	if mattermost.Spec.Database.Secret != "" {
+		if err := r.client.Get(context.TODO(), types.NamespacedName{
+			Namespace: mattermost.Namespace,
+			Name:      mattermost.Spec.Database.Secret,
+		}, dbSecret); err != nil {
+			return "", errors.Wrap(err, "unable to locate custom MySQL secret")
 		}
 
-		return userPassword, r.createResource(mattermost, dbSecret, reqLogger)
+		if _, ok := dbSecret.Data["USER"]; !ok {
+			return "", fmt.Errorf("custom MySQL Secret %s does not have an 'USER' value", mattermost.Spec.Database.Secret)
+		}
+		if _, ok := dbSecret.Data["DATABASE"]; !ok {
+			return "", fmt.Errorf("custom MySQL Secret %s does not have an 'DATABASE' value", mattermost.Spec.Database.Secret)
+		}
+		if _, ok := dbSecret.Data["ROOT_PASSWORD"]; !ok {
+			return "", fmt.Errorf("custom MySQL Secret %s does not have an 'ROOT_PASSWORD' value", mattermost.Spec.Database.Secret)
+		}
+		userPassword, ok := dbSecret.Data["PASSWORD"]
+		if !ok {
+			return "", fmt.Errorf("custom MySQL Secret %s does not have an 'PASSWORD' value", mattermost.Spec.Database.Secret)
+		}
+		reqLogger.Info("Skipping MySQL secret creation, using user provided secret")
+		return string(userPassword), nil
+	}
+	dbSecretName := fmt.Sprintf("%s-mysql-root-password", mattermost.Name)
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: dbSecretName, Namespace: mattermost.Namespace}, dbSecret)
+	if err != nil && kerrors.IsNotFound(err) {
+		// create a new secret
+		dbSecret = mattermostmysql.Secret(mattermost)
+		userPassword, ok := dbSecret.Data["PASSWORD"]
+		if !ok {
+			return "", fmt.Errorf("failed to create MySQL Secret %s does not have an 'PASSWORD' value", mattermost.Spec.Database.Secret)
+		}
+		return string(userPassword), r.createResource(mattermost, dbSecret, reqLogger)
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to check if mysql secret exists")
 		return "", err

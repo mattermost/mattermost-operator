@@ -155,6 +155,9 @@ spec:
                   description: If the user want to use an external DB. This can be
                     inside the same k8s cluster or outside like AWS RDS.
                   type: string
+                secret:
+                  description: If the user wants to use an existing Secret.
+                  type: string
                 replicas:
                   description: Defines the number of database replicas. For redundancy
                     use at least 2 replicas. Setting this will override the number

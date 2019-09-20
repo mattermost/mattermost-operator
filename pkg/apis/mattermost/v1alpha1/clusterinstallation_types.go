@@ -169,6 +169,9 @@ type Database struct {
 	// Defines the secret to be used for uploading backup.
 	// +optional
 	BackupSecretName string `json:"backupSecretName,omitempty"`
+	// Optionally enter the name of already existing Secret
+	// +optional
+	Secret string `json:"secret,omitempty"`
 }
 
 // ElasticSearch defines the ElasticSearch configuration for a ClusterInstallation.
