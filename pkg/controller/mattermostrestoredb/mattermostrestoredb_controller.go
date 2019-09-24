@@ -97,11 +97,10 @@ func (r *ReconcileMattermostRestoreDB) Reconcile(request reconcile.Request) (rec
 			// Request object not found, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
 			// Return and don't requeue
-			r.setRestoring()
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
-		r.setRestoring()
+		r.setFailed()
 		return reconcile.Result{}, err
 	}
 
@@ -109,14 +108,15 @@ func (r *ReconcileMattermostRestoreDB) Reconcile(request reconcile.Request) (rec
 	clusterInstallation := &mattermostv1alpha1.ClusterInstallation{}
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: restoreMM.Spec.MattermostClusterName, Namespace: restoreMM.Namespace}, clusterInstallation)
 	if err != nil && errors.IsNotFound(err) {
+		reqLogger.Error(err, "Mattermost Installation not found. Create a ClusterInstallation first", "Namespace", restoreMM.Namespace, "ClusterInstallation.Name", restoreMM.Spec.MattermostClusterName, "RestoreDB.name", restoreMM.Name)
 		r.setFailed()
 		status := restoreMM.Status
 		status.State = r.state
 		//TODO: add reason and inform need to delete/apply when a clusterinstallation is ready. JIRA MM-18633
 		err = r.updateStatus(restoreMM, status, reqLogger)
-		reqLogger.Error(err, "Mattermost Installation not found. Create a ClusterInstallation first", "Namespace", restoreMM.Namespace, "ClusterInstallation.Name", restoreMM.Spec.MattermostClusterName, "RestoreDB.name", restoreMM.Name)
 		return reconcile.Result{Requeue: false}, err
 	} else if err != nil {
+		reqLogger.Error(err, "Error trying to get the Mattermost ClusterInstallation", "Namespace", restoreMM.Namespace, "ClusterInstallation.Name", restoreMM.Spec.MattermostClusterName, "RestoreDB.name", restoreMM.Name)
 		r.setFailed()
 		status := restoreMM.Status
 		status.State = r.state

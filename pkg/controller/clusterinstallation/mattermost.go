@@ -149,7 +149,7 @@ func (r *ReconcileClusterInstallation) checkMattermostIngress(mattermost *matter
 
 func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, resourceName, ingressName, imageName string, reqLogger logr.Logger) error {
 	var externalDB, isLicensed bool
-	var dbData []string
+	var dbData databaseInfo
 	var err error
 	if mattermost.Spec.Database.ExternalSecret != "" {
 		err = r.checkSecret(mattermost.Spec.Database.ExternalSecret, "externalDB", mattermost.Namespace)
@@ -162,10 +162,10 @@ func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mat
 		if err != nil {
 			return errors.Wrap(err, "Error getting mysql database password.")
 		}
-		for _, value := range dbData {
-			if value == "" {
-				return errors.Wrap(nil, "One or more values in the MySQL secret are empty.")
-			}
+
+		err = dbData.Valid()
+		if err != nil {
+			return err
 		}
 	}
 
@@ -182,10 +182,7 @@ func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mat
 		isLicensed = true
 	}
 
-	dbUser := dbData[0]
-	dbPassword := dbData[1]
-	dbName := dbData[2]
-	deployment := mattermost.GenerateDeployment(resourceName, ingressName, imageName, dbUser, dbPassword, dbName, externalDB, isLicensed, minioService)
+	deployment := mattermost.GenerateDeployment(resourceName, ingressName, imageName, dbData.userName, dbData.userPassword, dbData.dbName, externalDB, isLicensed, minioService)
 	err = r.createDeploymentIfNotExists(mattermost, deployment, reqLogger)
 	if err != nil {
 		return err

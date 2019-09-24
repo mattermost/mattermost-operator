@@ -37,17 +37,18 @@ type RestoreState string
 // Restore States:
 // Two types of restore states are implemented: restoring and finished.
 const (
-	// Restoring is the state when the Mattermost DB is being restored
+	// Restoring is the state when the Mattermost DB is being restored.
 	Restoring RestoreState = "restoring"
 	// Finished is the state when the Mattermost DB restore process is complete.
 	Finished RestoreState = "finished"
-	Failed   RestoreState = "failed"
+	// Failed is the state when the Mattermost DB restore process is failed due a non existing cluster installation.
+	Failed RestoreState = "failed"
 )
 
 // MattermostRestoreDBStatus defines the observed state of MattermostRestoreDB
 // +k8s:openapi-gen=true
 type MattermostRestoreDBStatus struct {
-	// Represents the state of the Mattermost restore Database
+	// Represents the state of the Mattermost restore Database.
 	// +optional
 	State RestoreState `json:"state,omitempty"`
 	// The original number of database replicas. will be used to restore after applying the db restore process.
