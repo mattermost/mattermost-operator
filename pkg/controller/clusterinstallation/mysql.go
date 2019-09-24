@@ -123,13 +123,13 @@ func (r *ReconcileClusterInstallation) getOrCreateMySQLSecrets(mattermost *matte
 
 func (db *databaseInfo) Valid() error {
 	if db.userName == "" {
-		return errors.New("username should be empty")
+		return errors.New("database username shouldn't be empty")
 	}
 	if db.userPassword == "" {
-		return errors.New("password should be empty")
+		return errors.New("database password shouldn't be empty")
 	}
 	if db.dbName == "" {
-		return errors.New("database name should be empty")
+		return errors.New("database name shouldn't be empty")
 	}
 
 	return nil
