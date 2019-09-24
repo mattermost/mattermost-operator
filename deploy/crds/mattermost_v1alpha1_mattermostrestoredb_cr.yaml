@@ -1,0 +1,11 @@
+apiVersion: mattermost.com/v1alpha1
+kind: MattermostRestoreDB
+metadata:
+  name: example-mattermostrestoredb
+spec:
+  initBucketURL: s3://my-sample/my-backup.gz
+  mattermostClusterName: myMMClusterInstallation
+  mattermostDBName: mattermostdb
+  mattermostDBPassword: supersecure
+  mattermostDBUser: mmuser
+  restoreSecret: myawscreds

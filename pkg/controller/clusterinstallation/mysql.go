@@ -6,15 +6,22 @@ import (
 	"reflect"
 
 	"github.com/go-logr/logr"
+	"github.com/pkg/errors"
 	mysqlOperator "github.com/presslabs/mysql-operator/pkg/apis/mysql/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
 	mattermostmysql "github.com/mattermost/mattermost-operator/pkg/components/mysql"
 	"github.com/mattermost/mattermost-operator/pkg/components/utils"
 )
+
+type databaseInfo struct {
+	userName     string
+	userPassword string
+	dbName       string
+}
 
 func (r *ReconcileClusterInstallation) checkMySQLCluster(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
 	reqLogger = reqLogger.WithValues("Reconcile", "mysql")
@@ -56,7 +63,7 @@ func (r *ReconcileClusterInstallation) checkMySQLCluster(mattermost *mattermostv
 func (r *ReconcileClusterInstallation) createMySQLClusterIfNotExists(mattermost *mattermostv1alpha1.ClusterInstallation, cluster *mysqlOperator.MysqlCluster, reqLogger logr.Logger) error {
 	foundCluster := &mysqlOperator.MysqlCluster{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: cluster.Name, Namespace: cluster.Namespace}, foundCluster)
-	if err != nil && errors.IsNotFound(err) {
+	if err != nil && k8sErrors.IsNotFound(err) {
 		reqLogger.Info("Creating mysql cluster")
 		return r.createResource(mattermost, cluster, reqLogger)
 	} else if err != nil {
@@ -67,11 +74,14 @@ func (r *ReconcileClusterInstallation) createMySQLClusterIfNotExists(mattermost 
 	return nil
 }
 
-func (r *ReconcileClusterInstallation) getOrCreateMySQLSecrets(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) (string, error) {
+// getOrCreateMySQLSecrets get or create the MySQL secrets used by MySQL Operator to spin the cluster and
+// also used by mattermost to get the credentials to use to access the DB.
+// dbData is a []string -> { DBUserName, DBUserPassword, DBName }
+func (r *ReconcileClusterInstallation) getOrCreateMySQLSecrets(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) (databaseInfo, error) {
 	dbSecretName := fmt.Sprintf("%s-mysql-root-password", mattermost.Name)
 	dbSecret := &corev1.Secret{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: dbSecretName, Namespace: mattermost.Namespace}, dbSecret)
-	if err != nil && errors.IsNotFound(err) {
+	if err != nil && k8sErrors.IsNotFound(err) {
 		reqLogger.Info("Creating mysql secret")
 
 		dbSecret.SetName(dbSecretName)
@@ -86,10 +96,41 @@ func (r *ReconcileClusterInstallation) getOrCreateMySQLSecrets(mattermost *matte
 			"DATABASE":      []byte("mattermost"),
 		}
 
-		return userPassword, r.createResource(mattermost, dbSecret, reqLogger)
+		dbInfo := databaseInfo{
+			userName:     "mmuser",
+			userPassword: userPassword,
+			dbName:       "mattermost",
+		}
+		return dbInfo, r.createResource(mattermost, dbSecret, reqLogger)
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to check if mysql secret exists")
-		return "", err
+		dbInfo := databaseInfo{
+			userName:     "",
+			userPassword: "",
+			dbName:       "",
+		}
+		return dbInfo, err
 	}
-	return string(dbSecret.Data["PASSWORD"]), nil
+
+	dbInfo := databaseInfo{
+		userName:     string(dbSecret.Data["USER"]),
+		userPassword: string(dbSecret.Data["PASSWORD"]),
+		dbName:       string(dbSecret.Data["DATABASE"]),
+	}
+
+	return dbInfo, nil
+}
+
+func (db *databaseInfo) Valid() error {
+	if db.userName == "" {
+		return errors.New("database username shouldn't be empty")
+	}
+	if db.userPassword == "" {
+		return errors.New("database password shouldn't be empty")
+	}
+	if db.dbName == "" {
+		return errors.New("database name shouldn't be empty")
+	}
+
+	return nil
 }

@@ -141,12 +141,13 @@ spec:
                 backupRemoteDeletePolicy:
                   description: Defines the backup retention policy.
                   type: string
+                backupRestoreSecretName:
+                  description: Defines the secret to be used for uploading/restoring
+                    backup.
+                  type: string
                 backupSchedule:
                   description: Defines the interval for backups in cron expression
                     format.
-                  type: string
-                backupSecretName:
-                  description: Defines the secret to be used for uploading backup.
                   type: string
                 backupURL:
                   description: Defines the object storage url for uploading backups.
@@ -154,6 +155,11 @@ spec:
                 externalSecret:
                   description: If the user want to use an external DB. This can be
                     inside the same k8s cluster or outside like AWS RDS.
+                  type: string
+                initBucketURL:
+                  description: Defines the AWS S3 bucket where the Database Backup
+                    is stored. The operator will download the file to restore the
+                    data.
                   type: string
                 replicas:
                   description: Defines the number of database replicas. For redundancy

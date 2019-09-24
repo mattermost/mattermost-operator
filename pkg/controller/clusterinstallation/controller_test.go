@@ -266,7 +266,10 @@ func prepAllDependencyTestResources(r *ReconcileClusterInstallation, ci *matterm
 			Namespace: ci.Namespace,
 		},
 		Data: map[string][]byte{
-			"password": []byte("mysupersecure"),
+			"ROOT_PASSWORD": []byte("mysupersecure"),
+			"USER":          []byte("mmuser"),
+			"PASSWORD":      []byte("mysupersecure1"),
+			"DATABASE":      []byte("mattermost"),
 		},
 	}
 	err := r.client.Create(context.TODO(), dbSecret)
