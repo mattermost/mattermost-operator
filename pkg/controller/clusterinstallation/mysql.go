@@ -101,7 +101,7 @@ func (r *ReconcileClusterInstallation) getOrCreateMySQLSecrets(mattermost *matte
 			userPassword: userPassword,
 			dbName:       "mattermost",
 		}
-		return dbInfo, nil
+		return dbInfo, r.createResource(mattermost, dbSecret, reqLogger)
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to check if mysql secret exists")
 		dbInfo := databaseInfo{
