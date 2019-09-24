@@ -173,8 +173,11 @@ func (r *ReconcileMattermostRestoreDB) Reconcile(request reconcile.Request) (rec
 	}
 
 	sel := mattermostv1alpha1.MySQLLabels()
-	opts := &client.ListOptions{LabelSelector: labels.SelectorFromSet(sel)}
 
+	opts := &client.ListOptions{
+		LabelSelector: labels.SelectorFromSet(sel),
+		Namespace:     mySQLCluster.GetNamespace(),
+	}
 	pods := &corev1.PodList{}
 
 	err = r.client.List(context.TODO(), opts, pods)
@@ -182,6 +185,7 @@ func (r *ReconcileMattermostRestoreDB) Reconcile(request reconcile.Request) (rec
 		return reconcile.Result{}, errrors.Wrap(err, "unable to get pod list")
 	}
 	if len(pods.Items) != 0 {
+		reqLogger.Info("Current MySQL Pods", "Number of Pods", len(pods.Items), "Namespace", mySQLCluster.GetNamespace())
 		return reconcile.Result{RequeueAfter: time.Second * 3}, fmt.Errorf("Waiting for MySQL Statefulset pods scale to 0")
 	}
 
