@@ -70,7 +70,7 @@ spec:
               format: int32
               type: integer
             state:
-              description: Represents the state of the Mattermost restore Database
+              description: Represents the state of the Mattermost restore Database.
               type: string
           type: object
   version: v1alpha1

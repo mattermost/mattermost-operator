@@ -309,7 +309,7 @@ func schema_pkg_apis_mattermost_v1alpha1_MattermostRestoreDBStatus(ref common.Re
 				Properties: map[string]spec.Schema{
 					"state": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Represents the state of the Mattermost restore Database",
+							Description: "Represents the state of the Mattermost restore Database.",
 							Type:        []string{"string"},
 							Format:      "",
 						},

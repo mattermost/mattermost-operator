@@ -131,4 +131,6 @@ func (db *databaseInfo) Valid() error {
 	if db.dbName == "" {
 		return errors.New("database name should be empty")
 	}
+
+	return nil
 }
