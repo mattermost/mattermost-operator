@@ -63,7 +63,7 @@ Use Case: An existing AWS RDS Database
 
 If you have an machine running MySQL you just need to perform the `Percona XtraBackup` step
 
-## 3 Developer flow
+## 3 Developer Flow
 To test the operator locally. We recommend [Kind](https://kind.sigs.k8s.io/), however, you can use Minikube or Minishift as well.
 
 ### 3.1 Prerequisites
