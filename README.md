@@ -9,113 +9,12 @@ Learn more about Mattermost at https://mattermost.com.
 
 The Mattermost server source code is available at https://github.com/mattermost/mattermost-server.
 
-## 1. Prerequisites
+## 1 Install
 
-### 1.1 Kubernetes Cluster with `kubectl`
-You must have a running Kubernetes 1.11.0+ cluster. If you do not, then see the [official Kubernetes documentation](https://kubernetes.io/docs/setup/) to get one set up.
+See the install instructions at https://docs.mattermost.com/install/install-kubernetes.html.
 
-In addition you must have [kubectl](https://kubernetes.io/docs/reference/kubectl/overview/) configured for the relevant Kubernetes cluster. 
-
-### 1.2 MySQL Operator
-The presslabs/mysql-operator is required if you are not using an external database. To install the MySQL operator run:
-
-```bash
-$ kubectl create ns mysql-operator
-$ kubectl apply -n mysql-operator -f https://raw.githubusercontent.com/mattermost/mattermost-operator/master/docs/mysql-operator/mysql-operator.yaml
-```
-
-### 1.3 Minio Operator
-The Minio operator is required. To install the Minio operator run:
-
-```bash
-$ kubectl create ns minio-operator
-$ kubectl apply -n minio-operator -f https://raw.githubusercontent.com/mattermost/mattermost-operator/master/docs/minio-operator/minio-operator.yaml
-```
-
-### 1.4 Mattermost Operator
-Finally, install the Mattermost operator with:
-
-```bash
-$ kubectl create ns mattermost-operator
-$ kubectl apply -n mattermost-operator -f https://raw.githubusercontent.com/mattermost/mattermost-operator/master/docs/mattermost-operator/mattermost-operator.yaml
-```
-
-## 2. Install Mattermost
-
-### 2.1 Quick Install on Azure or AWS
-If you are running Kubernetes on Azure or AWS, run the following to install Mattermost:
-
-```bash
-$ kubectl apply -f https://raw.githubusercontent.com/mattermost/mattermost-operator/master/docs/examples/simple_aws_azure.yaml
-```
-
-After a couple minutes, run:
-```bash
-$ kubectl get clusterinstallation
-```
-
-This will show you something similar to:
-
-```
-NAME                              STATE    IMAGE                                      VERSION   ENDPOINT
-example-mattermost-installation   stable   mattermost/mattermost-enterprise-edition   5.15.0    ab8679c3387b311e9ac2a02c03e3d674-230738344.us-east-1.elb.amazonaws.com
-```
-
-Go to the endpoint listed to access your Mattermost instance.
-
-To customize your Mattermost installation, see [section 2.3 Custom Install](#2.3-custom-install).
-
-### 2.2 Quick Install Not on Azure or AWS
-If your Kubernetes is running somewhere other than on Azure or AWS, you'll need to install an Ingress controller to access your Mattermost installation. We recommend using the [NGINX Ingress Controller](https://kubernetes.github.io/ingress-nginx/deploy/).
-
-Once your Ingress controller is installed, run:
-
-```bash
-$ kubectl apply -f https://raw.githubusercontent.com/mattermost/mattermost-operator/master/docs/examples/simple_anywhere.yaml
-```
-
-To get the hostname or IP address to access your Mattermost installation, you need to look at the service for ingress controller. Using NGINX Ingress, you can do that with:
-
-```bash
-$ kubectl -n ingress-nginx get svc
-```
-
-### 2.3 Custom Install
-There are a few options that can specified when installing Mattermost with the operator. To customize your install, first download https://raw.githubusercontent.com/mattermost/mattermost-operator/master/docs/examples/full.yaml into a local file named `mm_clusterinstallation.yaml`.
-
-Open that up in your file editor and edit the fields under `metadata` and `spec`. The descriptions for each setting are present in that file.
-
-Once edited to your satisfaction, save the file and run:
-
-```bash
-$ kubectl apply -f mm_clusterinstallation.yaml
-```
-
-This will install Mattermost with your desired options.
-
-### 2.4 Uninstall Mattermost
-To uninstall a Mattermost installation, simply run `kubectl delete -f` with the file you used to install Mattermost.
-
-For example, from the AWS or Azure quick install:
-
-```bash
-$ kubectl delete -f https://raw.githubusercontent.com/mattermost/mattermost-operator/master/docs/examples/simple_aws_azure.yaml
-```
-
-For the install anywhere example:
-
-```bash
-$ kubectl delete -f https://raw.githubusercontent.com/mattermost/mattermost-operator/master/docs/examples/simple_anywhere.yaml
-```
-
-For the customized install options example:
-
-```bash
-$ kubectl delete -f mm_clusterinstallation.yaml
-```
-
-### 2.5 Restore an existing Mattermost MySQL Database
-To restore an existing Mattermost MySQL Database into a new Mattermost installation using the Mattermost Operator you will need to do a few steps.
+## 2 Restore an existing Mattermost MySQL Database
+To restore an existing Mattermost MySQL Database into a new Mattermost installation using the Mattermost Operator you will need to follow these steps:
 
 Use Case: An existing AWS RDS Database
   - First you need to dump the data using mysqldump
@@ -164,7 +63,7 @@ Use Case: An existing AWS RDS Database
 
 If you have an machine running MySQL you just need to perform the `Percona XtraBackup` step
 
-## 3. Developer flow
+## 3 Developer flow
 To test the operator locally. We recommend [Kind](https://kind.sigs.k8s.io/), however, you can use Minikube or Minishift as well.
 
 ### 3.1 Prerequisites
