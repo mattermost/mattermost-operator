@@ -22,7 +22,7 @@ func TestClusterInstallation(t *testing.T) {
 		Spec: ClusterInstallationSpec{
 			Replicas:    7,
 			Image:       "mattermost/mattermost-enterprise-edition",
-			Version:     "5.14.0",
+			Version:     "5.15.0",
 			IngressName: "foo.mattermost.dev",
 		},
 	}
@@ -54,7 +54,7 @@ func TestClusterInstallation(t *testing.T) {
 			},
 			Spec: ClusterInstallationSpec{
 				Image:       "mattermost/mattermost-enterprise-edition",
-				Version:     "5.14.0",
+				Version:     "5.15.0",
 				IngressName: "foo.mattermost.dev",
 				Size:        "1000users",
 			},
@@ -146,7 +146,7 @@ func TestClusterInstallation(t *testing.T) {
 func TestDeployment(t *testing.T) {
 	d := AppDeployment{
 		Image:   "mattermost/mattermost-enterprise-edition",
-		Version: "5.13.2",
+		Version: "5.15.0",
 	}
 
 	t.Run("correct image", func(t *testing.T) {
@@ -345,7 +345,7 @@ func TestClusterInstallationGenerateDeployment(t *testing.T) {
 				Spec: tt.Spec,
 			}
 
-			deployment := mattermost.GenerateDeployment("", "", "", "", "", false, false, "")
+			deployment := mattermost.GenerateDeployment("", "", "", "", "", "", false, false, "")
 			require.Equal(t, tt.want.Spec.Template.Spec.NodeSelector, deployment.Spec.Template.Spec.NodeSelector)
 			require.Equal(t, tt.want.Spec.Template.Spec.Affinity, deployment.Spec.Template.Spec.Affinity)
 		})

@@ -157,6 +157,10 @@ type Database struct {
 	// Defines the resource requests and limits for the database pods.
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+	// Defines the AWS S3 bucket where the Database Backup is stored.
+	// The operator will download the file to restore the data.
+	// +optional
+	InitBucketURL string `json:"initBucketURL,omitempty"`
 	// Defines the interval for backups in cron expression format.
 	// +optional
 	BackupSchedule string `json:"backupSchedule,omitempty"`
@@ -166,9 +170,9 @@ type Database struct {
 	// Defines the backup retention policy.
 	// +optional
 	BackupRemoteDeletePolicy string `json:"backupRemoteDeletePolicy,omitempty"`
-	// Defines the secret to be used for uploading backup.
+	// Defines the secret to be used for uploading/restoring backup.
 	// +optional
-	BackupSecretName string `json:"backupSecretName,omitempty"`
+	BackupRestoreSecretName string `json:"backupRestoreSecretName,omitempty"`
 }
 
 // ElasticSearch defines the ElasticSearch configuration for a ClusterInstallation.

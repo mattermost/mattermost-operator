@@ -17,7 +17,7 @@ import (
 
 // Cluster returns the MySQL cluster to deploy
 func Cluster(mattermost *mattermostv1alpha1.ClusterInstallation) *mysqlOperator.MysqlCluster {
-	return &mysqlOperator.MysqlCluster{
+	mysql := &mysqlOperator.MysqlCluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "db",
 			Namespace: mattermost.Namespace,
@@ -48,8 +48,15 @@ func Cluster(mattermost *mattermostv1alpha1.ClusterInstallation) *mysqlOperator.
 			},
 			BackupSchedule:           mattermost.Spec.Database.BackupSchedule,
 			BackupURL:                mattermost.Spec.Database.BackupURL,
-			BackupSecretName:         mattermost.Spec.Database.BackupSecretName,
+			BackupSecretName:         mattermost.Spec.Database.BackupRestoreSecretName,
 			BackupRemoteDeletePolicy: mysqlOperator.DeletePolicy(mattermost.Spec.Database.BackupRemoteDeletePolicy),
 		},
 	}
+
+	if mattermost.Spec.Database.InitBucketURL != "" && mattermost.Spec.Database.BackupRestoreSecretName != "" {
+		mysql.Spec.InitBucketURL = mattermost.Spec.Database.InitBucketURL
+		mysql.Spec.InitBucketSecretName = mattermost.Spec.Database.BackupRestoreSecretName
+	}
+
+	return mysql
 }

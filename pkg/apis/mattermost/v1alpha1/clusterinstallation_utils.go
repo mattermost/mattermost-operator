@@ -20,7 +20,7 @@ const (
 	// DefaultMattermostImage is the default Mattermost docker image
 	DefaultMattermostImage = "mattermost/mattermost-enterprise-edition"
 	// DefaultMattermostVersion is the default Mattermost docker tag
-	DefaultMattermostVersion = "5.14.0"
+	DefaultMattermostVersion = "5.15.0"
 	// DefaultMattermostSize is the default number of users
 	DefaultMattermostSize = "5000users"
 	// DefaultMattermostDatabaseType is the default Mattermost database
@@ -245,7 +245,7 @@ func (mattermost *ClusterInstallation) GenerateIngress(name, ingressName string,
 }
 
 // GenerateDeployment returns the deployment spec for Mattermost
-func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingressName, containerImage, dbUser, dbPassword string, externalDB, isLicensed bool, minioService string) *appsv1.Deployment {
+func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingressName, containerImage, dbUser, dbPassword, dbName string, externalDB, isLicensed bool, minioService string) *appsv1.Deployment {
 	envVarDB := []corev1.EnvVar{}
 
 	masterDBEnvVar := corev1.EnvVar{
@@ -264,15 +264,15 @@ func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingres
 		}
 	} else {
 		masterDBEnvVar.Value = fmt.Sprintf(
-			"mysql://%s:%s@tcp(db-mysql-master.%s:3306)/mattermost?charset=utf8mb4,utf8&readTimeout=30s&writeTimeout=30s",
-			dbUser, dbPassword, mattermost.Namespace,
+			"mysql://%s:%s@tcp(db-mysql-master.%s:3306)/%s?charset=utf8mb4,utf8&readTimeout=30s&writeTimeout=30s",
+			dbUser, dbPassword, mattermost.Namespace, dbName,
 		)
 
 		envVarDB = append(envVarDB, corev1.EnvVar{
 			Name: "MM_SQLSETTINGS_DATASOURCEREPLICAS",
 			Value: fmt.Sprintf(
-				"%s:%s@tcp(db-mysql.%s:3306)/mattermost?readTimeout=30s&writeTimeout=30s",
-				dbUser, dbPassword, mattermost.Namespace,
+				"%s:%s@tcp(db-mysql.%s:3306)/%s?readTimeout=30s&writeTimeout=30s",
+				dbUser, dbPassword, mattermost.Namespace, dbName,
 			),
 		})
 
@@ -597,6 +597,18 @@ func ClusterInstallationLabels(name string) map[string]string {
 	l[ClusterLabel] = name
 	l["app"] = "mattermost"
 
+	return l
+}
+
+// MySQLLabels returns the labels for selecting the resources
+// belonging to the given mysql cluster.
+func MySQLLabels() map[string]string {
+	l := map[string]string{}
+
+	l["app.kubernetes.io/component"] = "database"
+	l["app.kubernetes.io/instance"] = "db"
+	l["app.kubernetes.io/managed-by"] = "mysql.presslabs.org"
+	l["app.kubernetes.io/name"] = "mysql"
 	return l
 }
 
