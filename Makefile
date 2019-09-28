@@ -72,6 +72,8 @@ yaml: ## Generate the YAML file for easy operator installation
 	echo --- >> $(INSTALL_YAML)
 	cat deploy/crds/mattermost_v1alpha1_clusterinstallation_crd.yaml >> $(INSTALL_YAML)
 	echo --- >> $(INSTALL_YAML)
+	cat deploy/crds/mattermost_v1alpha1_mattermostrestoredb_crd.yaml >> $(INSTALL_YAML)
+	echo --- >> $(INSTALL_YAML)
 	cat deploy/role.yaml >> $(INSTALL_YAML)
 	echo --- >> $(INSTALL_YAML)
 	cat deploy/role_binding.yaml >> $(INSTALL_YAML)
