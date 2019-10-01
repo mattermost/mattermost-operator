@@ -3,6 +3,7 @@ package v1alpha1
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -416,10 +417,12 @@ func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingres
 
 	if !mattermost.Spec.UseServiceLoadBalancer {
 		if _, ok := mattermost.Spec.IngressAnnotations["nginx.ingress.kubernetes.io/proxy-body-size"]; ok {
-			size, _ := strconv.Atoi(mattermost.Spec.IngressAnnotations["nginx.ingress.kubernetes.io/proxy-body-size"])
+			size := mattermost.Spec.IngressAnnotations["nginx.ingress.kubernetes.io/proxy-body-size"]
+			reg := regexp.MustCompile(`M`)
+			sizeWithoutUnit, _ := strconv.Atoi(reg.Split(size, 2)[0])
 			envVarGeneral = append(envVarGeneral, corev1.EnvVar{
 				Name:  "MM_FILESETTINGS_MAXFILESIZE",
-				Value: strconv.Itoa(size * 1048576),
+				Value: strconv.Itoa(sizeWithoutUnit * 1048576),
 			})
 		} else {
 			envVarGeneral = append(envVarGeneral, corev1.EnvVar{

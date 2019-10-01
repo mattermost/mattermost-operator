@@ -34,7 +34,7 @@ func (r *ReconcileClusterInstallation) checkMattermost(mattermost *mattermostv1a
 	if !mattermost.Spec.UseServiceLoadBalancer {
 		ingressAnnotations := map[string]string{
 			"kubernetes.io/ingress.class":                 "nginx",
-			"nginx.ingress.kubernetes.io/proxy-body-size": "1000",
+			"nginx.ingress.kubernetes.io/proxy-body-size": "1000M",
 		}
 		for k, v := range mattermost.Spec.IngressAnnotations {
 			ingressAnnotations[k] = v
