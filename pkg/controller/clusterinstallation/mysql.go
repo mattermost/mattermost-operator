@@ -25,36 +25,38 @@ type databaseInfo struct {
 
 func (r *ReconcileClusterInstallation) checkMySQLCluster(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
 	reqLogger = reqLogger.WithValues("Reconcile", "mysql")
-	cluster := mattermostmysql.Cluster(mattermost)
+	desired := mattermostmysql.Cluster(mattermost)
 
-	err := r.createMySQLClusterIfNotExists(mattermost, cluster, reqLogger)
+	err := r.createMySQLClusterIfNotExists(mattermost, desired, reqLogger)
 	if err != nil {
 		return err
 	}
 
-	foundCluster := &mysqlOperator.MysqlCluster{}
-	err = r.client.Get(context.TODO(), types.NamespacedName{Name: cluster.Name, Namespace: cluster.Namespace}, foundCluster)
+	current := &mysqlOperator.MysqlCluster{}
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: desired.Name, Namespace: desired.Namespace}, current)
 	if err != nil {
 		return err
 	}
 
+	// Updating mysql.cluster with objectMatcher breaks mysql operator.
+	// Only fields that are expected to be changed by mattermost-operator should be included here.
 	var update bool
 
-	updatedLabels := ensureLabels(cluster.Labels, foundCluster.Labels)
-	if !reflect.DeepEqual(updatedLabels, foundCluster.Labels) {
+	updatedLabels := ensureLabels(desired.Labels, current.Labels)
+	if !reflect.DeepEqual(updatedLabels, current.Labels) {
 		reqLogger.Info("Updating mysql cluster labels")
-		foundCluster.Labels = updatedLabels
+		current.Labels = updatedLabels
 		update = true
 	}
 
-	if !reflect.DeepEqual(cluster.Spec, foundCluster.Spec) {
+	if !reflect.DeepEqual(desired.Spec, current.Spec) {
 		reqLogger.Info("Updating mysql cluster spec")
-		foundCluster.Spec = cluster.Spec
+		current.Spec = desired.Spec
 		update = true
 	}
 
 	if update {
-		return r.client.Update(context.TODO(), foundCluster)
+		return r.client.Update(context.TODO(), current)
 	}
 
 	return nil
@@ -65,7 +67,7 @@ func (r *ReconcileClusterInstallation) createMySQLClusterIfNotExists(mattermost 
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: cluster.Name, Namespace: cluster.Namespace}, foundCluster)
 	if err != nil && k8sErrors.IsNotFound(err) {
 		reqLogger.Info("Creating mysql cluster")
-		return r.createResource(mattermost, cluster, reqLogger)
+		return r.create(mattermost, cluster, reqLogger)
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to check if mysql cluster exists")
 		return err
@@ -101,7 +103,7 @@ func (r *ReconcileClusterInstallation) getOrCreateMySQLSecrets(mattermost *matte
 			userPassword: userPassword,
 			dbName:       "mattermost",
 		}
-		return dbInfo, r.createResource(mattermost, dbSecret, reqLogger)
+		return dbInfo, r.create(mattermost, dbSecret, reqLogger)
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to check if mysql secret exists")
 		dbInfo := databaseInfo{

@@ -3,15 +3,13 @@ package clusterinstallation
 import (
 	"context"
 	"fmt"
-	"reflect"
 
-	objectMatcher "github.com/banzaicloud/k8s-objectmatcher/patch"
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	v1beta1 "k8s.io/api/extensions/v1beta1"
+	"k8s.io/api/extensions/v1beta1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -57,102 +55,37 @@ func (r *ReconcileClusterInstallation) checkMattermost(mattermost *mattermostv1a
 }
 
 func (r *ReconcileClusterInstallation) checkMattermostService(mattermost *mattermostv1alpha1.ClusterInstallation, resourceName, selectorName string, reqLogger logr.Logger) error {
-	service := mattermost.GenerateService(resourceName, selectorName)
+	desired := mattermost.GenerateService(resourceName, selectorName)
 
-	err := r.createServiceIfNotExists(mattermost, service, reqLogger)
+	err := r.createServiceIfNotExists(mattermost, desired, reqLogger)
 	if err != nil {
 		return err
 	}
 
-	foundService := &corev1.Service{}
-	err = r.client.Get(context.TODO(), types.NamespacedName{Name: service.Name, Namespace: service.Namespace}, foundService)
+	current := &corev1.Service{}
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: desired.Name, Namespace: desired.Namespace}, current)
 	if err != nil {
 		return err
 	}
 
-	var update bool
-
-	updatedLabels := ensureLabels(service.Labels, foundService.Labels)
-	if !reflect.DeepEqual(updatedLabels, foundService.Labels) {
-		reqLogger.Info("Updating mattermost service labels")
-		foundService.Labels = updatedLabels
-		update = true
-	}
-
-	if !reflect.DeepEqual(service.Annotations, foundService.Annotations) {
-		reqLogger.Info("Updating mattermost service annotations")
-		foundService.Annotations = service.Annotations
-		update = true
-	}
-
-	// If we are using the loadBalancer the ClusterIp is immutable
-	// and other fields are created in the first time
-	if mattermost.Spec.UseServiceLoadBalancer {
-		service.Spec.ClusterIP = foundService.Spec.ClusterIP
-		service.Spec.ExternalTrafficPolicy = foundService.Spec.ExternalTrafficPolicy
-		service.Spec.SessionAffinity = foundService.Spec.SessionAffinity
-		for _, foundPort := range foundService.Spec.Ports {
-			for i, servicePort := range service.Spec.Ports {
-				if foundPort.Name == servicePort.Name {
-					service.Spec.Ports[i].NodePort = foundPort.NodePort
-					service.Spec.Ports[i].Protocol = foundPort.Protocol
-				}
-			}
-		}
-	}
-	if !reflect.DeepEqual(service.Spec, foundService.Spec) {
-		reqLogger.Info("Updating mattermost service spec")
-		foundService.Spec = service.Spec
-		update = true
-	}
-
-	if update {
-		return r.client.Update(context.TODO(), foundService)
-	}
-
-	return nil
+	return r.update(current, desired, reqLogger)
 }
 
 func (r *ReconcileClusterInstallation) checkMattermostIngress(mattermost *mattermostv1alpha1.ClusterInstallation, resourceName, ingressName string, ingressAnnotations map[string]string, reqLogger logr.Logger) error {
-	ingress := mattermost.GenerateIngress(resourceName, ingressName, ingressAnnotations)
+	desired := mattermost.GenerateIngress(resourceName, ingressName, ingressAnnotations)
 
-	err := r.createIngressIfNotExists(mattermost, ingress, reqLogger)
+	err := r.createIngressIfNotExists(mattermost, desired, reqLogger)
 	if err != nil {
 		return err
 	}
 
-	foundIngress := &v1beta1.Ingress{}
-	err = r.client.Get(context.TODO(), types.NamespacedName{Name: ingress.Name, Namespace: ingress.Namespace}, foundIngress)
+	current := &v1beta1.Ingress{}
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: desired.Name, Namespace: desired.Namespace}, current)
 	if err != nil {
 		return err
 	}
 
-	var update bool
-
-	updatedLabels := ensureLabels(ingress.Labels, foundIngress.Labels)
-	if !reflect.DeepEqual(updatedLabels, foundIngress.Labels) {
-		reqLogger.Info("Updating mattermost ingress labels")
-		foundIngress.Labels = updatedLabels
-		update = true
-	}
-
-	if !reflect.DeepEqual(ingress.Annotations, foundIngress.Annotations) {
-		reqLogger.Info("Updating mattermost ingress annotations")
-		foundIngress.Annotations = ingress.Annotations
-		update = true
-	}
-
-	if !reflect.DeepEqual(ingress.Spec, foundIngress.Spec) {
-		reqLogger.Info("Updating mattermost ingress spec")
-		foundIngress.Spec = ingress.Spec
-		update = true
-	}
-
-	if update {
-		return r.client.Update(context.TODO(), foundIngress)
-	}
-
-	return nil
+	return r.update(current, desired, reqLogger)
 }
 
 func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, resourceName, ingressName, imageName string, reqLogger logr.Logger) error {
@@ -190,20 +123,20 @@ func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mat
 		isLicensed = true
 	}
 
-	deployment := mattermost.GenerateDeployment(resourceName, ingressName, imageName, dbData.userName, dbData.userPassword, dbData.dbName, externalDB, isLicensed, minioService)
-	err = r.createDeploymentIfNotExists(mattermost, deployment, reqLogger)
+	desired := mattermost.GenerateDeployment(resourceName, ingressName, imageName, dbData.userName, dbData.userPassword, dbData.dbName, externalDB, isLicensed, minioService)
+	err = r.createDeploymentIfNotExists(mattermost, desired, reqLogger)
 	if err != nil {
 		return err
 	}
 
-	foundDeployment := &appsv1.Deployment{}
-	err = r.client.Get(context.TODO(), types.NamespacedName{Name: deployment.Name, Namespace: deployment.Namespace}, foundDeployment)
+	current := &appsv1.Deployment{}
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: desired.Name, Namespace: desired.Namespace}, current)
 	if err != nil {
 		reqLogger.Error(err, "Failed to get mattermost deployment")
 		return err
 	}
 
-	err = r.updateMattermostDeployment(mattermost, deployment, foundDeployment, imageName, reqLogger)
+	err = r.updateMattermostDeployment(mattermost, current, desired, imageName, reqLogger)
 	if err != nil {
 		reqLogger.Error(err, "Failed to update mattermost deployment")
 		return err
@@ -246,13 +179,13 @@ func (r *ReconcileClusterInstallation) launchUpdateJob(mi *mattermostv1alpha1.Cl
 // If an update is required then the deployment spec is set to:
 // - roll forward version
 // - keep active MattermostInstallation available by setting maxUnavailable=N-1
-func (r *ReconcileClusterInstallation) updateMattermostDeployment(mi *mattermostv1alpha1.ClusterInstallation, new, original *appsv1.Deployment, imageName string, reqLogger logr.Logger) error {
+func (r *ReconcileClusterInstallation) updateMattermostDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, current, desired *appsv1.Deployment, imageName string, reqLogger logr.Logger) error {
 	var update bool
 
 	// Look for mattermost container in pod spec and determine if the image
 	// needs to be updated.
-	for _, container := range original.Spec.Template.Spec.Containers {
-		if container.Name == new.Spec.Template.Spec.Containers[0].Name {
+	for _, container := range current.Spec.Template.Spec.Containers {
+		if container.Name == desired.Spec.Template.Spec.Containers[0].Name {
 			if container.Image != imageName {
 				reqLogger.Info("Current image is not the same as the requested, will upgrade the Mattermost installation")
 				update = true
@@ -268,10 +201,10 @@ func (r *ReconcileClusterInstallation) updateMattermostDeployment(mi *mattermost
 	// we will return and not upgrade the deployment.
 	if update {
 		reqLogger.Info(fmt.Sprintf("Running Mattermost image %s upgrade job check", imageName))
-		alreadyRunning, err := r.fetchRunningUpdateJob(mi, reqLogger)
+		alreadyRunning, err := r.fetchRunningUpdateJob(mattermost, reqLogger)
 		if err != nil && k8sErrors.IsNotFound(err) {
 			reqLogger.Info("Launching update job")
-			if err = r.launchUpdateJob(mi, new, imageName, reqLogger); err != nil {
+			if err = r.launchUpdateJob(mattermost, desired, imageName, reqLogger); err != nil {
 				return errors.Wrap(err, "Launching update job failed")
 			}
 			return errors.New("Began update job")
@@ -321,20 +254,7 @@ func (r *ReconcileClusterInstallation) updateMattermostDeployment(mi *mattermost
 		reqLogger.Info("Upgrade image job ran successfully")
 	}
 
-	patchResult, err := objectMatcher.DefaultPatchMaker.Calculate(original, new)
-	if err != nil {
-		return errors.Wrap(err, "error checking the difference in the deployment")
-	}
-
-	if !patchResult.IsEmpty() {
-		err := objectMatcher.DefaultAnnotator.SetLastAppliedAnnotation(new)
-		if err != nil {
-			return errors.Wrap(err, "error applying the annotation in the deployment")
-		}
-
-		return r.client.Update(context.TODO(), new)
-	}
-	return nil
+	return r.update(current, desired, reqLogger)
 }
 
 func (r *ReconcileClusterInstallation) fetchRunningUpdateJob(mi *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) (*batchv1.Job, error) {
