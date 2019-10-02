@@ -17,12 +17,7 @@ import (
 
 // Cluster returns the MySQL cluster to deploy
 func Cluster(mattermost *mattermostv1alpha1.ClusterInstallation) *mysqlOperator.MysqlCluster {
-	mysqlSecretName := fmt.Sprintf("%s-mysql-root-password", mattermost.Name)
-
-	if mattermost.Spec.Database.Secret != "" {
-		mysqlSecretName = mattermost.Spec.Database.Secret
-	}
-	return &mysqlOperator.MysqlCluster{
+	mysql := &mysqlOperator.MysqlCluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "db",
 			Namespace: mattermost.Namespace,
@@ -38,7 +33,7 @@ func Cluster(mattermost *mattermostv1alpha1.ClusterInstallation) *mysqlOperator.
 		Spec: mysqlOperator.MysqlClusterSpec{
 			MysqlVersion: "5.7",
 			Replicas:     utils.NewInt32(mattermost.Spec.Database.Replicas),
-			SecretName:   mysqlSecretName,
+			SecretName:   fmt.Sprintf("%s-mysql-root-password", mattermost.Name),
 			VolumeSpec: mysqlOperator.VolumeSpec{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimSpec{
 					AccessModes: []corev1.PersistentVolumeAccessMode{
@@ -53,10 +48,19 @@ func Cluster(mattermost *mattermostv1alpha1.ClusterInstallation) *mysqlOperator.
 			},
 			BackupSchedule:           mattermost.Spec.Database.BackupSchedule,
 			BackupURL:                mattermost.Spec.Database.BackupURL,
-			BackupSecretName:         mattermost.Spec.Database.BackupSecretName,
+			BackupSecretName:         mattermost.Spec.Database.BackupRestoreSecretName,
 			BackupRemoteDeletePolicy: mysqlOperator.DeletePolicy(mattermost.Spec.Database.BackupRemoteDeletePolicy),
 		},
 	}
+
+	if mattermost.Spec.Database.InitBucketURL != "" && mattermost.Spec.Database.BackupRestoreSecretName != "" {
+		mysql.Spec.InitBucketURL = mattermost.Spec.Database.InitBucketURL
+		mysql.Spec.InitBucketSecretName = mattermost.Spec.Database.BackupRestoreSecretName
+	} else if mattermost.Spec.Database.Secret != "" {
+		mysql.Spec.SecretName = mattermost.Spec.Database.Secret
+	}
+
+	return mysql
 }
 
 // Secret returns the secret name created to use together with MySQL deployment
@@ -65,7 +69,6 @@ func Secret(mattermost *mattermostv1alpha1.ClusterInstallation) *corev1.Secret {
 	data := make(map[string][]byte)
 	data["USER"] = []byte("mmuser")
 	data["DATABASE"] = []byte("mattermost")
-	data["ROOT_PASSWORD"] = componentUtils.New16ID()
 	data["PASSWORD"] = componentUtils.New16ID()
 
 	return mattermost.GenerateSecret(

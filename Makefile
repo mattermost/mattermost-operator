@@ -62,15 +62,17 @@ govet: ## Runs govet against all packages.
 	$(GO) vet -vettool=$(GOPATH)/bin/shadow $(PACKAGES)
 	@echo "govet success";
 
-generate: ## Runs the kubernetes code-generators and openapi
-	operator-sdk generate k8s
-	operator-sdk generate openapi
+generate: operator-sdk ## Runs the kubernetes code-generators and openapi
+	build/operator-sdk generate k8s
+	build/operator-sdk generate openapi
 	vendor/k8s.io/code-generator/generate-groups.sh all github.com/mattermost/mattermost-operator/pkg/client github.com/mattermost/mattermost-operator/pkg/apis mattermost:v1alpha1
 
 yaml: ## Generate the YAML file for easy operator installation
 	cat deploy/service_account.yaml > $(INSTALL_YAML)
 	echo --- >> $(INSTALL_YAML)
 	cat deploy/crds/mattermost_v1alpha1_clusterinstallation_crd.yaml >> $(INSTALL_YAML)
+	echo --- >> $(INSTALL_YAML)
+	cat deploy/crds/mattermost_v1alpha1_mattermostrestoredb_crd.yaml >> $(INSTALL_YAML)
 	echo --- >> $(INSTALL_YAML)
 	cat deploy/role.yaml >> $(INSTALL_YAML)
 	echo --- >> $(INSTALL_YAML)
@@ -84,10 +86,7 @@ dep: ## Get dependencies
 	dep ensure -v
 
 operator-sdk: ## Download sdk only if it's not available. Used in the docker build
-	@if [ ! -f build/operator-sdk ]; then \
-		curl -Lo build/operator-sdk https://github.com/operator-framework/operator-sdk/releases/download/$(SDK_VERSION)/operator-sdk-$(SDK_VERSION)-$(MACHINE)-linux-gnu && \
-		chmod +x build/operator-sdk; \
-	fi
+	build/get-operator-sdk.sh $(SDK_VERSION)
 
 clean: ## Clean up everything
 	rm -Rf build/_output
