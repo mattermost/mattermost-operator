@@ -226,7 +226,7 @@ spec:
                 secret:
                   description: 'Optionally enter the name of already existing secret.
                     Secret should have two values: "accesskey" and "secretkey". Required
-                    when ''ExternalURL'' is set.'
+                    when "ExternalURL" is set.'
                   type: string
                 storageSize:
                   description: Defines the storage size for Minio. ie 50Gi
