@@ -141,7 +141,7 @@ type Minio struct {
 	ExternalBucket string `json:"externalBucket,omitempty"`
 	// Optionally enter the name of already existing secret.
 	// Secret should have two values: "accesskey" and "secretkey".
-	// Required when 'ExternalURL' is set.
+	// Required when "ExternalURL" is set.
 	// +optional
 	Secret string `json:"secret,omitempty"`
 }
