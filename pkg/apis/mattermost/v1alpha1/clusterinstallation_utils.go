@@ -128,6 +128,11 @@ func (mi *Minio) SetDefaults() {
 	}
 }
 
+// IsExternal returns true if the MinIO/S3 instance is external
+func (mi *Minio) IsExternal() bool {
+	return mi.ExternalURL != ""
+}
+
 // SetDefaults sets the missing values in Database to the default ones
 func (db *Database) SetDefaults() {
 	if len(db.Type) == 0 {
@@ -317,7 +322,7 @@ func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingres
 		},
 	}
 
-	if mattermost.Spec.Minio.ExternalURL == "" {
+	if !mattermost.Spec.Minio.IsExternal() {
 		// Create the init container to create the MinIO bucker
 		initContainers = append(initContainers, corev1.Container{
 			Name:            "create-minio-bucket",

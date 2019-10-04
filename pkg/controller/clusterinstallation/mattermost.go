@@ -111,13 +111,13 @@ func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mat
 	}
 
 	var minioURL string
-	if mattermost.Spec.Minio.ExternalURL == "" {
+	if mattermost.Spec.Minio.IsExternal() {
+		minioURL = mattermost.Spec.Minio.ExternalURL
+	} else {
 		minioURL, err = r.getMinioService(mattermost, reqLogger)
 		if err != nil {
 			return errors.Wrap(err, "Error getting the minio service.")
 		}
-	} else {
-		minioURL = mattermost.Spec.Minio.ExternalURL
 	}
 
 	if mattermost.Spec.MattermostLicenseSecret != "" {
