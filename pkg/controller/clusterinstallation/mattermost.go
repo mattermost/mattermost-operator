@@ -92,13 +92,7 @@ func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mat
 	var externalDB, isLicensed bool
 	var dbData databaseInfo
 	var err error
-	if mattermost.Spec.Database.ExternalSecret != "" {
-		err = r.checkSecret(mattermost.Spec.Database.ExternalSecret, "externalDB", mattermost.Namespace)
-		if err != nil {
-			return errors.Wrap(err, "Error getting the external database secret.")
-		}
-		externalDB = true
-	} else {
+	if mattermost.Spec.Database.ExternalSecret == "" {
 		dbData, err = r.getOrCreateMySQLSecrets(mattermost, reqLogger)
 		if err != nil {
 			return errors.Wrap(err, "Error getting mysql database password.")
@@ -108,11 +102,22 @@ func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mat
 		if err != nil {
 			return err
 		}
+	} else {
+		err = r.checkSecret(mattermost.Spec.Database.ExternalSecret, "externalDB", mattermost.Namespace)
+		if err != nil {
+			return errors.Wrap(err, "Error getting the external database secret.")
+		}
+		externalDB = true
 	}
 
-	minioService, err := r.getMinioService(mattermost, reqLogger)
-	if err != nil {
-		return errors.Wrap(err, "Error getting the minio service.")
+	var minioURL string
+	if mattermost.Spec.Minio.IsExternal() {
+		minioURL = mattermost.Spec.Minio.ExternalURL
+	} else {
+		minioURL, err = r.getMinioService(mattermost, reqLogger)
+		if err != nil {
+			return errors.Wrap(err, "Error getting the minio service.")
+		}
 	}
 
 	if mattermost.Spec.MattermostLicenseSecret != "" {
@@ -123,7 +128,7 @@ func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mat
 		isLicensed = true
 	}
 
-	desired := mattermost.GenerateDeployment(resourceName, ingressName, imageName, dbData.userName, dbData.userPassword, dbData.dbName, externalDB, isLicensed, minioService)
+	desired := mattermost.GenerateDeployment(resourceName, ingressName, imageName, dbData.userName, dbData.userPassword, dbData.dbName, externalDB, isLicensed, minioURL)
 	err = r.createDeploymentIfNotExists(mattermost, desired, reqLogger)
 	if err != nil {
 		return err

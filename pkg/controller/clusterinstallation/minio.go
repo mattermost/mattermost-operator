@@ -23,6 +23,10 @@ func (r *ReconcileClusterInstallation) checkMinio(mattermost *mattermostv1alpha1
 		return err
 	}
 
+	if mattermost.Spec.Minio.IsExternal() {
+		return nil
+	}
+
 	return r.checkMinioInstance(mattermost, reqLogger)
 }
 

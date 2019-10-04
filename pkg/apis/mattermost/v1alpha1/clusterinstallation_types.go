@@ -133,7 +133,15 @@ type Minio struct {
 	// Defines the resource requests and limits for the Minio pods.
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
-	// Optionally enter the name of already existing Secret
+	// Set to use an external MinIO deployment or S3. Must also set 'Secret' and 'ExternalBucket'.
+	// +optional
+	ExternalURL string `json:"externalURL,omitempty"`
+	// Set to the bucket name of your external MinIO or S3.
+	// +optional
+	ExternalBucket string `json:"externalBucket,omitempty"`
+	// Optionally enter the name of already existing secret.
+	// Secret should have two values: "accesskey" and "secretkey".
+	// Required when "ExternalURL" is set.
 	// +optional
 	Secret string `json:"secret,omitempty"`
 }
