@@ -3,7 +3,6 @@ package v1alpha1
 import (
 	"errors"
 	"fmt"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -415,22 +414,29 @@ func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingres
 		},
 	}
 
+	valueSize := strconv.Itoa(1000 * 1048576)
 	if !mattermost.Spec.UseServiceLoadBalancer {
 		if _, ok := mattermost.Spec.IngressAnnotations["nginx.ingress.kubernetes.io/proxy-body-size"]; ok {
 			size := mattermost.Spec.IngressAnnotations["nginx.ingress.kubernetes.io/proxy-body-size"]
-			reg := regexp.MustCompile(`M`)
-			sizeWithoutUnit, _ := strconv.Atoi(reg.Split(size, 2)[0])
-			envVarGeneral = append(envVarGeneral, corev1.EnvVar{
-				Name:  "MM_FILESETTINGS_MAXFILESIZE",
-				Value: strconv.Itoa(sizeWithoutUnit * 1048576),
-			})
-		} else {
-			envVarGeneral = append(envVarGeneral, corev1.EnvVar{
-				Name:  "MM_FILESETTINGS_MAXFILESIZE",
-				Value: strconv.Itoa(1000 * 1048576),
-			})
+			if strings.HasSuffix(size, "M") {
+				maxFileSize, _ := strconv.Atoi(strings.TrimSuffix(size, "M"))
+				valueSize = strconv.Itoa(maxFileSize * 1048576)
+			} else if strings.HasSuffix(size, "m") {
+				maxFileSize, _ := strconv.Atoi(strings.TrimSuffix(size, "m"))
+				valueSize = strconv.Itoa(maxFileSize * 1048576)
+			} else if strings.HasSuffix(size, "G") {
+				maxFileSize, _ := strconv.Atoi(strings.TrimSuffix(size, "G"))
+				valueSize = strconv.Itoa(maxFileSize * 1048576000)
+			} else if strings.HasSuffix(size, "g") {
+				maxFileSize, _ := strconv.Atoi(strings.TrimSuffix(size, "g"))
+				valueSize = strconv.Itoa(maxFileSize * 1048576000)
+			}
 		}
 	}
+	envVarGeneral = append(envVarGeneral, corev1.EnvVar{
+		Name:  "MM_FILESETTINGS_MAXFILESIZE",
+		Value: valueSize,
+	})
 
 	// Mattermost License
 	volumeLicense := []corev1.Volume{}
