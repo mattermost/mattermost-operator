@@ -43,6 +43,13 @@ const (
 	// GreenName is the name of the green Mattermmost installation in a blue/green
 	// deployment type.
 	GreenName = "green"
+
+	// SizeMB is the number of bytes that make a megabyte
+	SizeMB = 1048576
+	// SizeGB is the number of bytes that make a gigabyte
+	SizeGB = 1048576000
+	// DefaultMaxFileSize is the default maximum file size configuration value that will be used unless nginx annotation is set
+	DefaultMaxFileSize = 1000
 )
 
 // SetDefaults set the missing values in the manifest to the default ones
@@ -414,22 +421,23 @@ func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingres
 		},
 	}
 
-	valueSize := strconv.Itoa(1000 * 1048576)
+
+	valueSize := strconv.Itoa(DefaultMaxFileSize * SizeMB)
 	if !mattermost.Spec.UseServiceLoadBalancer {
 		if _, ok := mattermost.Spec.IngressAnnotations["nginx.ingress.kubernetes.io/proxy-body-size"]; ok {
 			size := mattermost.Spec.IngressAnnotations["nginx.ingress.kubernetes.io/proxy-body-size"]
 			if strings.HasSuffix(size, "M") {
 				maxFileSize, _ := strconv.Atoi(strings.TrimSuffix(size, "M"))
-				valueSize = strconv.Itoa(maxFileSize * 1048576)
+				valueSize = strconv.Itoa(maxFileSize * SizeMB)
 			} else if strings.HasSuffix(size, "m") {
 				maxFileSize, _ := strconv.Atoi(strings.TrimSuffix(size, "m"))
-				valueSize = strconv.Itoa(maxFileSize * 1048576)
+				valueSize = strconv.Itoa(maxFileSize * SizeMB)
 			} else if strings.HasSuffix(size, "G") {
 				maxFileSize, _ := strconv.Atoi(strings.TrimSuffix(size, "G"))
-				valueSize = strconv.Itoa(maxFileSize * 1048576000)
+				valueSize = strconv.Itoa(maxFileSize * SizeGB)
 			} else if strings.HasSuffix(size, "g") {
 				maxFileSize, _ := strconv.Atoi(strings.TrimSuffix(size, "g"))
-				valueSize = strconv.Itoa(maxFileSize * 1048576000)
+				valueSize = strconv.Itoa(maxFileSize * SizeGB)
 			}
 		}
 	}
