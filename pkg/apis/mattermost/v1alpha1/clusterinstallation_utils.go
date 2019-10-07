@@ -421,7 +421,6 @@ func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingres
 		},
 	}
 
-
 	valueSize := strconv.Itoa(DefaultMaxFileSize * SizeMB)
 	if !mattermost.Spec.UseServiceLoadBalancer {
 		if _, ok := mattermost.Spec.IngressAnnotations["nginx.ingress.kubernetes.io/proxy-body-size"]; ok {
