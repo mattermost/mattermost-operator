@@ -205,6 +205,13 @@ spec:
               type: string
             minio:
               properties:
+                externalBucket:
+                  description: Set to the bucket name of your external MinIO or S3.
+                  type: string
+                externalURL:
+                  description: Set to use an external MinIO deployment or S3. Must
+                    also set 'Secret' and 'ExternalBucket'.
+                  type: string
                 replicas:
                   description: 'Defines the number of Minio replicas. Supply 1 to
                     run Minio in standalone mode with no redundancy. Supply 4 or more
@@ -219,7 +226,9 @@ spec:
                     pods.
                   type: object
                 secret:
-                  description: Optionally enter the name of already existing Secret
+                  description: 'Optionally enter the name of already existing secret.
+                    Secret should have two values: "accesskey" and "secretkey". Required
+                    when "ExternalURL" is set.'
                   type: string
                 storageSize:
                   description: Defines the storage size for Minio. ie 50Gi

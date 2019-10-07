@@ -128,6 +128,11 @@ func (mi *Minio) SetDefaults() {
 	}
 }
 
+// IsExternal returns true if the MinIO/S3 instance is external
+func (mi *Minio) IsExternal() bool {
+	return mi.ExternalURL != ""
+}
+
 // SetDefaults sets the missing values in Database to the default ones
 func (db *Database) SetDefaults() {
 	if len(db.Type) == 0 {
@@ -247,7 +252,7 @@ func (mattermost *ClusterInstallation) GenerateIngress(name, ingressName string,
 }
 
 // GenerateDeployment returns the deployment spec for Mattermost
-func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingressName, containerImage, dbUser, dbPassword, dbName string, externalDB, isLicensed bool, minioService string) *appsv1.Deployment {
+func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingressName, containerImage, dbUser, dbPassword, dbName string, externalDB, isLicensed bool, minioURL string) *appsv1.Deployment {
 	envVarDB := []corev1.EnvVar{}
 
 	masterDBEnvVar := corev1.EnvVar{
@@ -292,17 +297,6 @@ func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingres
 
 	envVarDB = append(envVarDB, masterDBEnvVar)
 
-	// Create the init container to check that MinIO is up and running
-	initContainers = append(initContainers, corev1.Container{
-		Name:            "init-check-minio",
-		Image:           "appropriate/curl:latest",
-		ImagePullPolicy: corev1.PullIfNotPresent,
-		Command: []string{
-			"sh", "-c",
-			fmt.Sprintf("until curl --max-time 5 http://%s/minio/health/ready; do echo waiting for minio; sleep 5; done;", minioService),
-		},
-	})
-
 	minioName := fmt.Sprintf("%s-minio", mattermost.Name)
 
 	// Check if custom secret was passed
@@ -327,26 +321,45 @@ func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingres
 			Key: "secretkey",
 		},
 	}
-	// Create the init container to create the MinIO bucker
-	initContainers = append(initContainers, corev1.Container{
-		Name:            "create-minio-bucket",
-		Image:           "minio/mc:latest",
-		ImagePullPolicy: corev1.PullIfNotPresent,
-		Command: []string{
-			"/bin/sh", "-c",
-			fmt.Sprintf("mc config host add localminio http://%s $(MINIO_ACCESS_KEY) $(MINIO_SECRET_KEY) && mc mb localminio/%s -q -p", minioService, mattermost.Name),
-		},
-		Env: []corev1.EnvVar{
-			{
-				Name:      "MINIO_ACCESS_KEY",
-				ValueFrom: minioAccessEnv,
+
+	if !mattermost.Spec.Minio.IsExternal() {
+		// Create the init container to create the MinIO bucker
+		initContainers = append(initContainers, corev1.Container{
+			Name:            "create-minio-bucket",
+			Image:           "minio/mc:latest",
+			ImagePullPolicy: corev1.PullIfNotPresent,
+			Command: []string{
+				"/bin/sh", "-c",
+				fmt.Sprintf("mc config host add localminio http://%s $(MINIO_ACCESS_KEY) $(MINIO_SECRET_KEY) && mc mb localminio/%s -q -p", minioURL, mattermost.Name),
 			},
-			{
-				Name:      "MINIO_SECRET_KEY",
-				ValueFrom: minioSecretEnv,
+			Env: []corev1.EnvVar{
+				{
+					Name:      "MINIO_ACCESS_KEY",
+					ValueFrom: minioAccessEnv,
+				},
+				{
+					Name:      "MINIO_SECRET_KEY",
+					ValueFrom: minioSecretEnv,
+				},
 			},
-		},
-	})
+		})
+
+		// Create the init container to check that MinIO is up and running
+		initContainers = append(initContainers, corev1.Container{
+			Name:            "init-check-minio",
+			Image:           "appropriate/curl:latest",
+			ImagePullPolicy: corev1.PullIfNotPresent,
+			Command: []string{
+				"sh", "-c",
+				fmt.Sprintf("until curl --max-time 5 http://%s/minio/health/ready; do echo waiting for minio; sleep 5; done;", minioURL),
+			},
+		})
+	}
+
+	bucket := mattermost.Name
+	if mattermost.Spec.Minio.ExternalBucket != "" {
+		bucket = mattermost.Spec.Minio.ExternalBucket
+	}
 
 	// Generate Minio config
 	envVarMinio := []corev1.EnvVar{
@@ -364,11 +377,11 @@ func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingres
 		},
 		{
 			Name:  "MM_FILESETTINGS_AMAZONS3BUCKET",
-			Value: mattermost.Name,
+			Value: bucket,
 		},
 		{
 			Name:  "MM_FILESETTINGS_AMAZONS3ENDPOINT",
-			Value: minioService,
+			Value: minioURL,
 		},
 		{
 			Name:  "MM_FILESETTINGS_AMAZONS3SSL",
