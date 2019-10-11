@@ -1,0 +1,34 @@
+name: CleanDocker
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  clean-docker:
+    name: Clean Docker images for PR
+    runs-on: ubuntu-latest
+    env:
+      DOCKER_USER: ${{ secrets.DOCKER_USER }}
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+    steps:
+    - name: Get Commits and delete
+      run: |
+        echo "***SHA***"
+        echo $GITHUB_SHA
+        echo "******"
+        PR=$(curl https://api.github.com/repos/mattermost/mattermost-operator/commits/"$GITHUB_SHA"/pulls --header 'Accept: application/vnd.github.groot-preview+json' | jq -r '.[] | .number')
+        echo "***PR***"
+        echo $PR
+        echo "******"
+        COMMITS=$(curl https://api.github.com/repos/mattermost/mattermost-operator/pulls/"$PR"/commits | jq -r '.[] | .sha')
+        echo "***Commits***"
+        echo $COMMITS
+        echo "******"
+
+        TOKEN=$(curl -s -H "Content-Type: application/json" -X POST --data '{"username": "'"$DOCKER_USER"'", "password": "'"$DOCKER_PASSWORD"'"}' https://hub.docker.com/v2/users/login/ | jq -r .token)
+        for commit in $COMMITS
+        do
+          echo "Deleting docker image ${commit:0:7}"
+          curl -X DELETE -s -H "Authorization: JWT ${TOKEN}" https://hub.docker.com/v2/repositories/mattermost/mattermost-operator/tags/"${commit:0:7}"/ || true
+        done
+        echo done
