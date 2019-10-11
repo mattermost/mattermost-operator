@@ -119,7 +119,7 @@ func (r *ReconcileClusterInstallation) createMinioInstanceIfNotExists(mattermost
 }
 
 func (r *ReconcileClusterInstallation) getMinioService(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) (string, error) {
-	minioServiceName := fmt.Sprintf("%s-minio", mattermost.Name)
+	minioServiceName := fmt.Sprintf("%s-minio-hl-svc", mattermost.Name)
 	minioService := &corev1.Service{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: minioServiceName, Namespace: mattermost.Namespace}, minioService)
 	if err != nil {
