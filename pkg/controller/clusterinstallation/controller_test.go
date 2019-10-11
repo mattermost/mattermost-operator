@@ -178,6 +178,13 @@ func TestReconcile(t *testing.T) {
 			},
 		}
 
+		svcKey := types.NamespacedName{Name: ci.Name, Namespace: ciNamespace}
+		svc := &corev1.Service{}
+		blueSvcKey := types.NamespacedName{Name: ci.Spec.BlueGreen.Blue.Name, Namespace: ciNamespace}
+		blueSvc := &corev1.Service{}
+		greenSvcKey := types.NamespacedName{Name: ci.Spec.BlueGreen.Green.Name, Namespace: ciNamespace}
+		greenSvc := &corev1.Service{}
+
 		err = c.Update(context.TODO(), ci)
 		require.NoError(t, err)
 
@@ -234,6 +241,17 @@ func TestReconcile(t *testing.T) {
 				assert.Equal(t, ci.Status.Image, ci.Spec.BlueGreen.Blue.Image)
 				assert.Equal(t, ci.Status.Endpoint, ci.Spec.BlueGreen.Blue.IngressName)
 			})
+			t.Run("service", func(t *testing.T) {
+				err = c.Get(context.TODO(), svcKey, svc)
+				require.NoError(t, err)
+				assert.Equal(t, ci.Spec.BlueGreen.Blue.Name, svc.Spec.Selector["v1alpha1.mattermost.com/installation"])
+				err = c.Get(context.TODO(), blueSvcKey, blueSvc)
+				require.NoError(t, err)
+				assert.Equal(t, ci.Spec.BlueGreen.Blue.Name, blueSvc.Spec.Selector["v1alpha1.mattermost.com/installation"])
+				err = c.Get(context.TODO(), greenSvcKey, greenSvc)
+				require.NoError(t, err)
+				assert.Equal(t, ci.Spec.BlueGreen.Green.Name, greenSvc.Spec.Selector["v1alpha1.mattermost.com/installation"])
+			})
 		})
 
 		t.Run("green", func(t *testing.T) {
@@ -254,6 +272,17 @@ func TestReconcile(t *testing.T) {
 				assert.Equal(t, ci.Status.Version, ci.Spec.BlueGreen.Green.Version)
 				assert.Equal(t, ci.Status.Image, ci.Spec.BlueGreen.Green.Image)
 				assert.Equal(t, ci.Status.Endpoint, ci.Spec.BlueGreen.Green.IngressName)
+			})
+			t.Run("service", func(t *testing.T) {
+				err = c.Get(context.TODO(), svcKey, svc)
+				require.NoError(t, err)
+				assert.Equal(t, ci.Spec.BlueGreen.Green.Name, svc.Spec.Selector["v1alpha1.mattermost.com/installation"])
+				err = c.Get(context.TODO(), blueSvcKey, blueSvc)
+				require.NoError(t, err)
+				assert.Equal(t, ci.Spec.BlueGreen.Blue.Name, blueSvc.Spec.Selector["v1alpha1.mattermost.com/installation"])
+				err = c.Get(context.TODO(), greenSvcKey, greenSvc)
+				require.NoError(t, err)
+				assert.Equal(t, ci.Spec.BlueGreen.Green.Name, greenSvc.Spec.Selector["v1alpha1.mattermost.com/installation"])
 			})
 		})
 	})
