@@ -63,6 +63,21 @@ jobs:
           command: ./test/e2e.sh
           no_output_timeout: 1h
 
+  push-docker-pr:
+    executor:
+      name: default
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run: make build-image
+      - run: |
+          set -e
+          set -u
+          export TAG="${CIRCLE_SHA1:0:7}"
+          echo $DOCKER_PASSWORD | docker login --username $DOCKER_USERNAME --password-stdin
+          docker tag mattermost/mattermost-operator:test mattermost/mattermost-operator:$TAG
+          docker push mattermost/mattermost-operator:$TAG
+
   push-docker:
     executor:
       name: default
@@ -99,6 +114,9 @@ workflows:
       - e2e:
           requires:
             - lint
+            - unittest
+      - push-docker-pr:
+          requires:
             - unittest
   master-build:
     jobs:
