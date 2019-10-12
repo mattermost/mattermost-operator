@@ -56,15 +56,15 @@ func Cluster(mattermost *mattermostv1alpha1.ClusterInstallation) *mysqlOperator.
 	if mattermost.Spec.Database.InitBucketURL != "" && mattermost.Spec.Database.BackupRestoreSecretName != "" {
 		mysql.Spec.InitBucketURL = mattermost.Spec.Database.InitBucketURL
 		mysql.Spec.InitBucketSecretName = mattermost.Spec.Database.BackupRestoreSecretName
-	} else if mattermost.Spec.Database.Secret != "" {
-		mysql.Spec.SecretName = mattermost.Spec.Database.Secret
+	} else if mattermost.Spec.Database.ExistingSecret != "" {
+		mysql.Spec.SecretName = mattermost.Spec.Database.ExistingSecret
 	}
 
 	return mysql
 }
 
-// Secret returns the secret name created to use together with MySQL deployment
-func Secret(mattermost *mattermostv1alpha1.ClusterInstallation) *corev1.Secret {
+// CreateSecret returns the secret name created to use together with MySQL deployment
+func CreateSecret(mattermost *mattermostv1alpha1.ClusterInstallation) *corev1.Secret {
 	secretName := fmt.Sprintf("%s-mysql-root-password", mattermost.Name)
 	data := make(map[string][]byte)
 	data["USER"] = []byte("mmuser")

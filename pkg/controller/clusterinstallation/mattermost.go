@@ -251,7 +251,7 @@ func (r *ReconcileClusterInstallation) updateMattermostDeployment(mattermost *ma
 			}
 		}()
 
-		// it's done, it either failed or succeded
+		// it's done, it either failed or succeeded
 		if alreadyRunning.Status.Failed > 0 {
 			return errors.New("Upgrade job failed")
 		}

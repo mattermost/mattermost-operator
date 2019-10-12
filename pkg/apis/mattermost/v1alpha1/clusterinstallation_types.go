@@ -183,7 +183,7 @@ type Database struct {
 	BackupSecretName string `json:"backupSecretName,omitempty"`
 	// Optionally enter the name of already existing Secret
 	// +optional
-	Secret                  string `json:"secret,omitempty"`
+	ExistingSecret	string `json:"existingSecret,omitempty"`
 	BackupRestoreSecretName string `json:"backupRestoreSecretName,omitempty"`
 }
 
