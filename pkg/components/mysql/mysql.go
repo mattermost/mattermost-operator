@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
-	componentUtils "github.com/mattermost/mattermost-operator/pkg/components/utils"
 	"github.com/mattermost/mattermost-operator/pkg/utils"
 	mysqlOperator "github.com/presslabs/mysql-operator/pkg/apis/mysql/v1alpha1"
 
@@ -61,19 +60,4 @@ func Cluster(mattermost *mattermostv1alpha1.ClusterInstallation) *mysqlOperator.
 	}
 
 	return mysql
-}
-
-// CreateSecret returns the secret name created to use together with MySQL deployment
-func CreateSecret(mattermost *mattermostv1alpha1.ClusterInstallation) *corev1.Secret {
-	secretName := fmt.Sprintf("%s-mysql-root-password", mattermost.Name)
-	data := make(map[string][]byte)
-	data["USER"] = []byte("mmuser")
-	data["DATABASE"] = []byte("mattermost")
-	data["PASSWORD"] = componentUtils.New16ID()
-
-	return mattermost.GenerateSecret(
-		secretName,
-		mattermostv1alpha1.ClusterInstallationResourceLabels(mattermost.Name),
-		data,
-	)
 }

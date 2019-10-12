@@ -6,6 +6,7 @@ import (
 	"reflect"
 
 	"github.com/go-logr/logr"
+	"github.com/mattermost/mattermost-operator/pkg/components/utils"
 	"github.com/pkg/errors"
 	mysqlOperator "github.com/presslabs/mysql-operator/pkg/apis/mysql/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
@@ -101,12 +102,24 @@ func (r *ReconcileClusterInstallation) getOrCreateMySQLSecrets(mattermost *matte
 	dbSecretName := fmt.Sprintf("%s-mysql-root-password", mattermost.Name)
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: dbSecretName, Namespace: mattermost.Namespace}, dbSecret)
 	if err != nil && k8sErrors.IsNotFound(err) {
-		// create a new secret
-		dbSecret = mattermostmysql.CreateSecret(mattermost)
+		reqLogger.Info("Creating mysql secret")
+
+		dbSecret.SetName(dbSecretName)
+		dbSecret.SetNamespace(mattermost.Namespace)
+		rootPassword := string(utils.New16ID())
+		userPassword := string(utils.New16ID())
+
+		dbSecret.Data = map[string][]byte{
+			"ROOT_PASSWORD": []byte(rootPassword),
+			"USER":          []byte("mmuser"),
+			"PASSWORD":      []byte(userPassword),
+			"DATABASE":      []byte("mattermost"),
+		}
+
 		dbInfo = databaseInfo{
-			userName:     string(dbSecret.Data["USER"]),
-			userPassword: string(dbSecret.Data["PASSWORD"]),
-			dbName:       string(dbSecret.Data["DATABASE"]),
+			userName:     "mmuser",
+			userPassword: userPassword,
+			dbName:       "mattermost",
 		}
 		return dbInfo, r.create(mattermost, dbSecret, reqLogger)
 	} else if err != nil {
