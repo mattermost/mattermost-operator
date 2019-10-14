@@ -323,7 +323,7 @@ func prepAllDependencyTestResources(r *ReconcileClusterInstallation, ci *matterm
 
 	minioService := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      ci.Name + "-minio",
+			Name:      ci.Name + "-minio-hl-svc",
 			Namespace: ci.Namespace,
 		},
 		Spec: corev1.ServiceSpec{

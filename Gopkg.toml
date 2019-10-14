@@ -68,7 +68,7 @@ required = [
 
 [[constraint]]
   name = "github.com/minio/minio-operator"
-  revision = "1d2a6c49cbae00402f36f61e91b162ff3b09446c"
+  revision = "1.0.4"
 
 # For dependency below: Refer to issue https://github.com/golang/dep/issues/1799
 [[override]]
@@ -90,4 +90,4 @@ version="v1.4.7"
 
 [[constraint]]
   name = "github.com/presslabs/mysql-operator"
-  version = "0.3.2"
+  version = "0.3.3"

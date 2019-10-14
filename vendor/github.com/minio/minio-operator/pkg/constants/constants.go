@@ -1,22 +1,28 @@
 /*
- * MinIO-Operator - Manage MinIO clusters in Kubernetes
+ * Copyright (C) 2019, MinIO, Inc.
  *
- * MinIO Cloud Storage, (C) 2018, 2019 MinIO, Inc.
+ * This code is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License, version 3,
+ * as published by the Free Software Foundation.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * You should have received a copy of the GNU Affero General Public License, version 3,
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
  */
 
 package constants
+
+import (
+	"crypto/elliptic"
+	"time"
+
+	appsv1 "k8s.io/api/apps/v1"
+)
 
 // InstanceLabel is applied to all components of a MinIOInstance cluster
 const InstanceLabel = "v1beta1.min.io/instance"
@@ -40,11 +46,8 @@ const MinIOVolumeMountPath = "/export"
 // MinIOVolumeSubPath specifies the default sub path under mount path
 const MinIOVolumeSubPath = ""
 
-// DefaultMinIOImagePath specifies the MinIO Docker hub path
-const DefaultMinIOImagePath = "minio/minio"
-
-// DefaultMinIOImageVersion specifies the latest released MinIO Docker hub image
-const DefaultMinIOImageVersion = "RELEASE.2019-06-19T18-24-42Z"
+// DefaultMinIOImage specifies the default MinIO Docker hub image
+const DefaultMinIOImage = "minio/minio:RELEASE.2019-09-11T19-53-16Z"
 
 // MinIOServerName specifies the default container name for MinIOInstance
 const MinIOServerName = "minio"
@@ -52,5 +55,36 @@ const MinIOServerName = "minio"
 // DefaultMinIOAccessKey specifies default access key for MinIOInstance
 const DefaultMinIOAccessKey = "AKIAIOSFODNN7EXAMPLE"
 
-//DefaultMinIOSecretKey specifies default secret key for MinIOInstance
+// DefaultMinIOSecretKey specifies default secret key for MinIOInstance
 const DefaultMinIOSecretKey = "wJalrXUtnFEMIK7MDENGbPxRfiCYEXAMPLEKEY"
+
+// DefaultPodManagementPolicy specifies default pod management policy as expllained here
+// https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#pod-management-policies
+const DefaultPodManagementPolicy = appsv1.ParallelPodManagement
+
+// DefaultUpdateStrategy specifies default pod update policy as explained here
+// https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#update-strategies
+const DefaultUpdateStrategy = "RollingUpdate"
+
+// HeadlessServiceNameSuffix specifies the suffix added to MinIOInstance name to create a headless service
+const HeadlessServiceNameSuffix = "-hl-svc"
+
+// CSRNameSuffix specifies the suffix added to MinIOInstance name to create a CSR
+const CSRNameSuffix = "-csr"
+
+// Auto TLS related constants
+
+// DefaultEllipticCurve specifies the default elliptic curve to be used for key generation
+var DefaultEllipticCurve = elliptic.P256()
+
+// DefaultOrgName specifies the default Org name to be used in automatic certificate generation
+var DefaultOrgName = []string{"Acme Co"}
+
+// DefaultQueryInterval specifies the interval between each query for CSR Status
+var DefaultQueryInterval = time.Second * 5
+
+// DefaultQueryTimeout specifies the timeout for query for CSR Status
+var DefaultQueryTimeout = time.Minute * 20
+
+// TLSSecretSuffix is the suffix applied to MinIOInstance name to create the TLS secret
+var TLSSecretSuffix = "-tls"
