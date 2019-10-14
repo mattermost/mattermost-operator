@@ -12,7 +12,7 @@ func (r *ReconcileClusterInstallation) checkBlueGreen(mattermost *mattermostv1al
 
 		blueGreen := []mattermostv1alpha1.AppDeployment{mattermost.Spec.BlueGreen.Blue, mattermost.Spec.BlueGreen.Green}
 		for _, deployment := range blueGreen {
-			err := r.checkMattermostService(mattermost, deployment.Name, mattermost.GetProductionDeploymentName(), reqLogger)
+			err := r.checkMattermostService(mattermost, deployment.Name, deployment.Name, reqLogger)
 			if err != nil {
 				return err
 			}
