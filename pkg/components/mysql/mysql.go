@@ -55,7 +55,9 @@ func Cluster(mattermost *mattermostv1alpha1.ClusterInstallation) *mysqlOperator.
 	if mattermost.Spec.Database.InitBucketURL != "" && mattermost.Spec.Database.BackupRestoreSecretName != "" {
 		mysql.Spec.InitBucketURL = mattermost.Spec.Database.InitBucketURL
 		mysql.Spec.InitBucketSecretName = mattermost.Spec.Database.BackupRestoreSecretName
-	} else if mattermost.Spec.Database.ExistingSecret != "" {
+	}
+
+	if mattermost.Spec.Database.ExistingSecret != "" {
 		mysql.Spec.SecretName = mattermost.Spec.Database.ExistingSecret
 	}
 

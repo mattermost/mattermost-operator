@@ -181,7 +181,7 @@ type Database struct {
 	// Defines the secret to be used for uploading/restoring backup.
 	// +optional
 	BackupSecretName string `json:"backupSecretName,omitempty"`
-	// Optionally enter the name of already existing Secret
+	// Optionally enter the name of an already existing Secret for use by the MySQL operator
 	// +optional
 	ExistingSecret          string `json:"existingSecret,omitempty"`
 	BackupRestoreSecretName string `json:"backupRestoreSecretName,omitempty"`
