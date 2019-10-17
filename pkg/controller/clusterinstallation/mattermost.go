@@ -13,6 +13,7 @@ import (
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	k8sClient "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -144,6 +145,54 @@ func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mat
 	err = r.updateMattermostDeployment(mattermost, current, desired, imageName, reqLogger)
 	if err != nil {
 		reqLogger.Error(err, "Failed to update mattermost deployment")
+		return err
+	}
+
+	return nil
+}
+func (r *ReconcileClusterInstallation) deleteAllMattermostComponents(mattermost *mattermostv1alpha1.ClusterInstallation, resourceName string, reqLogger logr.Logger) error {
+	err := r.deleteMattermostDeployment(mattermost, resourceName, reqLogger)
+	if err != nil {
+		return err
+	}
+
+	err = r.deleteMattermostService(mattermost, resourceName, reqLogger)
+	if err != nil {
+		return err
+	}
+
+	err = r.deleteMattermostIngress(mattermost, resourceName, reqLogger)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *ReconcileClusterInstallation) deleteMattermostDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, resourceName string, reqLogger logr.Logger) error {
+	return r.deleteMattermostResource(mattermost, resourceName, &appsv1.Deployment{}, reqLogger)
+}
+
+func (r *ReconcileClusterInstallation) deleteMattermostService(mattermost *mattermostv1alpha1.ClusterInstallation, resourceName string, reqLogger logr.Logger) error {
+	return r.deleteMattermostResource(mattermost, resourceName, &corev1.Service{}, reqLogger)
+}
+
+func (r *ReconcileClusterInstallation) deleteMattermostIngress(mattermost *mattermostv1alpha1.ClusterInstallation, resourceName string, reqLogger logr.Logger) error {
+	return r.deleteMattermostResource(mattermost, resourceName, &v1beta1.Ingress{}, reqLogger)
+}
+
+func (r *ReconcileClusterInstallation) deleteMattermostResource(mattermost *mattermostv1alpha1.ClusterInstallation, resourceName string, resource runtime.Object, reqLogger logr.Logger) error {
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: resourceName, Namespace: mattermost.GetNamespace()}, resource)
+	if err != nil && k8sErrors.IsNotFound(err) {
+		return nil
+	} else if err != nil {
+		reqLogger.Error(err, "Failed to check if mattermost resource exists")
+		return err
+	}
+
+	err = r.client.Delete(context.TODO(), resource)
+	if err != nil {
+		reqLogger.Error(err, "Failed to delete mattermost resource")
 		return err
 	}
 

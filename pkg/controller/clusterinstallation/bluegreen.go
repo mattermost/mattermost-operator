@@ -27,6 +27,24 @@ func (r *ReconcileClusterInstallation) checkBlueGreen(mattermost *mattermostv1al
 				return err
 			}
 		}
+
+		err := r.deleteMattermostDeployment(mattermost, mattermost.GetName(), reqLogger)
+		if err != nil {
+			return err
+		}
+	} else {
+		if mattermost.Status.BlueName != "" {
+			err := r.deleteAllMattermostComponents(mattermost, mattermost.Status.BlueName, reqLogger)
+			if err != nil {
+				return err
+			}
+		}
+		if mattermost.Status.GreenName != "" {
+			err := r.deleteAllMattermostComponents(mattermost, mattermost.Status.GreenName, reqLogger)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil

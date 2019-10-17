@@ -281,8 +281,14 @@ spec:
             Not included when requesting from the apiserver, only from the Mattermost
             Operator API itself. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status'
           properties:
+            blueName:
+              description: The name of the blue deployment in BlueGreen
+              type: string
             endpoint:
               description: The endpoint to access the Mattermost instance
+              type: string
+            greenName:
+              description: The name of the green deployment in BlueGreen
               type: string
             image:
               description: The image running on the pods in the Mattermost instance
