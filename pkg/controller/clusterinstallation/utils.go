@@ -54,6 +54,9 @@ func (r *ReconcileClusterInstallation) handleCheckClusterInstallation(mattermost
 		status = greenStatus
 	}
 
+	status.BlueName = mattermost.Spec.BlueGreen.Blue.Name
+	status.GreenName = mattermost.Spec.BlueGreen.Green.Name
+
 	if blueErr != nil {
 		return status, errors.Wrap(blueErr, "blue installation validation failed")
 	}

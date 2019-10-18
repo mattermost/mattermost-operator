@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -180,9 +181,9 @@ func TestReconcile(t *testing.T) {
 
 		svcKey := types.NamespacedName{Name: ci.Name, Namespace: ciNamespace}
 		svc := &corev1.Service{}
-		blueSvcKey := types.NamespacedName{Name: ci.Spec.BlueGreen.Blue.Name, Namespace: ciNamespace}
+		blueKey := types.NamespacedName{Name: ci.Spec.BlueGreen.Blue.Name, Namespace: ciNamespace}
 		blueSvc := &corev1.Service{}
-		greenSvcKey := types.NamespacedName{Name: ci.Spec.BlueGreen.Green.Name, Namespace: ciNamespace}
+		greenKey := types.NamespacedName{Name: ci.Spec.BlueGreen.Green.Name, Namespace: ciNamespace}
 		greenSvc := &corev1.Service{}
 
 		err = c.Update(context.TODO(), ci)
@@ -240,17 +241,25 @@ func TestReconcile(t *testing.T) {
 				assert.Equal(t, ci.Status.Version, ci.Spec.BlueGreen.Blue.Version)
 				assert.Equal(t, ci.Status.Image, ci.Spec.BlueGreen.Blue.Image)
 				assert.Equal(t, ci.Status.Endpoint, ci.Spec.BlueGreen.Blue.IngressName)
+				assert.Equal(t, ci.Status.BlueName, ci.Spec.BlueGreen.Blue.Name)
+				assert.Equal(t, ci.Status.GreenName, ci.Spec.BlueGreen.Green.Name)
 			})
 			t.Run("service", func(t *testing.T) {
 				err = c.Get(context.TODO(), svcKey, svc)
 				require.NoError(t, err)
 				assert.Equal(t, ci.Spec.BlueGreen.Blue.Name, svc.Spec.Selector["v1alpha1.mattermost.com/installation"])
-				err = c.Get(context.TODO(), blueSvcKey, blueSvc)
+				err = c.Get(context.TODO(), blueKey, blueSvc)
 				require.NoError(t, err)
 				assert.Equal(t, ci.Spec.BlueGreen.Blue.Name, blueSvc.Spec.Selector["v1alpha1.mattermost.com/installation"])
-				err = c.Get(context.TODO(), greenSvcKey, greenSvc)
+				err = c.Get(context.TODO(), greenKey, greenSvc)
 				require.NoError(t, err)
 				assert.Equal(t, ci.Spec.BlueGreen.Green.Name, greenSvc.Spec.Selector["v1alpha1.mattermost.com/installation"])
+			})
+			t.Run("check normal deployment", func(t *testing.T) {
+				deployment := &appsv1.Deployment{}
+				err = c.Get(context.TODO(), ciKey, deployment)
+				require.Error(t, err)
+				assert.True(t, k8sErrors.IsNotFound(err))
 			})
 		})
 
@@ -272,17 +281,59 @@ func TestReconcile(t *testing.T) {
 				assert.Equal(t, ci.Status.Version, ci.Spec.BlueGreen.Green.Version)
 				assert.Equal(t, ci.Status.Image, ci.Spec.BlueGreen.Green.Image)
 				assert.Equal(t, ci.Status.Endpoint, ci.Spec.BlueGreen.Green.IngressName)
+				assert.Equal(t, ci.Status.BlueName, ci.Spec.BlueGreen.Blue.Name)
+				assert.Equal(t, ci.Status.GreenName, ci.Spec.BlueGreen.Green.Name)
 			})
 			t.Run("service", func(t *testing.T) {
 				err = c.Get(context.TODO(), svcKey, svc)
 				require.NoError(t, err)
 				assert.Equal(t, ci.Spec.BlueGreen.Green.Name, svc.Spec.Selector["v1alpha1.mattermost.com/installation"])
-				err = c.Get(context.TODO(), blueSvcKey, blueSvc)
+				err = c.Get(context.TODO(), blueKey, blueSvc)
 				require.NoError(t, err)
 				assert.Equal(t, ci.Spec.BlueGreen.Blue.Name, blueSvc.Spec.Selector["v1alpha1.mattermost.com/installation"])
-				err = c.Get(context.TODO(), greenSvcKey, greenSvc)
+				err = c.Get(context.TODO(), greenKey, greenSvc)
 				require.NoError(t, err)
 				assert.Equal(t, ci.Spec.BlueGreen.Green.Name, greenSvc.Spec.Selector["v1alpha1.mattermost.com/installation"])
+			})
+		})
+
+		t.Run("clean up", func(t *testing.T) {
+			ci.Spec.BlueGreen.Enable = false
+			err = c.Update(context.TODO(), ci)
+			require.NoError(t, err)
+
+			t.Run("no reconcile errors", func(t *testing.T) {
+				res, err = r.Reconcile(req)
+				require.NoError(t, err)
+				require.Equal(t, res, reconcile.Result{})
+			})
+			t.Run("deployments", func(t *testing.T) {
+				blueDeploy := &appsv1.Deployment{}
+				greenDeploy := &appsv1.Deployment{}
+				err = c.Get(context.TODO(), blueKey, blueDeploy)
+				require.Error(t, err)
+				assert.True(t, k8sErrors.IsNotFound(err))
+				err = c.Get(context.TODO(), greenKey, greenDeploy)
+				require.Error(t, err)
+				assert.True(t, k8sErrors.IsNotFound(err))
+			})
+			t.Run("services", func(t *testing.T) {
+				err = c.Get(context.TODO(), blueKey, blueSvc)
+				require.Error(t, err)
+				assert.True(t, k8sErrors.IsNotFound(err))
+				err = c.Get(context.TODO(), greenKey, greenSvc)
+				require.Error(t, err)
+				assert.True(t, k8sErrors.IsNotFound(err))
+			})
+			t.Run("ingress", func(t *testing.T) {
+				blueIngress := &v1beta1.Ingress{}
+				greenIngress := &v1beta1.Ingress{}
+				err = c.Get(context.TODO(), blueKey, blueIngress)
+				require.Error(t, err)
+				assert.True(t, k8sErrors.IsNotFound(err))
+				err = c.Get(context.TODO(), greenKey, greenIngress)
+				require.Error(t, err)
+				assert.True(t, k8sErrors.IsNotFound(err))
 			})
 		})
 	})
