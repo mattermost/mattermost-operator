@@ -10,17 +10,12 @@ jobs:
     env:
       DOCKER_USER: ${{ secrets.DOCKER_USER }}
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+      GITHUB_CONTEXT: ${{ toJson(github) }}
     steps:
     - name: Get Commits and delete
       run: |
-        echo "***SHA***"
-        echo $GITHUB_SHA
-        echo "******"
-        PR=$(curl https://api.github.com/repos/mattermost/mattermost-operator/commits/"$GITHUB_SHA"/pulls --header 'Accept: application/vnd.github.groot-preview+json' | jq -r '.[] | .number')
-        echo "***PR***"
-        echo $PR
-        echo "******"
-        COMMITS=$(curl https://api.github.com/repos/mattermost/mattermost-operator/pulls/"$PR"/commits | jq -r '.[] | .sha')
+        COMMITS_URL=$(echo $GITHUB_CONTEXT | jq -r '.event.pull_request._links.commits.href')
+        COMMITS=$(curl $COMMITS_URL | jq -r '.[] | .sha')
         echo "***Commits***"
         echo $COMMITS
         echo "******"
