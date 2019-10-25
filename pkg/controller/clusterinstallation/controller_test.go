@@ -136,6 +136,12 @@ func TestReconcile(t *testing.T) {
 			},
 			Status: corev1.PodStatus{
 				Phase: corev1.PodRunning,
+				Conditions: []corev1.PodCondition{
+					corev1.PodCondition{
+						Type:   corev1.PodReady,
+						Status: corev1.ConditionFalse,
+					},
+				},
 			},
 		}
 		for i := 0; i < int(replicas); i++ {
@@ -144,8 +150,52 @@ func TestReconcile(t *testing.T) {
 			require.NoError(t, err)
 		}
 
+		t.Run("pods not ready", func(t *testing.T) {
+			res, err = r.Reconcile(req)
+			require.Error(t, err)
+		})
+
+		// Make pods ready
+		for i := 0; i < int(replicas); i++ {
+			podTemplate.ObjectMeta.Name = fmt.Sprintf("%s-pod-%d", ciName, i)
+			podTemplate.Status.Conditions = []corev1.PodCondition{
+				corev1.PodCondition{
+					Type:   corev1.PodReady,
+					Status: corev1.ConditionTrue,
+				},
+			}
+			err = c.Update(context.TODO(), podTemplate.DeepCopy())
+			require.NoError(t, err)
+		}
+
 		t.Run("no reconcile errors", func(t *testing.T) {
-			// Reconcile again and check for errors this time.
+			res, err = r.Reconcile(req)
+			require.NoError(t, err)
+			require.Equal(t, res, reconcile.Result{})
+		})
+
+		// Make pods not running
+		for i := 0; i < int(replicas); i++ {
+			podTemplate.ObjectMeta.Name = fmt.Sprintf("%s-pod-%d", ciName, i)
+			podTemplate.Status.Phase = corev1.PodPending
+			err = c.Update(context.TODO(), podTemplate.DeepCopy())
+			require.NoError(t, err)
+		}
+
+		t.Run("pods not running", func(t *testing.T) {
+			res, err = r.Reconcile(req)
+			require.Error(t, err)
+		})
+
+		// Make pods running
+		for i := 0; i < int(replicas); i++ {
+			podTemplate.ObjectMeta.Name = fmt.Sprintf("%s-pod-%d", ciName, i)
+			podTemplate.Status.Phase = corev1.PodRunning
+			err = c.Update(context.TODO(), podTemplate.DeepCopy())
+			require.NoError(t, err)
+		}
+
+		t.Run("no reconcile errors", func(t *testing.T) {
 			res, err = r.Reconcile(req)
 			require.NoError(t, err)
 			require.Equal(t, res, reconcile.Result{})
@@ -205,6 +255,12 @@ func TestReconcile(t *testing.T) {
 				},
 				Status: corev1.PodStatus{
 					Phase: corev1.PodRunning,
+					Conditions: []corev1.PodCondition{
+						corev1.PodCondition{
+							Type:   corev1.PodReady,
+							Status: corev1.ConditionTrue,
+						},
+					},
 				},
 			}
 

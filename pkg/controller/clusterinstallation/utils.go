@@ -107,6 +107,21 @@ func (r *ReconcileClusterInstallation) checkClusterInstallation(name, imageName,
 		if pod.Spec.Containers[0].Image != imageName {
 			return status, fmt.Errorf("mattermost pod %s is running incorrect image", pod.Name)
 		}
+
+		podIsReady := false
+		for _, condition := range pod.Status.Conditions {
+			if condition.Type == corev1.PodReady {
+				if condition.Status == corev1.ConditionTrue {
+					podIsReady = true
+				} else {
+					return status, fmt.Errorf("mattermost pod %s is not ready", pod.Name)
+				}
+			}
+		}
+		if !podIsReady {
+			return status, fmt.Errorf("mattermost pod %s is not ready", pod.Name)
+		}
+
 		status.UpdatedReplicas++
 	}
 
