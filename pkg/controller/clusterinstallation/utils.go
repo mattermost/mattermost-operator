@@ -113,6 +113,7 @@ func (r *ReconcileClusterInstallation) checkClusterInstallation(name, imageName,
 			if condition.Type == corev1.PodReady {
 				if condition.Status == corev1.ConditionTrue {
 					podIsReady = true
+					break
 				} else {
 					return status, fmt.Errorf("mattermost pod %s is not ready", pod.Name)
 				}
