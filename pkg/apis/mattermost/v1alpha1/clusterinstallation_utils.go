@@ -432,6 +432,14 @@ func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingres
 			Name:  "MM_PLUGINSETTINGS_ENABLEUPLOADS",
 			Value: "true",
 		},
+		{
+			Name:  "MM_METRICSSETTINGS_ENABLE",
+			Value: "true",
+		},
+		{
+			Name:  "MM_METRICSSETTINGS_LISTENADDRESS",
+			Value: ":8067",
+		},
 	}
 
 	valueSize := strconv.Itoa(DefaultMaxFileSize * SizeMB)
@@ -461,6 +469,7 @@ func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingres
 	// Mattermost License
 	volumeLicense := []corev1.Volume{}
 	volumeMountLicense := []corev1.VolumeMount{}
+	podAnnotations := map[string]string{}
 	if isLicensed {
 		envVarGeneral = append(envVarGeneral, corev1.EnvVar{
 			Name:  "MM_SERVICESETTINGS_LICENSEFILELOCATION",
@@ -494,6 +503,12 @@ func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingres
 		}
 
 		envVarGeneral = append(envVarGeneral, clusterEnvVars...)
+
+		podAnnotations = map[string]string{
+			"prometheus.io/scrape": "true",
+			"prometheus.io/path":   "/metrics",
+			"prometheus.io/port":   "8067",
+		}
 	}
 
 	// EnvVars Section
@@ -536,7 +551,8 @@ func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingres
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: ClusterInstallationLabels(deploymentName),
+					Labels:      ClusterInstallationLabels(deploymentName),
+					Annotations: podAnnotations,
 				},
 				Spec: corev1.PodSpec{
 					InitContainers: initContainers,
