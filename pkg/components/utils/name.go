@@ -4,6 +4,7 @@ import (
 	"crypto/md5"
 	"encoding/base64"
 	"fmt"
+	"strings"
 )
 
 func HashedName(name string) string {
@@ -12,7 +13,7 @@ func HashedName(name string) string {
 	if len(ss) > 6 {
 		ss = ss[:6]
 	}
-	return ss
+	return strings.ToLower(ss)
 }
 
 func HashWithPrefix(prefix, name string) string {
