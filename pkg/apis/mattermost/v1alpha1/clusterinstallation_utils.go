@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mattermost/mattermost-operator/pkg/components/mysql"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
@@ -259,7 +261,8 @@ func (mattermost *ClusterInstallation) GenerateIngress(name, ingressName string,
 
 // GenerateDeployment returns the deployment spec for Mattermost
 func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingressName, containerImage, dbUser, dbPassword, dbName string, externalDB, isLicensed bool, minioURL string) *appsv1.Deployment {
-	envVarDB := []corev1.EnvVar{}
+	var envVarDB []corev1.EnvVar
+	mysqlName := mysql.Name(mattermost.Name)
 
 	masterDBEnvVar := corev1.EnvVar{
 		Name: "MM_CONFIG",
@@ -277,15 +280,15 @@ func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingres
 		}
 	} else {
 		masterDBEnvVar.Value = fmt.Sprintf(
-			"mysql://%s:%s@tcp(db-mysql-master.%s:3306)/%s?charset=utf8mb4,utf8&readTimeout=30s&writeTimeout=30s",
-			dbUser, dbPassword, mattermost.Namespace, dbName,
+			"mysql://%s:%s@tcp(%s-mysql-master.%s:3306)/%s?charset=utf8mb4,utf8&readTimeout=30s&writeTimeout=30s",
+			dbUser, dbPassword, mysqlName, mattermost.Namespace, dbName,
 		)
 
 		envVarDB = append(envVarDB, corev1.EnvVar{
 			Name: "MM_SQLSETTINGS_DATASOURCEREPLICAS",
 			Value: fmt.Sprintf(
-				"%s:%s@tcp(db-mysql.%s:3306)/%s?readTimeout=30s&writeTimeout=30s",
-				dbUser, dbPassword, mattermost.Namespace, dbName,
+				"%s:%s@tcp(%s-mysql.%s:3306)/%s?readTimeout=30s&writeTimeout=30s",
+				dbUser, dbPassword, mysqlName, mattermost.Namespace, dbName,
 			),
 		})
 
@@ -296,7 +299,7 @@ func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingres
 			ImagePullPolicy: corev1.PullIfNotPresent,
 			Command: []string{
 				"sh", "-c",
-				fmt.Sprintf("until curl --max-time 5 http://db-mysql-master.%s:3306; do echo waiting for mysql; sleep 5; done;", mattermost.Namespace),
+				fmt.Sprintf("until curl --max-time 5 http://%s-mysql-master.%s:3306; do echo waiting for mysql; sleep 5; done;", mysqlName, mattermost.Namespace),
 			},
 		})
 	}

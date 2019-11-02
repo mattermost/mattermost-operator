@@ -194,7 +194,7 @@ func (r *ReconcileMattermostRestoreDB) Reconcile(request reconcile.Request) (rec
 	// Removing all the PVC for MySQL to be able to apply the restore
 	for i := 0; i < int(restoreMM.Status.OriginalDBReplicas); i++ {
 		persistentVolumeClaim := &corev1.PersistentVolumeClaim{}
-		dbPersistentVolClaim := fmt.Sprintf("data-db-mysql-%d", i)
+		dbPersistentVolClaim := fmt.Sprintf("data-%s-mysql-%d", mySQLCluster.Name, i)
 		reqLogger.Info("Deleting PVC...", "PersistentVolumeClaimName", dbPersistentVolClaim)
 		errGet := r.client.Get(context.TODO(), types.NamespacedName{Name: dbPersistentVolClaim, Namespace: restoreMM.Namespace}, persistentVolumeClaim)
 		if errGet != nil && errors.IsNotFound(errGet) {
