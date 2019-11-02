@@ -46,7 +46,7 @@ func TestHashedName(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := HashedName(tt.mattermostName); got != tt.want {
+			if got := HashWithPrefix("db", tt.mattermostName); got != tt.want {
 				t.Errorf("Name() = %v, want %v", got, tt.want)
 			}
 		})
