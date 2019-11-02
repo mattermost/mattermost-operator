@@ -1,24 +1,24 @@
 /*
- * MinIO-Operator - Manage MinIO clusters in Kubernetes
+ * Copyright (C) 2019, MinIO, Inc.
  *
- * MinIO Cloud Storage, (C) 2018, 2019 MinIO, Inc.
+ * This code is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License, version 3,
+ * as published by the Free Software Foundation.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * You should have received a copy of the GNU Affero General Public License, version 3,
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
  */
 
 package v1beta1
 
 import (
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -31,20 +31,47 @@ type MinIOInstance struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   MinIOInstanceSpec   `json:"spec"`
-	Status MinIOInstanceStatus `json:"status"`
+	Scheduler MinIOInstanceScheduler `json:"scheduler,omitempty"`
+	Spec      MinIOInstanceSpec      `json:"spec"`
+	Status    MinIOInstanceStatus    `json:"status"`
+}
+
+// MinIOInstanceScheduler is the spec for a MinIOInstance scheduler
+type MinIOInstanceScheduler struct {
+	// SchedulerName defines the name of scheduler to be used to schedule MinIOInstance pods
+	Name string `json:"name"`
+}
+
+// CertificateConfig is a specification for certificate contents
+type CertificateConfig struct {
+	CommonName       string   `json:"commonName,omitempty"`
+	OrganizationName []string `json:"organizationName,omitempty"`
+	DNSNames         []string `json:"dnsNames,omitempty"`
 }
 
 // MinIOInstanceSpec is the spec for a MinIOInstance resource
 type MinIOInstanceSpec struct {
-	// Version defines the MinIOInstance Docker image version.
-	Version string `json:"version"`
+	// Image defines the MinIOInstance Docker image.
+	// +optional
+	Image string `json:"image,omitempty"`
 	// Replicas defines the number of MinIO instances in a MinIOInstance resource
-	Replicas int32 `json:"replicas"`
+	// +optional
+	Replicas int32 `json:"replicas,omitempty"`
+	// Pod Management Policy for pod created by StatefulSet
+	// +optional
+	PodManagementPolicy appsv1.PodManagementPolicyType `json:"podManagementPolicy,omitempty"`
+	// Metadata defines the object metadata passed to each pod that is a part of this MinIOInstance
+	Metadata *metav1.ObjectMeta `json:"metadata,omitempty"`
 	// If provided, use this secret as the credentials for MinIOInstance resource
 	// Otherwise MinIO server creates dynamic credentials printed on MinIO server startup banner
 	// +optional
 	CredsSecret *corev1.LocalObjectReference `json:"credsSecret,omitempty"`
+	// If provided, use these environment variables for MinIOInstance resource
+	// +optional
+	Env []corev1.EnvVar `json:"env,omitempty"`
+	// If provided, use these requests and limit for cpu/memory resource allocation
+	// +optional
+	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 	// VolumeClaimTemplate allows a user to specify how volumes inside a MinIOInstance
 	// +optional
 	VolumeClaimTemplate *corev1.PersistentVolumeClaim `json:"volumeClaimTemplate,omitempty"`
@@ -56,15 +83,31 @@ type MinIOInstanceSpec struct {
 	// If specified, affinity will define the pod's scheduling constraints
 	// +optional
 	Affinity *corev1.Affinity `json:"affinity,omitempty"`
-	// SSLSecret allows a user to specify custom CA certificate, and private key for group replication SSL.
+	// ExternalCertSecret allows a user to specify custom CA certificate, and private key for group replication SSL.
 	// +optional
-	SSLSecret *corev1.LocalObjectReference `json:"sslSecret,omitempty"`
+	ExternalCertSecret *corev1.LocalObjectReference `json:"externalCertSecret,omitempty"`
 	// Mount path for MinIO volume (PV). Defaults to /export
 	// +optional
 	Mountpath string `json:"mountPath,omitempty"`
 	// Subpath inside mount path. This is the directory where MinIO stores data. Default to "" (empty)
 	// +optional
 	Subpath string `json:"subPath,omitempty"`
+	// Liveness Probe for container liveness. Container will be restarted if the probe fails.
+	// +optional
+	Liveness *corev1.Probe `json:"liveness,omitempty"`
+	// Readiness Probe for container readiness. Container will be removed from service endpoints if the probe fails.
+	// +optional
+	Readiness *corev1.Probe `json:"readiness,omitempty"`
+	// RequestAutoCert allows user to enable Kubernetes based TLS cert generation and signing as explained here:
+	// https://kubernetes.io/docs/tasks/tls/managing-tls-in-a-cluster/
+	// +optional
+	RequestAutoCert bool `json:"requestAutoCert,omitempty"`
+	// CertConfig allows users to set entries like CommonName, Organization, etc for the certificate
+	// +optional
+	CertConfig *CertificateConfig `json:"certConfig,omitempty"`
+	// Tolerations allows users to set entries like effect, key, operator, value.
+	// +optional
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 }
 
 // MinIOInstanceStatus is the status for a MinIOInstance resource

@@ -19,6 +19,7 @@ package mysqlcluster
 import (
 	"fmt"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"strconv"
 	"strings"
 
 	"github.com/imdario/mergo"
@@ -218,6 +219,13 @@ func (s *sfsSyncer) getEnvFor(name string) []core.EnvVar {
 		})
 	}
 
+	if s.cluster.Spec.ServerIDOffset != nil {
+		env = append(env, core.EnvVar{
+			Name:  "MY_SERVER_ID_OFFSET",
+			Value: strconv.FormatInt(int64(*s.cluster.Spec.ServerIDOffset), 10),
+		})
+	}
+
 	sctName := s.cluster.Spec.SecretName
 	sctOpName := s.cluster.GetNameForResource(mysqlcluster.Secret)
 	switch name {
@@ -240,7 +248,7 @@ func (s *sfsSyncer) getEnvFor(name string) []core.EnvVar {
 	}
 
 	// set MySQL root and application credentials
-	if name == containerMySQLInitName || !s.cluster.ShouldHaveInitContainerForMysql() && name == containerMySQLInitName {
+	if name == containerMySQLInitName || (!s.cluster.ShouldHaveInitContainerForMysql() && name == containerMysqlName) {
 		env = append(env, s.envVarFromSecret(sctName, "MYSQL_ROOT_PASSWORD", "ROOT_PASSWORD", false))
 		env = append(env, s.envVarFromSecret(sctName, "MYSQL_USER", "USER", true))
 		env = append(env, s.envVarFromSecret(sctName, "MYSQL_PASSWORD", "PASSWORD", true))
@@ -380,7 +388,7 @@ func (s *sfsSyncer) ensureContainersSpec() []core.Container {
 			"pt-kill",
 			// host need to be specified, see pt-kill bug: https://jira.percona.com/browse/PT-1223
 			"--host=127.0.0.1",
-			fmt.Sprintf("--defaults-file=%s/client.cnf", ConfVolumeMountPath),
+			fmt.Sprintf("--defaults-file=%s/client.conf", ConfVolumeMountPath),
 		}
 		command = append(command, getCliOptionsFromQueryLimits(s.cluster.Spec.QueryLimits)...)
 

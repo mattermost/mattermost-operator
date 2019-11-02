@@ -1,26 +1,24 @@
 /*
- * MinIO-Operator - Manage MinIO clusters in Kubernetes
+ * Copyright (C) 2019, MinIO, Inc.
  *
- * MinIO Cloud Storage, (C) 2018, 2019 MinIO, Inc.
+ * This code is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License, version 3,
+ * as published by the Free Software Foundation.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * You should have received a copy of the GNU Affero General Public License, version 3,
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
  */
 
 package mirror
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -308,7 +306,7 @@ func (c *Controller) syncHandler(key string) error {
 	ss, err := c.statefulSetLister.StatefulSets(mi.Namespace).Get(mi.Name)
 	// If the resource doesn't exist, we'll create it
 	if errors.IsNotFound(err) {
-		ss = statefulsets.NewForCluster(mi, svc.Name, c.imagePath)
+		ss = statefulsets.NewForCluster(mi, svc.Name)
 		_, err = c.kubeClientSet.AppsV1().StatefulSets(mi.Namespace).Create(ss)
 	}
 
@@ -332,17 +330,17 @@ func (c *Controller) syncHandler(key string) error {
 	// should update the StatefulSet resource.
 	if mi.Spec.Replicas != *ss.Spec.Replicas {
 		glog.V(4).Infof("MinIOInstance %s replicas: %d, StatefulSet replicas: %d", name, mi.Spec.Replicas, *ss.Spec.Replicas)
-		ss = statefulsets.NewForCluster(mi, svc.Name, c.imagePath)
+		ss = statefulsets.NewForCluster(mi, svc.Name)
 		_, err = c.kubeClientSet.AppsV1().StatefulSets(mi.Namespace).Update(ss)
 	}
 
 	// If this container version on the MinIOInstance resource is specified, and the
 	// version does not equal the current desired version in the StatefulSet, we
 	// should update the StatefulSet resource.
-	currentVersion := strings.TrimPrefix(ss.Spec.Template.Spec.Containers[0].Image, c.imagePath+":")
-	if mi.Spec.Version != currentVersion {
-		glog.V(4).Infof("Updating MinIOInstance %s MinIO server version %d, to: %d", name, mi.Spec.Version, currentVersion)
-		ss = statefulsets.NewForCluster(mi, svc.Name, c.imagePath)
+	currentImage := ss.Spec.Template.Spec.Containers[0].Image
+	if mi.Spec.Image != currentImage {
+		glog.V(4).Infof("Updating MinIOInstance %s MinIO server from %s, to: %s", name, currentImage, mi.Spec.Image)
+		ss = statefulsets.NewForCluster(mi, svc.Name)
 		_, err = c.kubeClientSet.AppsV1().StatefulSets(mi.Namespace).Update(ss)
 	}
 
@@ -374,7 +372,7 @@ func (c *Controller) updateMinIOInstanceStatus(minioInstance *miniov1beta1.MinIO
 	// we must use Update instead of UpdateStatus to update the Status block of the MinIOInstance resource.
 	// UpdateStatus will not allow changes to the Spec of the resource,
 	// which is ideal for ensuring nothing other than resource status has been updated.
-	_, err := c.minioClientSet.MinIOV1beta1().MinIOInstances(minioInstance.Namespace).Update(minioInstanceCopy)
+	_, err := c.minioClientSet.MinV1beta1().MinIOInstances(minioInstance.Namespace).Update(minioInstanceCopy)
 	return err
 }
 

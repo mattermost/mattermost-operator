@@ -12,7 +12,7 @@ func (r *ReconcileClusterInstallation) checkBlueGreen(mattermost *mattermostv1al
 
 		blueGreen := []mattermostv1alpha1.AppDeployment{mattermost.Spec.BlueGreen.Blue, mattermost.Spec.BlueGreen.Green}
 		for _, deployment := range blueGreen {
-			err := r.checkMattermostService(mattermost, deployment.Name, mattermost.GetProductionDeploymentName(), reqLogger)
+			err := r.checkMattermostService(mattermost, deployment.Name, deployment.Name, reqLogger)
 			if err != nil {
 				return err
 			}
@@ -23,6 +23,24 @@ func (r *ReconcileClusterInstallation) checkBlueGreen(mattermost *mattermostv1al
 				}
 			}
 			err = r.checkMattermostDeployment(mattermost, deployment.Name, deployment.IngressName, deployment.GetDeploymentImageName(), reqLogger)
+			if err != nil {
+				return err
+			}
+		}
+
+		err := r.deleteMattermostDeployment(mattermost, mattermost.GetName(), reqLogger)
+		if err != nil {
+			return err
+		}
+	} else {
+		if mattermost.Status.BlueName != "" {
+			err := r.deleteAllMattermostComponents(mattermost, mattermost.Status.BlueName, reqLogger)
+			if err != nil {
+				return err
+			}
+		}
+		if mattermost.Status.GreenName != "" {
+			err := r.deleteAllMattermostComponents(mattermost, mattermost.Status.GreenName, reqLogger)
 			if err != nil {
 				return err
 			}

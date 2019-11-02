@@ -54,6 +54,9 @@ func (r *ReconcileClusterInstallation) handleCheckClusterInstallation(mattermost
 		status = greenStatus
 	}
 
+	status.BlueName = mattermost.Spec.BlueGreen.Blue.Name
+	status.GreenName = mattermost.Spec.BlueGreen.Green.Name
+
 	if blueErr != nil {
 		return status, errors.Wrap(blueErr, "blue installation validation failed")
 	}
@@ -104,6 +107,22 @@ func (r *ReconcileClusterInstallation) checkClusterInstallation(name, imageName,
 		if pod.Spec.Containers[0].Image != imageName {
 			return status, fmt.Errorf("mattermost pod %s is running incorrect image", pod.Name)
 		}
+
+		podIsReady := false
+		for _, condition := range pod.Status.Conditions {
+			if condition.Type == corev1.PodReady {
+				if condition.Status == corev1.ConditionTrue {
+					podIsReady = true
+					break
+				} else {
+					return status, fmt.Errorf("mattermost pod %s is not ready", pod.Name)
+				}
+			}
+		}
+		if !podIsReady {
+			return status, fmt.Errorf("mattermost pod %s is not ready", pod.Name)
+		}
+
 		status.UpdatedReplicas++
 	}
 
@@ -165,7 +184,7 @@ func (r *ReconcileClusterInstallation) checkSecret(secretName, keyName, namespac
 	foundSecret := &corev1.Secret{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: secretName, Namespace: namespace}, foundSecret)
 	if err != nil {
-		return errors.Wrap(err, "Error getting secret")
+		return errors.Wrap(err, "error getting secret")
 	}
 
 	for key := range foundSecret.Data {
@@ -174,8 +193,7 @@ func (r *ReconcileClusterInstallation) checkSecret(secretName, keyName, namespac
 		}
 	}
 
-	msg := fmt.Sprintf("Missing required secret data. Want: %s", keyName)
-	return errors.Wrap(err, msg)
+	return fmt.Errorf("secret %s is missing data key: %s", secretName, keyName)
 }
 
 func (r *ReconcileClusterInstallation) updateStatus(mattermost *mattermostv1alpha1.ClusterInstallation, status mattermostv1alpha1.ClusterInstallationStatus, reqLogger logr.Logger) error {

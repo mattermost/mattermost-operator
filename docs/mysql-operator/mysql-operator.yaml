@@ -272,7 +272,7 @@ spec:
       serviceAccountName: mysql-operator
       containers:
         - name: operator
-          image: "quay.io/presslabs/mysql-operator:0.3.2"
+          image: "quay.io/presslabs/mysql-operator:0.3.3"
           imagePullPolicy: IfNotPresent
           env:
             - name: ORC_TOPOLOGY_USER
@@ -289,11 +289,11 @@ spec:
             - --leader-election-namespace=default
             # connect to orchestrator on localhost
             - --orchestrator-uri=http://127.0.0.1:3000/api
-            - --sidecar-image=quay.io/presslabs/mysql-operator-sidecar:0.3.2
+            - --sidecar-image=quay.io/presslabs/mysql-operator-sidecar:0.3.3
           resources:
             {}
         - name: orchestrator
-          image: quay.io/presslabs/mysql-operator-orchestrator:0.3.2
+          image: quay.io/presslabs/mysql-operator-orchestrator:0.3.3
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000

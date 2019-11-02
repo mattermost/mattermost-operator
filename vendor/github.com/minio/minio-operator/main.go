@@ -1,38 +1,37 @@
-// +build go1.12
+// +build go1.13
 
 /*
- * MinIO-Operator - Manage MinIO clusters in Kubernetes
+ * Copyright (C) 2019, MinIO, Inc.
  *
- * MinIO Cloud Storage, (C) 2018, 2019 MinIO, Inc.
+ * This code is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License, version 3,
+ * as published by the Free Software Foundation.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * You should have received a copy of the GNU Affero General Public License, version 3,
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
  */
 
 package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	"github.com/minio/minio-operator/pkg/constants"
-
 	"github.com/golang/glog"
 
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
+	certapi "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
@@ -41,19 +40,22 @@ import (
 	"github.com/minio/minio-operator/pkg/controller/cluster"
 )
 
+// Version provides the version of this minio-operator
+var Version = "DEVELOPMENT.GOGET"
+
 var (
-	masterURL  string
-	kubeconfig string
-	imagePath  string
+	masterURL    string
+	kubeconfig   string
+	checkVersion bool
 
 	onlyOneSignalHandler = make(chan struct{})
 	shutdownSignals      = []os.Signal{os.Interrupt, syscall.SIGTERM}
 )
 
 func init() {
-	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
-	flag.StringVar(&masterURL, "master", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
-	flag.StringVar(&imagePath, "image", constants.DefaultMinIOImagePath, "Custom minio container image.")
+	flag.StringVar(&kubeconfig, "kubeconfig", "", "path to a kubeconfig. Only required if out-of-cluster")
+	flag.StringVar(&masterURL, "master", "", "the address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster")
+	flag.BoolVar(&checkVersion, "version", false, "print version")
 }
 
 func main() {
@@ -61,6 +63,11 @@ func main() {
 	stopCh := setupSignalHandler()
 
 	flag.Parse()
+
+	if checkVersion {
+		fmt.Println(Version)
+		return
+	}
 
 	// Look for incluster config by default
 	cfg, err := rest.InClusterConfig()
@@ -80,17 +87,21 @@ func main() {
 
 	controllerClient, err := clientset.NewForConfig(cfg)
 	if err != nil {
-		glog.Fatalf("Error building example clientset: %s", err.Error())
+		glog.Fatalf("Error building MinIO clientset: %s", err.Error())
+	}
+
+	certClient, err := certapi.NewForConfig(cfg)
+	if err != nil {
+		glog.Errorf("Error building certificate clientset: %v", err.Error())
 	}
 
 	kubeInformerFactory := kubeinformers.NewSharedInformerFactory(kubeClient, time.Second*30)
 	minioInformerFactory := informers.NewSharedInformerFactory(controllerClient, time.Second*30)
 
-	controller := cluster.NewController(kubeClient, controllerClient,
+	controller := cluster.NewController(kubeClient, controllerClient, *certClient,
 		kubeInformerFactory.Apps().V1().StatefulSets(),
-		minioInformerFactory.MinIO().V1beta1().MinIOInstances(),
-		kubeInformerFactory.Core().V1().Services(),
-		imagePath)
+		minioInformerFactory.Min().V1beta1().MinIOInstances(),
+		kubeInformerFactory.Core().V1().Services())
 
 	go kubeInformerFactory.Start(stopCh)
 	go minioInformerFactory.Start(stopCh)

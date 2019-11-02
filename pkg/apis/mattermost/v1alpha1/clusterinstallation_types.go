@@ -232,6 +232,12 @@ type ClusterInstallationStatus struct {
 	// that are running with the desired image.
 	// +optional
 	UpdatedReplicas int32 `json:"updatedReplicas,omitempty"`
+	// The name of the blue deployment in BlueGreen
+	// +optional
+	BlueName string `json:"blueName,omitempty"`
+	// The name of the green deployment in BlueGreen
+	// +optional
+	GreenName string `json:"greenName,omitempty"`
 }
 
 // +genclient
