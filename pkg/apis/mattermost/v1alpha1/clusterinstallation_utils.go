@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mattermost/mattermost-operator/pkg/components/mysql"
+	"github.com/mattermost/mattermost-operator/pkg/components/utils"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -262,7 +262,7 @@ func (mattermost *ClusterInstallation) GenerateIngress(name, ingressName string,
 // GenerateDeployment returns the deployment spec for Mattermost
 func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingressName, containerImage, dbUser, dbPassword, dbName string, externalDB, isLicensed bool, minioURL string) *appsv1.Deployment {
 	var envVarDB []corev1.EnvVar
-	mysqlName := mysql.Name(mattermost.Name)
+	mysqlName := utils.HashWithPrefix("db", mattermost.Name)
 
 	masterDBEnvVar := corev1.EnvVar{
 		Name: "MM_CONFIG",

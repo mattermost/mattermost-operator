@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mattermost/mattermost-operator/pkg/components/mysql"
+	"github.com/mattermost/mattermost-operator/pkg/components/utils"
 
 	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -129,7 +129,7 @@ func mattermostScaleTest(t *testing.T, f *framework.Framework, ctx *framework.Te
 	err = waitForStatefulSet(t, f.Client.Client, namespace, "test-mm-minio", 1, retryInterval, timeout)
 	require.NoError(t, err)
 
-	err = waitForStatefulSet(t, f.Client.Client, namespace, fmt.Sprintf("%s-mysql", mysql.Name("test-mm")), 1, retryInterval, timeout)
+	err = waitForStatefulSet(t, f.Client.Client, namespace, fmt.Sprintf("%s-mysql", utils.HashWithPrefix("db", "test-mm")), 1, retryInterval, timeout)
 	require.NoError(t, err)
 
 	// wait for test-mm to reach 1 replicas
