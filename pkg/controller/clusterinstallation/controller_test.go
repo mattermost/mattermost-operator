@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mattermost/mattermost-operator/pkg/components/utils"
+
 	"github.com/mattermost/mattermost-operator/pkg/apis"
 	logmo "github.com/mattermost/mattermost-operator/pkg/log"
 	"github.com/stretchr/testify/assert"
@@ -82,7 +84,7 @@ func TestReconcile(t *testing.T) {
 	// Define the NamespacedName objects that will be used to lookup the
 	// cluster resources.
 	ciKey := types.NamespacedName{Name: ciName, Namespace: ciNamespace}
-	ciMysqlKey := types.NamespacedName{Name: "db", Namespace: ciNamespace}
+	ciMysqlKey := types.NamespacedName{Name: utils.HashWithPrefix("db", ciName), Namespace: ciNamespace}
 	ciMinioKey := types.NamespacedName{Name: ciName + "-minio", Namespace: ciNamespace}
 
 	t.Run("mysql", func(t *testing.T) {
