@@ -149,10 +149,6 @@ type Minio struct {
 // Database defines the database configuration for a ClusterInstallation.
 type Database struct {
 	Type string `json:"type,omitempty"`
-	// If the user want to use an external DB.
-	// This can be inside the same k8s cluster or outside like AWS RDS.
-	// +optional
-	ExternalSecret string `json:"externalSecret,omitempty"`
 	// Defines the storage size for the database. ie 50Gi
 	// +optional
 	// +kubebuilder:validation:Pattern=^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$
@@ -183,7 +179,7 @@ type Database struct {
 	BackupSecretName string `json:"backupSecretName,omitempty"`
 	// Optionally enter the name of an already existing Secret for use by the MySQL operator
 	// +optional
-	ExistingSecret          string `json:"existingSecret,omitempty"`
+	Secret                  string `json:"secret,omitempty"`
 	BackupRestoreSecretName string `json:"backupRestoreSecretName,omitempty"`
 }
 

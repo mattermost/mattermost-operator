@@ -83,21 +83,6 @@ func (r *ReconcileClusterInstallation) getOrCreateMySQLSecrets(mattermost *matte
 		userPassword: "",
 		dbName:       "",
 	}
-	// Check if the custom(existing) MySQL secret is provided
-	if mattermost.Spec.Database.ExistingSecret != "" {
-		if err := r.client.Get(context.TODO(), types.NamespacedName{
-			Namespace: mattermost.Namespace,
-			Name:      mattermost.Spec.Database.ExistingSecret,
-		}, dbSecret); err != nil {
-			return dbInfo, errors.Wrap(err, "unable to locate custom/existing MySQL secret")
-		}
-		dbInfo = databaseInfo{
-			userName:     string(dbSecret.Data["USER"]),
-			userPassword: string(dbSecret.Data["PASSWORD"]),
-			dbName:       string(dbSecret.Data["DATABASE"]),
-		}
-		return dbInfo, dbInfo.Valid()
-	}
 
 	dbSecretName := fmt.Sprintf("%s-mysql-root-password", mattermost.Name)
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: dbSecretName, Namespace: mattermost.Namespace}, dbSecret)

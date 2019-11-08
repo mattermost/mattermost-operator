@@ -157,12 +157,10 @@ spec:
                 backupURL:
                   description: Defines the object storage url for uploading backups.
                   type: string
-                externalSecret:
-                  description: If the user want to use an external DB. This can be
-                    inside the same k8s cluster or outside like AWS RDS.
+                secret:
+                  description: If the user wants to use an existing Secret or an external DB.
+                    This can be inside the same k8s cluster or outside like AWS RDS
                   type: string
-                existingSecret:
-                  description: If the user wants to use an existing Secret.
                 initBucketURL:
                   description: Defines the AWS S3 bucket where the Database Backup
                     is stored. The operator will download the file to restore the
