@@ -74,6 +74,10 @@ func TestMattermost(t *testing.T) {
 	t.Run("mattermost upgrade test", func(t *testing.T) {
 		mattermostUpgradeTest(t, f, ctx)
 	})
+
+	t.Run("mattermost with mysql replicas", func(t *testing.T) {
+		mattermostWithMySQLReplicas(t, f, ctx)
+	})
 }
 
 func mattermostScaleTest(t *testing.T, f *framework.Framework, ctx *framework.TestCtx) {
@@ -276,5 +280,70 @@ func mattermostUpgradeTest(t *testing.T, f *framework.Framework, ctx *framework.
 	require.Equal(t, "mattermost/mattermost-enterprise-edition:5.15.0", mmDeployment.Spec.Template.Spec.Containers[0].Image)
 
 	err = f.Client.Delete(context.TODO(), newMattermost)
+	require.NoError(t, err)
+}
+
+func mattermostWithMySQLReplicas(t *testing.T, f *framework.Framework, ctx *framework.TestCtx) {
+	namespace, err := ctx.GetNamespace()
+	require.NoError(t, err)
+
+	testName := "test-mm3"
+
+	// create ClusterInstallation custom resource
+	exampleMattermost := &operator.ClusterInstallation{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ClusterInstallation",
+			APIVersion: "mattermost.com/v1alpha1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      testName,
+			Namespace: namespace,
+		},
+		Spec: operator.ClusterInstallationSpec{
+			IngressName: "test-example.mattermost.dev",
+			Replicas:    1,
+			Resources: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("100m"),
+					corev1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+			},
+			Minio: operator.Minio{
+				StorageSize: "1Gi",
+				Replicas:    1,
+				Resources: corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("100m"),
+						corev1.ResourceMemory: resource.MustParse("100Mi"),
+					},
+				},
+			},
+			Database: operator.Database{
+				StorageSize: "1Gi",
+				Replicas:    3,
+				Resources: corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("100m"),
+						corev1.ResourceMemory: resource.MustParse("100Mi"),
+					},
+				},
+			},
+		},
+	}
+
+	// use TestCtx's create helper to create the object and add a cleanup function for the new object
+	err = f.Client.Create(context.TODO(), exampleMattermost, &framework.CleanupOptions{TestContext: ctx, Timeout: cleanupTimeout, RetryInterval: cleanupRetryInterval})
+	require.NoError(t, err)
+
+	err = waitForStatefulSet(t, f.Client.Client, namespace, fmt.Sprintf("%s-minio", testName), 1, retryInterval, timeout)
+	require.NoError(t, err)
+
+	err = waitForStatefulSet(t, f.Client.Client, namespace, fmt.Sprintf("%s-mysql", utils.HashWithPrefix("db", testName)), 3, retryInterval, timeout)
+	require.NoError(t, err)
+
+	err = waitForMySQLStatusReady(t, f.Client.Client, namespace, utils.HashWithPrefix("db", testName), 3, retryInterval, timeout)
+	require.NoError(t, err)
+
+	err = f.Client.Delete(context.TODO(), exampleMattermost)
 	require.NoError(t, err)
 }
