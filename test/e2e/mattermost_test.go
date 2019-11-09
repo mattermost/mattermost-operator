@@ -173,6 +173,8 @@ func mattermostUpgradeTest(t *testing.T, f *framework.Framework, ctx *framework.
 	namespace, err := ctx.GetNamespace()
 	require.NoError(t, err)
 
+	testName := "test-mm2"
+
 	// create ClusterInstallation custom resource
 	exampleMattermost := &operator.ClusterInstallation{
 		TypeMeta: metav1.TypeMeta{
@@ -180,7 +182,7 @@ func mattermostUpgradeTest(t *testing.T, f *framework.Framework, ctx *framework.
 			APIVersion: "mattermost.com/v1alpha1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-mm2",
+			Name:      testName,
 			Namespace: namespace,
 		},
 		Spec: operator.ClusterInstallationSpec{
@@ -221,11 +223,17 @@ func mattermostUpgradeTest(t *testing.T, f *framework.Framework, ctx *framework.
 	err = f.Client.Create(context.TODO(), exampleMattermost, &framework.CleanupOptions{TestContext: ctx, Timeout: cleanupTimeout, RetryInterval: cleanupRetryInterval})
 	require.NoError(t, err)
 
-	// wait for test-mm2 to reach 1 replicas
-	err = e2eutil.WaitForDeployment(t, f.KubeClient, namespace, "test-mm2", 1, retryInterval, timeout)
+	err = waitForStatefulSet(t, f.Client.Client, namespace, fmt.Sprintf("%s-minio", testName), 1, retryInterval, timeout)
 	require.NoError(t, err)
 
-	err = f.Client.Get(context.TODO(), types.NamespacedName{Name: "test-mm2", Namespace: namespace}, exampleMattermost)
+	err = waitForStatefulSet(t, f.Client.Client, namespace, fmt.Sprintf("%s-mysql", utils.HashWithPrefix("db", testName)), 1, retryInterval, timeout)
+	require.NoError(t, err)
+
+	// wait for test-mm2 to reach 1 replicas
+	err = e2eutil.WaitForDeployment(t, f.KubeClient, namespace, testName, 1, retryInterval, timeout)
+	require.NoError(t, err)
+
+	err = f.Client.Get(context.TODO(), types.NamespacedName{Name: testName, Namespace: namespace}, exampleMattermost)
 	require.NoError(t, err)
 
 	// Get the current pod
@@ -250,20 +258,20 @@ func mattermostUpgradeTest(t *testing.T, f *framework.Framework, ctx *framework.
 	require.NoError(t, err)
 
 	// wait for deployment be completed
-	err = e2eutil.WaitForDeployment(t, f.KubeClient, namespace, "test-mm2", 1, retryInterval, timeout)
+	err = e2eutil.WaitForDeployment(t, f.KubeClient, namespace, testName, 1, retryInterval, timeout)
 	require.NoError(t, err)
 
-	err = waitForReconcilicationComplete(t, f.Client.Client, namespace, "test-mm2", retryInterval, timeout)
+	err = waitForReconcilicationComplete(t, f.Client.Client, namespace, testName, retryInterval, timeout)
 	require.NoError(t, err)
 
 	newMattermost := &operator.ClusterInstallation{}
-	err = f.Client.Get(context.TODO(), types.NamespacedName{Name: "test-mm2", Namespace: namespace}, newMattermost)
+	err = f.Client.Get(context.TODO(), types.NamespacedName{Name: testName, Namespace: namespace}, newMattermost)
 	require.NoError(t, err)
 	require.Equal(t, "mattermost/mattermost-enterprise-edition", newMattermost.Status.Image)
 	require.Equal(t, "5.15.0", newMattermost.Status.Version)
 
 	mmDeployment := &appsv1.Deployment{}
-	err = f.Client.Get(context.TODO(), types.NamespacedName{Name: "test-mm2", Namespace: namespace}, mmDeployment)
+	err = f.Client.Get(context.TODO(), types.NamespacedName{Name: testName, Namespace: namespace}, mmDeployment)
 	require.NoError(t, err)
 	require.Equal(t, "mattermost/mattermost-enterprise-edition:5.15.0", mmDeployment.Spec.Template.Spec.Containers[0].Image)
 
