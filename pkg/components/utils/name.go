@@ -7,6 +7,8 @@ import (
 	"strings"
 )
 
+// HashedName returns md5 sum truncated to 6 alphanumeric characters and converted to lowercase.
+// The motivation behind is to render K8S resource definition's name with constant length deterministic string.
 func HashedName(name string) string {
 	s := md5.Sum([]byte(name))
 	ss := base64.RawStdEncoding.EncodeToString(s[:])
@@ -16,6 +18,7 @@ func HashedName(name string) string {
 	return strings.ToLower(ss)
 }
 
+// HashWithPrefix encapsulates K8S resource name creator.
 func HashWithPrefix(prefix, name string) string {
 	return fmt.Sprintf("%s-%s", prefix, HashedName(name))
 }
