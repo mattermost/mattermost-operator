@@ -1,6 +1,10 @@
 package utils
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
 
 func TestHashedName(t *testing.T) {
 	tests := []struct {
@@ -46,9 +50,8 @@ func TestHashedName(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := HashWithPrefix("db", tt.mattermostName); got != tt.want {
-				t.Errorf("Name() = %v, want %v", got, tt.want)
-			}
+			got := HashWithPrefix("db", tt.mattermostName)
+			require.Equal(t, tt.want, got)
 		})
 	}
 }
