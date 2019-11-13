@@ -6,13 +6,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mattermost/mattermost-operator/pkg/components/utils"
-
 	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apis "github.com/mattermost/mattermost-operator/pkg/apis"
 	operator "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
+	"github.com/mattermost/mattermost-operator/pkg/components/utils"
 
 	framework "github.com/operator-framework/operator-sdk/pkg/test"
 	"github.com/operator-framework/operator-sdk/pkg/test/e2eutil"
