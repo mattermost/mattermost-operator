@@ -32,7 +32,7 @@ func waitForMySQLStatusReady(t *testing.T, dynclient client.Client, namespace, n
 	if err != nil {
 		return err
 	}
-	t.Logf("Cluster has %d ready nodes!\n", mysql.Status.ReadyNodes)
+	t.Logf("All MySQL cluster nodes (%d) are ready!\n", mysql.Status.ReadyNodes)
 	return nil
 }
 
