@@ -5,7 +5,6 @@ import (
 
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
 	"github.com/mattermost/mattermost-operator/pkg/utils"
-
 	mysqlOperator "github.com/presslabs/mysql-operator/pkg/apis/mysql/v1alpha1"
 
 	corev1 "k8s.io/api/core/v1"
@@ -56,6 +55,10 @@ func Cluster(mattermost *mattermostv1alpha1.ClusterInstallation) *mysqlOperator.
 	if mattermost.Spec.Database.InitBucketURL != "" && mattermost.Spec.Database.BackupRestoreSecretName != "" {
 		mysql.Spec.InitBucketURL = mattermost.Spec.Database.InitBucketURL
 		mysql.Spec.InitBucketSecretName = mattermost.Spec.Database.BackupRestoreSecretName
+	}
+
+	if mattermost.Spec.Database.Secret != "" {
+		mysql.Spec.SecretName = mattermost.Spec.Database.Secret
 	}
 
 	return mysql

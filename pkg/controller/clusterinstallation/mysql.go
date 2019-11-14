@@ -6,6 +6,7 @@ import (
 	"reflect"
 
 	"github.com/go-logr/logr"
+	"github.com/mattermost/mattermost-operator/pkg/components/utils"
 	"github.com/pkg/errors"
 	mysqlOperator "github.com/presslabs/mysql-operator/pkg/apis/mysql/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
@@ -14,7 +15,6 @@ import (
 
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
 	mattermostmysql "github.com/mattermost/mattermost-operator/pkg/components/mysql"
-	"github.com/mattermost/mattermost-operator/pkg/components/utils"
 )
 
 type databaseInfo struct {
@@ -76,12 +76,15 @@ func (r *ReconcileClusterInstallation) createMySQLClusterIfNotExists(mattermost 
 	return nil
 }
 
-// getOrCreateMySQLSecrets get or create the MySQL secrets used by MySQL Operator to spin the cluster and
-// also used by mattermost to get the credentials to use to access the DB.
-// dbData is a []string -> { DBUserName, DBUserPassword, DBName }
 func (r *ReconcileClusterInstallation) getOrCreateMySQLSecrets(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) (databaseInfo, error) {
-	dbSecretName := fmt.Sprintf("%s-mysql-root-password", mattermost.Name)
 	dbSecret := &corev1.Secret{}
+	dbInfo := databaseInfo{
+		userName:     "",
+		userPassword: "",
+		dbName:       "",
+	}
+
+	dbSecretName := fmt.Sprintf("%s-mysql-root-password", mattermost.Name)
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: dbSecretName, Namespace: mattermost.Namespace}, dbSecret)
 	if err != nil && k8sErrors.IsNotFound(err) {
 		reqLogger.Info("Creating mysql secret")
@@ -98,7 +101,7 @@ func (r *ReconcileClusterInstallation) getOrCreateMySQLSecrets(mattermost *matte
 			"DATABASE":      []byte("mattermost"),
 		}
 
-		dbInfo := databaseInfo{
+		dbInfo = databaseInfo{
 			userName:     "mmuser",
 			userPassword: userPassword,
 			dbName:       "mattermost",
@@ -106,15 +109,9 @@ func (r *ReconcileClusterInstallation) getOrCreateMySQLSecrets(mattermost *matte
 		return dbInfo, r.create(mattermost, dbSecret, reqLogger)
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to check if mysql secret exists")
-		dbInfo := databaseInfo{
-			userName:     "",
-			userPassword: "",
-			dbName:       "",
-		}
 		return dbInfo, err
 	}
-
-	dbInfo := databaseInfo{
+	dbInfo = databaseInfo{
 		userName:     string(dbSecret.Data["USER"]),
 		userPassword: string(dbSecret.Data["PASSWORD"]),
 		dbName:       string(dbSecret.Data["DATABASE"]),

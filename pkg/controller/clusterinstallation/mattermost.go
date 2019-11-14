@@ -93,7 +93,7 @@ func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mat
 	var externalDB, isLicensed bool
 	var dbData databaseInfo
 	var err error
-	if mattermost.Spec.Database.ExternalSecret == "" {
+	if mattermost.Spec.Database.Secret == "" {
 		dbData, err = r.getOrCreateMySQLSecrets(mattermost, reqLogger)
 		if err != nil {
 			return errors.Wrap(err, "Error getting mysql database password.")
@@ -104,7 +104,7 @@ func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mat
 			return err
 		}
 	} else {
-		err = r.checkSecret(mattermost.Spec.Database.ExternalSecret, "externalDB", mattermost.Namespace)
+		err = r.checkSecret(mattermost.Spec.Database.Secret, "externalDB", mattermost.Namespace)
 		if err != nil {
 			return errors.Wrap(err, "Error getting the external database secret.")
 		}
@@ -300,7 +300,7 @@ func (r *ReconcileClusterInstallation) updateMattermostDeployment(mattermost *ma
 			}
 		}()
 
-		// it's done, it either failed or succeded
+		// it's done, it either failed or succeeded
 		if alreadyRunning.Status.Failed > 0 {
 			return errors.New("Upgrade job failed")
 		}
