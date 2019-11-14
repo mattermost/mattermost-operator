@@ -91,24 +91,32 @@ func (r *ReconcileClusterInstallation) checkMattermostIngress(mattermost *matter
 
 func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, resourceName, ingressName, imageName string, reqLogger logr.Logger) error {
 	var externalDB, isLicensed bool
-	var dbData databaseInfo
 	var err error
-	if mattermost.Spec.Database.Secret == "" {
-		dbData, err = r.getOrCreateMySQLSecrets(mattermost, reqLogger)
-		if err != nil {
-			return errors.Wrap(err, "Error getting mysql database password.")
-		}
+	dbInfo := &databaseInfo{}
 
-		err = dbData.Valid()
+	if mattermost.Spec.Database.Secret == "" {
+		dbInfo, err = r.getOrCreateMySQLSecrets(mattermost, reqLogger)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "unable to get database information")
 		}
 	} else {
-		err = r.checkSecret(mattermost.Spec.Database.Secret, "externalDB", mattermost.Namespace)
+		foundSecret := &corev1.Secret{}
+		err = r.client.Get(context.TODO(), types.NamespacedName{Name: mattermost.Spec.Database.Secret, Namespace: mattermost.Namespace}, foundSecret)
 		if err != nil {
-			return errors.Wrap(err, "Error getting the external database secret.")
+			return errors.Wrap(err, "error getting database secret")
 		}
-		externalDB = true
+
+		if _, ok := foundSecret.Data["DB_CONNECTION_STRING"]; ok {
+			externalDB = true
+		}
+
+		if !externalDB {
+			dbInfo = getDatabaseInfoFromSecret(foundSecret)
+			err = dbInfo.IsValid()
+			if err != nil {
+				return errors.Wrap(err, "database secret is not valid")
+			}
+		}
 	}
 
 	var minioURL string
@@ -129,7 +137,7 @@ func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mat
 		isLicensed = true
 	}
 
-	desired := mattermost.GenerateDeployment(resourceName, ingressName, imageName, dbData.userName, dbData.userPassword, dbData.dbName, externalDB, isLicensed, minioURL)
+	desired := mattermost.GenerateDeployment(resourceName, ingressName, imageName, dbInfo.userName, dbInfo.userPassword, dbInfo.dbName, externalDB, isLicensed, minioURL)
 	err = r.createDeploymentIfNotExists(mattermost, desired, reqLogger)
 	if err != nil {
 		return err

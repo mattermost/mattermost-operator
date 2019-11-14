@@ -32,7 +32,7 @@ func Cluster(mattermost *mattermostv1alpha1.ClusterInstallation) *mysqlOperator.
 		Spec: mysqlOperator.MysqlClusterSpec{
 			MysqlVersion: "5.7",
 			Replicas:     utils.NewInt32(mattermost.Spec.Database.Replicas),
-			SecretName:   fmt.Sprintf("%s-mysql-root-password", mattermost.Name),
+			SecretName:   DefaultDatabaseSecretName(mattermost.Name),
 			VolumeSpec: mysqlOperator.VolumeSpec{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimSpec{
 					AccessModes: []corev1.PersistentVolumeAccessMode{
@@ -62,4 +62,10 @@ func Cluster(mattermost *mattermostv1alpha1.ClusterInstallation) *mysqlOperator.
 	}
 
 	return mysql
+}
+
+// DefaultDatabaseSecretName returns the default database secret name based on
+// the provided installation name.
+func DefaultDatabaseSecretName(installationName string) string {
+	return fmt.Sprintf("%s-mysql-root-password", installationName)
 }

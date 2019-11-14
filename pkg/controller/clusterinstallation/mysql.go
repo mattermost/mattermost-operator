@@ -2,7 +2,6 @@ package clusterinstallation
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 
 	"github.com/go-logr/logr"
@@ -18,9 +17,36 @@ import (
 )
 
 type databaseInfo struct {
+	rootPassword string
 	userName     string
 	userPassword string
 	dbName       string
+}
+
+func (db *databaseInfo) IsValid() error {
+	if db.rootPassword == "" {
+		return errors.New("database root password shouldn't be empty")
+	}
+	if db.userName == "" {
+		return errors.New("database username shouldn't be empty")
+	}
+	if db.userPassword == "" {
+		return errors.New("database password shouldn't be empty")
+	}
+	if db.dbName == "" {
+		return errors.New("database name shouldn't be empty")
+	}
+
+	return nil
+}
+
+func getDatabaseInfoFromSecret(secret *corev1.Secret) *databaseInfo {
+	return &databaseInfo{
+		rootPassword: string(secret.Data["ROOT_PASSWORD"]),
+		userName:     string(secret.Data["USER"]),
+		userPassword: string(secret.Data["PASSWORD"]),
+		dbName:       string(secret.Data["DATABASE"]),
+	}
 }
 
 func (r *ReconcileClusterInstallation) checkMySQLCluster(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
@@ -76,60 +102,58 @@ func (r *ReconcileClusterInstallation) createMySQLClusterIfNotExists(mattermost 
 	return nil
 }
 
-func (r *ReconcileClusterInstallation) getOrCreateMySQLSecrets(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) (databaseInfo, error) {
+func (r *ReconcileClusterInstallation) getOrCreateMySQLSecrets(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) (*databaseInfo, error) {
+	var err error
 	dbSecret := &corev1.Secret{}
-	dbInfo := databaseInfo{
-		userName:     "",
-		userPassword: "",
-		dbName:       "",
+	dbInfo := &databaseInfo{}
+
+	dbSecretName := mattermostmysql.DefaultDatabaseSecretName(mattermost.Name)
+
+	if mattermost.Spec.Database.Secret != "" {
+		dbSecretName = mattermost.Spec.Database.Secret
+
+		err = r.client.Get(context.TODO(), types.NamespacedName{Name: dbSecretName, Namespace: mattermost.Namespace}, dbSecret)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get custom database secret")
+		}
+
+		dbInfo = getDatabaseInfoFromSecret(dbSecret)
+
+		return dbInfo, dbInfo.IsValid()
 	}
 
-	dbSecretName := fmt.Sprintf("%s-mysql-root-password", mattermost.Name)
-	err := r.client.Get(context.TODO(), types.NamespacedName{Name: dbSecretName, Namespace: mattermost.Namespace}, dbSecret)
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: dbSecretName, Namespace: mattermost.Namespace}, dbSecret)
 	if err != nil && k8sErrors.IsNotFound(err) {
-		reqLogger.Info("Creating mysql secret")
+		reqLogger.Info("Creating new mysql secret")
 
 		dbSecret.SetName(dbSecretName)
 		dbSecret.SetNamespace(mattermost.Namespace)
+		userName := "mmuser"
+		dbName := "mattermost"
 		rootPassword := string(utils.New16ID())
 		userPassword := string(utils.New16ID())
 
 		dbSecret.Data = map[string][]byte{
 			"ROOT_PASSWORD": []byte(rootPassword),
-			"USER":          []byte("mmuser"),
+			"USER":          []byte(userName),
 			"PASSWORD":      []byte(userPassword),
-			"DATABASE":      []byte("mattermost"),
+			"DATABASE":      []byte(dbName),
 		}
 
-		dbInfo = databaseInfo{
-			userName:     "mmuser",
-			userPassword: userPassword,
-			dbName:       "mattermost",
+		err = r.create(mattermost, dbSecret, reqLogger)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create mysql secret")
 		}
-		return dbInfo, r.create(mattermost, dbSecret, reqLogger)
+
+		dbInfo = getDatabaseInfoFromSecret(dbSecret)
+
+		return dbInfo, dbInfo.IsValid()
 	} else if err != nil {
-		reqLogger.Error(err, "Failed to check if mysql secret exists")
-		return dbInfo, err
-	}
-	dbInfo = databaseInfo{
-		userName:     string(dbSecret.Data["USER"]),
-		userPassword: string(dbSecret.Data["PASSWORD"]),
-		dbName:       string(dbSecret.Data["DATABASE"]),
+		reqLogger.Error(err, "failed to check if mysql secret exists")
+		return nil, err
 	}
 
-	return dbInfo, nil
-}
+	dbInfo = getDatabaseInfoFromSecret(dbSecret)
 
-func (db *databaseInfo) Valid() error {
-	if db.userName == "" {
-		return errors.New("database username shouldn't be empty")
-	}
-	if db.userPassword == "" {
-		return errors.New("database password shouldn't be empty")
-	}
-	if db.dbName == "" {
-		return errors.New("database name shouldn't be empty")
-	}
-
-	return nil
+	return dbInfo, dbInfo.IsValid()
 }

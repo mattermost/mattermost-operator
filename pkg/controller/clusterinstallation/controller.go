@@ -13,6 +13,7 @@ import (
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -216,11 +217,26 @@ func (r *ReconcileClusterInstallation) Reconcile(request reconcile.Request) (rec
 }
 
 func (r *ReconcileClusterInstallation) checkDatabase(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
+	// Check for an existing secret and determine which type it is (User-Managed
+	// or Operator-Manged). See the Database spec to learn more on this.
 	if mattermost.Spec.Database.Secret != "" {
-		err := r.checkSecret(mattermost.Spec.Database.Secret, "externalDB", mattermost.Namespace)
+		foundSecret := &corev1.Secret{}
+		err := r.client.Get(context.TODO(), types.NamespacedName{Name: mattermost.Spec.Database.Secret, Namespace: mattermost.Namespace}, foundSecret)
 		if err != nil {
-			return errors.Wrap(err, "Error getting the external database secret.")
+			return errors.Wrap(err, "error getting database secret")
 		}
+
+		if _, ok := foundSecret.Data["DB_CONNECTION_STRING"]; ok {
+			// No MySQL cluster setup is needed so return here.
+			return nil
+		}
+
+		err = getDatabaseInfoFromSecret(foundSecret).IsValid()
+		if err != nil {
+			return fmt.Errorf("database secret %s is not valid for either user-managed or operator-managed database types", mattermost.Spec.Database.Secret)
+		}
+
+		// Proceed to MySQL cluster setup.
 	}
 
 	switch mattermost.Spec.Database.Type {
