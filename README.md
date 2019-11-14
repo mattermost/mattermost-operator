@@ -77,11 +77,25 @@ $ cd $GOPATH/src/github.com/operator-framework
 $ git clone https://github.com/operator-framework/operator-sdk
 $ cd operator-sdk
 $ git checkout master
+$ make install
+```
+
+Second, you need to make sure you have [dep](https://github.com/golang/dep) installed. 
+
+### 3.2 Building mattermost-operator
+To start contributing to mattermost-operator you need to clone this repo to your local workspace. 
+
+```bash
+$ mkdir -p $GOPATH/src/github.com/mattermost
+$ cd $GOPATH/src/github.com/mattermost
+$ git clone https://github.com/mattermost/mattermost-operator
+$ cd mattermost-operator
+$ git checkout master
 $ make dep
 $ make install
 ```
 
-### 3.2 Testing locally
+### 3.3 Testing locally
 Developing and testing local changes to Mattermost operator is fairly simple. For that you can deploy Kind and then apply the manifests to deploy the dependencies and the Mattermost operator as well.
 
 You don't need to push the mattermost-operator image to DockerHub or any other registry if testing with kind. You can load the image, built with `make build-image`, directly to the Kind cluster by running the following:
