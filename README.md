@@ -92,7 +92,7 @@ $ git clone https://github.com/mattermost/mattermost-operator
 $ cd mattermost-operator
 $ git checkout master
 $ make dep
-$ make install
+$ make build
 ```
 
 ### 3.3 Testing locally
