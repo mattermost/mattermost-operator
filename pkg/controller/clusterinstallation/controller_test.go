@@ -66,7 +66,7 @@ func TestReconcile(t *testing.T) {
 
 	// Create the resources that would normally be created by other operators
 	// running on the kubernetes cluster.
-	err = prepAllDependencyTestResources(r, ci)
+	err = prepAllDependencyTestResources(r.client, ci)
 	require.NoError(t, err)
 
 	// Mock request to simulate Reconcile() being called on an event for a
@@ -395,39 +395,7 @@ func TestReconcile(t *testing.T) {
 	})
 }
 
-func prepAllDependencyTestResources(r *ReconcileClusterInstallation, ci *mattermostv1alpha1.ClusterInstallation) error {
-	dbSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      ci.Name + "-mysql-root-password",
-			Namespace: ci.Namespace,
-		},
-		Data: map[string][]byte{
-			"ROOT_PASSWORD": []byte("mysupersecure"),
-			"USER":          []byte("mmuser"),
-			"PASSWORD":      []byte("mysupersecure1"),
-			"DATABASE":      []byte("mattermost"),
-		},
-	}
-	err := r.client.Create(context.TODO(), dbSecret)
-	if err != nil {
-		return err
-	}
-
-	MinioSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      ci.Name + "-minio",
-			Namespace: ci.Namespace,
-		},
-		Data: map[string][]byte{
-			"accesskey": []byte("mysupersecure"),
-			"secretkey": []byte("mysupersecurekey"),
-		},
-	}
-	err = r.client.Create(context.TODO(), MinioSecret)
-	if err != nil {
-		return err
-	}
-
+func prepAllDependencyTestResources(client client.Client, ci *mattermostv1alpha1.ClusterInstallation) error {
 	minioService := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      ci.Name + "-minio-hl-svc",
@@ -438,5 +406,6 @@ func prepAllDependencyTestResources(r *ReconcileClusterInstallation, ci *matterm
 			ClusterIP: corev1.ClusterIPNone,
 		},
 	}
-	return r.client.Create(context.TODO(), minioService)
+
+	return client.Create(context.TODO(), minioService)
 }

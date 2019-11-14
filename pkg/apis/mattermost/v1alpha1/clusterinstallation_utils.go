@@ -272,7 +272,7 @@ func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingres
 				LocalObjectReference: corev1.LocalObjectReference{
 					Name: mattermost.Spec.Database.Secret,
 				},
-				Key: "externalDB",
+				Key: "DB_CONNECTION_STRING",
 			},
 		}
 	} else {

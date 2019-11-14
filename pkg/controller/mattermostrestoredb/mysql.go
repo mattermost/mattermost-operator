@@ -5,7 +5,6 @@ package mattermostrestoredb
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -13,10 +12,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
+	mattermostmysql "github.com/mattermost/mattermost-operator/pkg/components/mysql"
 )
 
 func (r *ReconcileMattermostRestoreDB) updateMySQLSecrets(mattermostRestore *mattermostv1alpha1.MattermostRestoreDB, reqLogger logr.Logger) error {
-	dbSecretName := fmt.Sprintf("%s-mysql-root-password", mattermostRestore.Spec.MattermostClusterName)
+	dbSecretName := mattermostmysql.DefaultDatabaseSecretName(mattermostRestore.Spec.MattermostClusterName)
 	dbSecret := &corev1.Secret{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: dbSecretName, Namespace: mattermostRestore.Namespace}, dbSecret)
 	if err != nil && errors.IsNotFound(err) {
