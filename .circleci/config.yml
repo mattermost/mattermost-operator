@@ -28,8 +28,12 @@ jobs:
       - run: |
           mkdir -p /tmp/pkg/apis/mattermost/v1alpha1
           cp -R pkg/apis/mattermost/v1alpha1/* /tmp/pkg/apis/mattermost/v1alpha1
+      - run: |
+          mkdir -p /tmp/deploy/crds
+          cp -R deploy/crds/* /tmp/deploy/crds
       - run: make generate
       - run: diff /tmp/pkg/apis/mattermost/v1alpha1 pkg/apis/mattermost/v1alpha1
+      - run: diff /tmp/deploy/crds deploy/crds
 
   unittest:
     executor:
