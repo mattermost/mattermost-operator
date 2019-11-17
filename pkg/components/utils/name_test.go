@@ -15,37 +15,42 @@ func TestHashedName(t *testing.T) {
 		{
 			name:           "basic",
 			mattermostName: "some-deployment",
-			want:           "db-vsbjj1",
+			want:           "db-5526c9",
 		},
 		{
 			name:           "short 1",
 			mattermostName: "s",
-			want:           "db-a8faro",
+			want:           "db-03c7c0",
 		},
 		{
 			name:           "short 1",
 			mattermostName: "a",
-			want:           "db-dmf1uc",
+			want:           "db-0cc175",
 		},
 		{
 			name:           "short 2",
 			mattermostName: "ab",
-			want:           "db-gh70q2",
+			want:           "db-187ef4",
 		},
 		{
 			name:           "short 0",
 			mattermostName: "",
-			want:           "db-1b2m2y",
+			want:           "db-d41d8c",
 		},
 		{
 			name:           "test-mm",
 			mattermostName: "test-mm",
-			want:           "db-ieihue",
+			want:           "db-8848a1",
 		},
 		{
 			name:           "test-mm2",
 			mattermostName: "test-mm2",
-			want:           "db-lbly8q",
+			want:           "db-95b2f2",
+		},
+		{
+			name:           "mm-jw",
+			mattermostName: "mm-jw",
+			want:           "db-f64f9d",
 		},
 	}
 	for _, tt := range tests {
