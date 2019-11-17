@@ -273,9 +273,9 @@ func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingres
 		masterDBEnvVar.ValueFrom = &corev1.EnvVarSource{
 			SecretKeyRef: &corev1.SecretKeySelector{
 				LocalObjectReference: corev1.LocalObjectReference{
-					Name: mattermost.Spec.Database.ExternalSecret,
+					Name: mattermost.Spec.Database.Secret,
 				},
-				Key: "externalDB",
+				Key: "DB_CONNECTION_STRING",
 			},
 		}
 	} else {

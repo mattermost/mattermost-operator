@@ -5,7 +5,6 @@ import (
 
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
 	"github.com/mattermost/mattermost-operator/pkg/utils"
-
 	mysqlOperator "github.com/presslabs/mysql-operator/pkg/apis/mysql/v1alpha1"
 
 	componentUtils "github.com/mattermost/mattermost-operator/pkg/components/utils"
@@ -35,7 +34,7 @@ func Cluster(mattermost *mattermostv1alpha1.ClusterInstallation) *mysqlOperator.
 		Spec: mysqlOperator.MysqlClusterSpec{
 			MysqlVersion: "5.7",
 			Replicas:     utils.NewInt32(mattermost.Spec.Database.Replicas),
-			SecretName:   fmt.Sprintf("%s-mysql-root-password", mattermost.Name),
+			SecretName:   DefaultDatabaseSecretName(mattermost.Name),
 			VolumeSpec: mysqlOperator.VolumeSpec{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimSpec{
 					AccessModes: []corev1.PersistentVolumeAccessMode{
@@ -60,5 +59,15 @@ func Cluster(mattermost *mattermostv1alpha1.ClusterInstallation) *mysqlOperator.
 		mysql.Spec.InitBucketSecretName = mattermost.Spec.Database.BackupRestoreSecretName
 	}
 
+	if mattermost.Spec.Database.Secret != "" {
+		mysql.Spec.SecretName = mattermost.Spec.Database.Secret
+	}
+
 	return mysql
+}
+
+// DefaultDatabaseSecretName returns the default database secret name based on
+// the provided installation name.
+func DefaultDatabaseSecretName(installationName string) string {
+	return fmt.Sprintf("%s-mysql-root-password", installationName)
 }

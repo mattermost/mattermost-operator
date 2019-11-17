@@ -62,7 +62,7 @@ func Instance(mattermost *mattermostv1alpha1.ClusterInstallation) *minioOperator
 
 // Secret returns the secret name created to use togehter with Minio deployment
 func Secret(mattermost *mattermostv1alpha1.ClusterInstallation) *corev1.Secret {
-	secretName := fmt.Sprintf("%s-minio", mattermost.Name)
+	secretName := DefaultMinioSecretName(mattermost.Name)
 	data := make(map[string][]byte)
 	data["accesskey"] = utils.New16ID()
 	data["secretkey"] = utils.New28ID()
@@ -72,4 +72,10 @@ func Secret(mattermost *mattermostv1alpha1.ClusterInstallation) *corev1.Secret {
 		mattermostv1alpha1.ClusterInstallationResourceLabels(mattermost.Name),
 		data,
 	)
+}
+
+// DefaultMinioSecretName returns the default minio secret name based on
+// the provided installation name.
+func DefaultMinioSecretName(installationName string) string {
+	return fmt.Sprintf("%s-minio", installationName)
 }
