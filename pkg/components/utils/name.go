@@ -2,7 +2,6 @@ package utils
 
 import (
 	"crypto/md5"
-	"encoding/base64"
 	"fmt"
 	"strings"
 )
@@ -11,7 +10,7 @@ import (
 // The motivation behind is to render K8S resource definition's name with constant length deterministic string.
 func HashedName(name string) string {
 	s := md5.Sum([]byte(name))
-	ss := base64.RawStdEncoding.EncodeToString(s[:])
+	ss := fmt.Sprintf("%x", s)
 	if len(ss) > 6 {
 		ss = ss[:6]
 	}
