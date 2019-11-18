@@ -52,6 +52,18 @@ const (
 	SizeGB = 1048576000
 	// DefaultMaxFileSize is the default maximum file size configuration value that will be used unless nginx annotation is set
 	DefaultMaxFileSize = 1000
+
+	// defaultRevHistoryLimit is the default RevisionHistoryLimit - number of possible roll-back points
+	// More details: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#rolling-back-a-deployment
+	defaultRevHistoryLimit = 5
+	// defaultMaxUnavailable is the default max number of unavailable pods out of specified `Replicas` during rolling update.
+	// More details: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#max-unavailable
+	// Recommended to be as low as possible - in order to have number of available pod as close to `Replicas` as possible
+	defaultMaxUnavailable = 0
+	// defaultMaxSurge is the default max number of extra pods over specified `Replicas` during rolling update.
+	// More details: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#max-surge
+	// Recommended not to be too high - in order to have not too many extra pods over requested `Replicas` number
+	defaultMaxSurge = 1
 )
 
 // SetDefaults set the missing values in the manifest to the default ones
@@ -521,11 +533,9 @@ func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingres
 	envVars = append(envVars, envVarES...)
 	envVars = append(envVars, envVarGeneral...)
 
-	revHistoryLimit := int32(5)
-	maxUnavailable := intstr.FromInt(int(mattermost.Spec.Replicas - 1))
-	if mattermost.Spec.Replicas == 1 {
-		maxUnavailable = intstr.FromInt(1)
-	}
+	revHistoryLimit := int32(defaultRevHistoryLimit)
+	maxUnavailable := intstr.FromInt(defaultMaxUnavailable)
+	maxSurge := intstr.FromInt(defaultMaxSurge)
 
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -545,6 +555,7 @@ func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingres
 				Type: appsv1.RollingUpdateDeploymentStrategyType,
 				RollingUpdate: &appsv1.RollingUpdateDeployment{
 					MaxUnavailable: &maxUnavailable,
+					MaxSurge:       &maxSurge,
 				},
 			},
 			RevisionHistoryLimit: &revHistoryLimit,

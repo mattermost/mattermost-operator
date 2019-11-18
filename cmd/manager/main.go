@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"time"
 
 	"github.com/mattermost/mattermost-operator/pkg/apis"
 	"github.com/mattermost/mattermost-operator/pkg/controller"
@@ -26,8 +27,12 @@ import (
 
 // Change below variables to serve metrics on different host or port.
 var (
-	metricsHost       = "0.0.0.0"
+	// metricsHost specifies host to bind to for serving prometheus metrics
+	metricsHost = "0.0.0.0"
+	// metricsPort specifies port to bind to for serving prometheus metrics
 	metricsPort int32 = 8383
+	// syncPeriod specifies the period to reconcile resources in order to reduce spread between local cache and k8s
+	syncPeriod = time.Duration(180 * time.Second)
 )
 
 func main() {
@@ -71,6 +76,7 @@ func main() {
 
 	// Create a new Cmd to provide shared dependencies and start components
 	mgr, err := manager.New(cfg, manager.Options{
+		SyncPeriod:         &syncPeriod,
 		Namespace:          "",
 		MetricsBindAddress: fmt.Sprintf("%s:%d", metricsHost, metricsPort),
 	})

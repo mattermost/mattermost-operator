@@ -23,8 +23,10 @@ import (
 )
 
 var (
+	// retryInterval is an interval between check attempts
 	retryInterval        = time.Second * 5
-	timeout              = time.Second * 300
+	// timeout to wait for k8s objects to be created
+	timeout              = time.Second * 900
 	cleanupRetryInterval = time.Second * 5
 	cleanupTimeout       = time.Second * 60
 )
