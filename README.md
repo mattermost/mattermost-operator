@@ -38,7 +38,7 @@ Use Case: An existing AWS RDS Database
   apiVersion: v1
   kind: Secret
   metadata:
-    name: test-restore
+    name: restore-secret
   type: Opaque
   stringData:
     AWS_ACCESS_KEY_ID: XXXXXXXXXXXX
@@ -58,7 +58,7 @@ Use Case: An existing AWS RDS Database
     mattermostDBName: mattermostdb
     mattermostDBPassword: supersecure
     mattermostDBUser: mmuser
-    restoreSecret: myawscreds
+    restoreSecret: restore-secret
   ```
 
 If you have an machine running MySQL you just need to perform the `Percona XtraBackup` step
