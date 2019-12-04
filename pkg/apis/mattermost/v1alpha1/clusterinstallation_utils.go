@@ -163,48 +163,9 @@ func (db *Database) SetDefaults() {
 	}
 }
 
-// GenerateService returns the service for Mattermost
-func (mattermost *ClusterInstallation) GenerateService(serviceName, selectorName string) *corev1.Service {
-	svcAnnotations := map[string]string{
-		"service.alpha.kubernetes.io/tolerate-unready-endpoints": "true",
-	}
-	if mattermost.Spec.UseServiceLoadBalancer {
-		for k, v := range mattermost.Spec.ServiceAnnotations {
-			svcAnnotations[k] = v
-		}
-		return &corev1.Service{
-			ObjectMeta: metav1.ObjectMeta{
-				Labels:    ClusterInstallationLabels(serviceName),
-				Name:      serviceName,
-				Namespace: mattermost.Namespace,
-				OwnerReferences: []metav1.OwnerReference{
-					*metav1.NewControllerRef(mattermost, schema.GroupVersionKind{
-						Group:   SchemeGroupVersion.Group,
-						Version: SchemeGroupVersion.Version,
-						Kind:    "ClusterInstallation",
-					}),
-				},
-				Annotations: svcAnnotations,
-			},
-			Spec: corev1.ServiceSpec{
-				Ports: []corev1.ServicePort{
-					{
-						Name:       "http",
-						Port:       80,
-						TargetPort: intstr.FromString("app"),
-					},
-					{
-						Name:       "https",
-						Port:       443,
-						TargetPort: intstr.FromString("app"),
-					},
-				},
-				Selector: ClusterInstallationLabels(selectorName),
-				Type:     corev1.ServiceTypeLoadBalancer,
-			},
-		}
-	}
-
+// newService returns semi-finished service with common parts filled.
+// Returned service is expected to be completed by the caller.
+func (mattermost *ClusterInstallation) newService(serviceName, selectorName string, annotations map[string]string) *corev1.Service {
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:    ClusterInstallationLabels(serviceName),
@@ -217,19 +178,55 @@ func (mattermost *ClusterInstallation) GenerateService(serviceName, selectorName
 					Kind:    "ClusterInstallation",
 				}),
 			},
-			Annotations: svcAnnotations,
+			Annotations: annotations,
 		},
 		Spec: corev1.ServiceSpec{
-			Ports: []corev1.ServicePort{
-				{
-					Port:       8065,
-					TargetPort: intstr.FromString("app"),
-				},
-			},
-			Selector:  ClusterInstallationLabels(selectorName),
-			ClusterIP: corev1.ClusterIPNone,
+			Selector: ClusterInstallationLabels(selectorName),
 		},
 	}
+}
+
+// GenerateService returns the service for Mattermost.
+func (mattermost *ClusterInstallation) GenerateService(serviceName, selectorName string) *corev1.Service {
+	// Service has custom annotations
+	annotations := map[string]string{
+		"service.alpha.kubernetes.io/tolerate-unready-endpoints": "true",
+	}
+
+	// Result service
+	var service *corev1.Service
+
+	if mattermost.Spec.UseServiceLoadBalancer {
+		// Create LoadBalancer service with additional annotations provided in .Spec
+		// LoadBalancer is directly accessible from outside and thus exposes ports 80 and 443
+		service = mattermost.newService(serviceName, selectorName, mergeStringMaps(annotations, mattermost.Spec.ServiceAnnotations))
+		service.Spec.Ports = []corev1.ServicePort{
+			{
+				Name:       "http",
+				Port:       80,
+				TargetPort: intstr.FromString("app"),
+			},
+			{
+				Name:       "https",
+				Port:       443,
+				TargetPort: intstr.FromString("app"),
+			},
+		}
+		service.Spec.Type = corev1.ServiceTypeLoadBalancer
+	} else {
+		// Create Headless service
+		// Headless service is not directly accessible from outside and thus exposes custom port
+		service = mattermost.newService(serviceName, selectorName, annotations)
+		service.Spec.Ports = []corev1.ServicePort{
+			{
+				Port:       8065,
+				TargetPort: intstr.FromString("app"),
+			},
+		}
+		service.Spec.ClusterIP = corev1.ClusterIPNone
+	}
+
+	return service
 }
 
 // GenerateIngress returns the ingress for Mattermost
@@ -692,4 +689,23 @@ func MySQLLabels() map[string]string {
 // created for the installation.
 func ClusterInstallationResourceLabels(name string) map[string]string {
 	return map[string]string{ClusterResourceLabel: name}
+}
+
+// mergeStringMaps inserts (and overwrites) data into receiver map object from origin.
+func mergeStringMaps(receiver, origin map[string]string) map[string]string {
+	if receiver == nil {
+		receiver = make(map[string]string)
+	}
+
+	if origin == nil {
+		// Nothing to merge from
+		return receiver
+	}
+
+	// Place key->value pair from src into dst
+	for key := range origin {
+		receiver[key] = origin[key]
+	}
+
+	return receiver
 }
