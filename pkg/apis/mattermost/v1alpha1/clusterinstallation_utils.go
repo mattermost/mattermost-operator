@@ -64,6 +64,9 @@ const (
 	// More details: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#max-surge
 	// Recommended not to be too high - in order to have not too many extra pods over requested `Replicas` number
 	defaultMaxSurge = 1
+
+	// Name of the container which runs Mattermost application
+	MattermostAppContainerName = "mattermost"
 )
 
 // SetDefaults set the missing values in the manifest to the default ones
@@ -269,6 +272,28 @@ func (mattermost *ClusterInstallation) GenerateIngress(name, ingressName string,
 			},
 		},
 	}
+}
+
+// GetContainerByName gets container from a deployment by name
+func (mattermost *ClusterInstallation) GetContainerByName(deployment *appsv1.Deployment, containerName string) *corev1.Container {
+	for i := range deployment.Spec.Template.Spec.Containers {
+		container := &deployment.Spec.Template.Spec.Containers[i]
+		if container.Name == containerName {
+			return container
+		}
+	}
+	return nil
+}
+
+// GetMainContainer gets container which runs Mattermost application from a deployment
+func (mattermost *ClusterInstallation) GetMainContainer(deployment *appsv1.Deployment) *corev1.Container {
+	// Check new-style - fixed name
+	container := mattermost.GetContainerByName(deployment, MattermostAppContainerName)
+	if container == nil {
+		// Check old-style - name of the container == name of the deployment
+		container = mattermost.GetContainerByName(deployment, deployment.Name)
+	}
+	return container
 }
 
 // GenerateDeployment returns the deployment spec for Mattermost
@@ -572,7 +597,7 @@ func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingres
 					InitContainers: initContainers,
 					Containers: []corev1.Container{
 						{
-							Name:                     deploymentName,
+							Name:                     MattermostAppContainerName,
 							Image:                    containerImage,
 							ImagePullPolicy:          corev1.PullAlways,
 							TerminationMessagePolicy: corev1.TerminationMessageFallbackToLogsOnError,

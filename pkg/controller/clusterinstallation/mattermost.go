@@ -20,7 +20,7 @@ import (
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
 )
 
-const updateName = "mattermost-update-check"
+const updateJobName = "mattermost-update-check"
 
 func (r *ReconcileClusterInstallation) checkMattermost(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
 	reqLogger = reqLogger.WithValues("Reconcile", "mattermost")
@@ -207,18 +207,21 @@ func (r *ReconcileClusterInstallation) deleteMattermostResource(mattermost *matt
 	return nil
 }
 
-func (r *ReconcileClusterInstallation) launchUpdateJob(mi *mattermostv1alpha1.ClusterInstallation, new *appsv1.Deployment, imageName string, reqLogger logr.Logger) error {
+func (r *ReconcileClusterInstallation) launchUpdateJob(
+	mi *mattermostv1alpha1.ClusterInstallation,
+	deployment *appsv1.Deployment,
+) error {
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      updateName,
+			Name:      updateJobName,
 			Namespace: mi.GetNamespace(),
 		},
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{"app": updateName},
+					Labels: map[string]string{"app": updateJobName},
 				},
-				Spec: *new.Spec.Template.Spec.DeepCopy(),
+				Spec: *deployment.Spec.Template.Spec.DeepCopy(),
 			},
 		},
 	}
@@ -237,97 +240,150 @@ func (r *ReconcileClusterInstallation) launchUpdateJob(mi *mattermostv1alpha1.Cl
 	return nil
 }
 
-// updateMattermostDeployment checks if the deployment should be updated.
-// If an update is required then the deployment spec is set to:
-// - roll forward version
-// - keep active MattermostInstallation available by setting maxUnavailable=N-1
-func (r *ReconcileClusterInstallation) updateMattermostDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, current, desired *appsv1.Deployment, imageName string, reqLogger logr.Logger) error {
-	var update bool
-
-	// Look for mattermost container in pod spec and determine if the image
-	// needs to be updated.
-	for _, container := range current.Spec.Template.Spec.Containers {
-		if container.Name == desired.Spec.Template.Spec.Containers[0].Name {
-			if container.Image != imageName {
-				reqLogger.Info("Current image is not the same as the requested, will upgrade the Mattermost installation")
-				update = true
-			}
-			break
-		}
-		// If we got here, something went wrong
-		return errors.New("Unable to find mattermost container in deployment")
+// isMainContainerImageSame checks whether main containers of specified deployments are the same or not.
+func (r *ReconcileClusterInstallation) isMainContainerImageSame(
+	mattermost *mattermostv1alpha1.ClusterInstallation,
+	a *appsv1.Deployment,
+	b *appsv1.Deployment,
+) (bool, error) {
+	// Sanity check
+	if (a == nil) || (b == nil) {
+		return false, errors.New("Unable to find main container, no deployment provided")
 	}
 
-	// Run a single-pod job with the new mattermost image to perform any
-	// database migrations before altering the deployment. If this fails,
-	// we will return and not upgrade the deployment.
-	if update {
-		reqLogger.Info(fmt.Sprintf("Running Mattermost image %s upgrade job check", imageName))
-		alreadyRunning, err := r.fetchRunningUpdateJob(mattermost, reqLogger)
-		if err != nil && k8sErrors.IsNotFound(err) {
-			reqLogger.Info("Launching update job")
-			if err = r.launchUpdateJob(mattermost, desired, imageName, reqLogger); err != nil {
-				return errors.Wrap(err, "Launching update job failed")
-			}
-			return errors.New("Began update job")
-		}
+	// Fetch containers to compare
 
-		if err != nil {
-			return errors.Wrap(err, "Error trying to determine if an update job already is running")
-		}
-
-		if alreadyRunning.Status.CompletionTime == nil {
-			return errors.New("Update image job still running..")
-		}
-
-		// job is done, schedule cleanup
-		defer func() {
-			reqLogger.Info(fmt.Sprintf("Deleting job %s/%s",
-				alreadyRunning.GetNamespace(), alreadyRunning.GetName()))
-
-			err = r.client.Delete(context.TODO(), alreadyRunning)
-			if err != nil {
-				reqLogger.Error(err, "Unable to cleanup image update check job")
-			}
-
-			podList := &corev1.PodList{}
-			listOptions := k8sClient.ListOptions{
-				LabelSelector: labels.SelectorFromSet(
-					labels.Set(map[string]string{"app": updateName})),
-				Namespace: alreadyRunning.GetNamespace(),
-			}
-
-			err = r.client.List(context.Background(), &listOptions, podList)
-			reqLogger.Info(fmt.Sprintf("Deleting %d pods", len(podList.Items)))
-			for _, p := range podList.Items {
-				reqLogger.Info(fmt.Sprintf("Deleting pod %s/%s", p.Namespace, p.Name))
-				err = r.client.Delete(context.TODO(), &p)
-				if err != nil {
-					reqLogger.Error(err, fmt.Sprintf("Problem deleting pod %s/%s", p.Namespace, p.Name))
-				}
-			}
-		}()
-
-		// it's done, it either failed or succeeded
-		if alreadyRunning.Status.Failed > 0 {
-			return errors.New("Upgrade job failed")
-		}
-
-		reqLogger.Info("Upgrade image job ran successfully")
+	containerA := mattermost.GetMainContainer(a)
+	if containerA == nil {
+		return false, errors.Errorf("Unable to find main container, incorrect deployment %s/%s", a.Namespace, a.Name)
 	}
+
+	containerB := mattermost.GetMainContainer(b)
+	if containerB == nil {
+		return false, errors.Errorf("Unable to find main container, incorrect deployment %s/%s", b.Namespace, b.Name)
+	}
+
+	// Both containers fetched, can compare images
+
+	return containerA.Image == containerB.Image, nil
+}
+
+// updateMattermostDeployment performs deployment update if necessary.
+// If a deployment update is necessary, an update job is launched to check new image.
+func (r *ReconcileClusterInstallation) updateMattermostDeployment(
+	mattermost *mattermostv1alpha1.ClusterInstallation,
+	current *appsv1.Deployment,
+	desired *appsv1.Deployment,
+	imageName string,
+	reqLogger logr.Logger,
+) error {
+	sameImage, err := r.isMainContainerImageSame(mattermost, current, desired)
+	if err != nil {
+		return err
+	}
+
+	if sameImage {
+		// Need to update other fields only, update job is not required
+		return r.update(current, desired, reqLogger)
+	}
+
+	// Image is not the same
+	// Run a single-pod job with the new mattermost image
+	// It will check whether new image is operational
+	// and may perform any database migrations before altering the deployment.
+	// If this fails, we will return and not upgrade the deployment.
+
+	reqLogger.Info("Current image is not the same as the requested, will upgrade the Mattermost installation")
+
+	job, err := r.checkUpdateJob(mattermost, desired, reqLogger)
+	if job != nil {
+		// Job is done, need to cleanup
+		defer r.cleanupUpdateJob(job, reqLogger)
+	}
+	if err != nil {
+		return err
+	}
+
+	// Job completed successfully
 
 	return r.update(current, desired, reqLogger)
 }
 
-func (r *ReconcileClusterInstallation) fetchRunningUpdateJob(mi *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) (*batchv1.Job, error) {
-	foundJob := &batchv1.Job{}
+// checkUpdateJob checks whether update job status. In case job is not running it is launched
+func (r *ReconcileClusterInstallation) checkUpdateJob(
+	mattermost *mattermostv1alpha1.ClusterInstallation,
+	desired *appsv1.Deployment,
+	reqLogger logr.Logger,
+) (*batchv1.Job, error) {
+	reqLogger.Info(fmt.Sprintf("Running Mattermost update image job check for image %s", mattermost.GetMainContainer(desired).Image))
+	job, err := r.fetchRunningUpdateJob(mattermost)
+	if err != nil {
+		// Unable to fetch job
+		if k8sErrors.IsNotFound(err) {
+			// Job is not running, let's launch
+			reqLogger.Info("Launching update image job")
+			if err = r.launchUpdateJob(mattermost, desired); err != nil {
+				return nil, errors.Wrap(err, "Launching update image job failed")
+			}
+			return nil, errors.New("Began update image job")
+		} else {
+			return nil, errors.Wrap(err, "Error trying to determine if an update image job is already running")
+		}
+	}
+
+	// Job is either running or completed
+
+	if job.Status.CompletionTime == nil {
+		return nil, errors.New("Update image job still running..")
+	}
+
+	// Job is completed, can check completion status
+
+	if job.Status.Failed > 0 {
+		return job, errors.New("Update image job failed")
+	}
+
+	reqLogger.Info("Update image job ran successfully")
+
+	return job, nil
+}
+
+// cleanupUpdateJob deletes update job and all pods of the job
+func (r *ReconcileClusterInstallation) cleanupUpdateJob(job *batchv1.Job, reqLogger logr.Logger) {
+	reqLogger.Info(fmt.Sprintf("Deleting update image job %s/%s", job.GetNamespace(), job.GetName()))
+
+	err := r.client.Delete(context.TODO(), job)
+	if err != nil {
+		reqLogger.Error(err, "Unable to cleanup update image job")
+	}
+
+	podList := &corev1.PodList{}
+	listOptions := k8sClient.ListOptions{
+		LabelSelector: labels.SelectorFromSet(labels.Set(map[string]string{"app": updateJobName})),
+		Namespace:     job.GetNamespace(),
+	}
+
+	err = r.client.List(context.Background(), &listOptions, podList)
+	reqLogger.Info(fmt.Sprintf("Deleting %d pods", len(podList.Items)))
+	for _, pod := range podList.Items {
+		reqLogger.Info(fmt.Sprintf("Deleting pod %s/%s", pod.Namespace, pod.Name))
+		err = r.client.Delete(context.TODO(), &pod)
+		if err != nil {
+			reqLogger.Error(err, fmt.Sprintf("Problem deleting pod %s/%s", pod.Namespace, pod.Name))
+		}
+	}
+}
+
+// fetchRunningUpdateJob gets update job
+func (r *ReconcileClusterInstallation) fetchRunningUpdateJob(mi *mattermostv1alpha1.ClusterInstallation) (*batchv1.Job, error) {
+	job := &batchv1.Job{}
 	err := r.client.Get(
 		context.TODO(),
 		types.NamespacedName{
-			Name:      updateName,
+			Name:      updateJobName,
 			Namespace: mi.GetNamespace(),
 		},
-		foundJob,
+		job,
 	)
-	return foundJob, err
+	return job, err
 }
