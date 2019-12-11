@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -278,9 +277,12 @@ func TestReconcile(t *testing.T) {
 					APIVersion: "v1",
 				},
 			}
-			sel := mattermostv1alpha1.ClusterInstallationLabels(deployment.Name)
-			opts := &client.ListOptions{LabelSelector: labels.SelectorFromSet(sel)}
-			err = c.List(context.TODO(), opts, podList)
+
+			listOptions := []client.ListOption{
+				client.InNamespace(ciNamespace),
+				client.MatchingLabels(mattermostv1alpha1.ClusterInstallationLabels(deployment.Name)),
+			}
+			err = c.List(context.TODO(), podList, listOptions...)
 			require.NoError(t, err)
 			require.Equal(t, int(replicas), len(podList.Items))
 		}

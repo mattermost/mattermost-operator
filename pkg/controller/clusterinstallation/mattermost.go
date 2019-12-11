@@ -358,12 +358,12 @@ func (r *ReconcileClusterInstallation) cleanupUpdateJob(job *batchv1.Job, reqLog
 	}
 
 	podList := &corev1.PodList{}
-	listOptions := k8sClient.ListOptions{
-		LabelSelector: labels.SelectorFromSet(labels.Set(map[string]string{"app": updateJobName})),
-		Namespace:     job.GetNamespace(),
+	listOptions := []k8sClient.ListOption{
+		k8sClient.InNamespace(job.GetNamespace()),
+		k8sClient.MatchingLabels(labels.Set(map[string]string{"app": updateJobName})),
 	}
 
-	err = r.client.List(context.Background(), &listOptions, podList)
+	err = r.client.List(context.Background(), podList, listOptions...)
 	reqLogger.Info(fmt.Sprintf("Deleting %d pods", len(podList.Items)))
 	for _, pod := range podList.Items {
 		reqLogger.Info(fmt.Sprintf("Deleting pod %s/%s", pod.Namespace, pod.Name))

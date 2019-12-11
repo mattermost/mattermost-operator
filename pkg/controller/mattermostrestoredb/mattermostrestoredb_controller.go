@@ -15,7 +15,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -172,15 +171,12 @@ func (r *ReconcileMattermostRestoreDB) Reconcile(request reconcile.Request) (rec
 		return reconcile.Result{RequeueAfter: time.Second * 3}, fmt.Errorf("Waiting for MySQL Statefulset scale to 0")
 	}
 
-	sel := mattermostv1alpha1.MySQLLabels()
-
-	opts := &client.ListOptions{
-		LabelSelector: labels.SelectorFromSet(sel),
-		Namespace:     mySQLCluster.GetNamespace(),
-	}
 	pods := &corev1.PodList{}
-
-	err = r.client.List(context.TODO(), opts, pods)
+	listOpts := []client.ListOption{
+		client.InNamespace(mySQLCluster.GetNamespace()),
+		client.MatchingLabels(mattermostv1alpha1.MySQLLabels()),
+	}
+	err = r.client.List(context.TODO(), pods, listOpts...)
 	if err != nil && !errors.IsNotFound(err) {
 		return reconcile.Result{}, errrors.Wrap(err, "unable to get pod list")
 	}
