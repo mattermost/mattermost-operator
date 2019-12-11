@@ -1,7 +1,7 @@
 .PHONY: all check-style unittest generate build clean build-image operator-sdk yaml
 
 OPERATOR_IMAGE ?= mattermost/mattermost-operator:test
-SDK_VERSION = v0.10.0
+SDK_VERSION = v0.13.0
 MACHINE = $(shell uname -m)
 BUILD_IMAGE = golang:1.12
 BASE_IMAGE = alpine:3.10
@@ -64,15 +64,17 @@ govet: ## Runs govet against all packages.
 
 generate: operator-sdk ## Runs the kubernetes code-generators and openapi
 	build/operator-sdk generate k8s
-	build/operator-sdk generate openapi
+	build/operator-sdk generate crds
+	which ./bin/openapi-gen > /dev/null || go build -o ./bin/openapi-gen k8s.io/kube-openapi/cmd/openapi-gen
+	./bin/openapi-gen --logtostderr=true -o "" -i ./pkg/apis/mattermost/v1alpha1 -O zz_generated.openapi -p ./pkg/apis/mattermost/v1alpha1 -h ./hack/boilerplate.go.txt -r "-"
 	vendor/k8s.io/code-generator/generate-groups.sh all github.com/mattermost/mattermost-operator/pkg/client github.com/mattermost/mattermost-operator/pkg/apis mattermost:v1alpha1
 
 yaml: ## Generate the YAML file for easy operator installation
 	cat deploy/service_account.yaml > $(INSTALL_YAML)
 	echo --- >> $(INSTALL_YAML)
-	cat deploy/crds/mattermost_v1alpha1_clusterinstallation_crd.yaml >> $(INSTALL_YAML)
+	cat deploy/crds/mattermost.com_clusterinstallations_crd.yaml >> $(INSTALL_YAML)
 	echo --- >> $(INSTALL_YAML)
-	cat deploy/crds/mattermost_v1alpha1_mattermostrestoredb_crd.yaml >> $(INSTALL_YAML)
+	cat deploy/crds/mattermost.com_mattermostrestoredbs_crd.yaml >> $(INSTALL_YAML)
 	echo --- >> $(INSTALL_YAML)
 	cat deploy/role.yaml >> $(INSTALL_YAML)
 	echo --- >> $(INSTALL_YAML)
