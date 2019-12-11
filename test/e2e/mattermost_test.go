@@ -24,7 +24,7 @@ import (
 
 var (
 	// retryInterval is an interval between check attempts
-	retryInterval        = time.Second * 5
+	retryInterval = time.Second * 5
 	// timeout to wait for k8s objects to be created
 	timeout              = time.Second * 900
 	cleanupRetryInterval = time.Second * 5
@@ -192,7 +192,7 @@ func mattermostUpgradeTest(t *testing.T, f *framework.Framework, ctx *framework.
 		},
 		Spec: operator.ClusterInstallationSpec{
 			Image:       "mattermost/mattermost-enterprise-edition",
-			Version:     "5.14.3",
+			Version:     "5.16.3",
 			IngressName: "test-example2.mattermost.dev",
 			Replicas:    1,
 			Resources: corev1.ResourceRequirements{
@@ -254,7 +254,7 @@ func mattermostUpgradeTest(t *testing.T, f *framework.Framework, ctx *framework.
 	require.NoError(t, err)
 
 	// Apply the new version
-	exampleMattermost.Spec.Version = "5.15.0"
+	exampleMattermost.Spec.Version = "5.17.1"
 	err = f.Client.Update(context.TODO(), exampleMattermost)
 	require.NoError(t, err)
 
@@ -273,12 +273,12 @@ func mattermostUpgradeTest(t *testing.T, f *framework.Framework, ctx *framework.
 	err = f.Client.Get(context.TODO(), types.NamespacedName{Name: testName, Namespace: namespace}, newMattermost)
 	require.NoError(t, err)
 	require.Equal(t, "mattermost/mattermost-enterprise-edition", newMattermost.Status.Image)
-	require.Equal(t, "5.15.0", newMattermost.Status.Version)
+	require.Equal(t, "5.17.1", newMattermost.Status.Version)
 
 	mmDeployment := &appsv1.Deployment{}
 	err = f.Client.Get(context.TODO(), types.NamespacedName{Name: testName, Namespace: namespace}, mmDeployment)
 	require.NoError(t, err)
-	require.Equal(t, "mattermost/mattermost-enterprise-edition:5.15.0", mmDeployment.Spec.Template.Spec.Containers[0].Image)
+	require.Equal(t, "mattermost/mattermost-enterprise-edition:5.17.1", mmDeployment.Spec.Template.Spec.Containers[0].Image)
 
 	err = f.Client.Delete(context.TODO(), newMattermost)
 	require.NoError(t, err)

@@ -4,7 +4,7 @@ metadata:
   name: mm-example-full # Name of your cluster as shown in Kubernetes.
 spec:
   image: mattermost/mattermost-enterprise-edition # Docker image for the app servers.
-  version: 5.15.0 # Docker tag for the image.
+  version: 5.17.1 # Docker tag for the image.
   size: 5000users # Size of the Mattermost installation, typically based on the number of users. Automatically sets the replica and resource limits for Minio, databaes and app servers based on the number provided here. Accepts 100users, 1000users, 5000users, 10000users, or 25000users. Manually setting replicas or resources will override the values set by 'size'.
   useServiceLoadBalancer: true # Set to true to use AWS or Azure load balancers instead of an NGINX controller.
   serviceAnnotations: {} # Service annotations to use with AWS or Azure load balancers.
