@@ -6,7 +6,7 @@ MACHINE = $(shell uname -m)
 BUILD_IMAGE = golang:1.13
 BASE_IMAGE = alpine:3.10
 GOPATH ?= $(shell go env GOPATH)
-GOFLAGS ?= $(GOFLAGS:)
+GOFLAGS ?= $(GOFLAGS:) -mod=vendor
 GO=go
 IMAGE_TAG=
 BUILD_TIME := $(shell date -u +%Y%m%d.%H%M%S)
@@ -26,7 +26,7 @@ unittest: ## Runs unit tests
 
 build: ## Build the mattermost-operator
 	@echo Building Mattermost-operator
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 $(GO) build -gcflags all=-trimpath=$(GOPATH) -asmflags all=-trimpath=$(GOPATH) -a -installsuffix cgo -o build/_output/bin/mattermost-operator $(GO_LINKER_FLAGS) ./cmd/manager/main.go
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 $(GO) build $(GOFLAGS) -gcflags all=-trimpath=$(GOPATH) -asmflags all=-trimpath=$(GOPATH) -a -installsuffix cgo -o build/_output/bin/mattermost-operator $(GO_LINKER_FLAGS) ./cmd/manager/main.go
 
 build-image: operator-sdk ## Build the docker image for mattermost-operator
 	@echo Building Mattermost-operator Docker Image
