@@ -127,6 +127,7 @@ main() {
     # resource details. Also comment `defer ctx.Cleanup()` in the cluster to
     # avoid resouce cleanup.
     echo "Starting Operator Testing..."
+    export GO111MODULE=auto
     docker_exec operator-sdk test local ./test/e2e --debug --verbose --namespace mattermost-operator --kubeconfig /root/.kube/config --go-test-flags -timeout=30m
 
     echo "Done Testing!"
