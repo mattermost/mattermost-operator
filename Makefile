@@ -65,7 +65,7 @@ govet: ## Runs govet against all packages.
 generate: operator-sdk ## Runs the kubernetes code-generators and openapi
 	build/operator-sdk generate k8s
 	build/operator-sdk generate crds
-	which ./bin/openapi-gen > /dev/null || go build -o ./bin/openapi-gen k8s.io/kube-openapi/cmd/openapi-gen
+	which ./bin/openapi-gen > /dev/null || GO111MODULE=on go build -o ./bin/openapi-gen k8s.io/kube-openapi/cmd/openapi-gen
 	./bin/openapi-gen --logtostderr=true -o "" -i ./pkg/apis/mattermost/v1alpha1 -O zz_generated.openapi -p ./pkg/apis/mattermost/v1alpha1 -h ./hack/boilerplate.go.txt -r "-"
 	vendor/k8s.io/code-generator/generate-groups.sh all github.com/mattermost/mattermost-operator/pkg/client github.com/mattermost/mattermost-operator/pkg/apis mattermost:v1alpha1
 
