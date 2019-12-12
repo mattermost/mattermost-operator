@@ -18,11 +18,13 @@ spec:
     listKind: MattermostRestoreDBList
     plural: mattermostrestoredbs
     singular: mattermostrestoredb
-  scope: Namespaced
+  scope: ""
   subresources:
     status: {}
   validation:
     openAPIV3Schema:
+      description: MattermostRestoreDB is the Schema for the mattermostrestoredbs
+        API
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -37,6 +39,7 @@ spec:
         metadata:
           type: object
         spec:
+          description: MattermostRestoreDBSpec defines the desired state of MattermostRestoreDB
           properties:
             initBucketURL:
               description: InitBucketURL defines where the DB backup file is located.
@@ -63,6 +66,7 @@ spec:
               type: string
           type: object
         status:
+          description: MattermostRestoreDBStatus defines the observed state of MattermostRestoreDB
           properties:
             originalDBReplicas:
               description: The original number of database replicas. will be used
@@ -73,6 +77,7 @@ spec:
               description: Represents the state of the Mattermost restore Database.
               type: string
           type: object
+      type: object
   version: v1alpha1
   versions:
   - name: v1alpha1

@@ -70,9 +70,9 @@ generate: operator-sdk ## Runs the kubernetes code-generators and openapi
 yaml: ## Generate the YAML file for easy operator installation
 	cat deploy/service_account.yaml > $(INSTALL_YAML)
 	echo --- >> $(INSTALL_YAML)
-	cat deploy/crds/mattermost_v1alpha1_clusterinstallation_crd.yaml >> $(INSTALL_YAML)
+	cat deploy/crds/mattermost.com_clusterinstallations_crd.yaml >> $(INSTALL_YAML)
 	echo --- >> $(INSTALL_YAML)
-	cat deploy/crds/mattermost_v1alpha1_mattermostrestoredb_crd.yaml >> $(INSTALL_YAML)
+	cat deploy/crds/mattermost.com_mattermostrestoredbs_crd.yaml >> $(INSTALL_YAML)
 	echo --- >> $(INSTALL_YAML)
 	cat deploy/role.yaml >> $(INSTALL_YAML)
 	echo --- >> $(INSTALL_YAML)
