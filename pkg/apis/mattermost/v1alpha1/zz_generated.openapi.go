@@ -27,6 +27,7 @@ func schema_pkg_apis_mattermost_v1alpha1_ClusterInstallation(ref common.Referenc
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Description: "ClusterInstallation is the Schema for the clusterinstallations API",
+				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
 						SchemaProps: spec.SchemaProps{
@@ -68,6 +69,7 @@ func schema_pkg_apis_mattermost_v1alpha1_ClusterInstallationSpec(ref common.Refe
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Description: "ClusterInstallationSpec defines the desired state of ClusterInstallation",
+				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"image": {
 						SchemaProps: spec.SchemaProps{
@@ -122,6 +124,7 @@ func schema_pkg_apis_mattermost_v1alpha1_ClusterInstallationSpec(ref common.Refe
 							Description: "NodeSelector is a selector which must be true for the pod to fit on a node. Selector which must match a node's labels for the pod to be scheduled on that node. More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Type:   []string{"string"},
@@ -172,6 +175,7 @@ func schema_pkg_apis_mattermost_v1alpha1_ClusterInstallationSpec(ref common.Refe
 						SchemaProps: spec.SchemaProps{
 							Type: []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Type:   []string{"string"},
@@ -185,6 +189,7 @@ func schema_pkg_apis_mattermost_v1alpha1_ClusterInstallationSpec(ref common.Refe
 						SchemaProps: spec.SchemaProps{
 							Type: []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Type:   []string{"string"},
@@ -208,6 +213,7 @@ func schema_pkg_apis_mattermost_v1alpha1_MattermostRestoreDB(ref common.Referenc
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Description: "MattermostRestoreDB is the Schema for the mattermostrestoredbs API",
+				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
 						SchemaProps: spec.SchemaProps{
@@ -251,6 +257,7 @@ func schema_pkg_apis_mattermost_v1alpha1_MattermostRestoreDBSpec(ref common.Refe
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Description: "MattermostRestoreDBSpec defines the desired state of MattermostRestoreDB",
+				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"mattermostClusterName": {
 						SchemaProps: spec.SchemaProps{
@@ -297,7 +304,6 @@ func schema_pkg_apis_mattermost_v1alpha1_MattermostRestoreDBSpec(ref common.Refe
 				},
 			},
 		},
-		Dependencies: []string{},
 	}
 }
 
@@ -306,6 +312,7 @@ func schema_pkg_apis_mattermost_v1alpha1_MattermostRestoreDBStatus(ref common.Re
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Description: "MattermostRestoreDBStatus defines the observed state of MattermostRestoreDB",
+				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"state": {
 						SchemaProps: spec.SchemaProps{
@@ -324,6 +331,5 @@ func schema_pkg_apis_mattermost_v1alpha1_MattermostRestoreDBStatus(ref common.Re
 				},
 			},
 		},
-		Dependencies: []string{},
 	}
 }
