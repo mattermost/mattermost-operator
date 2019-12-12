@@ -5,11 +5,11 @@ set -Eeuxo pipefail
 readonly REPO_ROOT="${REPO_ROOT:-$(git rev-parse --show-toplevel)}"
 
 run_ct_container() {
-    echo 'Running ct container...'
+    echo 'Running testing container...'
     docker run --rm --interactive --detach --network host --name test-cont \
         --volume "$(pwd):/go/src/github.com/mattermost/mattermost-operator" \
         --workdir "/go/src/github.com/mattermost/mattermost-operator" \
-        "golang:1.12.4" \
+        "golang:1.13" \
         cat
     echo
 }
