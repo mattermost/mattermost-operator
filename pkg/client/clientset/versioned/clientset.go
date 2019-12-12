@@ -6,6 +6,8 @@
 package versioned
 
 import (
+	"fmt"
+
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/client/clientset/versioned/typed/mattermost/v1alpha1"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
@@ -15,8 +17,6 @@ import (
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	MattermostV1alpha1() mattermostv1alpha1.MattermostV1alpha1Interface
-	// Deprecated: please explicitly pick a version if possible.
-	Mattermost() mattermostv1alpha1.MattermostV1alpha1Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
@@ -31,12 +31,6 @@ func (c *Clientset) MattermostV1alpha1() mattermostv1alpha1.MattermostV1alpha1In
 	return c.mattermostV1alpha1
 }
 
-// Deprecated: Mattermost retrieves the default version of MattermostClient.
-// Please explicitly pick a version.
-func (c *Clientset) Mattermost() mattermostv1alpha1.MattermostV1alpha1Interface {
-	return c.mattermostV1alpha1
-}
-
 // Discovery retrieves the DiscoveryClient
 func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 	if c == nil {
@@ -46,9 +40,14 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 }
 
 // NewForConfig creates a new Clientset for the given config.
+// If config's RateLimiter is not set and QPS and Burst are acceptable,
+// NewForConfig will generate a rate-limiter in configShallowCopy.
 func NewForConfig(c *rest.Config) (*Clientset, error) {
 	configShallowCopy := *c
 	if configShallowCopy.RateLimiter == nil && configShallowCopy.QPS > 0 {
+		if configShallowCopy.Burst <= 0 {
+			return nil, fmt.Errorf("Burst is required to be greater than 0 when RateLimiter is not set and QPS is set to greater than 0")
+		}
 		configShallowCopy.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(configShallowCopy.QPS, configShallowCopy.Burst)
 	}
 	var cs Clientset
