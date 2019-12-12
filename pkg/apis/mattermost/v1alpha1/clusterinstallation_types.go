@@ -206,7 +206,7 @@ type ElasticSearch struct {
 	Host string `json:"host,omitempty"`
 	// +optional
 	UserName string `json:"username,omitempty"`
-
+	// +optional
 	Password string `json:"password,omitempty"`
 }
 
@@ -282,7 +282,6 @@ type ClusterInstallation struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // ClusterInstallationList contains a list of ClusterInstallation
 type ClusterInstallationList struct {
 	metav1.TypeMeta `json:",inline"`
