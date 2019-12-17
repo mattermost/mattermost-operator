@@ -103,3 +103,39 @@ You don't need to push the mattermost-operator image to DockerHub or any other r
 ```bash
 $ kind load docker-image mattermost/mattermost-operator:test
 ```
+
+If you want to use [minikube](https://kubernetes.io/docs/setup/learning-environment/minikube/) for local testing, you need to push the image to the local docker registry of the minikube node to make it available during the deployment. 
+
+You need to have minikube already up and running. 
+
+* Enter the following command into your terminal to use minikube's docker environment:  
+`eval $(minikube docker-env)`
+* If you now list the available docker images in the local registry you will get the list of docker images from the minikube node
+```bash
+$ docker images
+
+REPOSITORY                                TAG                 IMAGE ID            CREATED             SIZE
+k8s.gcr.io/kube-proxy                     v1.16.2             8454cbe08dc9        2 months ago        86.1MB
+k8s.gcr.io/kube-apiserver                 v1.16.2             c2c9a0406787        2 months ago        217MB
+k8s.gcr.io/kube-controller-manager        v1.16.2             6e4bffa46d70        2 months ago        163MB
+k8s.gcr.io/kube-scheduler                 v1.16.2             ebac1ae204a2        2 months ago        87.3MB
+k8s.gcr.io/etcd                           3.3.15-0            b2756210eeab        3 months ago        247MB
+k8s.gcr.io/coredns                        1.6.2               bf261d157914        4 months ago        44.1MB
+k8s.gcr.io/kube-addon-manager             v9.0.2              bd12a212f9dc        4 months ago        83.1MB
+k8s.gcr.io/kube-addon-manager             v9.0                119701e77cbc        11 months ago       83.1MB
+k8s.gcr.io/kubernetes-dashboard-amd64     v1.10.1             f9aed6605b81        12 months ago       122MB
+k8s.gcr.io/k8s-dns-sidecar-amd64          1.14.13             4b2e93f0133d        15 months ago       42.9MB
+k8s.gcr.io/k8s-dns-kube-dns-amd64         1.14.13             55a3c5209c5e        15 months ago       51.2MB
+k8s.gcr.io/k8s-dns-dnsmasq-nanny-amd64    1.14.13             6dc8ef8287d3        15 months ago       41.4MB
+k8s.gcr.io/pause                          3.1                 da86e6ba6ca1        24 months ago       742kB
+gcr.io/k8s-minikube/storage-provisioner   v1.8.1              4689081edb10        2 years ago         80.8MB
+```
+* Now is the right time to build your new mattermost image with
+`make build-image`
+* After the build has finishes the new image is available on the minikube node
+```bash
+$ docker images                  
+REPOSITORY                                TAG                 IMAGE ID            CREATED             SIZE
+mattermost/mattermost-operator            test                e7f1e78a130b        2 minutes ago       49.6MB
+...
+```
