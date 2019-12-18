@@ -270,7 +270,6 @@ func (mattermost *ClusterInstallation) GenerateIngress(name, ingressName string,
 		},
 	}
 	if ingressAnnotations["cert-manager.io/issuer"] != "" {
-
 		ingress.Spec.TLS = []v1beta1.IngressTLS{
 			{
 				Hosts:      []string{ingressName},
