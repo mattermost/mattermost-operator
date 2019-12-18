@@ -234,7 +234,7 @@ func (mattermost *ClusterInstallation) GenerateService(serviceName, selectorName
 
 // GenerateIngress returns the ingress for Mattermost
 func (mattermost *ClusterInstallation) GenerateIngress(name, ingressName string, ingressAnnotations map[string]string) *v1beta1.Ingress {
-	return &v1beta1.Ingress{
+	var ingress = &v1beta1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: mattermost.Namespace,
@@ -269,6 +269,16 @@ func (mattermost *ClusterInstallation) GenerateIngress(name, ingressName string,
 			},
 		},
 	}
+	if ingressAnnotations["cert-manager.io/issuer"] != "" {
+
+		ingress.Spec.TLS = []v1beta1.IngressTLS{
+			{
+				Hosts:      []string{ingressName},
+				SecretName: strings.ReplaceAll(ingressName, ".", "-") + "-tls-cert",
+			},
+		}
+	}
+	return ingress
 }
 
 // GetContainerByName gets container from a deployment by name
