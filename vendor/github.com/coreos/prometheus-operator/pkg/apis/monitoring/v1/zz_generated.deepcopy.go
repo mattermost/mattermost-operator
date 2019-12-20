@@ -19,8 +19,8 @@
 package v1
 
 import (
-	core_v1 "k8s.io/api/core/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
 )
 
@@ -29,21 +29,13 @@ func (in *APIServerConfig) DeepCopyInto(out *APIServerConfig) {
 	*out = *in
 	if in.BasicAuth != nil {
 		in, out := &in.BasicAuth, &out.BasicAuth
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(BasicAuth)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(BasicAuth)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.TLSConfig != nil {
 		in, out := &in.TLSConfig, &out.TLSConfig
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(TLSConfig)
-			**out = **in
-		}
+		*out = new(TLSConfig)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
@@ -89,12 +81,8 @@ func (in *Alertmanager) DeepCopyInto(out *Alertmanager) {
 	in.Spec.DeepCopyInto(&out.Spec)
 	if in.Status != nil {
 		in, out := &in.Status, &out.Status
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(AlertmanagerStatus)
-			**out = **in
-		}
+		*out = new(AlertmanagerStatus)
+		**out = **in
 	}
 	return
 }
@@ -115,12 +103,8 @@ func (in *AlertmanagerEndpoints) DeepCopyInto(out *AlertmanagerEndpoints) {
 	out.Port = in.Port
 	if in.TLSConfig != nil {
 		in, out := &in.TLSConfig, &out.TLSConfig
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(TLSConfig)
-			**out = **in
-		}
+		*out = new(TLSConfig)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
@@ -139,7 +123,7 @@ func (in *AlertmanagerEndpoints) DeepCopy() *AlertmanagerEndpoints {
 func (in *AlertmanagerList) DeepCopyInto(out *AlertmanagerList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]Alertmanager, len(*in))
@@ -165,16 +149,17 @@ func (in *AlertmanagerSpec) DeepCopyInto(out *AlertmanagerSpec) {
 	*out = *in
 	if in.PodMetadata != nil {
 		in, out := &in.PodMetadata, &out.PodMetadata
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(meta_v1.ObjectMeta)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(metav1.ObjectMeta)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.Image != nil {
+		in, out := &in.Image, &out.Image
+		*out = new(string)
+		**out = **in
 	}
 	if in.ImagePullSecrets != nil {
 		in, out := &in.ImagePullSecrets, &out.ImagePullSecrets
-		*out = make([]core_v1.LocalObjectReference, len(*in))
+		*out = make([]corev1.LocalObjectReference, len(*in))
 		copy(*out, *in)
 	}
 	if in.Secrets != nil {
@@ -189,20 +174,26 @@ func (in *AlertmanagerSpec) DeepCopyInto(out *AlertmanagerSpec) {
 	}
 	if in.Replicas != nil {
 		in, out := &in.Replicas, &out.Replicas
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int32)
-			**out = **in
-		}
+		*out = new(int32)
+		**out = **in
 	}
 	if in.Storage != nil {
 		in, out := &in.Storage, &out.Storage
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(StorageSpec)
-			(*in).DeepCopyInto(*out)
+		*out = new(StorageSpec)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.Volumes != nil {
+		in, out := &in.Volumes, &out.Volumes
+		*out = make([]corev1.Volume, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.VolumeMounts != nil {
+		in, out := &in.VolumeMounts, &out.VolumeMounts
+		*out = make([]corev1.VolumeMount, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 	if in.NodeSelector != nil {
@@ -215,32 +206,31 @@ func (in *AlertmanagerSpec) DeepCopyInto(out *AlertmanagerSpec) {
 	in.Resources.DeepCopyInto(&out.Resources)
 	if in.Affinity != nil {
 		in, out := &in.Affinity, &out.Affinity
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(core_v1.Affinity)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(corev1.Affinity)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Tolerations != nil {
 		in, out := &in.Tolerations, &out.Tolerations
-		*out = make([]core_v1.Toleration, len(*in))
+		*out = make([]corev1.Toleration, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 	if in.SecurityContext != nil {
 		in, out := &in.SecurityContext, &out.SecurityContext
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(core_v1.PodSecurityContext)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(corev1.PodSecurityContext)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Containers != nil {
 		in, out := &in.Containers, &out.Containers
-		*out = make([]core_v1.Container, len(*in))
+		*out = make([]corev1.Container, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.InitContainers != nil {
+		in, out := &in.InitContainers, &out.InitContainers
+		*out = make([]corev1.Container, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
@@ -275,6 +265,22 @@ func (in *AlertmanagerStatus) DeepCopy() *AlertmanagerStatus {
 		return nil
 	}
 	out := new(AlertmanagerStatus)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *ArbitraryFSAccessThroughSMsConfig) DeepCopyInto(out *ArbitraryFSAccessThroughSMsConfig) {
+	*out = *in
+	return
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new ArbitraryFSAccessThroughSMsConfig.
+func (in *ArbitraryFSAccessThroughSMsConfig) DeepCopy() *ArbitraryFSAccessThroughSMsConfig {
+	if in == nil {
+		return nil
+	}
+	out := new(ArbitraryFSAccessThroughSMsConfig)
 	in.DeepCopyInto(out)
 	return out
 }
@@ -319,6 +325,7 @@ func (in *CrdKinds) DeepCopyInto(out *CrdKinds) {
 	out.Prometheus = in.Prometheus
 	out.Alertmanager = in.Alertmanager
 	out.ServiceMonitor = in.ServiceMonitor
+	out.PodMonitor = in.PodMonitor
 	out.PrometheusRule = in.PrometheusRule
 	return
 }
@@ -338,52 +345,48 @@ func (in *Endpoint) DeepCopyInto(out *Endpoint) {
 	*out = *in
 	if in.TargetPort != nil {
 		in, out := &in.TargetPort, &out.TargetPort
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(intstr.IntOrString)
-			**out = **in
-		}
+		*out = new(intstr.IntOrString)
+		**out = **in
 	}
 	if in.Params != nil {
 		in, out := &in.Params, &out.Params
 		*out = make(map[string][]string, len(*in))
 		for key, val := range *in {
+			var outVal []string
 			if val == nil {
 				(*out)[key] = nil
 			} else {
-				(*out)[key] = make([]string, len(val))
-				copy((*out)[key], val)
+				in, out := &val, &outVal
+				*out = make([]string, len(*in))
+				copy(*out, *in)
 			}
+			(*out)[key] = outVal
 		}
 	}
 	if in.TLSConfig != nil {
 		in, out := &in.TLSConfig, &out.TLSConfig
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(TLSConfig)
-			**out = **in
-		}
+		*out = new(TLSConfig)
+		(*in).DeepCopyInto(*out)
+	}
+	in.BearerTokenSecret.DeepCopyInto(&out.BearerTokenSecret)
+	if in.HonorTimestamps != nil {
+		in, out := &in.HonorTimestamps, &out.HonorTimestamps
+		*out = new(bool)
+		**out = **in
 	}
 	if in.BasicAuth != nil {
 		in, out := &in.BasicAuth, &out.BasicAuth
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(BasicAuth)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(BasicAuth)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.MetricRelabelConfigs != nil {
 		in, out := &in.MetricRelabelConfigs, &out.MetricRelabelConfigs
 		*out = make([]*RelabelConfig, len(*in))
 		for i := range *in {
-			if (*in)[i] == nil {
-				(*out)[i] = nil
-			} else {
-				(*out)[i] = new(RelabelConfig)
-				(*in)[i].DeepCopyInto((*out)[i])
+			if (*in)[i] != nil {
+				in, out := &(*in)[i], &(*out)[i]
+				*out = new(RelabelConfig)
+				(*in).DeepCopyInto(*out)
 			}
 		}
 	}
@@ -391,22 +394,17 @@ func (in *Endpoint) DeepCopyInto(out *Endpoint) {
 		in, out := &in.RelabelConfigs, &out.RelabelConfigs
 		*out = make([]*RelabelConfig, len(*in))
 		for i := range *in {
-			if (*in)[i] == nil {
-				(*out)[i] = nil
-			} else {
-				(*out)[i] = new(RelabelConfig)
-				(*in)[i].DeepCopyInto((*out)[i])
+			if (*in)[i] != nil {
+				in, out := &(*in)[i], &(*out)[i]
+				*out = new(RelabelConfig)
+				(*in).DeepCopyInto(*out)
 			}
 		}
 	}
 	if in.ProxyURL != nil {
 		in, out := &in.ProxyURL, &out.ProxyURL
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(string)
-			**out = **in
-		}
+		*out = new(string)
+		**out = **in
 	}
 	return
 }
@@ -443,6 +441,152 @@ func (in *NamespaceSelector) DeepCopy() *NamespaceSelector {
 }
 
 // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *PodMetricsEndpoint) DeepCopyInto(out *PodMetricsEndpoint) {
+	*out = *in
+	if in.TargetPort != nil {
+		in, out := &in.TargetPort, &out.TargetPort
+		*out = new(intstr.IntOrString)
+		**out = **in
+	}
+	if in.Params != nil {
+		in, out := &in.Params, &out.Params
+		*out = make(map[string][]string, len(*in))
+		for key, val := range *in {
+			var outVal []string
+			if val == nil {
+				(*out)[key] = nil
+			} else {
+				in, out := &val, &outVal
+				*out = make([]string, len(*in))
+				copy(*out, *in)
+			}
+			(*out)[key] = outVal
+		}
+	}
+	if in.HonorTimestamps != nil {
+		in, out := &in.HonorTimestamps, &out.HonorTimestamps
+		*out = new(bool)
+		**out = **in
+	}
+	if in.MetricRelabelConfigs != nil {
+		in, out := &in.MetricRelabelConfigs, &out.MetricRelabelConfigs
+		*out = make([]*RelabelConfig, len(*in))
+		for i := range *in {
+			if (*in)[i] != nil {
+				in, out := &(*in)[i], &(*out)[i]
+				*out = new(RelabelConfig)
+				(*in).DeepCopyInto(*out)
+			}
+		}
+	}
+	if in.RelabelConfigs != nil {
+		in, out := &in.RelabelConfigs, &out.RelabelConfigs
+		*out = make([]*RelabelConfig, len(*in))
+		for i := range *in {
+			if (*in)[i] != nil {
+				in, out := &(*in)[i], &(*out)[i]
+				*out = new(RelabelConfig)
+				(*in).DeepCopyInto(*out)
+			}
+		}
+	}
+	if in.ProxyURL != nil {
+		in, out := &in.ProxyURL, &out.ProxyURL
+		*out = new(string)
+		**out = **in
+	}
+	return
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new PodMetricsEndpoint.
+func (in *PodMetricsEndpoint) DeepCopy() *PodMetricsEndpoint {
+	if in == nil {
+		return nil
+	}
+	out := new(PodMetricsEndpoint)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *PodMonitor) DeepCopyInto(out *PodMonitor) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	in.Spec.DeepCopyInto(&out.Spec)
+	return
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new PodMonitor.
+func (in *PodMonitor) DeepCopy() *PodMonitor {
+	if in == nil {
+		return nil
+	}
+	out := new(PodMonitor)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *PodMonitorList) DeepCopyInto(out *PodMonitorList) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]*PodMonitor, len(*in))
+		for i := range *in {
+			if (*in)[i] != nil {
+				in, out := &(*in)[i], &(*out)[i]
+				*out = new(PodMonitor)
+				(*in).DeepCopyInto(*out)
+			}
+		}
+	}
+	return
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new PodMonitorList.
+func (in *PodMonitorList) DeepCopy() *PodMonitorList {
+	if in == nil {
+		return nil
+	}
+	out := new(PodMonitorList)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *PodMonitorSpec) DeepCopyInto(out *PodMonitorSpec) {
+	*out = *in
+	if in.PodTargetLabels != nil {
+		in, out := &in.PodTargetLabels, &out.PodTargetLabels
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.PodMetricsEndpoints != nil {
+		in, out := &in.PodMetricsEndpoints, &out.PodMetricsEndpoints
+		*out = make([]PodMetricsEndpoint, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	in.Selector.DeepCopyInto(&out.Selector)
+	in.NamespaceSelector.DeepCopyInto(&out.NamespaceSelector)
+	return
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new PodMonitorSpec.
+func (in *PodMonitorSpec) DeepCopy() *PodMonitorSpec {
+	if in == nil {
+		return nil
+	}
+	out := new(PodMonitorSpec)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
 func (in *Prometheus) DeepCopyInto(out *Prometheus) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
@@ -450,12 +594,8 @@ func (in *Prometheus) DeepCopyInto(out *Prometheus) {
 	in.Spec.DeepCopyInto(&out.Spec)
 	if in.Status != nil {
 		in, out := &in.Status, &out.Status
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(PrometheusStatus)
-			**out = **in
-		}
+		*out = new(PrometheusStatus)
+		**out = **in
 	}
 	return
 }
@@ -474,16 +614,15 @@ func (in *Prometheus) DeepCopy() *Prometheus {
 func (in *PrometheusList) DeepCopyInto(out *PrometheusList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]*Prometheus, len(*in))
 		for i := range *in {
-			if (*in)[i] == nil {
-				(*out)[i] = nil
-			} else {
-				(*out)[i] = new(Prometheus)
-				(*in)[i].DeepCopyInto((*out)[i])
+			if (*in)[i] != nil {
+				in, out := &(*in)[i], &(*out)[i]
+				*out = new(Prometheus)
+				(*in).DeepCopyInto(*out)
 			}
 		}
 	}
@@ -523,16 +662,15 @@ func (in *PrometheusRule) DeepCopy() *PrometheusRule {
 func (in *PrometheusRuleList) DeepCopyInto(out *PrometheusRuleList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]*PrometheusRule, len(*in))
 		for i := range *in {
-			if (*in)[i] == nil {
-				(*out)[i] = nil
-			} else {
-				(*out)[i] = new(PrometheusRule)
-				(*in)[i].DeepCopyInto((*out)[i])
+			if (*in)[i] != nil {
+				in, out := &(*in)[i], &(*out)[i]
+				*out = new(PrometheusRule)
+				(*in).DeepCopyInto(*out)
 			}
 		}
 	}
@@ -577,45 +715,60 @@ func (in *PrometheusSpec) DeepCopyInto(out *PrometheusSpec) {
 	*out = *in
 	if in.PodMetadata != nil {
 		in, out := &in.PodMetadata, &out.PodMetadata
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(meta_v1.ObjectMeta)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(metav1.ObjectMeta)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.ServiceMonitorSelector != nil {
 		in, out := &in.ServiceMonitorSelector, &out.ServiceMonitorSelector
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(meta_v1.LabelSelector)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(metav1.LabelSelector)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.ServiceMonitorNamespaceSelector != nil {
 		in, out := &in.ServiceMonitorNamespaceSelector, &out.ServiceMonitorNamespaceSelector
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(meta_v1.LabelSelector)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(metav1.LabelSelector)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.PodMonitorSelector != nil {
+		in, out := &in.PodMonitorSelector, &out.PodMonitorSelector
+		*out = new(metav1.LabelSelector)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.PodMonitorNamespaceSelector != nil {
+		in, out := &in.PodMonitorNamespaceSelector, &out.PodMonitorNamespaceSelector
+		*out = new(metav1.LabelSelector)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.Image != nil {
+		in, out := &in.Image, &out.Image
+		*out = new(string)
+		**out = **in
 	}
 	if in.ImagePullSecrets != nil {
 		in, out := &in.ImagePullSecrets, &out.ImagePullSecrets
-		*out = make([]core_v1.LocalObjectReference, len(*in))
+		*out = make([]corev1.LocalObjectReference, len(*in))
 		copy(*out, *in)
 	}
 	if in.Replicas != nil {
 		in, out := &in.Replicas, &out.Replicas
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int32)
-			**out = **in
-		}
+		*out = new(int32)
+		**out = **in
 	}
+	if in.ReplicaExternalLabelName != nil {
+		in, out := &in.ReplicaExternalLabelName, &out.ReplicaExternalLabelName
+		*out = new(string)
+		**out = **in
+	}
+	if in.PrometheusExternalLabelName != nil {
+		in, out := &in.PrometheusExternalLabelName, &out.PrometheusExternalLabelName
+		*out = new(string)
+		**out = **in
+	}
+	if in.WALCompression != nil {
+		in, out := &in.WALCompression, &out.WALCompression
+		*out = new(bool)
+		**out = **in
+	}
+	out.Rules = in.Rules
 	if in.ExternalLabels != nil {
 		in, out := &in.ExternalLabels, &out.ExternalLabels
 		*out = make(map[string]string, len(*in))
@@ -623,41 +776,37 @@ func (in *PrometheusSpec) DeepCopyInto(out *PrometheusSpec) {
 			(*out)[key] = val
 		}
 	}
+	if in.Query != nil {
+		in, out := &in.Query, &out.Query
+		*out = new(QuerySpec)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.Storage != nil {
 		in, out := &in.Storage, &out.Storage
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(StorageSpec)
-			(*in).DeepCopyInto(*out)
+		*out = new(StorageSpec)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.Volumes != nil {
+		in, out := &in.Volumes, &out.Volumes
+		*out = make([]corev1.Volume, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 	if in.RuleSelector != nil {
 		in, out := &in.RuleSelector, &out.RuleSelector
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(meta_v1.LabelSelector)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(metav1.LabelSelector)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.RuleNamespaceSelector != nil {
 		in, out := &in.RuleNamespaceSelector, &out.RuleNamespaceSelector
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(meta_v1.LabelSelector)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(metav1.LabelSelector)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Alerting != nil {
 		in, out := &in.Alerting, &out.Alerting
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(AlertingSpec)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(AlertingSpec)
+		(*in).DeepCopyInto(*out)
 	}
 	in.Resources.DeepCopyInto(&out.Resources)
 	if in.NodeSelector != nil {
@@ -679,16 +828,12 @@ func (in *PrometheusSpec) DeepCopyInto(out *PrometheusSpec) {
 	}
 	if in.Affinity != nil {
 		in, out := &in.Affinity, &out.Affinity
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(core_v1.Affinity)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(corev1.Affinity)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Tolerations != nil {
 		in, out := &in.Tolerations, &out.Tolerations
-		*out = make([]core_v1.Toleration, len(*in))
+		*out = make([]corev1.Toleration, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
@@ -709,65 +854,49 @@ func (in *PrometheusSpec) DeepCopyInto(out *PrometheusSpec) {
 	}
 	if in.SecurityContext != nil {
 		in, out := &in.SecurityContext, &out.SecurityContext
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(core_v1.PodSecurityContext)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(corev1.PodSecurityContext)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Containers != nil {
 		in, out := &in.Containers, &out.Containers
-		*out = make([]core_v1.Container, len(*in))
+		*out = make([]corev1.Container, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.InitContainers != nil {
+		in, out := &in.InitContainers, &out.InitContainers
+		*out = make([]corev1.Container, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 	if in.AdditionalScrapeConfigs != nil {
 		in, out := &in.AdditionalScrapeConfigs, &out.AdditionalScrapeConfigs
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(core_v1.SecretKeySelector)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(corev1.SecretKeySelector)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.AdditionalAlertRelabelConfigs != nil {
 		in, out := &in.AdditionalAlertRelabelConfigs, &out.AdditionalAlertRelabelConfigs
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(core_v1.SecretKeySelector)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(corev1.SecretKeySelector)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.AdditionalAlertManagerConfigs != nil {
 		in, out := &in.AdditionalAlertManagerConfigs, &out.AdditionalAlertManagerConfigs
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(core_v1.SecretKeySelector)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(corev1.SecretKeySelector)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.APIServerConfig != nil {
 		in, out := &in.APIServerConfig, &out.APIServerConfig
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(APIServerConfig)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(APIServerConfig)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Thanos != nil {
 		in, out := &in.Thanos, &out.Thanos
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ThanosSpec)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(ThanosSpec)
+		(*in).DeepCopyInto(*out)
 	}
+	out.ArbitraryFSAccessThroughSMs = in.ArbitraryFSAccessThroughSMs
 	return
 }
 
@@ -793,6 +922,42 @@ func (in *PrometheusStatus) DeepCopy() *PrometheusStatus {
 		return nil
 	}
 	out := new(PrometheusStatus)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *QuerySpec) DeepCopyInto(out *QuerySpec) {
+	*out = *in
+	if in.LookbackDelta != nil {
+		in, out := &in.LookbackDelta, &out.LookbackDelta
+		*out = new(string)
+		**out = **in
+	}
+	if in.MaxConcurrency != nil {
+		in, out := &in.MaxConcurrency, &out.MaxConcurrency
+		*out = new(int32)
+		**out = **in
+	}
+	if in.MaxSamples != nil {
+		in, out := &in.MaxSamples, &out.MaxSamples
+		*out = new(int32)
+		**out = **in
+	}
+	if in.Timeout != nil {
+		in, out := &in.Timeout, &out.Timeout
+		*out = new(string)
+		**out = **in
+	}
+	return
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new QuerySpec.
+func (in *QuerySpec) DeepCopy() *QuerySpec {
+	if in == nil {
+		return nil
+	}
+	out := new(QuerySpec)
 	in.DeepCopyInto(out)
 	return out
 }
@@ -846,21 +1011,13 @@ func (in *RemoteReadSpec) DeepCopyInto(out *RemoteReadSpec) {
 	}
 	if in.BasicAuth != nil {
 		in, out := &in.BasicAuth, &out.BasicAuth
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(BasicAuth)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(BasicAuth)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.TLSConfig != nil {
 		in, out := &in.TLSConfig, &out.TLSConfig
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(TLSConfig)
-			**out = **in
-		}
+		*out = new(TLSConfig)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
@@ -887,30 +1044,18 @@ func (in *RemoteWriteSpec) DeepCopyInto(out *RemoteWriteSpec) {
 	}
 	if in.BasicAuth != nil {
 		in, out := &in.BasicAuth, &out.BasicAuth
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(BasicAuth)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(BasicAuth)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.TLSConfig != nil {
 		in, out := &in.TLSConfig, &out.TLSConfig
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(TLSConfig)
-			**out = **in
-		}
+		*out = new(TLSConfig)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.QueueConfig != nil {
 		in, out := &in.QueueConfig, &out.QueueConfig
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(QueueConfig)
-			**out = **in
-		}
+		*out = new(QueueConfig)
+		**out = **in
 	}
 	return
 }
@@ -980,6 +1125,81 @@ func (in *RuleGroup) DeepCopy() *RuleGroup {
 }
 
 // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *Rules) DeepCopyInto(out *Rules) {
+	*out = *in
+	out.Alert = in.Alert
+	return
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new Rules.
+func (in *Rules) DeepCopy() *Rules {
+	if in == nil {
+		return nil
+	}
+	out := new(Rules)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *RulesAlert) DeepCopyInto(out *RulesAlert) {
+	*out = *in
+	return
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new RulesAlert.
+func (in *RulesAlert) DeepCopy() *RulesAlert {
+	if in == nil {
+		return nil
+	}
+	out := new(RulesAlert)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *SecretOrConfigMap) DeepCopyInto(out *SecretOrConfigMap) {
+	*out = *in
+	if in.Secret != nil {
+		in, out := &in.Secret, &out.Secret
+		*out = new(corev1.SecretKeySelector)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.ConfigMap != nil {
+		in, out := &in.ConfigMap, &out.ConfigMap
+		*out = new(corev1.ConfigMapKeySelector)
+		(*in).DeepCopyInto(*out)
+	}
+	return
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new SecretOrConfigMap.
+func (in *SecretOrConfigMap) DeepCopy() *SecretOrConfigMap {
+	if in == nil {
+		return nil
+	}
+	out := new(SecretOrConfigMap)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *SecretOrConfigMapValidationError) DeepCopyInto(out *SecretOrConfigMapValidationError) {
+	*out = *in
+	return
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new SecretOrConfigMapValidationError.
+func (in *SecretOrConfigMapValidationError) DeepCopy() *SecretOrConfigMapValidationError {
+	if in == nil {
+		return nil
+	}
+	out := new(SecretOrConfigMapValidationError)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
 func (in *ServiceMonitor) DeepCopyInto(out *ServiceMonitor) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
@@ -1002,16 +1222,15 @@ func (in *ServiceMonitor) DeepCopy() *ServiceMonitor {
 func (in *ServiceMonitorList) DeepCopyInto(out *ServiceMonitorList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]*ServiceMonitor, len(*in))
 		for i := range *in {
-			if (*in)[i] == nil {
-				(*out)[i] = nil
-			} else {
-				(*out)[i] = new(ServiceMonitor)
-				(*in)[i].DeepCopyInto((*out)[i])
+			if (*in)[i] != nil {
+				in, out := &(*in)[i], &(*out)[i]
+				*out = new(ServiceMonitor)
+				(*in).DeepCopyInto(*out)
 			}
 		}
 	}
@@ -1068,12 +1287,8 @@ func (in *StorageSpec) DeepCopyInto(out *StorageSpec) {
 	*out = *in
 	if in.EmptyDir != nil {
 		in, out := &in.EmptyDir, &out.EmptyDir
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(core_v1.EmptyDirVolumeSource)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(corev1.EmptyDirVolumeSource)
+		(*in).DeepCopyInto(*out)
 	}
 	in.VolumeClaimTemplate.DeepCopyInto(&out.VolumeClaimTemplate)
 	return
@@ -1092,6 +1307,13 @@ func (in *StorageSpec) DeepCopy() *StorageSpec {
 // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
 func (in *TLSConfig) DeepCopyInto(out *TLSConfig) {
 	*out = *in
+	in.CA.DeepCopyInto(&out.CA)
+	in.Cert.DeepCopyInto(&out.Cert)
+	if in.KeySecret != nil {
+		in, out := &in.KeySecret, &out.KeySecret
+		*out = new(corev1.SecretKeySelector)
+		(*in).DeepCopyInto(*out)
+	}
 	return
 }
 
@@ -1106,114 +1328,17 @@ func (in *TLSConfig) DeepCopy() *TLSConfig {
 }
 
 // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
-func (in *ThanosGCSSpec) DeepCopyInto(out *ThanosGCSSpec) {
+func (in *TLSConfigValidationError) DeepCopyInto(out *TLSConfigValidationError) {
 	*out = *in
-	if in.Bucket != nil {
-		in, out := &in.Bucket, &out.Bucket
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(string)
-			**out = **in
-		}
-	}
-	if in.SecretKey != nil {
-		in, out := &in.SecretKey, &out.SecretKey
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(core_v1.SecretKeySelector)
-			(*in).DeepCopyInto(*out)
-		}
-	}
 	return
 }
 
-// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new ThanosGCSSpec.
-func (in *ThanosGCSSpec) DeepCopy() *ThanosGCSSpec {
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new TLSConfigValidationError.
+func (in *TLSConfigValidationError) DeepCopy() *TLSConfigValidationError {
 	if in == nil {
 		return nil
 	}
-	out := new(ThanosGCSSpec)
-	in.DeepCopyInto(out)
-	return out
-}
-
-// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
-func (in *ThanosS3Spec) DeepCopyInto(out *ThanosS3Spec) {
-	*out = *in
-	if in.Bucket != nil {
-		in, out := &in.Bucket, &out.Bucket
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(string)
-			**out = **in
-		}
-	}
-	if in.Endpoint != nil {
-		in, out := &in.Endpoint, &out.Endpoint
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(string)
-			**out = **in
-		}
-	}
-	if in.AccessKey != nil {
-		in, out := &in.AccessKey, &out.AccessKey
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(core_v1.SecretKeySelector)
-			(*in).DeepCopyInto(*out)
-		}
-	}
-	if in.SecretKey != nil {
-		in, out := &in.SecretKey, &out.SecretKey
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(core_v1.SecretKeySelector)
-			(*in).DeepCopyInto(*out)
-		}
-	}
-	if in.Insecure != nil {
-		in, out := &in.Insecure, &out.Insecure
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
-	}
-	if in.SignatureVersion2 != nil {
-		in, out := &in.SignatureVersion2, &out.SignatureVersion2
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
-	}
-	if in.EncryptSSE != nil {
-		in, out := &in.EncryptSSE, &out.EncryptSSE
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
-	}
-	return
-}
-
-// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new ThanosS3Spec.
-func (in *ThanosS3Spec) DeepCopy() *ThanosS3Spec {
-	if in == nil {
-		return nil
-	}
-	out := new(ThanosS3Spec)
+	out := new(TLSConfigValidationError)
 	in.DeepCopyInto(out)
 	return out
 }
@@ -1221,69 +1346,36 @@ func (in *ThanosS3Spec) DeepCopy() *ThanosS3Spec {
 // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
 func (in *ThanosSpec) DeepCopyInto(out *ThanosSpec) {
 	*out = *in
-	if in.Peers != nil {
-		in, out := &in.Peers, &out.Peers
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(string)
-			**out = **in
-		}
+	if in.Image != nil {
+		in, out := &in.Image, &out.Image
+		*out = new(string)
+		**out = **in
 	}
 	if in.Version != nil {
 		in, out := &in.Version, &out.Version
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(string)
-			**out = **in
-		}
+		*out = new(string)
+		**out = **in
 	}
 	if in.Tag != nil {
 		in, out := &in.Tag, &out.Tag
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(string)
-			**out = **in
-		}
+		*out = new(string)
+		**out = **in
 	}
 	if in.SHA != nil {
 		in, out := &in.SHA, &out.SHA
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(string)
-			**out = **in
-		}
+		*out = new(string)
+		**out = **in
 	}
 	if in.BaseImage != nil {
 		in, out := &in.BaseImage, &out.BaseImage
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(string)
-			**out = **in
-		}
+		*out = new(string)
+		**out = **in
 	}
 	in.Resources.DeepCopyInto(&out.Resources)
-	if in.GCS != nil {
-		in, out := &in.GCS, &out.GCS
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ThanosGCSSpec)
-			(*in).DeepCopyInto(*out)
-		}
-	}
-	if in.S3 != nil {
-		in, out := &in.S3, &out.S3
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ThanosS3Spec)
-			(*in).DeepCopyInto(*out)
-		}
+	if in.ObjectStorageConfig != nil {
+		in, out := &in.ObjectStorageConfig, &out.ObjectStorageConfig
+		*out = new(corev1.SecretKeySelector)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }

@@ -19,7 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 func TestCheckMattermost(t *testing.T) {
@@ -74,7 +74,10 @@ func TestCheckMattermost(t *testing.T) {
 		require.NoError(t, err)
 		err = r.client.Get(context.TODO(), types.NamespacedName{Name: ciName, Namespace: ciNamespace}, found)
 		require.NoError(t, err)
-		assert.Equal(t, original, found)
+		assert.Equal(t, original.GetName(), found.GetName())
+		assert.Equal(t, original.GetNamespace(), found.GetNamespace())
+		assert.Equal(t, original.Spec.Selector, found.Spec.Selector)
+		assert.Equal(t, original.Spec.Ports, found.Spec.Ports)
 	})
 
 	t.Run("ingress", func(t *testing.T) {
@@ -98,7 +101,10 @@ func TestCheckMattermost(t *testing.T) {
 		require.NoError(t, err)
 		err = r.client.Get(context.TODO(), types.NamespacedName{Name: ciName, Namespace: ciNamespace}, found)
 		require.NoError(t, err)
-		assert.Equal(t, original, found)
+		assert.Equal(t, original.GetAnnotations(), found.GetAnnotations())
+		assert.Equal(t, original.GetName(), found.GetName())
+		assert.Equal(t, original.GetNamespace(), found.GetNamespace())
+		assert.Equal(t, original.Spec.Rules, original.Spec.Rules)
 	})
 
 	t.Run("deployment", func(t *testing.T) {
@@ -138,7 +144,7 @@ func TestCheckMattermost(t *testing.T) {
 		require.NoError(t, err)
 		err = r.client.Get(context.TODO(), types.NamespacedName{Name: ciName, Namespace: ciNamespace}, found)
 		require.NoError(t, err)
-		assert.Equal(t, original.Labels, found.Labels)
+		assert.Equal(t, original.GetLabels(), found.GetLabels())
 		assert.Equal(t, original.Spec.Replicas, found.Spec.Replicas)
 		assert.Equal(t, original.Spec.Template, found.Spec.Template)
 	})
@@ -223,7 +229,10 @@ func TestCheckMattermostExternalDB(t *testing.T) {
 		require.NoError(t, err)
 		err = r.client.Get(context.TODO(), types.NamespacedName{Name: ciName, Namespace: ciNamespace}, found)
 		require.NoError(t, err)
-		assert.Equal(t, original, found)
+		assert.Equal(t, original.GetName(), found.GetName())
+		assert.Equal(t, original.GetNamespace(), found.GetNamespace())
+		assert.Equal(t, original.Spec.Selector, found.Spec.Selector)
+		assert.Equal(t, original.Spec.Ports, found.Spec.Ports)
 	})
 
 	t.Run("ingress", func(t *testing.T) {
@@ -247,7 +256,10 @@ func TestCheckMattermostExternalDB(t *testing.T) {
 		require.NoError(t, err)
 		err = r.client.Get(context.TODO(), types.NamespacedName{Name: ciName, Namespace: ciNamespace}, found)
 		require.NoError(t, err)
-		assert.Equal(t, original, found)
+		assert.Equal(t, original.GetAnnotations(), found.GetAnnotations())
+		assert.Equal(t, original.GetName(), found.GetName())
+		assert.Equal(t, original.GetNamespace(), found.GetNamespace())
+		assert.Equal(t, original.Spec.Rules, original.Spec.Rules)
 	})
 
 	t.Run("deployment", func(t *testing.T) {
