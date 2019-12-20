@@ -22,7 +22,7 @@ func TestClusterInstallation(t *testing.T) {
 		Spec: ClusterInstallationSpec{
 			Replicas:    7,
 			Image:       "mattermost/mattermost-enterprise-edition",
-			Version:     "5.17.1",
+			Version:     "5.18.0",
 			IngressName: "foo.mattermost.dev",
 		},
 	}
@@ -54,7 +54,7 @@ func TestClusterInstallation(t *testing.T) {
 			},
 			Spec: ClusterInstallationSpec{
 				Image:       "mattermost/mattermost-enterprise-edition",
-				Version:     "5.17.1",
+				Version:     "5.18.0",
 				IngressName: "foo.mattermost.dev",
 				Size:        "1000users",
 			},
@@ -146,7 +146,7 @@ func TestClusterInstallation(t *testing.T) {
 func TestDeployment(t *testing.T) {
 	d := AppDeployment{
 		Image:   "mattermost/mattermost-enterprise-edition",
-		Version: "5.17.1",
+		Version: "5.18.0",
 	}
 
 	t.Run("correct image", func(t *testing.T) {

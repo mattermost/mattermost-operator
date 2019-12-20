@@ -40,7 +40,7 @@ func TestCheckMattermost(t *testing.T) {
 		Spec: mattermostv1alpha1.ClusterInstallationSpec{
 			Replicas:    replicas,
 			Image:       "mattermost/mattermost-enterprise-edition",
-			Version:     "5.17.1",
+			Version:     "5.18.0",
 			IngressName: "foo.mattermost.dev",
 		},
 	}
@@ -180,7 +180,7 @@ func TestCheckMattermostExternalDB(t *testing.T) {
 		Spec: mattermostv1alpha1.ClusterInstallationSpec{
 			Replicas:    replicas,
 			Image:       "mattermost/mattermost-enterprise-edition",
-			Version:     "5.17.1",
+			Version:     "5.18.0",
 			IngressName: "foo.mattermost.dev",
 			Database: mattermostv1alpha1.Database{
 				Secret: externalDBSecretName,
