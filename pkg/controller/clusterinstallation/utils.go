@@ -11,7 +11,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -19,6 +18,7 @@ import (
 func (r *ReconcileClusterInstallation) handleCheckClusterInstallation(mattermost *mattermostv1alpha1.ClusterInstallation) (mattermostv1alpha1.ClusterInstallationStatus, error) {
 	if !mattermost.Spec.BlueGreen.Enable {
 		return r.checkClusterInstallation(
+			mattermost.GetNamespace(),
 			mattermost.Name,
 			mattermost.GetImageName(),
 			mattermost.Spec.Image,
@@ -31,6 +31,7 @@ func (r *ReconcileClusterInstallation) handleCheckClusterInstallation(mattermost
 	// BlueGreen is a bit tricky. To properly check for errors and also to return
 	// the correct status, we should check both and then manually return status.
 	blueStatus, blueErr := r.checkClusterInstallation(
+		mattermost.GetNamespace(),
 		mattermost.Spec.BlueGreen.Blue.Name,
 		mattermost.Spec.BlueGreen.Blue.GetDeploymentImageName(),
 		mattermost.Spec.BlueGreen.Blue.Image,
@@ -39,6 +40,7 @@ func (r *ReconcileClusterInstallation) handleCheckClusterInstallation(mattermost
 		mattermost.Spec.UseServiceLoadBalancer,
 	)
 	greenStatus, greenErr := r.checkClusterInstallation(
+		mattermost.GetNamespace(),
 		mattermost.Spec.BlueGreen.Green.Name,
 		mattermost.Spec.BlueGreen.Green.GetDeploymentImageName(),
 		mattermost.Spec.BlueGreen.Green.Image,
@@ -73,15 +75,12 @@ func (r *ReconcileClusterInstallation) handleCheckClusterInstallation(mattermost
 // NOTE: this is a vital health check. Every reconciliation loop should run this
 // check at the very end to ensure that everything in the installation is as it
 // should be. Over time, more types of checks should be added here as needed.
-func (r *ReconcileClusterInstallation) checkClusterInstallation(name, imageName, image, version string, replicas int32, useServiceLoadBalancer bool) (mattermostv1alpha1.ClusterInstallationStatus, error) {
+func (r *ReconcileClusterInstallation) checkClusterInstallation(namespace, name, imageName, image, version string, replicas int32, useServiceLoadBalancer bool) (mattermostv1alpha1.ClusterInstallationStatus, error) {
 	status := mattermostv1alpha1.ClusterInstallationStatus{
 		State:           mattermostv1alpha1.Reconciling,
 		Replicas:        0,
 		UpdatedReplicas: 0,
 	}
-
-	sel := mattermostv1alpha1.ClusterInstallationLabels(name)
-	opts := &client.ListOptions{LabelSelector: labels.SelectorFromSet(sel)}
 
 	pods := &corev1.PodList{
 		TypeMeta: metav1.TypeMeta{
@@ -90,7 +89,11 @@ func (r *ReconcileClusterInstallation) checkClusterInstallation(name, imageName,
 		},
 	}
 
-	err := r.client.List(context.TODO(), opts, pods)
+	listOptions := []client.ListOption{
+		client.InNamespace(namespace),
+		client.MatchingLabels(mattermostv1alpha1.ClusterInstallationLabels(name)),
+	}
+	err := r.client.List(context.TODO(), pods, listOptions...)
 	if err != nil {
 		return status, errors.Wrap(err, "unable to get pod list")
 	}
@@ -141,7 +144,7 @@ func (r *ReconcileClusterInstallation) checkClusterInstallation(name, imageName,
 				APIVersion: "v1",
 			},
 		}
-		err := r.client.List(context.TODO(), opts, svc)
+		err := r.client.List(context.TODO(), svc, listOptions...)
 		if err != nil {
 			return status, errors.Wrap(err, "unable to get service list")
 		}
@@ -164,7 +167,7 @@ func (r *ReconcileClusterInstallation) checkClusterInstallation(name, imageName,
 				APIVersion: "v1",
 			},
 		}
-		err := r.client.List(context.TODO(), opts, ingress)
+		err := r.client.List(context.TODO(), ingress, listOptions...)
 		if err != nil {
 			return status, errors.Wrap(err, "unable to get ingress list")
 		}

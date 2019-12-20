@@ -243,9 +243,12 @@ func mattermostUpgradeTest(t *testing.T, f *framework.Framework, ctx *framework.
 
 	// Get the current pod
 	pods := corev1.PodList{}
-	opts := client.ListOptions{Namespace: namespace}
-	opts.SetLabelSelector("app=mattermost")
-	err = f.Client.List(context.TODO(), &opts, &pods)
+	listOptions := []client.ListOption{
+		client.InNamespace(namespace),
+		client.MatchingLabels(map[string]string{"app": "mattermost"}),
+	}
+
+	err = f.Client.List(context.TODO(), &pods, listOptions...)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(pods.Items))
 

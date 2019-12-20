@@ -1,12 +1,12 @@
 .PHONY: all check-style unittest generate build clean build-image operator-sdk yaml
 
 OPERATOR_IMAGE ?= mattermost/mattermost-operator:test
-SDK_VERSION = v0.10.0
+SDK_VERSION = v0.13.0
 MACHINE = $(shell uname -m)
-BUILD_IMAGE = golang:1.12
+BUILD_IMAGE = golang:1.13
 BASE_IMAGE = alpine:3.10
 GOPATH ?= $(shell go env GOPATH)
-GOFLAGS ?= $(GOFLAGS:)
+GOFLAGS ?= $(GOFLAGS:) -mod=vendor
 GO=go
 IMAGE_TAG=
 BUILD_TIME := $(shell date -u +%Y%m%d.%H%M%S)
@@ -26,7 +26,7 @@ unittest: ## Runs unit tests
 
 build: ## Build the mattermost-operator
 	@echo Building Mattermost-operator
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 $(GO) build -gcflags all=-trimpath=$(GOPATH) -asmflags all=-trimpath=$(GOPATH) -a -installsuffix cgo -o build/_output/bin/mattermost-operator $(GO_LINKER_FLAGS) ./cmd/manager/main.go
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 $(GO) build $(GOFLAGS) -gcflags all=-trimpath=$(GOPATH) -asmflags all=-trimpath=$(GOPATH) -a -installsuffix cgo -o build/_output/bin/mattermost-operator $(GO_LINKER_FLAGS) ./cmd/manager/main.go
 
 build-image: operator-sdk ## Build the docker image for mattermost-operator
 	@echo Building Mattermost-operator Docker Image
@@ -58,21 +58,25 @@ gofmt: ## Runs gofmt against all packages.
 govet: ## Runs govet against all packages.
 	@echo Running GOVET
 	$(GO) get golang.org/x/tools/go/analysis/passes/shadow/cmd/shadow
-	$(GO) vet $(PACKAGES)
-	$(GO) vet -vettool=$(GOPATH)/bin/shadow $(PACKAGES)
+	$(GO) vet $(GOFLAGS) $(PACKAGES)
+	$(GO) vet $(GOFLAGS) -vettool=$(GOPATH)/bin/shadow $(PACKAGES)
 	@echo "govet success";
 
 generate: operator-sdk ## Runs the kubernetes code-generators and openapi
 	build/operator-sdk generate k8s
-	build/operator-sdk generate openapi
-	vendor/k8s.io/code-generator/generate-groups.sh all github.com/mattermost/mattermost-operator/pkg/client github.com/mattermost/mattermost-operator/pkg/apis mattermost:v1alpha1
+	build/operator-sdk generate crds
+
+	which ./bin/openapi-gen > /dev/null || GO111MODULE=on go build -o ./bin/openapi-gen k8s.io/kube-openapi/cmd/openapi-gen
+	./bin/openapi-gen --logtostderr=true -o "" -i ./pkg/apis/mattermost/v1alpha1 -O zz_generated.openapi -p ./pkg/apis/mattermost/v1alpha1 -h ./hack/boilerplate.go.txt -r "-"
+
+	vendor/k8s.io/code-generator/generate-groups.sh all github.com/mattermost/mattermost-operator/pkg/client github.com/mattermost/mattermost-operator/pkg/apis "mattermost:v1alpha1" -h ./hack/boilerplate.go.txt
 
 yaml: ## Generate the YAML file for easy operator installation
 	cat deploy/service_account.yaml > $(INSTALL_YAML)
 	echo --- >> $(INSTALL_YAML)
-	cat deploy/crds/mattermost_v1alpha1_clusterinstallation_crd.yaml >> $(INSTALL_YAML)
+	cat deploy/crds/mattermost.com_clusterinstallations_crd.yaml >> $(INSTALL_YAML)
 	echo --- >> $(INSTALL_YAML)
-	cat deploy/crds/mattermost_v1alpha1_mattermostrestoredb_crd.yaml >> $(INSTALL_YAML)
+	cat deploy/crds/mattermost.com_mattermostrestoredbs_crd.yaml >> $(INSTALL_YAML)
 	echo --- >> $(INSTALL_YAML)
 	cat deploy/role.yaml >> $(INSTALL_YAML)
 	echo --- >> $(INSTALL_YAML)
