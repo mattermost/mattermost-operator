@@ -7,8 +7,8 @@ import (
 
 	"github.com/mattermost/mattermost-operator/pkg/components/utils"
 
+	blubr "github.com/mattermost/blubr"
 	"github.com/mattermost/mattermost-operator/pkg/apis"
-	logmo "github.com/mattermost/mattermost-operator/pkg/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"
@@ -31,7 +31,7 @@ import (
 
 func TestReconcile(t *testing.T) {
 	// Setup logging for the reconciler so we can see what happened on failure.
-	logger := logmo.InitLogger()
+	logger := blubr.InitLogger()
 	logger = logger.WithName("test.opr")
 	logf.SetLogger(logger)
 

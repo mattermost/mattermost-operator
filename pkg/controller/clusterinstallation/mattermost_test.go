@@ -7,10 +7,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	blubr "github.com/mattermost/blubr"
 	"github.com/mattermost/mattermost-operator/pkg/apis"
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
 	mattermostmysql "github.com/mattermost/mattermost-operator/pkg/components/mysql"
-	logmo "github.com/mattermost/mattermost-operator/pkg/log"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -24,7 +24,7 @@ import (
 
 func TestCheckMattermost(t *testing.T) {
 	// Setup logging for the reconciler so we can see what happened on failure.
-	logger := logmo.InitLogger()
+	logger := blubr.InitLogger()
 	logger = logger.WithName("test.opr")
 	logf.SetLogger(logger)
 
@@ -163,7 +163,7 @@ func TestCheckMattermost(t *testing.T) {
 
 func TestCheckMattermostExternalDB(t *testing.T) {
 	// Setup logging for the reconciler so we can see what happened on failure.
-	logger := logmo.InitLogger()
+	logger := blubr.InitLogger()
 	logger = logger.WithName("test.opr")
 	logf.SetLogger(logger)
 

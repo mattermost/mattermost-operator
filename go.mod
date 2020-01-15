@@ -6,12 +6,12 @@ require (
 	github.com/banzaicloud/k8s-objectmatcher v1.0.1
 	github.com/go-logr/logr v0.1.0
 	github.com/go-openapi/spec v0.19.5
+	github.com/mattermost/blubr v0.0.0-20200113232543-f0ce67760aeb
 	github.com/minio/minio-operator v0.0.0-20191007061920-bdea7aa7032f
 	github.com/operator-framework/operator-sdk v0.13.0
 	github.com/pborman/uuid v1.2.0
 	github.com/pkg/errors v0.8.1
 	github.com/presslabs/mysql-operator v0.3.3
-	github.com/sirupsen/logrus v1.4.2
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.4.0
 	golang.org/x/net v0.0.0-20190827160401-ba9fcec4b297

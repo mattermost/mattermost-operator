@@ -10,15 +10,15 @@ import (
 
 	"github.com/mattermost/mattermost-operator/pkg/apis"
 	"github.com/mattermost/mattermost-operator/pkg/controller"
-	"github.com/mattermost/mattermost-operator/pkg/log"
 	"github.com/mattermost/mattermost-operator/version"
 
+	blubr "github.com/mattermost/blubr"
 	"github.com/operator-framework/operator-sdk/pkg/leader"
 	"github.com/operator-framework/operator-sdk/pkg/log/zap"
 	"github.com/operator-framework/operator-sdk/pkg/metrics"
 	sdkVersion "github.com/operator-framework/operator-sdk/version"
 	"github.com/spf13/pflag"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -51,7 +51,7 @@ func main() {
 	// Setup logging.
 	// This logger wraps logrus in a 'logr.Logger' interface. This is required
 	// for the deferred logging required by the various operator packages.
-	logger := log.InitLogger()
+	logger := blubr.InitLogger()
 	logger = logger.WithName("opr")
 	logf.SetLogger(logger)
 
