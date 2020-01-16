@@ -59,6 +59,7 @@ jobs:
       - KIND_VERSION=v0.4.0
       - SDK_VERSION=v0.13.0
     machine: true
+    resource_class: large
     working_directory: /home/circleci/.go_workspace/src/github.com/mattermost/mattermost-operator
     steps:
       - checkout
