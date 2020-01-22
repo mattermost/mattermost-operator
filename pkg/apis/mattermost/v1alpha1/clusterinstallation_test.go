@@ -351,3 +351,49 @@ func TestClusterInstallationGenerateDeployment(t *testing.T) {
 		})
 	}
 }
+
+func TestMergeEnvVars(t *testing.T) {
+	tests := []struct {
+		name     string
+		original []corev1.EnvVar
+		new      []corev1.EnvVar
+		want     []corev1.EnvVar
+	}{
+		{
+			name:     "empty",
+			original: []corev1.EnvVar{},
+			new:      []corev1.EnvVar{},
+			want:     []corev1.EnvVar{},
+		},
+		{
+			name:     "append",
+			original: []corev1.EnvVar{},
+			new:      []corev1.EnvVar{{Name: "env1", Value: "value1"}},
+			want:     []corev1.EnvVar{{Name: "env1", Value: "value1"}},
+		},
+		{
+			name:     "merge",
+			original: []corev1.EnvVar{{Name: "env1", Value: "value1"}},
+			new:      []corev1.EnvVar{{Name: "env1", Value: "value2"}},
+			want:     []corev1.EnvVar{{Name: "env1", Value: "value2"}},
+		},
+		{
+			name:     "append and merge",
+			original: []corev1.EnvVar{{Name: "env1", Value: "value1"}},
+			new:      []corev1.EnvVar{{Name: "env1", Value: "value2"}, {Name: "env2", Value: "value1"}},
+			want:     []corev1.EnvVar{{Name: "env1", Value: "value2"}, {Name: "env2", Value: "value1"}},
+		},
+		{
+			name:     "complex",
+			original: []corev1.EnvVar{{Name: "env1", Value: "value1"}, {Name: "env2", Value: "value1"}},
+			new:      []corev1.EnvVar{{Name: "env1", Value: "value2"}, {Name: "env3", Value: "value1"}},
+			want:     []corev1.EnvVar{{Name: "env1", Value: "value2"}, {Name: "env2", Value: "value1"}, {Name: "env3", Value: "value1"}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, mergeEnvVars(tt.original, tt.new))
+		})
+	}
+}

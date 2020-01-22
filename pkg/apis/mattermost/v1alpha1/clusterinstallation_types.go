@@ -69,6 +69,9 @@ type ClusterInstallationSpec struct {
 
 	// +optional
 	IngressAnnotations map[string]string `json:"ingressAnnotations,omitempty"`
+	// Optional environment variables to set in the Mattermost application pods.
+	// +optional
+	MattermostEnv []corev1.EnvVar `json:"mattermostEnv,omitempty"`
 }
 
 // Canary defines the configuration of Canary deployment for a ClusterInstallation
