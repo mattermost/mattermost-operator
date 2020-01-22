@@ -12,6 +12,7 @@ import (
 	apis "github.com/mattermost/mattermost-operator/pkg/apis"
 	operator "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
 	"github.com/mattermost/mattermost-operator/pkg/components/utils"
+	operatortest "github.com/mattermost/mattermost-operator/test"
 
 	framework "github.com/operator-framework/operator-sdk/pkg/test"
 	"github.com/operator-framework/operator-sdk/pkg/test/e2eutil"
@@ -192,7 +193,7 @@ func mattermostUpgradeTest(t *testing.T, f *framework.Framework, ctx *framework.
 		},
 		Spec: operator.ClusterInstallationSpec{
 			Image:       "mattermost/mattermost-enterprise-edition",
-			Version:     "5.17.2",
+			Version:     operatortest.PreviousStableMattermostVersion,
 			IngressName: "test-example2.mattermost.dev",
 			Replicas:    1,
 			Resources: corev1.ResourceRequirements{
@@ -257,7 +258,7 @@ func mattermostUpgradeTest(t *testing.T, f *framework.Framework, ctx *framework.
 	require.NoError(t, err)
 
 	// Apply the new version
-	exampleMattermost.Spec.Version = "5.18.0"
+	exampleMattermost.Spec.Version = operatortest.LatestStableMattermostVersion
 	err = f.Client.Update(context.TODO(), exampleMattermost)
 	require.NoError(t, err)
 
@@ -276,12 +277,12 @@ func mattermostUpgradeTest(t *testing.T, f *framework.Framework, ctx *framework.
 	err = f.Client.Get(context.TODO(), types.NamespacedName{Name: testName, Namespace: namespace}, newMattermost)
 	require.NoError(t, err)
 	require.Equal(t, "mattermost/mattermost-enterprise-edition", newMattermost.Status.Image)
-	require.Equal(t, "5.18.0", newMattermost.Status.Version)
+	require.Equal(t, operatortest.LatestStableMattermostVersion, newMattermost.Status.Version)
 
 	mmDeployment := &appsv1.Deployment{}
 	err = f.Client.Get(context.TODO(), types.NamespacedName{Name: testName, Namespace: namespace}, mmDeployment)
 	require.NoError(t, err)
-	require.Equal(t, "mattermost/mattermost-enterprise-edition:5.18.0", mmDeployment.Spec.Template.Spec.Containers[0].Image)
+	require.Equal(t, "mattermost/mattermost-enterprise-edition:"+operatortest.LatestStableMattermostVersion, mmDeployment.Spec.Template.Spec.Containers[0].Image)
 
 	err = f.Client.Delete(context.TODO(), newMattermost)
 	require.NoError(t, err)

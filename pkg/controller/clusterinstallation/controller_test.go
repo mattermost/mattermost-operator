@@ -9,6 +9,7 @@ import (
 
 	blubr "github.com/mattermost/blubr"
 	"github.com/mattermost/mattermost-operator/pkg/apis"
+	operatortest "github.com/mattermost/mattermost-operator/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"
@@ -47,7 +48,7 @@ func TestReconcile(t *testing.T) {
 		Spec: mattermostv1alpha1.ClusterInstallationSpec{
 			Replicas:    replicas,
 			Image:       "mattermost/mattermost-enterprise-edition",
-			Version:     "5.18.0",
+			Version:     operatortest.LatestStableMattermostVersion,
 			IngressName: "foo.mattermost.dev",
 		},
 	}
@@ -220,13 +221,13 @@ func TestReconcile(t *testing.T) {
 				Name:        "blue-installation",
 				IngressName: "blue-ingress",
 				Image:       "mattermost/mattermost-blue-edition",
-				Version:     "5.17.2",
+				Version:     operatortest.PreviousStableMattermostVersion,
 			},
 			Green: mattermostv1alpha1.AppDeployment{
 				Name:        "green-installation",
 				IngressName: "green-ingress",
 				Image:       "mattermost/mattermost-green-edition",
-				Version:     "5.18.0",
+				Version:     operatortest.LatestStableMattermostVersion,
 			},
 		}
 

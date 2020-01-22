@@ -3,6 +3,7 @@ package v1alpha1
 import (
 	"testing"
 
+	operatortest "github.com/mattermost/mattermost-operator/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
@@ -22,7 +23,7 @@ func TestClusterInstallation(t *testing.T) {
 		Spec: ClusterInstallationSpec{
 			Replicas:    7,
 			Image:       "mattermost/mattermost-enterprise-edition",
-			Version:     "5.18.0",
+			Version:     operatortest.LatestStableMattermostVersion,
 			IngressName: "foo.mattermost.dev",
 		},
 	}
@@ -54,7 +55,7 @@ func TestClusterInstallation(t *testing.T) {
 			},
 			Spec: ClusterInstallationSpec{
 				Image:       "mattermost/mattermost-enterprise-edition",
-				Version:     "5.18.0",
+				Version:     operatortest.LatestStableMattermostVersion,
 				IngressName: "foo.mattermost.dev",
 				Size:        "1000users",
 			},
@@ -146,7 +147,7 @@ func TestClusterInstallation(t *testing.T) {
 func TestDeployment(t *testing.T) {
 	d := AppDeployment{
 		Image:   "mattermost/mattermost-enterprise-edition",
-		Version: "5.18.0",
+		Version: operatortest.LatestStableMattermostVersion,
 	}
 
 	t.Run("correct image", func(t *testing.T) {
