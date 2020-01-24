@@ -11,6 +11,7 @@ import (
 	"github.com/mattermost/mattermost-operator/pkg/apis"
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
 	mattermostmysql "github.com/mattermost/mattermost-operator/pkg/components/mysql"
+	operatortest "github.com/mattermost/mattermost-operator/test"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -40,7 +41,7 @@ func TestCheckMattermost(t *testing.T) {
 		Spec: mattermostv1alpha1.ClusterInstallationSpec{
 			Replicas:    replicas,
 			Image:       "mattermost/mattermost-enterprise-edition",
-			Version:     "5.18.0",
+			Version:     operatortest.LatestStableMattermostVersion,
 			IngressName: "foo.mattermost.dev",
 		},
 	}
@@ -180,7 +181,7 @@ func TestCheckMattermostExternalDB(t *testing.T) {
 		Spec: mattermostv1alpha1.ClusterInstallationSpec{
 			Replicas:    replicas,
 			Image:       "mattermost/mattermost-enterprise-edition",
-			Version:     "5.18.0",
+			Version:     operatortest.LatestStableMattermostVersion,
 			IngressName: "foo.mattermost.dev",
 			Database: mattermostv1alpha1.Database{
 				Secret: externalDBSecretName,
