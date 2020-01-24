@@ -555,6 +555,9 @@ func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingres
 	envVars = append(envVars, envVarES...)
 	envVars = append(envVars, envVarGeneral...)
 
+	// Merge our custom env vars in.
+	envVars = mergeEnvVars(envVars, mattermost.Spec.MattermostEnv)
+
 	revHistoryLimit := int32(defaultRevHistoryLimit)
 	maxUnavailable := intstr.FromInt(defaultMaxUnavailable)
 	maxSurge := intstr.FromInt(defaultMaxSurge)
@@ -733,4 +736,25 @@ func mergeStringMaps(receiver, origin map[string]string) map[string]string {
 	}
 
 	return receiver
+}
+
+// mergeEnvVars takes two sets of env vars and merges them together. This will
+// replace env vars that already existed or will append them if they are new.
+func mergeEnvVars(original, new []corev1.EnvVar) []corev1.EnvVar {
+	for _, newEnvVar := range new {
+		var replaced bool
+
+		for originalPos, originalEnvVar := range original {
+			if originalEnvVar.Name == newEnvVar.Name {
+				original[originalPos] = newEnvVar
+				replaced = true
+			}
+		}
+
+		if !replaced {
+			original = append(original, newEnvVar)
+		}
+	}
+
+	return original
 }

@@ -201,12 +201,25 @@ func schema_pkg_apis_mattermost_v1alpha1_ClusterInstallationSpec(ref common.Refe
 							},
 						},
 					},
+					"mattermostEnv": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Optional environment variables to set in the Mattermost application pods.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("k8s.io/api/core/v1.EnvVar"),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"ingressName"},
 			},
 		},
 		Dependencies: []string{
-			"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.BlueGreen", "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.Canary", "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.Database", "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.ElasticSearch", "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.Minio", "k8s.io/api/core/v1.Affinity", "k8s.io/api/core/v1.ResourceRequirements"},
+			"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.BlueGreen", "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.Canary", "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.Database", "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.ElasticSearch", "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.Minio", "k8s.io/api/core/v1.Affinity", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.ResourceRequirements"},
 	}
 }
 

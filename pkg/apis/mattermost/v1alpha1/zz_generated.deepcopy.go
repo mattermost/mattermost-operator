@@ -178,6 +178,13 @@ func (in *ClusterInstallationSpec) DeepCopyInto(out *ClusterInstallationSpec) {
 			(*out)[key] = val
 		}
 	}
+	if in.MattermostEnv != nil {
+		in, out := &in.MattermostEnv, &out.MattermostEnv
+		*out = make([]v1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	return
 }
 
