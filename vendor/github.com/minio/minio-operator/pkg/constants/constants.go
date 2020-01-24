@@ -47,7 +47,7 @@ const MinIOVolumeMountPath = "/export"
 const MinIOVolumeSubPath = ""
 
 // DefaultMinIOImage specifies the default MinIO Docker hub image
-const DefaultMinIOImage = "minio/minio:RELEASE.2019-09-11T19-53-16Z"
+const DefaultMinIOImage = "minio/minio:RELEASE.2020-01-03T19-12-21Z"
 
 // MinIOServerName specifies the default container name for MinIOInstance
 const MinIOServerName = "minio"

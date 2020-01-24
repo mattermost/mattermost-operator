@@ -106,6 +106,10 @@ type MysqlClusterSpec struct {
 	// +optional
 	VolumeSpec VolumeSpec `json:"volumeSpec,omitempty"`
 
+	// TmpfsSize if specified, mounts a tmpfs of this size into /tmp
+	// +optional
+	TmpfsSize string `json:"tmpfsSize,omitempty"`
+
 	// MaxSlaveLatency represents the allowed latency for a slave node in
 	// seconds. If set then the node with a latency grater than this is removed
 	// from service.
