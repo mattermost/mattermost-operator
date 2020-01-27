@@ -18,7 +18,7 @@ spec:
     listKind: MattermostRestoreDBList
     plural: mattermostrestoredbs
     singular: mattermostrestoredb
-  scope: ""
+  scope: Namespaced
   subresources:
     status: {}
   validation:

@@ -1,10 +1,11 @@
 .PHONY: all check-style unittest generate build clean build-image operator-sdk yaml
 
 OPERATOR_IMAGE ?= mattermost/mattermost-operator:test
-SDK_VERSION = v0.13.0
+SDK_VERSION = v0.15.0
 MACHINE = $(shell uname -m)
 BUILD_IMAGE = golang:1.13
-BASE_IMAGE = alpine:3.10
+BASE_IMAGE = alpine:3.11
+GOROOT ?= $(shell go env GOROOT)
 GOPATH ?= $(shell go env GOPATH)
 GOFLAGS ?= $(GOFLAGS:) -mod=vendor
 GO=go
@@ -63,7 +64,9 @@ govet: ## Runs govet against all packages.
 	@echo "govet success";
 
 generate: operator-sdk ## Runs the kubernetes code-generators and openapi
-	build/operator-sdk generate k8s
+	## We have to manually export GOROOT here to get around the following issue:
+	## https://github.com/operator-framework/operator-sdk/issues/1854#issuecomment-525132306
+	GOROOT=$(GOROOT) build/operator-sdk generate k8s
 	build/operator-sdk generate crds
 
 	which ./bin/openapi-gen > /dev/null || GO111MODULE=on go build -o ./bin/openapi-gen k8s.io/kube-openapi/cmd/openapi-gen

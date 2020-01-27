@@ -26,7 +26,7 @@ spec:
     listKind: ClusterInstallationList
     plural: clusterinstallations
     singular: clusterinstallation
-  scope: ""
+  scope: Namespaced
   subresources:
     status: {}
   validation:
