@@ -34,6 +34,12 @@ type ClusterInstallationSpec struct {
 	// Defines the resource requests and limits for the Mattermost app server pods.
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+	// Defines the probe to check if the application is up and running.
+	// +optional
+	LivenessProbe corev1.Probe `json:"livenessProbe,omitempty"`
+	// Defines the probe to check if the application is ready to accept traffic.
+	// +optional
+	ReadinessProbe corev1.Probe `json:"readinessProbe,omitempty"`
 	// IngressName defines the name to be used when creating the ingress rules
 	IngressName string `json:"ingressName"`
 	// Secret that contains the mattermost license

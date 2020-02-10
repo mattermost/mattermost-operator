@@ -562,6 +562,8 @@ func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingres
 	maxUnavailable := intstr.FromInt(defaultMaxUnavailable)
 	maxSurge := intstr.FromInt(defaultMaxSurge)
 
+	liveness, readiness := setProbes(mattermost.Spec.LivenessProbe, mattermost.Spec.ReadinessProbe)
+
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      deploymentName,
@@ -609,30 +611,10 @@ func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingres
 									Name:          "app",
 								},
 							},
-							ReadinessProbe: &corev1.Probe{
-								Handler: corev1.Handler{
-									HTTPGet: &corev1.HTTPGetAction{
-										Path: "/api/v4/system/ping",
-										Port: intstr.FromInt(8065),
-									},
-								},
-								InitialDelaySeconds: 120,
-								PeriodSeconds:       5,
-								FailureThreshold:    6,
-							},
-							LivenessProbe: &corev1.Probe{
-								Handler: corev1.Handler{
-									HTTPGet: &corev1.HTTPGetAction{
-										Path: "/api/v4/system/ping",
-										Port: intstr.FromInt(8065),
-									},
-								},
-								InitialDelaySeconds: 90,
-								PeriodSeconds:       10,
-								FailureThreshold:    3,
-							},
-							VolumeMounts: volumeMountLicense,
-							Resources:    mattermost.Spec.Resources,
+							ReadinessProbe: readiness,
+							LivenessProbe:  liveness,
+							VolumeMounts:   volumeMountLicense,
+							Resources:      mattermost.Spec.Resources,
 						},
 					},
 					Volumes:      volumeLicense,
@@ -757,4 +739,80 @@ func mergeEnvVars(original, new []corev1.EnvVar) []corev1.EnvVar {
 	}
 
 	return original
+}
+
+func setProbes(customLiveness corev1.Probe, customReadiness corev1.Probe) (*corev1.Probe, *corev1.Probe) {
+	liveness := &corev1.Probe{
+		Handler: corev1.Handler{
+			HTTPGet: &corev1.HTTPGetAction{
+				Path: "/api/v4/system/ping",
+				Port: intstr.FromInt(8065),
+			},
+		},
+		InitialDelaySeconds: 10,
+		PeriodSeconds:       10,
+		FailureThreshold:    3,
+	}
+
+	if customLiveness.Handler != (corev1.Handler{}) {
+		liveness.Handler = customLiveness.Handler
+	}
+
+	if customLiveness.InitialDelaySeconds != 0 {
+		liveness.InitialDelaySeconds = customLiveness.InitialDelaySeconds
+	}
+
+	if customLiveness.PeriodSeconds != 0 {
+		liveness.PeriodSeconds = customLiveness.PeriodSeconds
+	}
+
+	if customLiveness.FailureThreshold != 0 {
+		liveness.FailureThreshold = customLiveness.FailureThreshold
+	}
+
+	if customLiveness.SuccessThreshold != 0 {
+		liveness.SuccessThreshold = customLiveness.SuccessThreshold
+	}
+
+	if customLiveness.FailureThreshold != 0 {
+		liveness.FailureThreshold = customLiveness.FailureThreshold
+	}
+
+	readiness := &corev1.Probe{
+		Handler: corev1.Handler{
+			HTTPGet: &corev1.HTTPGetAction{
+				Path: "/api/v4/system/ping",
+				Port: intstr.FromInt(8065),
+			},
+		},
+		InitialDelaySeconds: 10,
+		PeriodSeconds:       5,
+		FailureThreshold:    6,
+	}
+
+	if customReadiness.Handler != (corev1.Handler{}) {
+		readiness.Handler = customReadiness.Handler
+	}
+
+	if customReadiness.InitialDelaySeconds != 0 {
+		readiness.InitialDelaySeconds = customReadiness.InitialDelaySeconds
+	}
+
+	if customReadiness.PeriodSeconds != 0 {
+		readiness.PeriodSeconds = customReadiness.PeriodSeconds
+	}
+
+	if customReadiness.FailureThreshold != 0 {
+		readiness.FailureThreshold = customReadiness.FailureThreshold
+	}
+
+	if customReadiness.SuccessThreshold != 0 {
+		readiness.SuccessThreshold = customReadiness.SuccessThreshold
+	}
+
+	if customReadiness.FailureThreshold != 0 {
+		readiness.FailureThreshold = customReadiness.FailureThreshold
+	}
+
+	return liveness, readiness
 }

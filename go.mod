@@ -29,7 +29,7 @@ require (
 	golang.org/x/crypto v0.0.0-20200117160349-530e935923ad // indirect
 	golang.org/x/net v0.0.0-20200114155413-6afb5195e5aa
 	golang.org/x/sys v0.0.0-20200122134326-e047566fdf82 // indirect
-	golang.org/x/tools v0.0.0-20200124144541-e0a7ba33caea // indirect
+	golang.org/x/tools v0.0.0-20200207224406-61798d64f025 // indirect
 	gopkg.in/yaml.v2 v2.2.8 // indirect
 	k8s.io/api v0.17.2
 	k8s.io/apimachinery v0.17.2

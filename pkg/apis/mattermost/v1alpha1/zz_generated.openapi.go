@@ -107,6 +107,18 @@ func schema_pkg_apis_mattermost_v1alpha1_ClusterInstallationSpec(ref common.Refe
 							Ref:         ref("k8s.io/api/core/v1.ResourceRequirements"),
 						},
 					},
+					"livenessProbe": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Defines the probe to check if the application is up and running.",
+							Ref:         ref("k8s.io/api/core/v1.Probe"),
+						},
+					},
+					"readinessProbe": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Defines the probe to check if the application is ready to accept traffic.",
+							Ref:         ref("k8s.io/api/core/v1.Probe"),
+						},
+					},
 					"ingressName": {
 						SchemaProps: spec.SchemaProps{
 							Description: "IngressName defines the name to be used when creating the ingress rules",
@@ -219,7 +231,7 @@ func schema_pkg_apis_mattermost_v1alpha1_ClusterInstallationSpec(ref common.Refe
 			},
 		},
 		Dependencies: []string{
-			"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.BlueGreen", "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.Canary", "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.Database", "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.ElasticSearch", "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.Minio", "k8s.io/api/core/v1.Affinity", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.ResourceRequirements"},
+			"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.BlueGreen", "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.Canary", "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.Database", "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.ElasticSearch", "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.Minio", "k8s.io/api/core/v1.Affinity", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.Probe", "k8s.io/api/core/v1.ResourceRequirements"},
 	}
 }
 
