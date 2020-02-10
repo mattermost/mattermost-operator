@@ -45,6 +45,11 @@ func schema_pkg_apis_mattermost_v1alpha1_ClusterInstallation(ref common.Referenc
 							Format:      "",
 						},
 					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+						},
+					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Specification of the desired behavior of the Mattermost cluster. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status",
@@ -62,7 +67,7 @@ func schema_pkg_apis_mattermost_v1alpha1_ClusterInstallation(ref common.Referenc
 			},
 		},
 		Dependencies: []string{
-			"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.ClusterInstallationSpec", "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.ClusterInstallationStatus"},
+			"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.ClusterInstallationSpec", "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1.ClusterInstallationStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
 	}
 }
 
@@ -105,18 +110,6 @@ func schema_pkg_apis_mattermost_v1alpha1_ClusterInstallationSpec(ref common.Refe
 						SchemaProps: spec.SchemaProps{
 							Description: "Defines the resource requests and limits for the Mattermost app server pods.",
 							Ref:         ref("k8s.io/api/core/v1.ResourceRequirements"),
-						},
-					},
-					"livenessProbe": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Defines the probe to check if the application is up and running.",
-							Ref:         ref("k8s.io/api/core/v1.Probe"),
-						},
-					},
-					"readinessProbe": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Defines the probe to check if the application is ready to accept traffic.",
-							Ref:         ref("k8s.io/api/core/v1.Probe"),
 						},
 					},
 					"ingressName": {
@@ -214,6 +207,11 @@ func schema_pkg_apis_mattermost_v1alpha1_ClusterInstallationSpec(ref common.Refe
 						},
 					},
 					"mattermostEnv": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "set",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Optional environment variables to set in the Mattermost application pods.",
 							Type:        []string{"array"},
@@ -224,6 +222,18 @@ func schema_pkg_apis_mattermost_v1alpha1_ClusterInstallationSpec(ref common.Refe
 									},
 								},
 							},
+						},
+					},
+					"livenessProbe": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Defines the probe to check if the application is up and running.",
+							Ref:         ref("k8s.io/api/core/v1.Probe"),
+						},
+					},
+					"readinessProbe": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Defines the probe to check if the application is ready to accept traffic.",
+							Ref:         ref("k8s.io/api/core/v1.Probe"),
 						},
 					},
 				},

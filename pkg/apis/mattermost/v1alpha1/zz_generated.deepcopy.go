@@ -147,8 +147,6 @@ func (in *ClusterInstallationSize) DeepCopy() *ClusterInstallationSize {
 func (in *ClusterInstallationSpec) DeepCopyInto(out *ClusterInstallationSpec) {
 	*out = *in
 	in.Resources.DeepCopyInto(&out.Resources)
-	in.LivenessProbe.DeepCopyInto(&out.LivenessProbe)
-	in.ReadinessProbe.DeepCopyInto(&out.ReadinessProbe)
 	if in.NodeSelector != nil {
 		in, out := &in.NodeSelector, &out.NodeSelector
 		*out = make(map[string]string, len(*in))
@@ -187,6 +185,8 @@ func (in *ClusterInstallationSpec) DeepCopyInto(out *ClusterInstallationSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	in.LivenessProbe.DeepCopyInto(&out.LivenessProbe)
+	in.ReadinessProbe.DeepCopyInto(&out.ReadinessProbe)
 	return
 }
 
