@@ -185,6 +185,8 @@ func (in *ClusterInstallationSpec) DeepCopyInto(out *ClusterInstallationSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	in.LivenessProbe.DeepCopyInto(&out.LivenessProbe)
+	in.ReadinessProbe.DeepCopyInto(&out.ReadinessProbe)
 	return
 }
 

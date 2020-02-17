@@ -71,7 +71,14 @@ type ClusterInstallationSpec struct {
 	IngressAnnotations map[string]string `json:"ingressAnnotations,omitempty"`
 	// Optional environment variables to set in the Mattermost application pods.
 	// +optional
+	// +listType=set
 	MattermostEnv []corev1.EnvVar `json:"mattermostEnv,omitempty"`
+	// Defines the probe to check if the application is up and running.
+	// +optional
+	LivenessProbe corev1.Probe `json:"livenessProbe,omitempty"`
+	// Defines the probe to check if the application is ready to accept traffic.
+	// +optional
+	ReadinessProbe corev1.Probe `json:"readinessProbe,omitempty"`
 }
 
 // Canary defines the configuration of Canary deployment for a ClusterInstallation
@@ -269,10 +276,7 @@ type ClusterInstallationStatus struct {
 // +kubebuilder:printcolumn:priority=0,name="Version",type=string,JSONPath=".status.version",description="Version of Mattermost"
 // +kubebuilder:printcolumn:priority=0,name="Endpoint",type=string,JSONPath=".status.endpoint",description="Endpoint"
 type ClusterInstallation struct {
-	metav1.TypeMeta `json:",inline"`
-	// Standard object’s metadata. More info:
-	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
-	// +k8s:openapi-gen=false
+	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	// Specification of the desired behavior of the Mattermost cluster. More info:
 	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
