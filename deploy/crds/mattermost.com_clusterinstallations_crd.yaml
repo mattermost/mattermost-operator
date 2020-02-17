@@ -956,7 +956,8 @@ spec:
                       fieldRef:
                         description: 'Selects a field of the pod: supports metadata.name,
                           metadata.namespace, metadata.labels, metadata.annotations,
-                          spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP.'
+                          spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP,
+                          status.podIPs.'
                         properties:
                           apiVersion:
                             description: Version of the schema the FieldPath is written
