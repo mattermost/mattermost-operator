@@ -40,7 +40,7 @@ require (
 
 )
 
-// Pinned to kubernetes-1.16.7
+// Pinned to kubernetes-1.17.2
 replace (
 	github.com/docker/docker => github.com/moby/moby v0.7.3-0.20190826074503-38ab9da00309
 	k8s.io/api => k8s.io/api v0.17.2
