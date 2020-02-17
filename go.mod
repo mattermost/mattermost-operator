@@ -29,7 +29,7 @@ require (
 	golang.org/x/crypto v0.0.0-20200117160349-530e935923ad // indirect
 	golang.org/x/net v0.0.0-20200114155413-6afb5195e5aa
 	golang.org/x/sys v0.0.0-20200122134326-e047566fdf82 // indirect
-	golang.org/x/tools v0.0.0-20200124144541-e0a7ba33caea // indirect
+	golang.org/x/tools v0.0.0-20200216192241-b320d3a0f5a2 // indirect
 	k8s.io/api v0.17.2
 	k8s.io/apimachinery v0.17.2
 	k8s.io/client-go v12.0.0+incompatible
@@ -45,15 +45,15 @@ replace (
 	github.com/docker/docker => github.com/moby/moby v0.7.3-0.20190826074503-38ab9da00309
 	k8s.io/api => k8s.io/api v0.17.2
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.17.2
-	k8s.io/apimachinery => k8s.io/apimachinery v0.16.8-beta.0
+	k8s.io/apimachinery => k8s.io/apimachinery v0.17.2
 	k8s.io/apiserver => k8s.io/apiserver v0.17.2
 	k8s.io/cli-runtime => k8s.io/cli-runtime v0.17.2
 	k8s.io/client-go => k8s.io/client-go v0.17.2
 	k8s.io/cloud-provider => k8s.io/cloud-provider v0.17.2
 	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.17.2
-	k8s.io/code-generator => k8s.io/code-generator v0.16.8-beta.0
+	k8s.io/code-generator => k8s.io/code-generator v0.17.2
 	k8s.io/component-base => k8s.io/component-base v0.17.2
-	k8s.io/cri-api => k8s.io/cri-api v0.16.8-beta.0
+	k8s.io/cri-api => k8s.io/cri-api v0.17.2
 	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.17.2
 	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.17.2
 	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.17.2
