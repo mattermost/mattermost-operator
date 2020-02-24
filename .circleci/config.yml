@@ -57,7 +57,7 @@ jobs:
       - IMAGE_NAME=mattermost/mattermost-operator
       - IMAGE_TAG=test
       - KIND_VERSION=v0.4.0
-      - SDK_VERSION=v0.13.0
+      - SDK_VERSION=v0.15.1
     machine: true
     resource_class: xlarge
     working_directory: /home/circleci/.go_workspace/src/github.com/mattermost/mattermost-operator
