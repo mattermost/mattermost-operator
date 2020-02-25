@@ -36,18 +36,12 @@ run_kind() {
 
     echo "Create Kubernetes cluster with kind..."
     kind create cluster --config test/kind-config.yaml --wait 5m
-
-    echo "Export kubeconfig..."
-    # shellcheck disable=SC2155
-    export KUBECONFIG="$(kind get kubeconfig-path)"
-    cp "$(kind get kubeconfig-path)" ~/.kube/config
     echo
 
     echo 'Copying kubeconfig to container...'
-    local kubeconfig
-    kubeconfig="$(kind get kubeconfig-path)"
+    kind get kubeconfig
     docker_exec mkdir /root/.kube
-    docker cp "$kubeconfig" test-cont:/root/.kube/config
+    docker cp ~/.kube/config test-cont:/root/.kube/config
     docker_exec kubectl cluster-info
     echo
 
@@ -104,10 +98,6 @@ main() {
     kind load docker-image minio/k8s-operator:1.0.4
 
 
-    # Setup a local storage class
-    kubectl delete storageclass standard
-    kubectl apply -f test/local-path-provisioner.yaml
-    sleep 5
     # Create a namespace for testing operator.
     # This is needed because the service account created using
     # deploy/service_account.yaml has a static namespace. Creating operator in
