@@ -601,7 +601,7 @@ func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingres
 						{
 							Name:                     MattermostAppContainerName,
 							Image:                    containerImage,
-							ImagePullPolicy:          corev1.PullAlways,
+							ImagePullPolicy:          corev1.PullIfNotPresent,
 							TerminationMessagePolicy: corev1.TerminationMessageFallbackToLogsOnError,
 							Command:                  []string{"mattermost"},
 							Env:                      envVars,

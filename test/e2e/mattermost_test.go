@@ -325,7 +325,7 @@ func mattermostWithMySQLReplicas(t *testing.T, f *framework.Framework, ctx *fram
 			},
 			Database: operator.Database{
 				StorageSize: "1Gi",
-				Replicas:    3,
+				Replicas:    2,
 				Resources: corev1.ResourceRequirements{
 					Requests: corev1.ResourceList{
 						corev1.ResourceCPU:    resource.MustParse("100m"),
@@ -343,10 +343,10 @@ func mattermostWithMySQLReplicas(t *testing.T, f *framework.Framework, ctx *fram
 	err = waitForStatefulSet(t, f.Client.Client, namespace, fmt.Sprintf("%s-minio", testName), 1, retryInterval, timeout)
 	require.NoError(t, err)
 
-	err = waitForStatefulSet(t, f.Client.Client, namespace, fmt.Sprintf("%s-mysql", utils.HashWithPrefix("db", testName)), 3, retryInterval, timeout)
+	err = waitForStatefulSet(t, f.Client.Client, namespace, fmt.Sprintf("%s-mysql", utils.HashWithPrefix("db", testName)), 2, retryInterval, timeout)
 	require.NoError(t, err)
 
-	err = waitForMySQLStatusReady(t, f.Client.Client, namespace, utils.HashWithPrefix("db", testName), 3, retryInterval, timeout)
+	err = waitForMySQLStatusReady(t, f.Client.Client, namespace, utils.HashWithPrefix("db", testName), 2, retryInterval, timeout)
 	require.NoError(t, err)
 
 	err = f.Client.Delete(context.TODO(), exampleMattermost)

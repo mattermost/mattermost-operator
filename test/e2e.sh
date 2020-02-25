@@ -107,6 +107,7 @@ main() {
     # Setup a local storage class
     kubectl delete storageclass standard
     kubectl apply -f test/local-path-provisioner.yaml
+    sleep 5
     # Create a namespace for testing operator.
     # This is needed because the service account created using
     # deploy/service_account.yaml has a static namespace. Creating operator in
@@ -116,12 +117,12 @@ main() {
     # Create the mysql operator
     kubectl create ns mysql-operator
     kubectl apply -n mysql-operator -f docs/mysql-operator/mysql-operator.yaml
-
+    sleep 5
     # Create the minio operator
     kubectl create ns minio-operator
     kubectl apply -n minio-operator -f docs/minio-operator/minio-operator.yaml
 
-    sleep 20
+    sleep 60
     kubectl get pods --all-namespaces
     # NOTE: Append this test command with `|| true` to debug by inspecting the
     # resource details. Also comment `defer ctx.Cleanup()` in the cluster to
