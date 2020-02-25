@@ -98,6 +98,10 @@ main() {
     kind load docker-image minio/k8s-operator:1.0.4
 
 
+    # Setup a local storage class
+    kubectl delete storageclass standard
+    kubectl apply -f test/local-path-provisioner.yaml
+    sleep 5
     # Create a namespace for testing operator.
     # This is needed because the service account created using
     # deploy/service_account.yaml has a static namespace. Creating operator in
