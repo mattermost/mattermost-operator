@@ -80,8 +80,6 @@ $ git checkout master
 $ make install
 ```
 
-Second, you need to make sure you have [dep](https://github.com/golang/dep) installed. 
-
 ### 3.2 Building mattermost-operator
 To start contributing to mattermost-operator you need to clone this repo to your local workspace. 
 
@@ -91,7 +89,6 @@ $ cd $GOPATH/src/github.com/mattermost
 $ git clone https://github.com/mattermost/mattermost-operator
 $ cd mattermost-operator
 $ git checkout master
-$ make dep
 $ make build
 ```
 

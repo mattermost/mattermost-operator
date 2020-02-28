@@ -27,7 +27,7 @@ unittest: ## Runs unit tests
 
 build: ## Build the mattermost-operator
 	@echo Building Mattermost-operator
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 $(GO) build $(GOFLAGS) -gcflags all=-trimpath=$(GOPATH) -asmflags all=-trimpath=$(GOPATH) -a -installsuffix cgo -o build/_output/bin/mattermost-operator $(GO_LINKER_FLAGS) ./cmd/manager/main.go
+	GO111MODULE=on GOOS=linux GOARCH=amd64 CGO_ENABLED=0 $(GO) build $(GOFLAGS) -gcflags all=-trimpath=$(GOPATH) -asmflags all=-trimpath=$(GOPATH) -a -installsuffix cgo -o build/_output/bin/mattermost-operator $(GO_LINKER_FLAGS) ./cmd/manager/main.go
 
 build-image: operator-sdk ## Build the docker image for mattermost-operator
 	@echo Building Mattermost-operator Docker Image
@@ -87,10 +87,6 @@ yaml: ## Generate the YAML file for easy operator installation
 	echo --- >> $(INSTALL_YAML)
 	cat deploy/operator.yaml >> $(INSTALL_YAML)
 	sed -i '' 's/mattermost-operator:test/mattermost-operator:latest/g' ./$(INSTALL_YAML)
-
-
-dep: ## Get dependencies
-	dep ensure -v
 
 operator-sdk: ## Download sdk only if it's not available. Used in the docker build
 	build/get-operator-sdk.sh $(SDK_VERSION)
