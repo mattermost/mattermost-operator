@@ -36,18 +36,12 @@ run_kind() {
 
     echo "Create Kubernetes cluster with kind..."
     kind create cluster --config test/kind-config.yaml --wait 5m
-
-    echo "Export kubeconfig..."
-    # shellcheck disable=SC2155
-    export KUBECONFIG="$(kind get kubeconfig-path)"
-    cp "$(kind get kubeconfig-path)" ~/.kube/config
     echo
 
     echo 'Copying kubeconfig to container...'
-    local kubeconfig
-    kubeconfig="$(kind get kubeconfig-path)"
+    kind get kubeconfig
     docker_exec mkdir /root/.kube
-    docker cp "$kubeconfig" test-cont:/root/.kube/config
+    docker cp ~/.kube/config test-cont:/root/.kube/config
     docker_exec kubectl cluster-info
     echo
 
@@ -82,13 +76,6 @@ main() {
 
     install_operator-sdk
 
-    echo "Ready for testing"
-
-    # Build the operator container image.
-    # This would build a container with tag mattermost/mattermost-operator:test,
-    # which is used in the e2e test setup below.
-    make build-image
-
     # Move the operator container inside Kind container so that the image is
     # available to the docker in docker environment.
     # Copy the image to the cluster to make a bit more fast to start
@@ -100,14 +87,9 @@ main() {
     kind load docker-image quay.io/presslabs/mysql-operator:0.3.3
     kind load docker-image quay.io/presslabs/mysql-operator-sidecar:0.3.3
     kind load docker-image quay.io/presslabs/mysql-operator-orchestrator:0.3.3
-    kind load docker-image mattermost/mattermost-operator:test
     kind load docker-image minio/k8s-operator:1.0.4
+    sleep 10
 
-
-    # Setup a local storage class
-    kubectl delete storageclass standard
-    kubectl apply -f test/local-path-provisioner.yaml
-    sleep 5
     # Create a namespace for testing operator.
     # This is needed because the service account created using
     # deploy/service_account.yaml has a static namespace. Creating operator in
@@ -117,13 +99,22 @@ main() {
     # Create the mysql operator
     kubectl create ns mysql-operator
     kubectl apply -n mysql-operator -f docs/mysql-operator/mysql-operator.yaml
-    sleep 5
+    sleep 10
     # Create the minio operator
     kubectl create ns minio-operator
     kubectl apply -n minio-operator -f docs/minio-operator/minio-operator.yaml
+    sleep 10
 
-    sleep 60
     kubectl get pods --all-namespaces
+    # Build the operator container image.
+    # This would build a container with tag mattermost/mattermost-operator:test,
+    # which is used in the e2e test setup below.
+    make build-image
+    kind load docker-image mattermost/mattermost-operator:test
+    sleep 5
+
+    kubectl get pods --all-namespaces
+    echo "Ready for testing"
     # NOTE: Append this test command with `|| true` to debug by inspecting the
     # resource details. Also comment `defer ctx.Cleanup()` in the cluster to
     # avoid resouce cleanup.

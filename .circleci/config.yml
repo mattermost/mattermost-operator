@@ -52,14 +52,14 @@ jobs:
   e2e:
     environment:
       - CHANGE_MINIKUBE_NONE_USER=true
-      - K8S_VERSION=v1.15.0
+      - K8S_VERSION=v1.15.7
       - MINIKUBE_VERSION=v0.28.2
       - IMAGE_NAME=mattermost/mattermost-operator
       - IMAGE_TAG=test
-      - KIND_VERSION=v0.4.0
+      - KIND_VERSION=v0.7.0
       - SDK_VERSION=v0.15.1
     machine: true
-    resource_class: xlarge
+    resource_class: 2xlarge
     working_directory: /home/circleci/.go_workspace/src/github.com/mattermost/mattermost-operator
     steps:
       - checkout
@@ -110,20 +110,52 @@ workflows:
     jobs:
       - shellcheck/check:
           exclude: ./vendor/*
-      - lint
-      - generate
+          filters:
+            branches:
+              ignore:
+                - master
+                - /^v.*/
+      - lint:
+          filters:
+            branches:
+              ignore:
+                - master
+                - /^v.*/
+      - generate:
+          filters:
+            branches:
+              ignore:
+                - master
+                - /^v.*/
       - unittest:
           requires:
             - lint
             - generate
+          filters:
+            branches:
+              ignore:
+                - master
+                - /^v.*/
       - e2e:
           requires:
             - lint
             - unittest
+          filters:
+            branches:
+              ignore:
+                - master
+                - /^v.*/
+
       - push-docker-pr:
           context: matterbuild-docker
           requires:
             - unittest
+          filters:
+            branches:
+              ignore:
+                - master
+                - /^v.*/
+
   master-build:
     jobs:
       - lint:
