@@ -73,7 +73,7 @@ func (r *ReconcileClusterInstallation) checkMattermostService(mattermost *matter
 }
 
 func (r *ReconcileClusterInstallation) checkMattermostIngress(mattermost *mattermostv1alpha1.ClusterInstallation, resourceName, ingressName string, ingressAnnotations map[string]string, reqLogger logr.Logger) error {
-	desired := mattermost.GenerateIngress(resourceName, ingressName, ingressAnnotations)
+	desired := mattermost.GenerateIngress(resourceName, ingressName, ingressAnnotations, mattermost.Spec.UseIngressTLS)
 
 	err := r.createIngressIfNotExists(mattermost, desired, reqLogger)
 	if err != nil {
