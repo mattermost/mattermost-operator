@@ -81,7 +81,8 @@ func TestCheckMattermost(t *testing.T) {
 		assert.Equal(t, original.Spec.Ports, found.Spec.Ports)
 	})
 
-	t.Run("ingress", func(t *testing.T) {
+	t.Run("ingress no tls", func(t *testing.T) {
+		ci.Spec.UseIngressTLS = false
 		err = r.checkMattermostIngress(ci, ci.Name, ci.Spec.IngressName, ci.Spec.IngressAnnotations, logger)
 		assert.NoError(t, err)
 
@@ -89,6 +90,7 @@ func TestCheckMattermost(t *testing.T) {
 		err = r.client.Get(context.TODO(), types.NamespacedName{Name: ciName, Namespace: ciNamespace}, found)
 		require.NoError(t, err)
 		require.NotNil(t, found)
+		require.Nil(t, found.Spec.TLS)
 
 		original := found.DeepCopy()
 		modified := found.DeepCopy()
@@ -105,7 +107,44 @@ func TestCheckMattermost(t *testing.T) {
 		assert.Equal(t, original.GetAnnotations(), found.GetAnnotations())
 		assert.Equal(t, original.GetName(), found.GetName())
 		assert.Equal(t, original.GetNamespace(), found.GetNamespace())
-		assert.Equal(t, original.Spec.Rules, original.Spec.Rules)
+		assert.Equal(t, original.Spec.Rules, found.Spec.Rules)
+	})
+
+	t.Run("ingress with tls", func(t *testing.T) {
+		ci.Spec.UseIngressTLS = true
+		ci.Spec.IngressAnnotations = map[string]string{
+			"kubernetes.io/ingress.class": "nginx-test",
+			"test-ingress":                "blabla",
+		}
+
+		err = r.checkMattermostIngress(ci, ci.Name, ci.Spec.IngressName, ci.Spec.IngressAnnotations, logger)
+		assert.NoError(t, err)
+
+		found := &v1beta1.Ingress{}
+		err = r.client.Get(context.TODO(), types.NamespacedName{Name: ciName, Namespace: ciNamespace}, found)
+		require.NoError(t, err)
+		require.NotNil(t, found)
+		require.NotNil(t, found.Spec.TLS)
+		require.NotNil(t, found.Annotations)
+		assert.Contains(t, found.Annotations, "kubernetes.io/ingress.class")
+
+		original := found.DeepCopy()
+		modified := found.DeepCopy()
+		modified.Labels = nil
+		modified.Annotations = nil
+		modified.Spec = v1beta1.IngressSpec{}
+
+		err = r.client.Update(context.TODO(), modified)
+		require.NoError(t, err)
+		err = r.checkMattermostIngress(ci, ci.Name, ci.Spec.IngressName, ci.Spec.IngressAnnotations, logger)
+		require.NoError(t, err)
+		err = r.client.Get(context.TODO(), types.NamespacedName{Name: ciName, Namespace: ciNamespace}, found)
+		require.NoError(t, err)
+		assert.Equal(t, original.GetAnnotations(), found.GetAnnotations())
+		assert.Equal(t, original.GetName(), found.GetName())
+		assert.Equal(t, original.GetNamespace(), found.GetNamespace())
+		assert.Equal(t, original.Spec.Rules, found.Spec.Rules)
+		assert.Equal(t, original.Spec.TLS, original.Spec.TLS)
 	})
 
 	t.Run("deployment", func(t *testing.T) {
