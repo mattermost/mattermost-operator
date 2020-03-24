@@ -1218,6 +1218,8 @@ spec:
                 ''Minio.Replicas'', ''Minio.Resource'', ''Database.Replicas'', or
                 ''Database.Resources'' will override the values set by Size.'
               type: string
+            useIngressTLS:
+              type: boolean
             useServiceLoadBalancer:
               type: boolean
             version:

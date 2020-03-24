@@ -192,6 +192,12 @@ func schema_pkg_apis_mattermost_v1alpha1_ClusterInstallationSpec(ref common.Refe
 							},
 						},
 					},
+					"useIngressTLS": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"boolean"},
+							Format: "",
+						},
+					},
 					"ingressAnnotations": {
 						SchemaProps: spec.SchemaProps{
 							Type: []string{"object"},
