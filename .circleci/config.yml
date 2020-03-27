@@ -7,7 +7,7 @@ executors:
   default:
     working_directory: /go/src/github.com/mattermost/mattermost-operator
     docker:
-      - image: circleci/golang:1.13
+      - image: circleci/golang:1.13.9
 
 jobs:
   lint:
@@ -51,13 +51,11 @@ jobs:
 
   e2e:
     environment:
-      - CHANGE_MINIKUBE_NONE_USER=true
       - K8S_VERSION=v1.15.7
-      - MINIKUBE_VERSION=v0.28.2
       - IMAGE_NAME=mattermost/mattermost-operator
       - IMAGE_TAG=test
       - KIND_VERSION=v0.7.0
-      - SDK_VERSION=v0.15.1
+      - SDK_VERSION=v0.16.0
     machine: true
     resource_class: 2xlarge
     working_directory: /home/circleci/.go_workspace/src/github.com/mattermost/mattermost-operator
