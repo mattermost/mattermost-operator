@@ -42,7 +42,7 @@ func TestMattermost(t *testing.T) {
 	err := framework.AddToFrameworkScheme(apis.AddToScheme, mattermostList)
 	require.NoError(t, err)
 
-	ctx := framework.NewTestCtx(t)
+	ctx := framework.NewContext(t)
 	defer ctx.Cleanup()
 
 	t.Run("initialize cluster resources", func(t *testing.T) {
@@ -82,7 +82,7 @@ func TestMattermost(t *testing.T) {
 	})
 }
 
-func mattermostScaleTest(t *testing.T, f *framework.Framework, ctx *framework.TestCtx) {
+func mattermostScaleTest(t *testing.T, f *framework.Framework, ctx *framework.Context) {
 	namespace, err := ctx.GetNamespace()
 	require.NoError(t, err)
 
@@ -128,7 +128,7 @@ func mattermostScaleTest(t *testing.T, f *framework.Framework, ctx *framework.Te
 		},
 	}
 
-	// use TestCtx's create helper to create the object and add a cleanup function for the new object
+	// use Context's create helper to create the object and add a cleanup function for the new object
 	err = f.Client.Create(context.TODO(), exampleMattermost, &framework.CleanupOptions{TestContext: ctx, Timeout: cleanupTimeout, RetryInterval: cleanupRetryInterval})
 	require.NoError(t, err)
 
@@ -175,7 +175,7 @@ func mattermostScaleTest(t *testing.T, f *framework.Framework, ctx *framework.Te
 	require.NoError(t, err)
 }
 
-func mattermostUpgradeTest(t *testing.T, f *framework.Framework, ctx *framework.TestCtx) {
+func mattermostUpgradeTest(t *testing.T, f *framework.Framework, ctx *framework.Context) {
 	namespace, err := ctx.GetNamespace()
 	require.NoError(t, err)
 
@@ -225,7 +225,7 @@ func mattermostUpgradeTest(t *testing.T, f *framework.Framework, ctx *framework.
 		},
 	}
 
-	// use TestCtx's create helper to create the object and add a cleanup function for the new object
+	// use Context's create helper to create the object and add a cleanup function for the new object
 	err = f.Client.Create(context.TODO(), exampleMattermost, &framework.CleanupOptions{TestContext: ctx, Timeout: cleanupTimeout, RetryInterval: cleanupRetryInterval})
 	require.NoError(t, err)
 
@@ -288,7 +288,7 @@ func mattermostUpgradeTest(t *testing.T, f *framework.Framework, ctx *framework.
 	require.NoError(t, err)
 }
 
-func mattermostWithMySQLReplicas(t *testing.T, f *framework.Framework, ctx *framework.TestCtx) {
+func mattermostWithMySQLReplicas(t *testing.T, f *framework.Framework, ctx *framework.Context) {
 	namespace, err := ctx.GetNamespace()
 	require.NoError(t, err)
 
@@ -336,7 +336,7 @@ func mattermostWithMySQLReplicas(t *testing.T, f *framework.Framework, ctx *fram
 		},
 	}
 
-	// use TestCtx's create helper to create the object and add a cleanup function for the new object
+	// use Context's create helper to create the object and add a cleanup function for the new object
 	err = f.Client.Create(context.TODO(), exampleMattermost, &framework.CleanupOptions{TestContext: ctx, Timeout: cleanupTimeout, RetryInterval: cleanupRetryInterval})
 	require.NoError(t, err)
 

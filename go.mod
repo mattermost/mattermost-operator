@@ -15,7 +15,7 @@ require (
 	github.com/json-iterator/go v1.1.9 // indirect
 	github.com/mattermost/blubr v0.0.0-20200113232543-f0ce67760aeb
 	github.com/minio/minio-operator v0.0.0-20200123180224-604167ea8cdb
-	github.com/operator-framework/operator-sdk v0.15.1
+	github.com/operator-framework/operator-sdk v0.16.0
 	github.com/pborman/uuid v1.2.0
 	github.com/pkg/errors v0.9.1
 	github.com/presslabs/mysql-operator v0.3.8
@@ -27,9 +27,9 @@ require (
 	go.uber.org/multierr v1.4.0 // indirect
 	go.uber.org/zap v1.13.0 // indirect
 	golang.org/x/crypto v0.0.0-20200117160349-530e935923ad // indirect
-	golang.org/x/net v0.0.0-20200114155413-6afb5195e5aa
+	golang.org/x/net v0.0.0-20200226121028-0de0cce0169b
 	golang.org/x/sys v0.0.0-20200122134326-e047566fdf82 // indirect
-	golang.org/x/tools v0.0.0-20200216192241-b320d3a0f5a2 // indirect
+	golang.org/x/tools v0.0.0-20200327172716-42235f63843a // indirect
 	k8s.io/api v0.17.2
 	k8s.io/apimachinery v0.17.2
 	k8s.io/client-go v12.0.0+incompatible
