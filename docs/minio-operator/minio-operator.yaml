@@ -10,6 +10,7 @@ spec:
     kind: MinIOInstance
     singular: minioinstance
     plural: minioinstances
+  preserveUnknownFields: true
   validation:
   # openAPIV3Schema is the schema for validating custom objects.
   # Refer https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#specifying-a-structural-schema
@@ -30,6 +31,10 @@ spec:
               type: string
             subpath:
               type: string
+  additionalPrinterColumns:
+    - name: Replicas
+      type: integer
+      JSONPath: ".spec.replicas"
 ---
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRole
@@ -60,6 +65,7 @@ rules:
   - list
   - patch
   - watch
+  - update
 - apiGroups:
   - "certificates.k8s.io"
   resources:
@@ -121,5 +127,5 @@ spec:
       serviceAccountName: minio-operator-sa
       containers:
         - name: minio-operator
-          image: minio/k8s-operator:1.0.4
+          image: minio/k8s-operator:1.0.7
           imagePullPolicy: IfNotPresent

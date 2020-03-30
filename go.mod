@@ -14,7 +14,7 @@ require (
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
 	github.com/json-iterator/go v1.1.9 // indirect
 	github.com/mattermost/blubr v0.0.0-20200113232543-f0ce67760aeb
-	github.com/minio/minio-operator v0.0.0-20200123180224-604167ea8cdb
+	github.com/minio/minio-operator v0.0.0-20200214142425-158e343f1f19
 	github.com/operator-framework/operator-sdk v0.16.0
 	github.com/pborman/uuid v1.2.0
 	github.com/pkg/errors v0.9.1

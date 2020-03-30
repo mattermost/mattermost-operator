@@ -111,7 +111,7 @@ github.com/markbates/inflect
 github.com/mattermost/blubr
 # github.com/matttproud/golang_protobuf_extensions v1.0.1
 github.com/matttproud/golang_protobuf_extensions/pbutil
-# github.com/minio/minio-operator v0.0.0-20200123180224-604167ea8cdb
+# github.com/minio/minio-operator v0.0.0-20200214142425-158e343f1f19
 github.com/minio/minio-operator/pkg/apis/miniocontroller
 github.com/minio/minio-operator/pkg/apis/miniocontroller/v1beta1
 github.com/minio/minio-operator/pkg/constants
