@@ -551,8 +551,8 @@ github.com/miekg/dns v0.0.0-20181005163659-0d29b283ac0f/go.mod h1:W1PPwlIAgtquWB
 github.com/miekg/dns v1.1.3/go.mod h1:W1PPwlIAgtquWBMBEV9nkV9Cazfe8ScdGz/Lj7v3Nrg=
 github.com/miekg/dns v1.1.4/go.mod h1:W1PPwlIAgtquWBMBEV9nkV9Cazfe8ScdGz/Lj7v3Nrg=
 github.com/mindprince/gonvml v0.0.0-20171110221305-fee913ce8fb2/go.mod h1:2eu9pRWp8mo84xCg6KswZ+USQHjwgRhNp06sozOdsTY=
-github.com/minio/minio-operator v0.0.0-20200123180224-604167ea8cdb h1:CHutg1z2Ktpz+f20poioJq1PRPCDoHW072LLdgwMby4=
-github.com/minio/minio-operator v0.0.0-20200123180224-604167ea8cdb/go.mod h1:pGokMmbfgUzaDjoohGaz8AEthLb1EQCPPftynyiKKzY=
+github.com/minio/minio-operator v0.0.0-20200214142425-158e343f1f19 h1:8UtY1V5Tz7hMB98pE2Bvs9+VUvO4cYj60wxMD63LvQc=
+github.com/minio/minio-operator v0.0.0-20200214142425-158e343f1f19/go.mod h1:pGokMmbfgUzaDjoohGaz8AEthLb1EQCPPftynyiKKzY=
 github.com/mistifyio/go-zfs v2.1.1+incompatible/go.mod h1:8AuVvqP/mXw1px98n46wfvcGfQ4ci2FwoAjKYxuo3Z4=
 github.com/mitchellh/copystructure v1.0.0/go.mod h1:SNtv71yrdKgLRyLFxmLdkAbkKEFWgYaq1OVrnRcwhnw=
 github.com/mitchellh/go-homedir v1.1.0 h1:lukF9ziXFxDFPkA1vsr5zpc1XuPDn/wFntq5mG+4E0Y=
@@ -1004,8 +1004,6 @@ golang.org/x/tools v0.0.0-20191119224855-298f0cb1881e/go.mod h1:b+2E5dAYhXwXZwtn
 golang.org/x/tools v0.0.0-20191125144606-a911d9008d1f/go.mod h1:b+2E5dAYhXwXZwtnZ6UAqBI28+e2cm9otk0dWdXHAEo=
 golang.org/x/tools v0.0.0-20200117161641-43d50277825c h1:2EA2K0k9bcvvEDlqD8xdlOhCOqq+O/p9Voqi4x9W1YU=
 golang.org/x/tools v0.0.0-20200117161641-43d50277825c/go.mod h1:TB2adYChydJhpapKDTa4BR/hXlZSLoq2Wpct/0txZ28=
-golang.org/x/tools v0.0.0-20200216192241-b320d3a0f5a2 h1:0sfSpGSa544Fwnbot3Oxq/U6SXqjty6Jy/3wRhVS7ig=
-golang.org/x/tools v0.0.0-20200216192241-b320d3a0f5a2/go.mod h1:TB2adYChydJhpapKDTa4BR/hXlZSLoq2Wpct/0txZ28=
 golang.org/x/tools v0.0.0-20200327172716-42235f63843a h1:nZPvz874FG8d8iARpJWCyVtmJAV8Nnr6xqKDvQRhXFA=
 golang.org/x/tools v0.0.0-20200327172716-42235f63843a/go.mod h1:Sl4aGygMT6LrqrWclx+PTx3U+LnKx/seiNR+3G19Ar8=
 golang.org/x/xerrors v0.0.0-20190717185122-a985d3407aa7 h1:9zdDQZ7Thm29KFXgAX/+yaf3eVbP7djjWp/dXAppNCc=
