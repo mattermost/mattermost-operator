@@ -171,6 +171,13 @@ func (in *ClusterInstallationSpec) DeepCopyInto(out *ClusterInstallationSpec) {
 			(*out)[key] = val
 		}
 	}
+	if in.ResourceLabels != nil {
+		in, out := &in.ResourceLabels, &out.ResourceLabels
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	if in.IngressAnnotations != nil {
 		in, out := &in.IngressAnnotations, &out.IngressAnnotations
 		*out = make(map[string]string, len(*in))

@@ -171,7 +171,7 @@ func (db *Database) SetDefaults() {
 func (mattermost *ClusterInstallation) newService(serviceName, selectorName string, annotations map[string]string) *corev1.Service {
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:    ClusterInstallationLabels(serviceName),
+			Labels:    mattermost.ClusterInstallationLabels(serviceName),
 			Name:      serviceName,
 			Namespace: mattermost.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
@@ -184,7 +184,7 @@ func (mattermost *ClusterInstallation) newService(serviceName, selectorName stri
 			Annotations: annotations,
 		},
 		Spec: corev1.ServiceSpec{
-			Selector: ClusterInstallationLabels(selectorName),
+			Selector: ClusterInstallationSelectorLabels(selectorName),
 		},
 	}
 }
@@ -238,7 +238,7 @@ func (mattermost *ClusterInstallation) GenerateIngress(name, ingressName string,
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: mattermost.Namespace,
-			Labels:    ClusterInstallationLabels(name),
+			Labels:    mattermost.ClusterInstallationLabels(name),
 			OwnerReferences: []metav1.OwnerReference{
 				*metav1.NewControllerRef(mattermost, schema.GroupVersionKind{
 					Group:   SchemeGroupVersion.Group,
@@ -579,7 +579,7 @@ func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingres
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      deploymentName,
 			Namespace: mattermost.Namespace,
-			Labels:    ClusterInstallationLabels(deploymentName),
+			Labels:    mattermost.ClusterInstallationLabels(deploymentName),
 			OwnerReferences: []metav1.OwnerReference{
 				*metav1.NewControllerRef(mattermost, schema.GroupVersionKind{
 					Group:   SchemeGroupVersion.Group,
@@ -599,11 +599,11 @@ func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingres
 			RevisionHistoryLimit: &revHistoryLimit,
 			Replicas:             &mattermost.Spec.Replicas,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: ClusterInstallationLabels(deploymentName),
+				MatchLabels: ClusterInstallationSelectorLabels(deploymentName),
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels:      ClusterInstallationLabels(deploymentName),
+					Labels:      mattermost.ClusterInstallationLabels(deploymentName),
 					Annotations: podAnnotations,
 				},
 				Spec: corev1.PodSpec{
@@ -683,13 +683,24 @@ func (d *AppDeployment) GetDeploymentImageName() string {
 	return fmt.Sprintf("%s:%s", d.Image, d.Version)
 }
 
-// ClusterInstallationLabels returns the labels for selecting the resources
+// ClusterInstallationSelectorLabels returns the selector labels for selecting the resources
 // belonging to the given mattermost clusterinstallation.
-func ClusterInstallationLabels(name string) map[string]string {
+func ClusterInstallationSelectorLabels(name string) map[string]string {
 	l := ClusterInstallationResourceLabels(name)
 	l[ClusterLabel] = name
 	l["app"] = "mattermost"
+	return l
+}
 
+// ClusterInstallationLabels returns the labels for selecting the resources
+// belonging to the given mattermost clusterinstallation.
+func (mattermost *ClusterInstallation) ClusterInstallationLabels(name string) map[string]string {
+	l := ClusterInstallationResourceLabels(name)
+	l[ClusterLabel] = name
+	l["app"] = "mattermost"
+	for k, v := range mattermost.Spec.ResourceLabels {
+		l[k] = v
+	}
 	return l
 }
 

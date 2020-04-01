@@ -127,7 +127,7 @@ func TestReconcile(t *testing.T) {
 		podTemplate := corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ciNamespace,
-				Labels:    mattermostv1alpha1.ClusterInstallationLabels(ciName),
+				Labels:    ci.ClusterInstallationLabels(ciName),
 			},
 			Spec: corev1.PodSpec{
 				Containers: []corev1.Container{
@@ -246,7 +246,7 @@ func TestReconcile(t *testing.T) {
 			podTemplate := corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: ciNamespace,
-					Labels:    mattermostv1alpha1.ClusterInstallationLabels(deployment.Name),
+					Labels:    ci.ClusterInstallationLabels(deployment.Name),
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -280,7 +280,7 @@ func TestReconcile(t *testing.T) {
 			}
 			listOptions := []client.ListOption{
 				client.InNamespace(ciNamespace),
-				client.MatchingLabels(mattermostv1alpha1.ClusterInstallationLabels(deployment.Name)),
+				client.MatchingLabels(ci.ClusterInstallationLabels(deployment.Name)),
 			}
 			err = c.List(context.TODO(), podList, listOptions...)
 			require.NoError(t, err)
