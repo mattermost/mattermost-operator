@@ -39,7 +39,7 @@ func (r *ReconcileClusterInstallation) handleCheckClusterInstallation(mattermost
 		mattermost.Spec.BlueGreen.Blue.Version,
 		mattermost.Spec.Replicas,
 		mattermost.Spec.UseServiceLoadBalancer,
-		mattermost.ClusterInstallationLabels(mattermost.Name),
+		mattermost.ClusterInstallationLabels(mattermost.Spec.BlueGreen.Blue.Name),
 	)
 	greenStatus, greenErr := r.checkClusterInstallation(
 		mattermost.GetNamespace(),
@@ -49,7 +49,7 @@ func (r *ReconcileClusterInstallation) handleCheckClusterInstallation(mattermost
 		mattermost.Spec.BlueGreen.Green.Version,
 		mattermost.Spec.Replicas,
 		mattermost.Spec.UseServiceLoadBalancer,
-		mattermost.ClusterInstallationLabels(mattermost.Name),
+		mattermost.ClusterInstallationLabels(mattermost.Spec.BlueGreen.Green.Name),
 	)
 
 	var status mattermostv1alpha1.ClusterInstallationStatus
