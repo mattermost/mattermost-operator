@@ -1186,6 +1186,10 @@ spec:
                 set by 'Size'.
               format: int32
               type: integer
+            resourceLabels:
+              additionalProperties:
+                type: string
+              type: object
             resources:
               description: Defines the resource requests and limits for the Mattermost
                 app server pods.

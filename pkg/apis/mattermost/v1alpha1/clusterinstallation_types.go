@@ -71,6 +71,9 @@ type ClusterInstallationSpec struct {
 	UseIngressTLS bool `json:"useIngressTLS,omitempty"`
 
 	// +optional
+	ResourceLabels map[string]string `json:"resourceLabels,omitempty"`
+
+	// +optional
 	IngressAnnotations map[string]string `json:"ingressAnnotations,omitempty"`
 	// Optional environment variables to set in the Mattermost application pods.
 	// +optional

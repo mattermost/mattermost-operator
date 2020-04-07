@@ -25,6 +25,7 @@ func (r *ReconcileClusterInstallation) handleCheckClusterInstallation(mattermost
 			mattermost.Spec.Version,
 			mattermost.Spec.Replicas,
 			mattermost.Spec.UseServiceLoadBalancer,
+			mattermost.ClusterInstallationLabels(mattermost.Name),
 		)
 	}
 
@@ -38,6 +39,7 @@ func (r *ReconcileClusterInstallation) handleCheckClusterInstallation(mattermost
 		mattermost.Spec.BlueGreen.Blue.Version,
 		mattermost.Spec.Replicas,
 		mattermost.Spec.UseServiceLoadBalancer,
+		mattermost.ClusterInstallationLabels(mattermost.Spec.BlueGreen.Blue.Name),
 	)
 	greenStatus, greenErr := r.checkClusterInstallation(
 		mattermost.GetNamespace(),
@@ -47,6 +49,7 @@ func (r *ReconcileClusterInstallation) handleCheckClusterInstallation(mattermost
 		mattermost.Spec.BlueGreen.Green.Version,
 		mattermost.Spec.Replicas,
 		mattermost.Spec.UseServiceLoadBalancer,
+		mattermost.ClusterInstallationLabels(mattermost.Spec.BlueGreen.Green.Name),
 	)
 
 	var status mattermostv1alpha1.ClusterInstallationStatus
@@ -75,7 +78,7 @@ func (r *ReconcileClusterInstallation) handleCheckClusterInstallation(mattermost
 // NOTE: this is a vital health check. Every reconciliation loop should run this
 // check at the very end to ensure that everything in the installation is as it
 // should be. Over time, more types of checks should be added here as needed.
-func (r *ReconcileClusterInstallation) checkClusterInstallation(namespace, name, imageName, image, version string, replicas int32, useServiceLoadBalancer bool) (mattermostv1alpha1.ClusterInstallationStatus, error) {
+func (r *ReconcileClusterInstallation) checkClusterInstallation(namespace, name, imageName, image, version string, replicas int32, useServiceLoadBalancer bool, labels map[string]string) (mattermostv1alpha1.ClusterInstallationStatus, error) {
 	status := mattermostv1alpha1.ClusterInstallationStatus{
 		State:           mattermostv1alpha1.Reconciling,
 		Replicas:        0,
@@ -91,7 +94,7 @@ func (r *ReconcileClusterInstallation) checkClusterInstallation(namespace, name,
 
 	listOptions := []client.ListOption{
 		client.InNamespace(namespace),
-		client.MatchingLabels(mattermostv1alpha1.ClusterInstallationLabels(name)),
+		client.MatchingLabels(labels),
 	}
 	err := r.client.List(context.TODO(), pods, listOptions...)
 	if err != nil {
