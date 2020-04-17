@@ -698,6 +698,12 @@ func (mattermost *ClusterInstallation) ClusterInstallationLabels(name string) ma
 	l := ClusterInstallationResourceLabels(name)
 	l[ClusterLabel] = name
 	l["app"] = "mattermost"
+	if mattermost.Spec.BlueGreen.Enable && len(mattermost.Spec.BlueGreen.ResourceLabels) != 0 {
+		for k, v := range mattermost.Spec.BlueGreen.ResourceLabels {
+			l[k] = v
+		}
+		return l
+	}
 	for k, v := range mattermost.Spec.ResourceLabels {
 		l[k] = v
 	}

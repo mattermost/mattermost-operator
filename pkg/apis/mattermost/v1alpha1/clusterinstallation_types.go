@@ -111,6 +111,9 @@ type BlueGreen struct {
 	// Green defines the green deployment.
 	// +optional
 	Green AppDeployment `json:"green,omitempty"`
+
+	// +optional
+	ResourceLabels map[string]string `json:"resourceLabels,omitempty"`
 }
 
 // AppDeployment defines the configuration of deployment for a ClusterInstallation.
