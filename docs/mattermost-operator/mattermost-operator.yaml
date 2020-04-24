@@ -648,6 +648,10 @@ spec:
                     name:
                       description: Name defines the name of the deployment
                       type: string
+                    resourceLabels:
+                      additionalProperties:
+                        type: string
+                      type: object
                     version:
                       description: Version defines the Docker image version that will
                         be used for the deployment. Required when BlueGreen or Canary
@@ -673,6 +677,10 @@ spec:
                     name:
                       description: Name defines the name of the deployment
                       type: string
+                    resourceLabels:
+                      additionalProperties:
+                        type: string
+                      type: object
                     version:
                       description: Version defines the Docker image version that will
                         be used for the deployment. Required when BlueGreen or Canary
@@ -683,10 +691,6 @@ spec:
                   description: ProductionDeployment defines if the current production
                     is blue or green.
                   type: string
-                resourceLabels:
-                  additionalProperties:
-                    type: string
-                  type: object
               type: object
             canary:
               description: Canary defines the configuration of Canary deployment for
@@ -708,6 +712,10 @@ spec:
                     name:
                       description: Name defines the name of the deployment
                       type: string
+                    resourceLabels:
+                      additionalProperties:
+                        type: string
+                      type: object
                     version:
                       description: Version defines the Docker image version that will
                         be used for the deployment. Required when BlueGreen or Canary

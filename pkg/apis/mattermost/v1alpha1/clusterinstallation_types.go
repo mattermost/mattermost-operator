@@ -111,9 +111,6 @@ type BlueGreen struct {
 	// Green defines the green deployment.
 	// +optional
 	Green AppDeployment `json:"green,omitempty"`
-
-	// +optional
-	ResourceLabels map[string]string `json:"resourceLabels,omitempty"`
 }
 
 // AppDeployment defines the configuration of deployment for a ClusterInstallation.
@@ -133,6 +130,9 @@ type AppDeployment struct {
 	// Required when BlueGreen or Canary is enabled.
 	// +optional
 	Version string `json:"version,omitempty"`
+
+	// +optional
+	ResourceLabels map[string]string `json:"resourceLabels,omitempty"`
 }
 
 // Minio defines the configuration of Minio for a ClusterInstallation.
