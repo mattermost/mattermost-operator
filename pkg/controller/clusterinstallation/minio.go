@@ -126,6 +126,6 @@ func (r *ReconcileClusterInstallation) getMinioService(mattermost *mattermostv1a
 		return "", err
 	}
 
-	connectionString := fmt.Sprintf("%s.%s.svc.cluster.local:%d", minioService.Name, mattermost.Namespace, minioService.Spec.Ports[0].Port)
+	connectionString := fmt.Sprintf("%s.%s:%d", minioService.Name, mattermost.Namespace, minioService.Spec.Ports[0].Port)
 	return connectionString, nil
 }
