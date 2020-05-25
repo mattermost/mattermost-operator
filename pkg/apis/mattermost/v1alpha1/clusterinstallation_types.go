@@ -77,7 +77,6 @@ type ClusterInstallationSpec struct {
 	IngressAnnotations map[string]string `json:"ingressAnnotations,omitempty"`
 	// Optional environment variables to set in the Mattermost application pods.
 	// +optional
-	// +listType=set
 	MattermostEnv []corev1.EnvVar `json:"mattermostEnv,omitempty"`
 	// Defines the probe to check if the application is up and running.
 	// +optional

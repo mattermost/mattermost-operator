@@ -1,7 +1,7 @@
 .PHONY: all check-style unittest generate build clean build-image operator-sdk yaml
 
 OPERATOR_IMAGE ?= mattermost/mattermost-operator:test
-SDK_VERSION = v0.16.0
+SDK_VERSION = v0.17.1
 MACHINE = $(shell uname -m)
 BUILD_IMAGE = golang:1.13.9
 BASE_IMAGE = alpine:3.11

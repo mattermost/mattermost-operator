@@ -227,11 +227,6 @@ func schema_pkg_apis_mattermost_v1alpha1_ClusterInstallationSpec(ref common.Refe
 						},
 					},
 					"mattermostEnv": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "set",
-							},
-						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Optional environment variables to set in the Mattermost application pods.",
 							Type:        []string{"array"},
