@@ -50,7 +50,7 @@ func TestMattermost(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	namespace, err := ctx.GetNamespace()
+	namespace, err := ctx.GetOperatorNamespace()
 	require.NoError(t, err)
 
 	// get global framework variables
@@ -83,7 +83,7 @@ func TestMattermost(t *testing.T) {
 }
 
 func mattermostScaleTest(t *testing.T, f *framework.Framework, ctx *framework.Context) {
-	namespace, err := ctx.GetNamespace()
+	namespace, err := ctx.GetWatchNamespace()
 	require.NoError(t, err)
 
 	// create ClusterInstallation custom resource
@@ -176,7 +176,7 @@ func mattermostScaleTest(t *testing.T, f *framework.Framework, ctx *framework.Co
 }
 
 func mattermostUpgradeTest(t *testing.T, f *framework.Framework, ctx *framework.Context) {
-	namespace, err := ctx.GetNamespace()
+	namespace, err := ctx.GetWatchNamespace()
 	require.NoError(t, err)
 
 	testName := "test-mm2"
@@ -289,7 +289,7 @@ func mattermostUpgradeTest(t *testing.T, f *framework.Framework, ctx *framework.
 }
 
 func mattermostWithMySQLReplicas(t *testing.T, f *framework.Framework, ctx *framework.Context) {
-	namespace, err := ctx.GetNamespace()
+	namespace, err := ctx.GetWatchNamespace()
 	require.NoError(t, err)
 
 	testName := "test-mm3"
