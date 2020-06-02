@@ -84,6 +84,24 @@ type ClusterInstallationSpec struct {
 	// Defines the probe to check if the application is ready to accept traffic.
 	// +optional
 	ReadinessProbe corev1.Probe `json:"readinessProbe,omitempty"`
+
+	// CACertificates tells the operator which secret contains the certificate PEM file(s). Each file
+	// is mounted separatelly as a volume inside Mattermost container filesystem. The secret should
+	// contain a map where the key defines the filename and the value defines the PEM data.
+	// For example: <certificate.pem>/<certificate data>
+	// +optional
+	CACertificates CACertificates `json:"certificates,omitempty"`
+}
+
+// CACertificates defines a configuration object used for mounting CA certificate files
+// inside Mattermost container filesystem.
+type CACertificates struct {
+	// SecretName references the secret object that contains the CA certificate files (default: ca-certificate-files).
+	// +optional
+	SecretName string `json:"secretName,omitempty"`
+	// Path defines the path where the CA certificate files will mounted (default: /etc/ssl/certs).
+	// +optional
+	Path string `json:"path,omitempty"`
 }
 
 // Canary defines the configuration of Canary deployment for a ClusterInstallation

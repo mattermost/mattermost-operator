@@ -2,7 +2,10 @@ package clusterinstallation
 
 import (
 	"context"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
+	"regexp"
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
@@ -15,12 +18,20 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/validation"
 	k8sClient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
 )
 
 const updateJobName = "mattermost-update-check"
+
+var alphaReg *regexp.Regexp
+
+func init() {
+	alphaReg = regexp.MustCompile("[^a-zA-Z0-9]+")
+}
 
 func (r *ReconcileClusterInstallation) checkMattermost(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
 	reqLogger = reqLogger.WithValues("Reconcile", "mattermost")
@@ -137,7 +148,17 @@ func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mat
 		isLicensed = true
 	}
 
-	desired := mattermost.GenerateDeployment(resourceName, ingressName, imageName, dbInfo.userName, dbInfo.userPassword, dbInfo.dbName, externalDB, isLicensed, minioURL)
+	certificateFilesSecret, err := r.getCertificateFilesSecretIfAny(mattermost)
+	if err != nil {
+		return errors.Wrap(err, "failed to get certificate files from secret")
+	}
+
+	certificateFilesMap, err := makeCertificateFilesMap(certificateFilesSecret)
+	if err != nil {
+		return errors.Wrap(err, "failed to parse certificate files from secret")
+	}
+
+	desired := mattermost.GenerateDeployment(resourceName, ingressName, imageName, dbInfo.userName, dbInfo.userPassword, dbInfo.dbName, minioURL, externalDB, isLicensed, certificateFilesMap)
 	err = r.createDeploymentIfNotExists(mattermost, desired, reqLogger)
 	if err != nil {
 		return err
@@ -386,4 +407,71 @@ func (r *ReconcileClusterInstallation) fetchRunningUpdateJob(mi *mattermostv1alp
 		job,
 	)
 	return job, err
+}
+
+// getCertificateFilesSecretIfAny returns a secret that may contain certificate files or, nil and error (when error is not metav1.StatusReasonNotFound type)
+func (r *ReconcileClusterInstallation) getCertificateFilesSecretIfAny(mattermost *mattermostv1alpha1.ClusterInstallation) (*corev1.Secret, error) {
+	certificatesObjKey := types.NamespacedName{
+		Namespace: mattermost.Namespace,
+		Name:      v1alpha1.DefaultCertificatesSecretName,
+	}
+
+	if mattermost.Spec.CACertificates.SecretName != "" {
+		certificatesObjKey.Name = mattermost.Spec.CACertificates.SecretName
+	}
+
+	secretCert := corev1.Secret{}
+	err := r.client.Get(context.TODO(), certificatesObjKey, &secretCert)
+	if err != nil && !k8sErrors.IsNotFound(err) {
+		return nil, errors.Wrap(err, "failed to get secret for loading the certificate CA files")
+	}
+
+	return &secretCert, nil
+}
+
+// validateCertificateFile validates the filename length and the certificate PEM bytes
+func validateCertificateFile(filename string, certificatePEM []byte) error {
+	if len(filename) > validation.DNS1123SubdomainMaxLength {
+		return errors.Errorf("filename exceeded maximum length of %d charecters", validation.DNS1123SubdomainMaxLength)
+	}
+
+	block, _ := pem.Decode(certificatePEM)
+	if block == nil {
+		return errors.Errorf("failed to decode the certificate PEM correspondent to the filename %s", filename)
+	}
+
+	_, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return errors.Wrapf(err, "failed to parse the certificate PEM correspondent to the filename %s", filename)
+	}
+
+	return nil
+}
+
+// makeCertificateFilesMap takes a secret which may contain CA certificate files.
+// It validates each certificate and returns a map of DNS1123 compliant key and
+// certificate filename value.
+func makeCertificateFilesMap(secret *corev1.Secret) (map[string]string, error) {
+	certificateFilesMap := make(map[string]string, 0)
+
+	if secret == nil {
+		return certificateFilesMap, nil
+	}
+
+	if len(secret.Data) < 1 {
+		return certificateFilesMap, nil
+	}
+
+	for filename, certBytes := range secret.Data {
+		err := validateCertificateFile(filename, certBytes)
+		if err != nil {
+			return certificateFilesMap, errors.Wrap(err, "invalid certificate file")
+		}
+
+		// key must comply with DNS1123 format
+		key := alphaReg.ReplaceAllString(filename, "")
+		certificateFilesMap[key] = filename
+	}
+
+	return certificateFilesMap, nil
 }

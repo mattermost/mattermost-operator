@@ -67,6 +67,13 @@ const (
 
 	// Name of the container which runs Mattermost application
 	MattermostAppContainerName = "mattermost"
+
+	// DefaultCertificatesSecretName is the default name of the secret that contains the certificate CA files.
+	DefaultCertificatesSecretName = "ca-certificate-files"
+
+	// defaultCertificateFilesPath is the default path where the certificate files will be mounted. Note that this path
+	// is valid for Debian, Ubuntu and Alpine but may not work for other distributions.
+	defaultCertificateFilesPath = "/etc/ssl/certs"
 )
 
 // SetDefaults set the missing values in the manifest to the default ones
@@ -305,7 +312,7 @@ func (mattermost *ClusterInstallation) GetMainContainer(deployment *appsv1.Deplo
 }
 
 // GenerateDeployment returns the deployment spec for Mattermost
-func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingressName, containerImage, dbUser, dbPassword, dbName string, externalDB, isLicensed bool, minioURL string) *appsv1.Deployment {
+func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingressName, containerImage, dbUser, dbPassword, dbName, minioURL string, externalDB, isLicensed bool, certificateFilesMap map[string]string) *appsv1.Deployment {
 	var envVarDB []corev1.EnvVar
 	mysqlName := utils.HashWithPrefix("db", mattermost.Name)
 
@@ -514,23 +521,34 @@ func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingres
 		Value: valueSize,
 	})
 
-	// Mattermost License
-	volumeLicense := []corev1.Volume{}
-	volumeMountLicense := []corev1.VolumeMount{}
+	// Mattermost container volumes
+	volumes := []corev1.Volume{}
+	volumesMount := []corev1.VolumeMount{}
 	podAnnotations := map[string]string{}
+
+	// CA Certificate Files
+	for name, filename := range certificateFilesMap {
+		volumeMount := mattermost.getCertificateVolumeMount(name, filename)
+		volumesMount = append(volumesMount, *volumeMount)
+
+		volume := mattermost.getCertificateVolume(name, filename)
+		volumes = append(volumes, *volume)
+	}
+
+	// Mattermost License
 	if isLicensed {
 		envVarGeneral = append(envVarGeneral, corev1.EnvVar{
 			Name:  "MM_SERVICESETTINGS_LICENSEFILELOCATION",
 			Value: "/mattermost-license/license",
 		})
 
-		volumeMountLicense = append(volumeMountLicense, corev1.VolumeMount{
+		volumesMount = append(volumesMount, corev1.VolumeMount{
 			MountPath: "/mattermost-license",
 			Name:      "mattermost-license",
 			ReadOnly:  true,
 		})
 
-		volumeLicense = append(volumeLicense, corev1.Volume{
+		volumes = append(volumes, corev1.Volume{
 			Name: "mattermost-license",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
@@ -624,11 +642,11 @@ func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingres
 							},
 							ReadinessProbe: readiness,
 							LivenessProbe:  liveness,
-							VolumeMounts:   volumeMountLicense,
+							VolumeMounts:   volumesMount,
 							Resources:      mattermost.Spec.Resources,
 						},
 					},
-					Volumes:      volumeLicense,
+					Volumes:      volumes,
 					Affinity:     mattermost.Spec.Affinity,
 					NodeSelector: mattermost.Spec.NodeSelector,
 				},
@@ -850,4 +868,50 @@ func setProbes(customLiveness corev1.Probe, customReadiness corev1.Probe) (*core
 	}
 
 	return liveness, readiness
+}
+
+func (mattermost *ClusterInstallation) getCertificateVolume(volumename, filename string) *corev1.Volume {
+	volume := corev1.Volume{
+		Name: volumename,
+		VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
+				SecretName: mattermost.getCertificateSecretName(),
+				Items: []corev1.KeyToPath{
+					{
+						Key:  filename,
+						Path: filename,
+					},
+				},
+			},
+		},
+	}
+
+	return &volume
+}
+
+func (mattermost *ClusterInstallation) getCertificateVolumeMount(volumename, filename string) *corev1.VolumeMount {
+	volumeMount := corev1.VolumeMount{
+		Name:      volumename,
+		SubPath:   filename,
+		MountPath: fmt.Sprintf("%s/%s", mattermost.getCertificatePath(), filename),
+		ReadOnly:  true,
+	}
+
+	return &volumeMount
+}
+
+func (mattermost *ClusterInstallation) getCertificatePath() string {
+	if mattermost.Spec.CACertificates.Path == "" {
+		return defaultCertificateFilesPath
+	}
+
+	return mattermost.Spec.CACertificates.Path
+}
+
+func (mattermost *ClusterInstallation) getCertificateSecretName() string {
+	if mattermost.Spec.CACertificates.SecretName == "" {
+		return DefaultCertificatesSecretName
+	}
+
+	return mattermost.Spec.CACertificates.SecretName
 }

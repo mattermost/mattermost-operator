@@ -339,6 +339,51 @@ func TestClusterInstallationGenerateDeployment(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "certificate CA files",
+			Spec: ClusterInstallationSpec{
+				CACertificates: CACertificates{
+					SecretName: "ca-certificate-files",
+					Path:       "/my_certs",
+				},
+			},
+			want: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: v1.PodTemplateSpec{
+						Spec: v1.PodSpec{
+							Volumes: []v1.Volume{
+								{
+									Name: "cacertificate",
+									VolumeSource: v1.VolumeSource{
+										Secret: &v1.SecretVolumeSource{
+											SecretName: "ca-certificate-files",
+											Items: []v1.KeyToPath{
+												{
+													Key:  "ca-certificate.pem",
+													Path: "ca-certificate.pem",
+												},
+											},
+										},
+									},
+								},
+							},
+							Containers: []v1.Container{
+								{
+									VolumeMounts: []v1.VolumeMount{
+										{
+											Name:      "cacertificate",
+											MountPath: "/my_certs/ca-certificate.pem",
+											SubPath:   "ca-certificate.pem",
+											ReadOnly:  true,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -347,9 +392,21 @@ func TestClusterInstallationGenerateDeployment(t *testing.T) {
 				Spec: tt.Spec,
 			}
 
-			deployment := mattermost.GenerateDeployment("", "", "", "", "", "", false, false, "")
-			require.Equal(t, tt.want.Spec.Template.Spec.NodeSelector, deployment.Spec.Template.Spec.NodeSelector)
-			require.Equal(t, tt.want.Spec.Template.Spec.Affinity, deployment.Spec.Template.Spec.Affinity)
+			switch tt.name {
+			case "certificate CA files":
+				deployment := mattermost.GenerateDeployment("", "", "", "", "", "", "", false, false, map[string]string{"cacertificate": "ca-certificate.pem"})
+				require.Equal(t, 1, len(deployment.Spec.Template.Spec.Volumes))
+				require.Equal(t, tt.want.Spec.Template.Spec.Volumes[0].Name, deployment.Spec.Template.Spec.Volumes[0].Name)
+				require.Equal(t, tt.want.Spec.Template.Spec.Volumes[0].Secret.SecretName, deployment.Spec.Template.Spec.Volumes[0].Secret.SecretName)
+				require.Equal(t, tt.want.Spec.Template.Spec.Volumes[0].Secret.Items[0], deployment.Spec.Template.Spec.Volumes[0].Secret.Items[0])
+				require.Equal(t, 1, len(deployment.Spec.Template.Spec.Containers[0].VolumeMounts))
+				require.Equal(t, tt.want.Spec.Template.Spec.Containers[0].VolumeMounts[0], deployment.Spec.Template.Spec.Containers[0].VolumeMounts[0])
+
+			default:
+				deployment := mattermost.GenerateDeployment("", "", "", "", "", "", "", false, false, nil)
+				require.Equal(t, tt.want.Spec.Template.Spec.NodeSelector, deployment.Spec.Template.Spec.NodeSelector)
+				require.Equal(t, tt.want.Spec.Template.Spec.Affinity, deployment.Spec.Template.Spec.Affinity)
+			}
 		})
 	}
 }
