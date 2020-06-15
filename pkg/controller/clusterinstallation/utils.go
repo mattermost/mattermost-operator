@@ -132,6 +132,10 @@ func (r *ReconcileClusterInstallation) checkClusterInstallation(namespace, name,
 		status.UpdatedReplicas++
 	}
 
+	if replicas < 0 {
+		replicas = 0
+	}
+
 	if int32(len(pods.Items)) != replicas {
 		return status, fmt.Errorf("found %d pods, but wanted %d", len(pods.Items), replicas)
 	}
