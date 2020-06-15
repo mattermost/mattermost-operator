@@ -20,6 +20,7 @@ type ComponentSize struct {
 	Resources corev1.ResourceRequirements
 }
 
+// Size100String represents estimated installation sizing for 100 users.
 const Size100String = "100users"
 
 var size100 = ClusterInstallationSize{
@@ -56,6 +57,7 @@ var size100 = ClusterInstallationSize{
 	},
 }
 
+// Size1000String represents estimated installation sizing for 1000 users.
 const Size1000String = "1000users"
 
 var size1000 = ClusterInstallationSize{
@@ -92,6 +94,7 @@ var size1000 = ClusterInstallationSize{
 	},
 }
 
+// Size5000String represents estimated installation sizing for 5000 users.
 const Size5000String = "5000users"
 
 var size5000 = ClusterInstallationSize{
@@ -128,6 +131,7 @@ var size5000 = ClusterInstallationSize{
 	},
 }
 
+// Size10000String represents estimated installation sizing for 10000 users.
 const Size10000String = "10000users"
 
 var size10000 = ClusterInstallationSize{
@@ -164,6 +168,7 @@ var size10000 = ClusterInstallationSize{
 	},
 }
 
+// Size25000String represents estimated installation sizing for 25000 users.
 const Size25000String = "25000users"
 
 var size25000 = ClusterInstallationSize{
@@ -202,6 +207,7 @@ var size25000 = ClusterInstallationSize{
 
 // Sizes used for development and testing
 
+// SizeMiniSingletonString represents a very small dev installation.
 const SizeMiniSingletonString = "miniSingleton"
 
 var sizeMiniSingleton = ClusterInstallationSize{
@@ -238,6 +244,7 @@ var sizeMiniSingleton = ClusterInstallationSize{
 	},
 }
 
+// SizeMiniHAString represents a very small dev installation with multiple replicas.
 const SizeMiniHAString = "miniHA"
 
 var sizeMiniHA = ClusterInstallationSize{

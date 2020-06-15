@@ -65,7 +65,8 @@ const (
 	// Recommended not to be too high - in order to have not too many extra pods over requested `Replicas` number
 	defaultMaxSurge = 1
 
-	// Name of the container which runs Mattermost application
+	// MattermostAppContainerName is the name of the container which runs the
+	// Mattermost application
 	MattermostAppContainerName = "mattermost"
 )
 
@@ -575,6 +576,11 @@ func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingres
 
 	liveness, readiness := setProbes(mattermost.Spec.LivenessProbe, mattermost.Spec.ReadinessProbe)
 
+	replicas := mattermost.Spec.Replicas
+	if replicas < 0 {
+		replicas = 0
+	}
+
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      deploymentName,
@@ -597,7 +603,7 @@ func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingres
 				},
 			},
 			RevisionHistoryLimit: &revHistoryLimit,
-			Replicas:             &mattermost.Spec.Replicas,
+			Replicas:             &replicas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: ClusterInstallationSelectorLabels(deploymentName),
 			},

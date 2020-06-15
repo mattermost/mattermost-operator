@@ -339,6 +339,17 @@ func TestClusterInstallationGenerateDeployment(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "negative app replica",
+			Spec: ClusterInstallationSpec{
+				Replicas: -1,
+			},
+			want: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Replicas: i32p(0),
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -550,4 +561,8 @@ func TestSetProbes(t *testing.T) {
 			require.Equal(t, tt.wantReadiness, readiness)
 		})
 	}
+}
+
+func i32p(i int32) *int32 {
+	return &i
 }
