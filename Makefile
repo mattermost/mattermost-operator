@@ -4,7 +4,7 @@ OPERATOR_IMAGE ?= mattermost/mattermost-operator:test
 SDK_VERSION = v0.17.1
 MACHINE = $(shell uname -m)
 BUILD_IMAGE = golang:1.14.4
-BASE_IMAGE = alpine:3.13
+BASE_IMAGE = alpine:3.12
 GOROOT ?= $(shell go env GOROOT)
 GOPATH ?= $(shell go env GOPATH)
 GOFLAGS ?= $(GOFLAGS:) -mod=vendor
