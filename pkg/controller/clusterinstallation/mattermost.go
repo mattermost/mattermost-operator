@@ -226,6 +226,13 @@ func (r *ReconcileClusterInstallation) launchUpdateJob(
 		},
 	}
 
+	// We dont need to validate the readiness/liveness for this short live job
+	// if the job fails it will get another later.
+	for i := range job.Spec.Template.Spec.Containers {
+		job.Spec.Template.Spec.Containers[i].LivenessProbe = nil
+		job.Spec.Template.Spec.Containers[i].ReadinessProbe = nil
+	}
+
 	// Override values for job-specific behavior.
 	job.Spec.Template.Spec.RestartPolicy = corev1.RestartPolicyNever
 	for i := range job.Spec.Template.Spec.Containers {
