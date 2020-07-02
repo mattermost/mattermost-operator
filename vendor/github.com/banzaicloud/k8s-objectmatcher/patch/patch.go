@@ -15,8 +15,9 @@
 package patch
 
 import (
-	"encoding/json"
 	"fmt"
+
+	json "github.com/json-iterator/go"
 
 	"github.com/goph/emperror"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -37,20 +38,27 @@ func NewPatchMaker(annotator *Annotator) *PatchMaker {
 	}
 }
 
-func (p *PatchMaker) Calculate(currentObject, modifiedObject runtime.Object) (*PatchResult, error) {
-	current, err := json.Marshal(currentObject)
+func (p *PatchMaker) Calculate(currentObject, modifiedObject runtime.Object, opts ...CalculateOption) (*PatchResult, error) {
+	current, err := json.ConfigCompatibleWithStandardLibrary.Marshal(currentObject)
 	if err != nil {
 		return nil, emperror.Wrap(err, "Failed to convert current object to byte sequence")
+	}
+
+	modified, err := json.ConfigCompatibleWithStandardLibrary.Marshal(modifiedObject)
+	if err != nil {
+		return nil, emperror.Wrap(err, "Failed to convert current object to byte sequence")
+	}
+
+	for _, opt := range opts {
+		current, modified, err = opt(current, modified)
+		if err != nil {
+			return nil, emperror.Wrap(err, "Failed to apply option function")
+		}
 	}
 
 	current, _, err = DeleteNullInJson(current)
 	if err != nil {
 		return nil, emperror.Wrap(err, "Failed to delete null from current object")
-	}
-
-	modified, err := json.Marshal(modifiedObject)
-	if err != nil {
-		return nil, emperror.Wrap(err, "Failed to convert current object to byte sequence")
 	}
 
 	modified, _, err = DeleteNullInJson(modified)
@@ -67,7 +75,7 @@ func (p *PatchMaker) Calculate(currentObject, modifiedObject runtime.Object) (*P
 
 	switch currentObject.(type) {
 	default:
-		lookupPatchMeta, err := strategicpatch.NewPatchMetaFromStruct(modifiedObject)
+		lookupPatchMeta, err := strategicpatch.NewPatchMetaFromStruct(currentObject)
 		if err != nil {
 			return nil, emperror.WrapWith(err, "Failed to lookup patch meta", "current object", currentObject)
 		}
@@ -78,11 +86,11 @@ func (p *PatchMaker) Calculate(currentObject, modifiedObject runtime.Object) (*P
 		// $setElementOrder can make it hard to decide whether there is an actual diff or not.
 		// In cases like that trying to apply the patch locally on current will make it clear.
 		if string(patch) != "{}" {
-			patchCurrent, err := strategicpatch.StrategicMergePatch(current, patch, modifiedObject)
+			patchCurrent, err := strategicpatch.StrategicMergePatch(current, patch, currentObject)
 			if err != nil {
 				return nil, emperror.Wrap(err, "Failed to apply patch again to check for an actual diff")
 			}
-			patch, err = strategicpatch.CreateTwoWayMergePatch(current, patchCurrent, modifiedObject)
+			patch, err = strategicpatch.CreateTwoWayMergePatch(current, patchCurrent, currentObject)
 			if err != nil {
 				return nil, emperror.Wrap(err, "Failed to create patch again to check for an actual diff")
 			}

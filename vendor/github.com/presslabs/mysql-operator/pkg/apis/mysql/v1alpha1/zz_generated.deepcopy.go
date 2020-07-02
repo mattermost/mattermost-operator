@@ -242,6 +242,11 @@ func (in *MysqlClusterSpec) DeepCopyInto(out *MysqlClusterSpec) {
 	}
 	in.PodSpec.DeepCopyInto(&out.PodSpec)
 	in.VolumeSpec.DeepCopyInto(&out.VolumeSpec)
+	if in.TmpfsSize != nil {
+		in, out := &in.TmpfsSize, &out.TmpfsSize
+		x := (*in).DeepCopy()
+		*out = &x
+	}
 	if in.MaxSlaveLatency != nil {
 		in, out := &in.MaxSlaveLatency, &out.MaxSlaveLatency
 		*out = new(int64)
@@ -256,6 +261,36 @@ func (in *MysqlClusterSpec) DeepCopyInto(out *MysqlClusterSpec) {
 		in, out := &in.ServerIDOffset, &out.ServerIDOffset
 		*out = new(int)
 		**out = **in
+	}
+	if in.MetricsExporterExtraArgs != nil {
+		in, out := &in.MetricsExporterExtraArgs, &out.MetricsExporterExtraArgs
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.RcloneExtraArgs != nil {
+		in, out := &in.RcloneExtraArgs, &out.RcloneExtraArgs
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.XbstreamExtraArgs != nil {
+		in, out := &in.XbstreamExtraArgs, &out.XbstreamExtraArgs
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.XtrabackupExtraArgs != nil {
+		in, out := &in.XtrabackupExtraArgs, &out.XtrabackupExtraArgs
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.XtrabackupPrepareExtraArgs != nil {
+		in, out := &in.XtrabackupPrepareExtraArgs, &out.XtrabackupPrepareExtraArgs
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.InitFileExtraSQL != nil {
+		in, out := &in.InitFileExtraSQL, &out.InitFileExtraSQL
+		*out = make([]string, len(*in))
+		copy(*out, *in)
 	}
 	return
 }
@@ -404,6 +439,36 @@ func (in *PodSpec) DeepCopyInto(out *PodSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.Volumes != nil {
+		in, out := &in.Volumes, &out.Volumes
+		*out = make([]v1.Volume, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.VolumeMounts != nil {
+		in, out := &in.VolumeMounts, &out.VolumeMounts
+		*out = make([]v1.VolumeMount, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.InitContainers != nil {
+		in, out := &in.InitContainers, &out.InitContainers
+		*out = make([]v1.Container, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.Containers != nil {
+		in, out := &in.Containers, &out.Containers
+		*out = make([]v1.Container, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	in.MetricsExporterResources.DeepCopyInto(&out.MetricsExporterResources)
+	in.MySQLOperatorSidecarResources.DeepCopyInto(&out.MySQLOperatorSidecarResources)
 	return
 }
 
