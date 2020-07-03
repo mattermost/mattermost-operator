@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/mattermost/mattermost-operator/pkg/components/utils"
+	"github.com/mattermost/mattermost-operator/pkg/database"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -306,7 +307,7 @@ func (mattermost *ClusterInstallation) GetMainContainer(deployment *appsv1.Deplo
 }
 
 // GenerateDeployment returns the deployment spec for Mattermost
-func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingressName, containerImage, dbUser, dbPassword, dbName string, externalDB, isLicensed bool, minioURL string) *appsv1.Deployment {
+func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingressName, containerImage string, isLicensed bool, minioURL string, dbInfo *database.Info) *appsv1.Deployment {
 	var envVarDB []corev1.EnvVar
 	mysqlName := utils.HashWithPrefix("db", mattermost.Name)
 
@@ -315,7 +316,7 @@ func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingres
 	}
 
 	var initContainers []corev1.Container
-	if externalDB {
+	if dbInfo.IsExternal() {
 		masterDBEnvVar.ValueFrom = &corev1.EnvVarSource{
 			SecretKeyRef: &corev1.SecretKeySelector{
 				LocalObjectReference: corev1.LocalObjectReference{
@@ -324,17 +325,42 @@ func (mattermost *ClusterInstallation) GenerateDeployment(deploymentName, ingres
 				Key: "DB_CONNECTION_STRING",
 			},
 		}
+
+		if dbInfo.HasDatabaseCheckURL() {
+			initContainers = append(initContainers, corev1.Container{
+				Name:            "init-check-database",
+				Image:           "appropriate/curl:latest",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{
+						Name: "DB_CONNECTION_CHECK_URL",
+						ValueFrom: &corev1.EnvVarSource{
+							SecretKeyRef: &corev1.SecretKeySelector{
+								LocalObjectReference: corev1.LocalObjectReference{
+									Name: mattermost.Spec.Database.Secret,
+								},
+								Key: "DB_CONNECTION_CHECK_URL",
+							},
+						},
+					},
+				},
+				Command: []string{
+					"sh", "-c",
+					"until curl --max-time 5 $DB_CONNECTION_CHECK_URL; do echo waiting for mysql; sleep 5; done;",
+				},
+			})
+		}
 	} else {
 		masterDBEnvVar.Value = fmt.Sprintf(
 			"mysql://%s:%s@tcp(%s-mysql-master.%s:3306)/%s?charset=utf8mb4,utf8&readTimeout=30s&writeTimeout=30s",
-			dbUser, dbPassword, mysqlName, mattermost.Namespace, dbName,
+			dbInfo.UserName, dbInfo.UserPassword, mysqlName, mattermost.Namespace, dbInfo.DatabaseName,
 		)
 
 		envVarDB = append(envVarDB, corev1.EnvVar{
 			Name: "MM_SQLSETTINGS_DATASOURCEREPLICAS",
 			Value: fmt.Sprintf(
 				"%s:%s@tcp(%s-mysql.%s:3306)/%s?readTimeout=30s&writeTimeout=30s",
-				dbUser, dbPassword, mysqlName, mattermost.Namespace, dbName,
+				dbInfo.UserName, dbInfo.UserPassword, mysqlName, mattermost.Namespace, dbInfo.DatabaseName,
 			),
 		})
 

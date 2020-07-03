@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/mattermost/mattermost-operator/pkg/components/utils"
+	"github.com/mattermost/mattermost-operator/pkg/database"
 	"github.com/pkg/errors"
 	mysqlOperator "github.com/presslabs/mysql-operator/pkg/apis/mysql/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
@@ -14,39 +15,6 @@ import (
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
 	mattermostmysql "github.com/mattermost/mattermost-operator/pkg/components/mysql"
 )
-
-type databaseInfo struct {
-	rootPassword string
-	userName     string
-	userPassword string
-	dbName       string
-}
-
-func (db *databaseInfo) IsValid() error {
-	if db.rootPassword == "" {
-		return errors.New("database root password shouldn't be empty")
-	}
-	if db.userName == "" {
-		return errors.New("database username shouldn't be empty")
-	}
-	if db.userPassword == "" {
-		return errors.New("database password shouldn't be empty")
-	}
-	if db.dbName == "" {
-		return errors.New("database name shouldn't be empty")
-	}
-
-	return nil
-}
-
-func getDatabaseInfoFromSecret(secret *corev1.Secret) *databaseInfo {
-	return &databaseInfo{
-		rootPassword: string(secret.Data["ROOT_PASSWORD"]),
-		userName:     string(secret.Data["USER"]),
-		userPassword: string(secret.Data["PASSWORD"]),
-		dbName:       string(secret.Data["DATABASE"]),
-	}
-}
 
 func (r *ReconcileClusterInstallation) checkMySQLCluster(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
 	reqLogger = reqLogger.WithValues("Reconcile", "mysql")
@@ -79,10 +47,10 @@ func (r *ReconcileClusterInstallation) createMySQLClusterIfNotExists(mattermost 
 	return nil
 }
 
-func (r *ReconcileClusterInstallation) getOrCreateMySQLSecrets(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) (*databaseInfo, error) {
+func (r *ReconcileClusterInstallation) getOrCreateMySQLSecrets(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) (*database.Info, error) {
 	var err error
 	dbSecret := &corev1.Secret{}
-	dbInfo := &databaseInfo{}
+	dbInfo := &database.Info{}
 
 	dbSecretName := mattermostmysql.DefaultDatabaseSecretName(mattermost.Name)
 
@@ -94,7 +62,7 @@ func (r *ReconcileClusterInstallation) getOrCreateMySQLSecrets(mattermost *matte
 			return nil, errors.Wrap(err, "failed to get custom database secret")
 		}
 
-		dbInfo = getDatabaseInfoFromSecret(dbSecret)
+		dbInfo = database.GenerateDatabaseInfoFromSecret(dbSecret)
 
 		return dbInfo, dbInfo.IsValid()
 	}
@@ -122,7 +90,7 @@ func (r *ReconcileClusterInstallation) getOrCreateMySQLSecrets(mattermost *matte
 			return nil, errors.Wrap(err, "failed to create mysql secret")
 		}
 
-		dbInfo = getDatabaseInfoFromSecret(dbSecret)
+		dbInfo = database.GenerateDatabaseInfoFromSecret(dbSecret)
 
 		return dbInfo, dbInfo.IsValid()
 	} else if err != nil {
@@ -130,7 +98,7 @@ func (r *ReconcileClusterInstallation) getOrCreateMySQLSecrets(mattermost *matte
 		return nil, err
 	}
 
-	dbInfo = getDatabaseInfoFromSecret(dbSecret)
+	dbInfo = database.GenerateDatabaseInfoFromSecret(dbSecret)
 
 	return dbInfo, dbInfo.IsValid()
 }

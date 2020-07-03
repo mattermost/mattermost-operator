@@ -3,6 +3,7 @@ package v1alpha1
 import (
 	"testing"
 
+	"github.com/mattermost/mattermost-operator/pkg/database"
 	operatortest "github.com/mattermost/mattermost-operator/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -358,7 +359,7 @@ func TestClusterInstallationGenerateDeployment(t *testing.T) {
 				Spec: tt.Spec,
 			}
 
-			deployment := mattermost.GenerateDeployment("", "", "", "", "", "", false, false, "")
+			deployment := mattermost.GenerateDeployment("", "", "", false, "", &database.Info{})
 			require.Equal(t, tt.want.Spec.Template.Spec.NodeSelector, deployment.Spec.Template.Spec.NodeSelector)
 			require.Equal(t, tt.want.Spec.Template.Spec.Affinity, deployment.Spec.Template.Spec.Affinity)
 		})

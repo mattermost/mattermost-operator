@@ -12,5 +12,5 @@ import (
 func (r *ReconcileClusterInstallation) checkPostgres(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
 	// reqLogger := reqLogger.WithValues("Reconcile", "postgres")
 
-	return errors.New("Database type 'postgres' not yet implemented")
+	return errors.New("database type 'postgres' not yet implemented")
 }

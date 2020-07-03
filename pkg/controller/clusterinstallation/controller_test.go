@@ -139,7 +139,7 @@ func TestReconcile(t *testing.T) {
 			Status: corev1.PodStatus{
 				Phase: corev1.PodRunning,
 				Conditions: []corev1.PodCondition{
-					corev1.PodCondition{
+					{
 						Type:   corev1.PodReady,
 						Status: corev1.ConditionFalse,
 					},
@@ -166,7 +166,7 @@ func TestReconcile(t *testing.T) {
 			for i := 0; i < int(replicas); i++ {
 				if pod.ObjectMeta.Name == fmt.Sprintf("%s-pod-%d", ciName, i) {
 					pod.Status.Conditions = []corev1.PodCondition{
-						corev1.PodCondition{
+						{
 							Type:   corev1.PodReady,
 							Status: corev1.ConditionTrue,
 						},
@@ -279,7 +279,7 @@ func TestReconcile(t *testing.T) {
 				Status: corev1.PodStatus{
 					Phase: corev1.PodRunning,
 					Conditions: []corev1.PodCondition{
-						corev1.PodCondition{
+						{
 							Type:   corev1.PodReady,
 							Status: corev1.ConditionTrue,
 						},

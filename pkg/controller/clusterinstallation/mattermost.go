@@ -18,6 +18,7 @@ import (
 	k8sClient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
+	"github.com/mattermost/mattermost-operator/pkg/database"
 )
 
 const updateJobName = "mattermost-update-check"
@@ -90,33 +91,28 @@ func (r *ReconcileClusterInstallation) checkMattermostIngress(mattermost *matter
 }
 
 func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, resourceName, ingressName, imageName string, reqLogger logr.Logger) error {
-	var externalDB, isLicensed bool
+	var isLicensed bool
 	var err error
-	dbInfo := &databaseInfo{}
+	dbInfo := &database.Info{}
 
-	if mattermost.Spec.Database.Secret == "" {
+	if len(mattermost.Spec.Database.Secret) == 0 {
 		dbInfo, err = r.getOrCreateMySQLSecrets(mattermost, reqLogger)
 		if err != nil {
-			return errors.Wrap(err, "unable to get database information")
+			return errors.Wrap(err, "failed to get database information")
 		}
 	} else {
-		foundSecret := &corev1.Secret{}
-		err = r.client.Get(context.TODO(), types.NamespacedName{Name: mattermost.Spec.Database.Secret, Namespace: mattermost.Namespace}, foundSecret)
+		databaseSecret := &corev1.Secret{}
+		err = r.client.Get(context.TODO(), types.NamespacedName{Name: mattermost.Spec.Database.Secret, Namespace: mattermost.Namespace}, databaseSecret)
 		if err != nil {
-			return errors.Wrap(err, "error getting database secret")
+			return errors.Wrap(err, "failed to get database secret")
 		}
 
-		if _, ok := foundSecret.Data["DB_CONNECTION_STRING"]; ok {
-			externalDB = true
-		}
+		dbInfo = database.GenerateDatabaseInfoFromSecret(databaseSecret)
+	}
 
-		if !externalDB {
-			dbInfo = getDatabaseInfoFromSecret(foundSecret)
-			err = dbInfo.IsValid()
-			if err != nil {
-				return errors.Wrap(err, "database secret is not valid")
-			}
-		}
+	err = dbInfo.IsValid()
+	if err != nil {
+		return errors.Wrap(err, "database secret is not valid")
 	}
 
 	var minioURL string
@@ -125,35 +121,33 @@ func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mat
 	} else {
 		minioURL, err = r.getMinioService(mattermost, reqLogger)
 		if err != nil {
-			return errors.Wrap(err, "Error getting the minio service.")
+			return errors.Wrap(err, "failed to get minio service.")
 		}
 	}
 
 	if mattermost.Spec.MattermostLicenseSecret != "" {
 		err = r.checkSecret(mattermost.Spec.MattermostLicenseSecret, "license", mattermost.Namespace)
 		if err != nil {
-			return errors.Wrap(err, "Error getting the mattermost license secret.")
+			return errors.Wrap(err, "failed to get mattermost license secret.")
 		}
 		isLicensed = true
 	}
 
-	desired := mattermost.GenerateDeployment(resourceName, ingressName, imageName, dbInfo.userName, dbInfo.userPassword, dbInfo.dbName, externalDB, isLicensed, minioURL)
+	desired := mattermost.GenerateDeployment(resourceName, ingressName, imageName, isLicensed, minioURL, dbInfo)
 	err = r.createDeploymentIfNotExists(mattermost, desired, reqLogger)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to create mattermost deployment")
 	}
 
 	current := &appsv1.Deployment{}
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: desired.Name, Namespace: desired.Namespace}, current)
 	if err != nil {
-		reqLogger.Error(err, "Failed to get mattermost deployment")
-		return err
+		return errors.Wrap(err, "failed to get mattermost deployment")
 	}
 
 	err = r.updateMattermostDeployment(mattermost, current, desired, imageName, reqLogger)
 	if err != nil {
-		reqLogger.Error(err, "Failed to update mattermost deployment")
-		return err
+		return errors.Wrap(err, "failed to update mattermost deployment")
 	}
 
 	return nil
@@ -226,8 +220,7 @@ func (r *ReconcileClusterInstallation) launchUpdateJob(
 		},
 	}
 
-	// We dont need to validate the readiness/liveness for this short live job
-	// if the job fails it will get another later.
+	// We dont need to validate the readiness/liveness for this short lived job.
 	for i := range job.Spec.Template.Spec.Containers {
 		job.Spec.Template.Spec.Containers[i].LivenessProbe = nil
 		job.Spec.Template.Spec.Containers[i].ReadinessProbe = nil
@@ -333,15 +326,15 @@ func (r *ReconcileClusterInstallation) checkUpdateJob(
 				return nil, errors.Wrap(err, "Launching update image job failed")
 			}
 			return nil, errors.New("Began update image job")
-		} else {
-			return nil, errors.Wrap(err, "Error trying to determine if an update image job is already running")
 		}
+
+		return nil, errors.Wrap(err, "failed to determine if an update image job is already running")
 	}
 
 	// Job is either running or completed
 
 	if job.Status.CompletionTime == nil {
-		return nil, errors.New("Update image job still running..")
+		return nil, errors.New("Update image job still running")
 	}
 
 	// Job is completed, can check completion status
