@@ -1,7 +1,7 @@
 .PHONY: all check-style unittest generate build clean build-image operator-sdk yaml
 
 OPERATOR_IMAGE ?= mattermost/mattermost-operator:test
-SDK_VERSION = v0.17.1
+SDK_VERSION = v0.18.2
 MACHINE = $(shell uname -m)
 BUILD_IMAGE = golang:1.14.4
 BASE_IMAGE = alpine:3.12
@@ -23,7 +23,7 @@ INSTALL_YAML=docs/mattermost-operator/mattermost-operator.yaml
 all: check-style unittest build ## Run all the things
 
 unittest: ## Runs unit tests
-	go test $(GO_LINKER_FLAGS) $(TEST_PACKAGES) -v -covermode=count -coverprofile=coverage.out
+	go test -mod=vendor $(GO_LINKER_FLAGS) $(TEST_PACKAGES) -v -covermode=count -coverprofile=coverage.out
 
 build: ## Build the mattermost-operator
 	@echo Building Mattermost-operator

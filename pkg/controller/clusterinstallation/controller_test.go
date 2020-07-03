@@ -158,16 +158,23 @@ func TestReconcile(t *testing.T) {
 		})
 
 		// Make pods ready
-		for i := 0; i < int(replicas); i++ {
-			podTemplate.ObjectMeta.Name = fmt.Sprintf("%s-pod-%d", ciName, i)
-			podTemplate.Status.Conditions = []corev1.PodCondition{
-				corev1.PodCondition{
-					Type:   corev1.PodReady,
-					Status: corev1.ConditionTrue,
-				},
+		pods := &corev1.PodList{}
+		err = c.List(context.TODO(), pods)
+		require.NoError(t, err)
+
+		for _, pod := range pods.Items {
+			for i := 0; i < int(replicas); i++ {
+				if pod.ObjectMeta.Name == fmt.Sprintf("%s-pod-%d", ciName, i) {
+					pod.Status.Conditions = []corev1.PodCondition{
+						corev1.PodCondition{
+							Type:   corev1.PodReady,
+							Status: corev1.ConditionTrue,
+						},
+					}
+					err = c.Update(context.TODO(), pod.DeepCopy())
+					require.NoError(t, err)
+				}
 			}
-			err = c.Update(context.TODO(), podTemplate.DeepCopy())
-			require.NoError(t, err)
 		}
 
 		t.Run("no reconcile errors", func(t *testing.T) {
@@ -177,11 +184,18 @@ func TestReconcile(t *testing.T) {
 		})
 
 		// Make pods not running
-		for i := 0; i < int(replicas); i++ {
-			podTemplate.ObjectMeta.Name = fmt.Sprintf("%s-pod-%d", ciName, i)
-			podTemplate.Status.Phase = corev1.PodPending
-			err = c.Update(context.TODO(), podTemplate.DeepCopy())
-			require.NoError(t, err)
+		pods = &corev1.PodList{}
+		err = c.List(context.TODO(), pods)
+		require.NoError(t, err)
+
+		for _, pod := range pods.Items {
+			for i := 0; i < int(replicas); i++ {
+				if pod.ObjectMeta.Name == fmt.Sprintf("%s-pod-%d", ciName, i) {
+					pod.Status.Phase = corev1.PodPending
+					err = c.Update(context.TODO(), pod.DeepCopy())
+					require.NoError(t, err)
+				}
+			}
 		}
 
 		t.Run("pods not running", func(t *testing.T) {
@@ -190,11 +204,18 @@ func TestReconcile(t *testing.T) {
 		})
 
 		// Make pods running
-		for i := 0; i < int(replicas); i++ {
-			podTemplate.ObjectMeta.Name = fmt.Sprintf("%s-pod-%d", ciName, i)
-			podTemplate.Status.Phase = corev1.PodRunning
-			err = c.Update(context.TODO(), podTemplate.DeepCopy())
-			require.NoError(t, err)
+		pods = &corev1.PodList{}
+		err = c.List(context.TODO(), pods)
+		require.NoError(t, err)
+
+		for _, pod := range pods.Items {
+			for i := 0; i < int(replicas); i++ {
+				if pod.ObjectMeta.Name == fmt.Sprintf("%s-pod-%d", ciName, i) {
+					pod.Status.Phase = corev1.PodRunning
+					err = c.Update(context.TODO(), pod.DeepCopy())
+					require.NoError(t, err)
+				}
+			}
 		}
 
 		t.Run("no reconcile errors", func(t *testing.T) {

@@ -6,6 +6,7 @@
 package v1alpha1
 
 import (
+	"context"
 	time "time"
 
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
@@ -48,13 +49,13 @@ func NewFilteredClusterInstallationInformer(client versioned.Interface, namespac
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.MattermostV1alpha1().ClusterInstallations(namespace).List(options)
+				return client.MattermostV1alpha1().ClusterInstallations(namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.MattermostV1alpha1().ClusterInstallations(namespace).Watch(options)
+				return client.MattermostV1alpha1().ClusterInstallations(namespace).Watch(context.TODO(), options)
 			},
 		},
 		&mattermostv1alpha1.ClusterInstallation{},

@@ -2,9 +2,9 @@ apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   labels:
-    app: 'mysql-operator'
     controller-tools.k8s.io: "1.0"
     release: 'mysql-operator'
+    app: mysql-operator
   name: mysqlbackups.mysql.presslabs.org
   namespace: mysql-operator
 spec:
@@ -19,9 +19,9 @@ apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   labels:
-    app: 'mysql-operator'
     controller-tools.k8s.io: "1.0"
     release: 'mysql-operator'
+    app: mysql-operator
   name: mysqlclusters.mysql.presslabs.org
   namespace: mysql-operator
 spec:
@@ -272,7 +272,7 @@ spec:
       serviceAccountName: mysql-operator
       containers:
         - name: operator
-          image: "quay.io/presslabs/mysql-operator:0.3.3"
+          image: "quay.io/presslabs/mysql-operator:0.4.0"
           imagePullPolicy: IfNotPresent
           env:
             - name: ORC_TOPOLOGY_USER
@@ -286,14 +286,12 @@ spec:
                   name: mysql-operator-orc
                   key: TOPOLOGY_PASSWORD
           args:
-            - --leader-election-namespace=default
+            - --leader-election-namespace=mysql-operator
             # connect to orchestrator on localhost
             - --orchestrator-uri=http://127.0.0.1:3000/api
-            - --sidecar-image=quay.io/presslabs/mysql-operator-sidecar:0.3.3
-          resources:
-            {}
+            - --sidecar-image=quay.io/presslabs/mysql-operator-sidecar:0.4.0
         - name: orchestrator
-          image: quay.io/presslabs/mysql-operator-orchestrator:0.3.3
+          image: quay.io/presslabs/mysql-operator-orchestrator:0.4.0
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000
@@ -328,8 +326,6 @@ spec:
             httpGet:
               path: /api/raft-health
               port: 3000
-          resources:
-            null
       volumes:
         - name: config
           configMap:
@@ -337,7 +333,6 @@ spec:
       # security context to mount corectly the volume for orc
       securityContext:
         fsGroup: 777
-      affinity:
   volumeClaimTemplates:
     - metadata:
         name: data
