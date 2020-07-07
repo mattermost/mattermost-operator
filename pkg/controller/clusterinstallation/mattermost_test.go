@@ -11,6 +11,7 @@ import (
 	"github.com/mattermost/mattermost-operator/pkg/apis"
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
 	mattermostmysql "github.com/mattermost/mattermost-operator/pkg/components/mysql"
+	"github.com/mattermost/mattermost-operator/pkg/database"
 	operatortest "github.com/mattermost/mattermost-operator/test"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -195,7 +196,7 @@ func TestCheckMattermost(t *testing.T) {
 			err := r.client.Get(context.TODO(), types.NamespacedName{Name: mattermostmysql.DefaultDatabaseSecretName(ciName), Namespace: ciNamespace}, dbSecret)
 			require.NoError(t, err)
 
-			dbInfo := getDatabaseInfoFromSecret(dbSecret)
+			dbInfo := database.GenerateDatabaseInfoFromSecret(dbSecret)
 			require.NoError(t, dbInfo.IsValid())
 		})
 	})

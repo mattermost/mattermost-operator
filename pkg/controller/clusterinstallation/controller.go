@@ -23,6 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
+	"github.com/mattermost/mattermost-operator/pkg/database"
 )
 
 var log = logf.Log.WithName("clusterinstallation.controller")
@@ -220,20 +221,15 @@ func (r *ReconcileClusterInstallation) checkDatabase(mattermost *mattermostv1alp
 	// Check for an existing secret and determine which type it is (User-Managed
 	// or Operator-Manged). See the Database spec to learn more on this.
 	if mattermost.Spec.Database.Secret != "" {
-		foundSecret := &corev1.Secret{}
-		err := r.client.Get(context.TODO(), types.NamespacedName{Name: mattermost.Spec.Database.Secret, Namespace: mattermost.Namespace}, foundSecret)
+		databaseSecret := &corev1.Secret{}
+		err := r.client.Get(context.TODO(), types.NamespacedName{Name: mattermost.Spec.Database.Secret, Namespace: mattermost.Namespace}, databaseSecret)
 		if err != nil {
-			return errors.Wrap(err, "error getting database secret")
+			return errors.Wrap(err, "failed to get database secret")
 		}
 
-		if _, ok := foundSecret.Data["DB_CONNECTION_STRING"]; ok {
-			// No MySQL cluster setup is needed so return here.
-			return nil
-		}
-
-		err = getDatabaseInfoFromSecret(foundSecret).IsValid()
+		err = database.GenerateDatabaseInfoFromSecret(databaseSecret).IsValid()
 		if err != nil {
-			return fmt.Errorf("database secret %s is not valid for either user-managed or operator-managed database types", mattermost.Spec.Database.Secret)
+			return errors.Wrap(err, "database secret is not valid")
 		}
 
 		// Proceed to MySQL cluster setup.
