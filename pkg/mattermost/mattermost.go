@@ -1,0 +1,712 @@
+package v1alpha1
+
+import (
+	"fmt"
+	"strconv"
+	"strings"
+
+	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
+	"github.com/mattermost/mattermost-operator/pkg/components/utils"
+	"github.com/mattermost/mattermost-operator/pkg/database"
+
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	v1beta1 "k8s.io/api/extensions/v1beta1"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/intstr"
+)
+
+const (
+	// ClusterLabel is the label applied across all compoments
+	ClusterLabel = "v1alpha1.mattermost.com/installation"
+	// ClusterResourceLabel is the label applied to a given ClusterInstallation
+	// as well as all other resources created to support it.
+	ClusterResourceLabel = "v1alpha1.mattermost.com/resource"
+
+	// BlueName is the name of the blue Mattermmost installation in a blue/green
+	// deployment type.
+	BlueName = "blue"
+	// GreenName is the name of the green Mattermmost installation in a blue/green
+	// deployment type.
+	GreenName = "green"
+
+	// SizeMB is the number of bytes that make a megabyte
+	SizeMB = 1048576
+	// SizeGB is the number of bytes that make a gigabyte
+	SizeGB = 1048576000
+	// DefaultMaxFileSize is the default maximum file size configuration value that will be used unless nginx annotation is set
+	DefaultMaxFileSize = 1000
+
+	// defaultRevHistoryLimit is the default RevisionHistoryLimit - number of possible roll-back points
+	// More details: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#rolling-back-a-deployment
+	defaultRevHistoryLimit = 5
+	// defaultMaxUnavailable is the default max number of unavailable pods out of specified `Replicas` during rolling update.
+	// More details: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#max-unavailable
+	// Recommended to be as low as possible - in order to have number of available pod as close to `Replicas` as possible
+	defaultMaxUnavailable = 0
+	// defaultMaxSurge is the default max number of extra pods over specified `Replicas` during rolling update.
+	// More details: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#max-surge
+	// Recommended not to be too high - in order to have not too many extra pods over requested `Replicas` number
+	defaultMaxSurge = 1
+
+	// MattermostAppContainerName is the name of the container which runs the
+	// Mattermost application
+	MattermostAppContainerName = "mattermost"
+)
+
+// GenerateService returns the service for Mattermost.
+func GenerateService(mattermost *mattermostv1alpha1.ClusterInstallation, serviceName, selectorName string) *corev1.Service {
+	// Service has custom annotations
+	annotations := map[string]string{
+		"service.alpha.kubernetes.io/tolerate-unready-endpoints": "true",
+	}
+
+	// Result service
+	var service *corev1.Service
+
+	if mattermost.Spec.UseServiceLoadBalancer {
+		// Create LoadBalancer service with additional annotations provided in .Spec
+		// LoadBalancer is directly accessible from outside and thus exposes ports 80 and 443
+		service = newService(mattermost, serviceName, selectorName, mergeStringMaps(annotations, mattermost.Spec.ServiceAnnotations))
+		service.Spec.Ports = []corev1.ServicePort{
+			{
+				Name:       "http",
+				Port:       80,
+				TargetPort: intstr.FromString("app"),
+			},
+			{
+				Name:       "https",
+				Port:       443,
+				TargetPort: intstr.FromString("app"),
+			},
+		}
+		service.Spec.Type = corev1.ServiceTypeLoadBalancer
+	} else {
+		// Create Headless service
+		// Headless service is not directly accessible from outside and thus exposes custom port
+		service = newService(mattermost, serviceName, selectorName, annotations)
+		service.Spec.Ports = []corev1.ServicePort{
+			{
+				Port:       8065,
+				TargetPort: intstr.FromString("app"),
+			},
+		}
+		service.Spec.ClusterIP = corev1.ClusterIPNone
+	}
+
+	return service
+}
+
+// GenerateIngress returns the ingress for Mattermost
+func GenerateIngress(mattermost *mattermostv1alpha1.ClusterInstallation, name, ingressName string, ingressAnnotations map[string]string, useTLS bool) *v1beta1.Ingress {
+	ingress := &v1beta1.Ingress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: mattermost.Namespace,
+			Labels:    mattermost.ClusterInstallationLabels(name),
+			OwnerReferences: []metav1.OwnerReference{
+				*metav1.NewControllerRef(mattermost, schema.GroupVersionKind{
+					Group:   mattermostv1alpha1.SchemeGroupVersion.Group,
+					Version: mattermostv1alpha1.SchemeGroupVersion.Version,
+					Kind:    "ClusterInstallation",
+				}),
+			},
+			Annotations: ingressAnnotations,
+		},
+		Spec: v1beta1.IngressSpec{
+			Rules: []v1beta1.IngressRule{
+				{
+					Host: ingressName,
+					IngressRuleValue: v1beta1.IngressRuleValue{
+						HTTP: &v1beta1.HTTPIngressRuleValue{
+							Paths: []v1beta1.HTTPIngressPath{
+								{
+									Path: "/",
+									Backend: v1beta1.IngressBackend{
+										ServiceName: name,
+										ServicePort: intstr.FromInt(8065),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if useTLS {
+		ingress.Spec.TLS = []v1beta1.IngressTLS{
+			{
+				Hosts:      []string{ingressName},
+				SecretName: strings.ReplaceAll(ingressName, ".", "-") + "-tls-cert",
+			},
+		}
+	}
+
+	return ingress
+}
+
+// GenerateDeployment returns the deployment spec for Mattermost
+func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, deploymentName, ingressName, containerImage string, isLicensed bool, minioURL string, dbInfo *database.Info) *appsv1.Deployment {
+	var envVarDB []corev1.EnvVar
+	mysqlName := utils.HashWithPrefix("db", mattermost.Name)
+
+	masterDBEnvVar := corev1.EnvVar{
+		Name: "MM_CONFIG",
+	}
+
+	var initContainers []corev1.Container
+	if dbInfo.IsExternal() {
+		masterDBEnvVar.ValueFrom = &corev1.EnvVarSource{
+			SecretKeyRef: &corev1.SecretKeySelector{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: mattermost.Spec.Database.Secret,
+				},
+				Key: "DB_CONNECTION_STRING",
+			},
+		}
+
+		if dbInfo.HasDatabaseCheckURL() {
+			initContainers = append(initContainers, corev1.Container{
+				Name:            "init-check-database",
+				Image:           "appropriate/curl:latest",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env: []corev1.EnvVar{
+					{
+						Name: "DB_CONNECTION_CHECK_URL",
+						ValueFrom: &corev1.EnvVarSource{
+							SecretKeyRef: &corev1.SecretKeySelector{
+								LocalObjectReference: corev1.LocalObjectReference{
+									Name: mattermost.Spec.Database.Secret,
+								},
+								Key: "DB_CONNECTION_CHECK_URL",
+							},
+						},
+					},
+				},
+				Command: []string{
+					"sh", "-c",
+					"until curl --max-time 5 $DB_CONNECTION_CHECK_URL; do echo waiting for mysql; sleep 5; done;",
+				},
+			})
+		}
+	} else {
+		masterDBEnvVar.Value = fmt.Sprintf(
+			"mysql://%s:%s@tcp(%s-mysql-master.%s:3306)/%s?charset=utf8mb4,utf8&readTimeout=30s&writeTimeout=30s",
+			dbInfo.UserName, dbInfo.UserPassword, mysqlName, mattermost.Namespace, dbInfo.DatabaseName,
+		)
+
+		envVarDB = append(envVarDB, corev1.EnvVar{
+			Name: "MM_SQLSETTINGS_DATASOURCEREPLICAS",
+			Value: fmt.Sprintf(
+				"%s:%s@tcp(%s-mysql.%s:3306)/%s?readTimeout=30s&writeTimeout=30s",
+				dbInfo.UserName, dbInfo.UserPassword, mysqlName, mattermost.Namespace, dbInfo.DatabaseName,
+			),
+		})
+
+		// Create the init container to check that the DB is up and running
+		initContainers = append(initContainers, corev1.Container{
+			Name:            "init-check-mysql",
+			Image:           "appropriate/curl:latest",
+			ImagePullPolicy: corev1.PullIfNotPresent,
+			Command: []string{
+				"sh", "-c",
+				fmt.Sprintf("until curl --max-time 5 http://%s-mysql-master.%s:3306; do echo waiting for mysql; sleep 5; done;", mysqlName, mattermost.Namespace),
+			},
+		})
+	}
+
+	envVarDB = append(envVarDB, masterDBEnvVar)
+
+	minioName := fmt.Sprintf("%s-minio", mattermost.Name)
+
+	// Check if custom secret was passed
+	if mattermost.Spec.Minio.Secret != "" {
+		minioName = mattermost.Spec.Minio.Secret
+	}
+
+	minioAccessEnv := &corev1.EnvVarSource{
+		SecretKeyRef: &corev1.SecretKeySelector{
+			LocalObjectReference: corev1.LocalObjectReference{
+				Name: minioName,
+			},
+			Key: "accesskey",
+		},
+	}
+
+	minioSecretEnv := &corev1.EnvVarSource{
+		SecretKeyRef: &corev1.SecretKeySelector{
+			LocalObjectReference: corev1.LocalObjectReference{
+				Name: minioName,
+			},
+			Key: "secretkey",
+		},
+	}
+
+	if !mattermost.Spec.Minio.IsExternal() {
+		// Create the init container to create the MinIO bucker
+		initContainers = append(initContainers, corev1.Container{
+			Name:            "create-minio-bucket",
+			Image:           "minio/mc:latest",
+			ImagePullPolicy: corev1.PullIfNotPresent,
+			Command: []string{
+				"/bin/sh", "-c",
+				fmt.Sprintf("mc config host add localminio http://%s $(MINIO_ACCESS_KEY) $(MINIO_SECRET_KEY) && mc mb localminio/%s -q -p", minioURL, mattermost.Name),
+			},
+			Env: []corev1.EnvVar{
+				{
+					Name:      "MINIO_ACCESS_KEY",
+					ValueFrom: minioAccessEnv,
+				},
+				{
+					Name:      "MINIO_SECRET_KEY",
+					ValueFrom: minioSecretEnv,
+				},
+			},
+		})
+
+		// Create the init container to check that MinIO is up and running
+		initContainers = append(initContainers, corev1.Container{
+			Name:            "init-check-minio",
+			Image:           "appropriate/curl:latest",
+			ImagePullPolicy: corev1.PullIfNotPresent,
+			Command: []string{
+				"sh", "-c",
+				fmt.Sprintf("until curl --max-time 5 http://%s/minio/health/ready; do echo waiting for minio; sleep 5; done;", minioURL),
+			},
+		})
+	}
+
+	bucket := mattermost.Name
+	if mattermost.Spec.Minio.ExternalBucket != "" {
+		bucket = mattermost.Spec.Minio.ExternalBucket
+	}
+
+	// Generate Minio config
+	envVarMinio := []corev1.EnvVar{
+		{
+			Name:  "MM_FILESETTINGS_DRIVERNAME",
+			Value: "amazons3",
+		},
+		{
+			Name:      "MM_FILESETTINGS_AMAZONS3ACCESSKEYID",
+			ValueFrom: minioAccessEnv,
+		},
+		{
+			Name:      "MM_FILESETTINGS_AMAZONS3SECRETACCESSKEY",
+			ValueFrom: minioSecretEnv,
+		},
+		{
+			Name:  "MM_FILESETTINGS_AMAZONS3BUCKET",
+			Value: bucket,
+		},
+		{
+			Name:  "MM_FILESETTINGS_AMAZONS3ENDPOINT",
+			Value: minioURL,
+		},
+		{
+			Name:  "MM_FILESETTINGS_AMAZONS3SSL",
+			Value: "false",
+		},
+	}
+
+	// ES section vars
+	envVarES := []corev1.EnvVar{}
+	if mattermost.Spec.ElasticSearch.Host != "" {
+		envVarES = []corev1.EnvVar{
+			{
+				Name:  "MM_ELASTICSEARCHSETTINGS_ENABLEINDEXING",
+				Value: "true",
+			},
+			{
+				Name:  "MM_ELASTICSEARCHSETTINGS_ENABLESEARCHING",
+				Value: "true",
+			},
+			{
+				Name:  "MM_ELASTICSEARCHSETTINGS_CONNECTIONURL",
+				Value: mattermost.Spec.ElasticSearch.Host,
+			},
+			{
+				Name:  "MM_ELASTICSEARCHSETTINGS_USERNAME",
+				Value: mattermost.Spec.ElasticSearch.UserName,
+			},
+			{
+				Name:  "MM_ELASTICSEARCHSETTINGS_PASSWORD",
+				Value: mattermost.Spec.ElasticSearch.Password,
+			},
+		}
+	}
+
+	siteURL := fmt.Sprintf("https://%s", ingressName)
+	envVarGeneral := []corev1.EnvVar{
+		{
+			Name:  "MM_SERVICESETTINGS_SITEURL",
+			Value: siteURL,
+		},
+		{
+			Name:  "MM_PLUGINSETTINGS_ENABLEUPLOADS",
+			Value: "true",
+		},
+		{
+			Name:  "MM_METRICSSETTINGS_ENABLE",
+			Value: "true",
+		},
+		{
+			Name:  "MM_METRICSSETTINGS_LISTENADDRESS",
+			Value: ":8067",
+		},
+	}
+
+	valueSize := strconv.Itoa(DefaultMaxFileSize * SizeMB)
+	if !mattermost.Spec.UseServiceLoadBalancer {
+		if _, ok := mattermost.Spec.IngressAnnotations["nginx.ingress.kubernetes.io/proxy-body-size"]; ok {
+			size := mattermost.Spec.IngressAnnotations["nginx.ingress.kubernetes.io/proxy-body-size"]
+			if strings.HasSuffix(size, "M") {
+				maxFileSize, _ := strconv.Atoi(strings.TrimSuffix(size, "M"))
+				valueSize = strconv.Itoa(maxFileSize * SizeMB)
+			} else if strings.HasSuffix(size, "m") {
+				maxFileSize, _ := strconv.Atoi(strings.TrimSuffix(size, "m"))
+				valueSize = strconv.Itoa(maxFileSize * SizeMB)
+			} else if strings.HasSuffix(size, "G") {
+				maxFileSize, _ := strconv.Atoi(strings.TrimSuffix(size, "G"))
+				valueSize = strconv.Itoa(maxFileSize * SizeGB)
+			} else if strings.HasSuffix(size, "g") {
+				maxFileSize, _ := strconv.Atoi(strings.TrimSuffix(size, "g"))
+				valueSize = strconv.Itoa(maxFileSize * SizeGB)
+			}
+		}
+	}
+	envVarGeneral = append(envVarGeneral, corev1.EnvVar{
+		Name:  "MM_FILESETTINGS_MAXFILESIZE",
+		Value: valueSize,
+	})
+
+	// Mattermost License
+	volumeLicense := []corev1.Volume{}
+	volumeMountLicense := []corev1.VolumeMount{}
+	podAnnotations := map[string]string{}
+	if isLicensed {
+		envVarGeneral = append(envVarGeneral, corev1.EnvVar{
+			Name:  "MM_SERVICESETTINGS_LICENSEFILELOCATION",
+			Value: "/mattermost-license/license",
+		})
+
+		volumeMountLicense = append(volumeMountLicense, corev1.VolumeMount{
+			MountPath: "/mattermost-license",
+			Name:      "mattermost-license",
+			ReadOnly:  true,
+		})
+
+		volumeLicense = append(volumeLicense, corev1.Volume{
+			Name: "mattermost-license",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: mattermost.Spec.MattermostLicenseSecret,
+				},
+			},
+		})
+
+		clusterEnvVars := []corev1.EnvVar{
+			{
+				Name:  "MM_CLUSTERSETTINGS_ENABLE",
+				Value: "true",
+			},
+			{
+				Name:  "MM_CLUSTERSETTINGS_CLUSTERNAME",
+				Value: "production",
+			},
+		}
+
+		envVarGeneral = append(envVarGeneral, clusterEnvVars...)
+
+		podAnnotations = map[string]string{
+			"prometheus.io/scrape": "true",
+			"prometheus.io/path":   "/metrics",
+			"prometheus.io/port":   "8067",
+		}
+	}
+
+	// EnvVars Section
+	envVars := []corev1.EnvVar{}
+	envVars = append(envVars, envVarDB...)
+	envVars = append(envVars, envVarMinio...)
+	envVars = append(envVars, envVarES...)
+	envVars = append(envVars, envVarGeneral...)
+
+	// Merge our custom env vars in.
+	envVars = mergeEnvVars(envVars, mattermost.Spec.MattermostEnv)
+
+	revHistoryLimit := int32(defaultRevHistoryLimit)
+	maxUnavailable := intstr.FromInt(defaultMaxUnavailable)
+	maxSurge := intstr.FromInt(defaultMaxSurge)
+
+	liveness, readiness := setProbes(mattermost.Spec.LivenessProbe, mattermost.Spec.ReadinessProbe)
+
+	replicas := mattermost.Spec.Replicas
+	if replicas < 0 {
+		replicas = 0
+	}
+
+	return &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      deploymentName,
+			Namespace: mattermost.Namespace,
+			Labels:    mattermost.ClusterInstallationLabels(deploymentName),
+			OwnerReferences: []metav1.OwnerReference{
+				*metav1.NewControllerRef(mattermost, schema.GroupVersionKind{
+					Group:   mattermostv1alpha1.SchemeGroupVersion.Group,
+					Version: mattermostv1alpha1.SchemeGroupVersion.Version,
+					Kind:    "ClusterInstallation",
+				}),
+			},
+		},
+		Spec: appsv1.DeploymentSpec{
+			Strategy: appsv1.DeploymentStrategy{
+				Type: appsv1.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: &appsv1.RollingUpdateDeployment{
+					MaxUnavailable: &maxUnavailable,
+					MaxSurge:       &maxSurge,
+				},
+			},
+			RevisionHistoryLimit: &revHistoryLimit,
+			Replicas:             &replicas,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: ClusterInstallationSelectorLabels(deploymentName),
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels:      mattermost.ClusterInstallationLabels(deploymentName),
+					Annotations: podAnnotations,
+				},
+				Spec: corev1.PodSpec{
+					InitContainers: initContainers,
+					Containers: []corev1.Container{
+						{
+							Name:                     MattermostAppContainerName,
+							Image:                    containerImage,
+							ImagePullPolicy:          corev1.PullIfNotPresent,
+							TerminationMessagePolicy: corev1.TerminationMessageFallbackToLogsOnError,
+							Command:                  []string{"mattermost"},
+							Env:                      envVars,
+							Ports: []corev1.ContainerPort{
+								{
+									ContainerPort: 8065,
+									Name:          "app",
+								},
+							},
+							ReadinessProbe: readiness,
+							LivenessProbe:  liveness,
+							VolumeMounts:   volumeMountLicense,
+							Resources:      mattermost.Spec.Resources,
+						},
+					},
+					Volumes:      volumeLicense,
+					Affinity:     mattermost.Spec.Affinity,
+					NodeSelector: mattermost.Spec.NodeSelector,
+				},
+			},
+		},
+	}
+}
+
+// GenerateSecret returns the service for Mattermost
+func GenerateSecret(mattermost *mattermostv1alpha1.ClusterInstallation, secretName string, labels map[string]string, values map[string][]byte) *corev1.Secret {
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels:    labels,
+			Name:      secretName,
+			Namespace: mattermost.Namespace,
+			OwnerReferences: []metav1.OwnerReference{
+				*metav1.NewControllerRef(mattermost, schema.GroupVersionKind{
+					Group:   mattermostv1alpha1.SchemeGroupVersion.Group,
+					Version: mattermostv1alpha1.SchemeGroupVersion.Version,
+					Kind:    "ClusterInstallation",
+				}),
+			},
+		},
+		Data: values,
+	}
+}
+
+// ClusterInstallationSelectorLabels returns the selector labels for selecting the resources
+// belonging to the given mattermost clusterinstallation.
+func ClusterInstallationSelectorLabels(name string) map[string]string {
+	l := ClusterInstallationResourceLabels(name)
+	l[ClusterLabel] = name
+	l["app"] = "mattermost"
+	return l
+}
+
+// ClusterInstallationLabels returns the labels for selecting the resources
+// belonging to the given mattermost clusterinstallation.
+func ClusterInstallationLabels(mattermost *mattermostv1alpha1.ClusterInstallation, name string) map[string]string {
+	l := ClusterInstallationResourceLabels(name)
+	l[ClusterLabel] = name
+	l["app"] = "mattermost"
+
+	labels := map[string]string{}
+	if mattermost.Spec.BlueGreen.Enable {
+		if mattermost.Spec.BlueGreen.ProductionDeployment == BlueName {
+			labels = mattermost.Spec.BlueGreen.Blue.ResourceLabels
+		}
+		if mattermost.Spec.BlueGreen.ProductionDeployment == GreenName {
+			labels = mattermost.Spec.BlueGreen.Green.ResourceLabels
+		}
+	} else {
+		labels = mattermost.Spec.ResourceLabels
+	}
+
+	for k, v := range labels {
+		l[k] = v
+	}
+	return l
+}
+
+// ClusterInstallationResourceLabels returns the labels for selecting a given
+// ClusterInstallation as well as any external dependency resources that were
+// created for the installation.
+func ClusterInstallationResourceLabels(name string) map[string]string {
+	return map[string]string{ClusterResourceLabel: name}
+}
+
+// mergeStringMaps inserts (and overwrites) data into receiver map object from origin.
+func mergeStringMaps(receiver, origin map[string]string) map[string]string {
+	if receiver == nil {
+		receiver = make(map[string]string)
+	}
+
+	if origin == nil {
+		// Nothing to merge from
+		return receiver
+	}
+
+	// Place key->value pair from src into dst
+	for key := range origin {
+		receiver[key] = origin[key]
+	}
+
+	return receiver
+}
+
+// mergeEnvVars takes two sets of env vars and merges them together. This will
+// replace env vars that already existed or will append them if they are new.
+func mergeEnvVars(original, new []corev1.EnvVar) []corev1.EnvVar {
+	for _, newEnvVar := range new {
+		var replaced bool
+
+		for originalPos, originalEnvVar := range original {
+			if originalEnvVar.Name == newEnvVar.Name {
+				original[originalPos] = newEnvVar
+				replaced = true
+			}
+		}
+
+		if !replaced {
+			original = append(original, newEnvVar)
+		}
+	}
+
+	return original
+}
+
+func setProbes(customLiveness corev1.Probe, customReadiness corev1.Probe) (*corev1.Probe, *corev1.Probe) {
+	liveness := &corev1.Probe{
+		Handler: corev1.Handler{
+			HTTPGet: &corev1.HTTPGetAction{
+				Path: "/api/v4/system/ping",
+				Port: intstr.FromInt(8065),
+			},
+		},
+		InitialDelaySeconds: 10,
+		PeriodSeconds:       10,
+		FailureThreshold:    3,
+	}
+
+	if customLiveness.Handler != (corev1.Handler{}) {
+		liveness.Handler = customLiveness.Handler
+	}
+
+	if customLiveness.InitialDelaySeconds != 0 {
+		liveness.InitialDelaySeconds = customLiveness.InitialDelaySeconds
+	}
+
+	if customLiveness.PeriodSeconds != 0 {
+		liveness.PeriodSeconds = customLiveness.PeriodSeconds
+	}
+
+	if customLiveness.FailureThreshold != 0 {
+		liveness.FailureThreshold = customLiveness.FailureThreshold
+	}
+
+	if customLiveness.SuccessThreshold != 0 {
+		liveness.SuccessThreshold = customLiveness.SuccessThreshold
+	}
+
+	if customLiveness.FailureThreshold != 0 {
+		liveness.FailureThreshold = customLiveness.FailureThreshold
+	}
+
+	readiness := &corev1.Probe{
+		Handler: corev1.Handler{
+			HTTPGet: &corev1.HTTPGetAction{
+				Path: "/api/v4/system/ping",
+				Port: intstr.FromInt(8065),
+			},
+		},
+		InitialDelaySeconds: 10,
+		PeriodSeconds:       5,
+		FailureThreshold:    6,
+	}
+
+	if customReadiness.Handler != (corev1.Handler{}) {
+		readiness.Handler = customReadiness.Handler
+	}
+
+	if customReadiness.InitialDelaySeconds != 0 {
+		readiness.InitialDelaySeconds = customReadiness.InitialDelaySeconds
+	}
+
+	if customReadiness.PeriodSeconds != 0 {
+		readiness.PeriodSeconds = customReadiness.PeriodSeconds
+	}
+
+	if customReadiness.FailureThreshold != 0 {
+		readiness.FailureThreshold = customReadiness.FailureThreshold
+	}
+
+	if customReadiness.SuccessThreshold != 0 {
+		readiness.SuccessThreshold = customReadiness.SuccessThreshold
+	}
+
+	if customReadiness.FailureThreshold != 0 {
+		readiness.FailureThreshold = customReadiness.FailureThreshold
+	}
+
+	return liveness, readiness
+}
+
+// newService returns semi-finished service with common parts filled.
+// Returned service is expected to be completed by the caller.
+func newService(mattermost *mattermostv1alpha1.ClusterInstallation, serviceName, selectorName string, annotations map[string]string) *corev1.Service {
+	return &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels:    mattermost.ClusterInstallationLabels(serviceName),
+			Name:      serviceName,
+			Namespace: mattermost.Namespace,
+			OwnerReferences: []metav1.OwnerReference{
+				*metav1.NewControllerRef(mattermost, schema.GroupVersionKind{
+					Group:   mattermostv1alpha1.SchemeGroupVersion.Group,
+					Version: mattermostv1alpha1.SchemeGroupVersion.Version,
+					Kind:    "ClusterInstallation",
+				}),
+			},
+			Annotations: annotations,
+		},
+		Spec: corev1.ServiceSpec{
+			Selector: ClusterInstallationSelectorLabels(selectorName),
+		},
+	}
+}

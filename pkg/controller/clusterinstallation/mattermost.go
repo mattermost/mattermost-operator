@@ -19,6 +19,7 @@ import (
 
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
 	"github.com/mattermost/mattermost-operator/pkg/database"
+	mattermostApp "github.com/mattermost/mattermost-operator/pkg/mattermost"
 )
 
 const updateJobName = "mattermost-update-check"
@@ -57,7 +58,7 @@ func (r *ReconcileClusterInstallation) checkMattermost(mattermost *mattermostv1a
 }
 
 func (r *ReconcileClusterInstallation) checkMattermostService(mattermost *mattermostv1alpha1.ClusterInstallation, resourceName, selectorName string, reqLogger logr.Logger) error {
-	desired := mattermost.GenerateService(resourceName, selectorName)
+	desired := mattermostApp.GenerateService(mattermost, resourceName, selectorName)
 
 	err := r.createServiceIfNotExists(mattermost, desired, reqLogger)
 	if err != nil {
@@ -74,7 +75,7 @@ func (r *ReconcileClusterInstallation) checkMattermostService(mattermost *matter
 }
 
 func (r *ReconcileClusterInstallation) checkMattermostIngress(mattermost *mattermostv1alpha1.ClusterInstallation, resourceName, ingressName string, ingressAnnotations map[string]string, reqLogger logr.Logger) error {
-	desired := mattermost.GenerateIngress(resourceName, ingressName, ingressAnnotations, mattermost.Spec.UseIngressTLS)
+	desired := mattermostApp.GenerateIngress(mattermost, resourceName, ingressName, ingressAnnotations, mattermost.Spec.UseIngressTLS)
 
 	err := r.createIngressIfNotExists(mattermost, desired, reqLogger)
 	if err != nil {
@@ -133,7 +134,7 @@ func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mat
 		isLicensed = true
 	}
 
-	desired := mattermost.GenerateDeployment(resourceName, ingressName, imageName, isLicensed, minioURL, dbInfo)
+	desired := mattermostApp.GenerateDeployment(mattermost, resourceName, ingressName, imageName, isLicensed, minioURL, dbInfo)
 	err = r.createDeploymentIfNotExists(mattermost, desired, reqLogger)
 	if err != nil {
 		return errors.Wrap(err, "failed to create mattermost deployment")
@@ -152,6 +153,7 @@ func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mat
 
 	return nil
 }
+
 func (r *ReconcileClusterInstallation) deleteAllMattermostComponents(mattermost *mattermostv1alpha1.ClusterInstallation, resourceName string, reqLogger logr.Logger) error {
 	err := r.deleteMattermostDeployment(mattermost, resourceName, reqLogger)
 	if err != nil {
