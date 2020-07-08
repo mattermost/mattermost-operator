@@ -5,13 +5,13 @@ import (
 
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
 	"github.com/mattermost/mattermost-operator/pkg/components/utils"
+	mattermostApp "github.com/mattermost/mattermost-operator/pkg/mattermost"
 
 	minioOperator "github.com/minio/minio-operator/pkg/apis/miniocontroller/v1beta1"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	resource "k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -67,7 +67,8 @@ func Secret(mattermost *mattermostv1alpha1.ClusterInstallation) *corev1.Secret {
 	data["accesskey"] = utils.New16ID()
 	data["secretkey"] = utils.New28ID()
 
-	return mattermost.GenerateSecret(
+	return mattermostApp.GenerateSecret(
+		mattermost,
 		secretName,
 		mattermostv1alpha1.ClusterInstallationResourceLabels(mattermost.Name),
 		data,
