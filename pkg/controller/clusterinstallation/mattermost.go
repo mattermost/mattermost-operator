@@ -75,7 +75,7 @@ func (r *ReconcileClusterInstallation) checkMattermostService(mattermost *matter
 }
 
 func (r *ReconcileClusterInstallation) checkMattermostIngress(mattermost *mattermostv1alpha1.ClusterInstallation, resourceName, ingressName string, ingressAnnotations map[string]string, reqLogger logr.Logger) error {
-	desired := mattermostApp.GenerateIngress(mattermost, resourceName, ingressName, ingressAnnotations, mattermost.Spec.UseIngressTLS)
+	desired := mattermostApp.GenerateIngress(mattermost, resourceName, ingressName, ingressAnnotations)
 
 	err := r.createIngressIfNotExists(mattermost, desired, reqLogger)
 	if err != nil {
@@ -92,7 +92,6 @@ func (r *ReconcileClusterInstallation) checkMattermostIngress(mattermost *matter
 }
 
 func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, resourceName, ingressName, imageName string, reqLogger logr.Logger) error {
-	var isLicensed bool
 	var err error
 	dbInfo := &database.Info{}
 
@@ -131,10 +130,9 @@ func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mat
 		if err != nil {
 			return errors.Wrap(err, "failed to get mattermost license secret.")
 		}
-		isLicensed = true
 	}
 
-	desired := mattermostApp.GenerateDeployment(mattermost, resourceName, ingressName, imageName, isLicensed, minioURL, dbInfo)
+	desired := mattermostApp.GenerateDeployment(mattermost, dbInfo, resourceName, ingressName, imageName, minioURL)
 	err = r.createDeploymentIfNotExists(mattermost, desired, reqLogger)
 	if err != nil {
 		return errors.Wrap(err, "failed to create mattermost deployment")
@@ -255,12 +253,12 @@ func (r *ReconcileClusterInstallation) isMainContainerImageSame(
 
 	// Fetch containers to compare
 
-	containerA := mattermost.GetMainContainer(a)
+	containerA := mattermost.GetMattermostAppContainer(a)
 	if containerA == nil {
 		return false, errors.Errorf("Unable to find main container, incorrect deployment %s/%s", a.Namespace, a.Name)
 	}
 
-	containerB := mattermost.GetMainContainer(b)
+	containerB := mattermost.GetMattermostAppContainer(b)
 	if containerB == nil {
 		return false, errors.Errorf("Unable to find main container, incorrect deployment %s/%s", b.Namespace, b.Name)
 	}
@@ -317,7 +315,7 @@ func (r *ReconcileClusterInstallation) checkUpdateJob(
 	desired *appsv1.Deployment,
 	reqLogger logr.Logger,
 ) (*batchv1.Job, error) {
-	reqLogger.Info(fmt.Sprintf("Running Mattermost update image job check for image %s", mattermost.GetMainContainer(desired).Image))
+	reqLogger.Info(fmt.Sprintf("Running Mattermost update image job check for image %s", mattermost.GetMattermostAppContainer(desired).Image))
 	job, err := r.fetchRunningUpdateJob(mattermost)
 	if err != nil {
 		// Unable to fetch job

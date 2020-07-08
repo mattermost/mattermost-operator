@@ -38,25 +38,6 @@ const (
 	// deployment type.
 	GreenName = "green"
 
-	// SizeMB is the number of bytes that make a megabyte
-	SizeMB = 1048576
-	// SizeGB is the number of bytes that make a gigabyte
-	SizeGB = 1048576000
-	// DefaultMaxFileSize is the default maximum file size configuration value that will be used unless nginx annotation is set
-	DefaultMaxFileSize = 1000
-
-	// defaultRevHistoryLimit is the default RevisionHistoryLimit - number of possible roll-back points
-	// More details: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#rolling-back-a-deployment
-	defaultRevHistoryLimit = 5
-	// defaultMaxUnavailable is the default max number of unavailable pods out of specified `Replicas` during rolling update.
-	// More details: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#max-unavailable
-	// Recommended to be as low as possible - in order to have number of available pod as close to `Replicas` as possible
-	defaultMaxUnavailable = 0
-	// defaultMaxSurge is the default max number of extra pods over specified `Replicas` during rolling update.
-	// More details: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#max-surge
-	// Recommended not to be too high - in order to have not too many extra pods over requested `Replicas` number
-	defaultMaxSurge = 1
-
 	// MattermostAppContainerName is the name of the container which runs the
 	// Mattermost application
 	MattermostAppContainerName = "mattermost"
@@ -170,8 +151,9 @@ func (mattermost *ClusterInstallation) GetContainerByName(deployment *appsv1.Dep
 	return nil
 }
 
-// GetMainContainer gets container which runs Mattermost application from a deployment
-func (mattermost *ClusterInstallation) GetMainContainer(deployment *appsv1.Deployment) *corev1.Container {
+// GetMattermostAppContainer gets container which runs Mattermost application
+// from a deployment.
+func (mattermost *ClusterInstallation) GetMattermostAppContainer(deployment *appsv1.Deployment) *corev1.Container {
 	// Check new-style - fixed name
 	container := mattermost.GetContainerByName(deployment, MattermostAppContainerName)
 	if container == nil {
@@ -213,7 +195,7 @@ func (d *AppDeployment) GetDeploymentImageName() string {
 func ClusterInstallationSelectorLabels(name string) map[string]string {
 	l := ClusterInstallationResourceLabels(name)
 	l[ClusterLabel] = name
-	l["app"] = "mattermost"
+	l["app"] = MattermostAppContainerName
 	return l
 }
 
@@ -222,7 +204,7 @@ func ClusterInstallationSelectorLabels(name string) map[string]string {
 func (mattermost *ClusterInstallation) ClusterInstallationLabels(name string) map[string]string {
 	l := ClusterInstallationResourceLabels(name)
 	l[ClusterLabel] = name
-	l["app"] = "mattermost"
+	l["app"] = MattermostAppContainerName
 
 	labels := map[string]string{}
 	if mattermost.Spec.BlueGreen.Enable {
@@ -245,13 +227,12 @@ func (mattermost *ClusterInstallation) ClusterInstallationLabels(name string) ma
 // MySQLLabels returns the labels for selecting the resources belonging to the
 // given mysql cluster.
 func MySQLLabels() map[string]string {
-	l := map[string]string{}
-	l["app.kubernetes.io/component"] = "database"
-	l["app.kubernetes.io/instance"] = "db"
-	l["app.kubernetes.io/managed-by"] = "mysql.presslabs.org"
-	l["app.kubernetes.io/name"] = "mysql"
-
-	return l
+	return map[string]string{
+		"app.kubernetes.io/component":  "database",
+		"app.kubernetes.io/instance":   "db",
+		"app.kubernetes.io/managed-by": "mysql.presslabs.org",
+		"app.kubernetes.io/name":       "mysql",
+	}
 }
 
 // ClusterInstallationResourceLabels returns the labels for selecting a given

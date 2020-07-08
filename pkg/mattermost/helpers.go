@@ -1,0 +1,121 @@
+package mattermost
+
+import (
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+)
+
+// mergeStringMaps inserts (and overwrites) data into receiver map object from
+// origin.
+func mergeStringMaps(receiver, origin map[string]string) map[string]string {
+	if receiver == nil {
+		receiver = make(map[string]string)
+	}
+
+	if origin == nil {
+		return receiver
+	}
+
+	for key := range origin {
+		receiver[key] = origin[key]
+	}
+
+	return receiver
+}
+
+// mergeEnvVars takes two sets of env vars and merges them together. This will
+// replace env vars that already existed or will append them if they are new.
+func mergeEnvVars(original, new []corev1.EnvVar) []corev1.EnvVar {
+	for _, newEnvVar := range new {
+		var replaced bool
+
+		for originalPos, originalEnvVar := range original {
+			if originalEnvVar.Name == newEnvVar.Name {
+				original[originalPos] = newEnvVar
+				replaced = true
+			}
+		}
+
+		if !replaced {
+			original = append(original, newEnvVar)
+		}
+	}
+
+	return original
+}
+
+func setProbes(customLiveness corev1.Probe, customReadiness corev1.Probe) (*corev1.Probe, *corev1.Probe) {
+	liveness := &corev1.Probe{
+		Handler: corev1.Handler{
+			HTTPGet: &corev1.HTTPGetAction{
+				Path: "/api/v4/system/ping",
+				Port: intstr.FromInt(8065),
+			},
+		},
+		InitialDelaySeconds: 10,
+		PeriodSeconds:       10,
+		FailureThreshold:    3,
+	}
+
+	if customLiveness.Handler != (corev1.Handler{}) {
+		liveness.Handler = customLiveness.Handler
+	}
+
+	if customLiveness.InitialDelaySeconds != 0 {
+		liveness.InitialDelaySeconds = customLiveness.InitialDelaySeconds
+	}
+
+	if customLiveness.PeriodSeconds != 0 {
+		liveness.PeriodSeconds = customLiveness.PeriodSeconds
+	}
+
+	if customLiveness.FailureThreshold != 0 {
+		liveness.FailureThreshold = customLiveness.FailureThreshold
+	}
+
+	if customLiveness.SuccessThreshold != 0 {
+		liveness.SuccessThreshold = customLiveness.SuccessThreshold
+	}
+
+	if customLiveness.FailureThreshold != 0 {
+		liveness.FailureThreshold = customLiveness.FailureThreshold
+	}
+
+	readiness := &corev1.Probe{
+		Handler: corev1.Handler{
+			HTTPGet: &corev1.HTTPGetAction{
+				Path: "/api/v4/system/ping",
+				Port: intstr.FromInt(8065),
+			},
+		},
+		InitialDelaySeconds: 10,
+		PeriodSeconds:       5,
+		FailureThreshold:    6,
+	}
+
+	if customReadiness.Handler != (corev1.Handler{}) {
+		readiness.Handler = customReadiness.Handler
+	}
+
+	if customReadiness.InitialDelaySeconds != 0 {
+		readiness.InitialDelaySeconds = customReadiness.InitialDelaySeconds
+	}
+
+	if customReadiness.PeriodSeconds != 0 {
+		readiness.PeriodSeconds = customReadiness.PeriodSeconds
+	}
+
+	if customReadiness.FailureThreshold != 0 {
+		readiness.FailureThreshold = customReadiness.FailureThreshold
+	}
+
+	if customReadiness.SuccessThreshold != 0 {
+		readiness.SuccessThreshold = customReadiness.SuccessThreshold
+	}
+
+	if customReadiness.FailureThreshold != 0 {
+		readiness.FailureThreshold = customReadiness.FailureThreshold
+	}
+
+	return liveness, readiness
+}

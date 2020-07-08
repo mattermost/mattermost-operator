@@ -166,7 +166,28 @@ type Minio struct {
 
 // Database defines the database configuration for a ClusterInstallation.
 type Database struct {
+	// Defines the type of database to use for an Operator-Managed database. This
+	// value is ignored when using a User-Managed database.
 	Type string `json:"type,omitempty"`
+	// Optionally enter the name of an already-existing Secret for connecting to
+	// the database. This secret should be configured as follows:
+	//
+	// User-Managed Database
+	//   - Key: DB_CONNECTION_STRING | Value: <FULL_DATABASE_CONNECTION_STRING>
+	// Operator-Managed Database
+	//   - Key: ROOT_PASSWORD | Value: <ROOT_DATABASE_PASSWORD>
+	//   - Key: USER | Value: <USER_NAME>
+	//   - Key: PASSWORD | Value: <USER_PASSWORD>
+	//   - Key: DATABASE Value: <DATABASE_NAME>
+	//
+	// Notes:
+	//   If you define all secret values for both User-Managed and
+	//   Operator-Managed database types, the User-Managed connection string will
+	//   take precedence and the Operator-Managed values will be ignored. If the
+	//   secret is left blank, the default behavior is to use an Operator-Managed
+	//   database with strong randomly-generated database credentials.
+	// +optional
+	Secret string `json:"secret,omitempty"`
 	// Defines the storage size for the database. ie 50Gi
 	// +optional
 	// +kubebuilder:validation:Pattern=^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$
@@ -195,25 +216,6 @@ type Database struct {
 	// Defines the secret to be used for uploading/restoring backup.
 	// +optional
 	BackupSecretName string `json:"backupSecretName,omitempty"`
-	// Optionally enter the name of an already-existing Secret for connecting to
-	// the database. This secret should be configured as follows:
-	//
-	// User-Managed Database
-	//   - Key: DB_CONNECTION_STRING | Value: <FULL_DATABASE_CONNECTION_STRING>
-	// Operator-Managed Database
-	//   - Key: ROOT_PASSWORD | Value: <ROOT_DATABASE_PASSWORD>
-	//   - Key: USER | Value: <USER_NAME>
-	//   - Key: PASSWORD | Value: <USER_PASSWORD>
-	//   - Key: DATABASE Value: <DATABASE_NAME>
-	//
-	// Notes:
-	//   If you define all secret values for both User-Managed and
-	//   Operator-Managed database types, the User-Managed connection string will
-	//   take precedence and the Operator-Managed values will be ignored. If the
-	//   secret is left blank, the default behavior is to use an Operator-Managed
-	//   database with strong randomly-generated database credentials.
-	// +optional
-	Secret string `json:"secret,omitempty"`
 	// Defines the secret to be used when performing a database restore.
 	// +optional
 	BackupRestoreSecretName string `json:"backupRestoreSecretName,omitempty"`

@@ -1,4 +1,4 @@
-package v1alpha1
+package mattermost
 
 import (
 	"fmt"
@@ -18,58 +18,19 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-const (
-	// ClusterLabel is the label applied across all compoments
-	ClusterLabel = "v1alpha1.mattermost.com/installation"
-	// ClusterResourceLabel is the label applied to a given ClusterInstallation
-	// as well as all other resources created to support it.
-	ClusterResourceLabel = "v1alpha1.mattermost.com/resource"
-
-	// BlueName is the name of the blue Mattermmost installation in a blue/green
-	// deployment type.
-	BlueName = "blue"
-	// GreenName is the name of the green Mattermmost installation in a blue/green
-	// deployment type.
-	GreenName = "green"
-
-	// SizeMB is the number of bytes that make a megabyte
-	SizeMB = 1048576
-	// SizeGB is the number of bytes that make a gigabyte
-	SizeGB = 1048576000
-	// DefaultMaxFileSize is the default maximum file size configuration value that will be used unless nginx annotation is set
-	DefaultMaxFileSize = 1000
-
-	// defaultRevHistoryLimit is the default RevisionHistoryLimit - number of possible roll-back points
-	// More details: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#rolling-back-a-deployment
-	defaultRevHistoryLimit = 5
-	// defaultMaxUnavailable is the default max number of unavailable pods out of specified `Replicas` during rolling update.
-	// More details: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#max-unavailable
-	// Recommended to be as low as possible - in order to have number of available pod as close to `Replicas` as possible
-	defaultMaxUnavailable = 0
-	// defaultMaxSurge is the default max number of extra pods over specified `Replicas` during rolling update.
-	// More details: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#max-surge
-	// Recommended not to be too high - in order to have not too many extra pods over requested `Replicas` number
-	defaultMaxSurge = 1
-
-	// MattermostAppContainerName is the name of the container which runs the
-	// Mattermost application
-	MattermostAppContainerName = "mattermost"
-)
-
-// GenerateService returns the service for Mattermost.
+// GenerateService returns the service for the Mattermost app.
 func GenerateService(mattermost *mattermostv1alpha1.ClusterInstallation, serviceName, selectorName string) *corev1.Service {
-	// Service has custom annotations
-	annotations := map[string]string{
+	baseAnnotations := map[string]string{
 		"service.alpha.kubernetes.io/tolerate-unready-endpoints": "true",
 	}
 
-	// Result service
-	var service *corev1.Service
-
 	if mattermost.Spec.UseServiceLoadBalancer {
-		// Create LoadBalancer service with additional annotations provided in .Spec
-		// LoadBalancer is directly accessible from outside and thus exposes ports 80 and 443
-		service = newService(mattermost, serviceName, selectorName, mergeStringMaps(annotations, mattermost.Spec.ServiceAnnotations))
+		// Create a LoadBalancer service with additional annotations provided in
+		// the Mattermost Spec. The LoadBalancer is directly accessible from
+		// outside the cluster thus exposes ports 80 and 443.
+		service := newService(mattermost, serviceName, selectorName,
+			mergeStringMaps(baseAnnotations, mattermost.Spec.ServiceAnnotations),
+		)
 		service.Spec.Ports = []corev1.ServicePort{
 			{
 				Name:       "http",
@@ -83,24 +44,26 @@ func GenerateService(mattermost *mattermostv1alpha1.ClusterInstallation, service
 			},
 		}
 		service.Spec.Type = corev1.ServiceTypeLoadBalancer
-	} else {
-		// Create Headless service
-		// Headless service is not directly accessible from outside and thus exposes custom port
-		service = newService(mattermost, serviceName, selectorName, annotations)
-		service.Spec.Ports = []corev1.ServicePort{
-			{
-				Port:       8065,
-				TargetPort: intstr.FromString("app"),
-			},
-		}
-		service.Spec.ClusterIP = corev1.ClusterIPNone
+
+		return service
 	}
+
+	// Create a headless service which is not directly accessible from outside
+	// the cluster and thus exposes a custom port.
+	service := newService(mattermost, serviceName, selectorName, baseAnnotations)
+	service.Spec.Ports = []corev1.ServicePort{
+		{
+			Port:       8065,
+			TargetPort: intstr.FromString("app"),
+		},
+	}
+	service.Spec.ClusterIP = corev1.ClusterIPNone
 
 	return service
 }
 
-// GenerateIngress returns the ingress for Mattermost
-func GenerateIngress(mattermost *mattermostv1alpha1.ClusterInstallation, name, ingressName string, ingressAnnotations map[string]string, useTLS bool) *v1beta1.Ingress {
+// GenerateIngress returns the ingress for the Mattermost app.
+func GenerateIngress(mattermost *mattermostv1alpha1.ClusterInstallation, name, ingressName string, ingressAnnotations map[string]string) *v1beta1.Ingress {
 	ingress := &v1beta1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -137,7 +100,7 @@ func GenerateIngress(mattermost *mattermostv1alpha1.ClusterInstallation, name, i
 		},
 	}
 
-	if useTLS {
+	if mattermost.Spec.UseIngressTLS {
 		ingress.Spec.TLS = []v1beta1.IngressTLS{
 			{
 				Hosts:      []string{ingressName},
@@ -149,8 +112,8 @@ func GenerateIngress(mattermost *mattermostv1alpha1.ClusterInstallation, name, i
 	return ingress
 }
 
-// GenerateDeployment returns the deployment spec for Mattermost
-func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, deploymentName, ingressName, containerImage string, isLicensed bool, minioURL string, dbInfo *database.Info) *appsv1.Deployment {
+// GenerateDeployment returns the deployment for Mattermost app.
+func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbInfo *database.Info, deploymentName, ingressName, containerImage string, minioURL string) *appsv1.Deployment {
 	var envVarDB []corev1.EnvVar
 	mysqlName := utils.HashWithPrefix("db", mattermost.Name)
 
@@ -360,22 +323,22 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, depl
 		},
 	}
 
-	valueSize := strconv.Itoa(DefaultMaxFileSize * SizeMB)
+	valueSize := strconv.Itoa(defaultMaxFileSize * sizeMB)
 	if !mattermost.Spec.UseServiceLoadBalancer {
 		if _, ok := mattermost.Spec.IngressAnnotations["nginx.ingress.kubernetes.io/proxy-body-size"]; ok {
 			size := mattermost.Spec.IngressAnnotations["nginx.ingress.kubernetes.io/proxy-body-size"]
 			if strings.HasSuffix(size, "M") {
 				maxFileSize, _ := strconv.Atoi(strings.TrimSuffix(size, "M"))
-				valueSize = strconv.Itoa(maxFileSize * SizeMB)
+				valueSize = strconv.Itoa(maxFileSize * sizeMB)
 			} else if strings.HasSuffix(size, "m") {
 				maxFileSize, _ := strconv.Atoi(strings.TrimSuffix(size, "m"))
-				valueSize = strconv.Itoa(maxFileSize * SizeMB)
+				valueSize = strconv.Itoa(maxFileSize * sizeMB)
 			} else if strings.HasSuffix(size, "G") {
 				maxFileSize, _ := strconv.Atoi(strings.TrimSuffix(size, "G"))
-				valueSize = strconv.Itoa(maxFileSize * SizeGB)
+				valueSize = strconv.Itoa(maxFileSize * sizeGB)
 			} else if strings.HasSuffix(size, "g") {
 				maxFileSize, _ := strconv.Atoi(strings.TrimSuffix(size, "g"))
-				valueSize = strconv.Itoa(maxFileSize * SizeGB)
+				valueSize = strconv.Itoa(maxFileSize * sizeGB)
 			}
 		}
 	}
@@ -388,7 +351,7 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, depl
 	volumeLicense := []corev1.Volume{}
 	volumeMountLicense := []corev1.VolumeMount{}
 	podAnnotations := map[string]string{}
-	if isLicensed {
+	if len(mattermost.Spec.MattermostLicenseSecret) != 0 {
 		envVarGeneral = append(envVarGeneral, corev1.EnvVar{
 			Name:  "MM_SERVICESETTINGS_LICENSEFILELOCATION",
 			Value: "/mattermost-license/license",
@@ -474,7 +437,7 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, depl
 			RevisionHistoryLimit: &revHistoryLimit,
 			Replicas:             &replicas,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: ClusterInstallationSelectorLabels(deploymentName),
+				MatchLabels: mattermostv1alpha1.ClusterInstallationSelectorLabels(deploymentName),
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -485,7 +448,7 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, depl
 					InitContainers: initContainers,
 					Containers: []corev1.Container{
 						{
-							Name:                     MattermostAppContainerName,
+							Name:                     mattermostv1alpha1.MattermostAppContainerName,
 							Image:                    containerImage,
 							ImagePullPolicy:          corev1.PullIfNotPresent,
 							TerminationMessagePolicy: corev1.TerminationMessageFallbackToLogsOnError,
@@ -512,7 +475,7 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, depl
 	}
 }
 
-// GenerateSecret returns the service for Mattermost
+// GenerateSecret returns the secret for Mattermost
 func GenerateSecret(mattermost *mattermostv1alpha1.ClusterInstallation, secretName string, labels map[string]string, values map[string][]byte) *corev1.Secret {
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -529,163 +492,6 @@ func GenerateSecret(mattermost *mattermostv1alpha1.ClusterInstallation, secretNa
 		},
 		Data: values,
 	}
-}
-
-// ClusterInstallationSelectorLabels returns the selector labels for selecting the resources
-// belonging to the given mattermost clusterinstallation.
-func ClusterInstallationSelectorLabels(name string) map[string]string {
-	l := ClusterInstallationResourceLabels(name)
-	l[ClusterLabel] = name
-	l["app"] = "mattermost"
-	return l
-}
-
-// ClusterInstallationLabels returns the labels for selecting the resources
-// belonging to the given mattermost clusterinstallation.
-func ClusterInstallationLabels(mattermost *mattermostv1alpha1.ClusterInstallation, name string) map[string]string {
-	l := ClusterInstallationResourceLabels(name)
-	l[ClusterLabel] = name
-	l["app"] = "mattermost"
-
-	labels := map[string]string{}
-	if mattermost.Spec.BlueGreen.Enable {
-		if mattermost.Spec.BlueGreen.ProductionDeployment == BlueName {
-			labels = mattermost.Spec.BlueGreen.Blue.ResourceLabels
-		}
-		if mattermost.Spec.BlueGreen.ProductionDeployment == GreenName {
-			labels = mattermost.Spec.BlueGreen.Green.ResourceLabels
-		}
-	} else {
-		labels = mattermost.Spec.ResourceLabels
-	}
-
-	for k, v := range labels {
-		l[k] = v
-	}
-	return l
-}
-
-// ClusterInstallationResourceLabels returns the labels for selecting a given
-// ClusterInstallation as well as any external dependency resources that were
-// created for the installation.
-func ClusterInstallationResourceLabels(name string) map[string]string {
-	return map[string]string{ClusterResourceLabel: name}
-}
-
-// mergeStringMaps inserts (and overwrites) data into receiver map object from origin.
-func mergeStringMaps(receiver, origin map[string]string) map[string]string {
-	if receiver == nil {
-		receiver = make(map[string]string)
-	}
-
-	if origin == nil {
-		// Nothing to merge from
-		return receiver
-	}
-
-	// Place key->value pair from src into dst
-	for key := range origin {
-		receiver[key] = origin[key]
-	}
-
-	return receiver
-}
-
-// mergeEnvVars takes two sets of env vars and merges them together. This will
-// replace env vars that already existed or will append them if they are new.
-func mergeEnvVars(original, new []corev1.EnvVar) []corev1.EnvVar {
-	for _, newEnvVar := range new {
-		var replaced bool
-
-		for originalPos, originalEnvVar := range original {
-			if originalEnvVar.Name == newEnvVar.Name {
-				original[originalPos] = newEnvVar
-				replaced = true
-			}
-		}
-
-		if !replaced {
-			original = append(original, newEnvVar)
-		}
-	}
-
-	return original
-}
-
-func setProbes(customLiveness corev1.Probe, customReadiness corev1.Probe) (*corev1.Probe, *corev1.Probe) {
-	liveness := &corev1.Probe{
-		Handler: corev1.Handler{
-			HTTPGet: &corev1.HTTPGetAction{
-				Path: "/api/v4/system/ping",
-				Port: intstr.FromInt(8065),
-			},
-		},
-		InitialDelaySeconds: 10,
-		PeriodSeconds:       10,
-		FailureThreshold:    3,
-	}
-
-	if customLiveness.Handler != (corev1.Handler{}) {
-		liveness.Handler = customLiveness.Handler
-	}
-
-	if customLiveness.InitialDelaySeconds != 0 {
-		liveness.InitialDelaySeconds = customLiveness.InitialDelaySeconds
-	}
-
-	if customLiveness.PeriodSeconds != 0 {
-		liveness.PeriodSeconds = customLiveness.PeriodSeconds
-	}
-
-	if customLiveness.FailureThreshold != 0 {
-		liveness.FailureThreshold = customLiveness.FailureThreshold
-	}
-
-	if customLiveness.SuccessThreshold != 0 {
-		liveness.SuccessThreshold = customLiveness.SuccessThreshold
-	}
-
-	if customLiveness.FailureThreshold != 0 {
-		liveness.FailureThreshold = customLiveness.FailureThreshold
-	}
-
-	readiness := &corev1.Probe{
-		Handler: corev1.Handler{
-			HTTPGet: &corev1.HTTPGetAction{
-				Path: "/api/v4/system/ping",
-				Port: intstr.FromInt(8065),
-			},
-		},
-		InitialDelaySeconds: 10,
-		PeriodSeconds:       5,
-		FailureThreshold:    6,
-	}
-
-	if customReadiness.Handler != (corev1.Handler{}) {
-		readiness.Handler = customReadiness.Handler
-	}
-
-	if customReadiness.InitialDelaySeconds != 0 {
-		readiness.InitialDelaySeconds = customReadiness.InitialDelaySeconds
-	}
-
-	if customReadiness.PeriodSeconds != 0 {
-		readiness.PeriodSeconds = customReadiness.PeriodSeconds
-	}
-
-	if customReadiness.FailureThreshold != 0 {
-		readiness.FailureThreshold = customReadiness.FailureThreshold
-	}
-
-	if customReadiness.SuccessThreshold != 0 {
-		readiness.SuccessThreshold = customReadiness.SuccessThreshold
-	}
-
-	if customReadiness.FailureThreshold != 0 {
-		readiness.FailureThreshold = customReadiness.FailureThreshold
-	}
-
-	return liveness, readiness
 }
 
 // newService returns semi-finished service with common parts filled.
@@ -706,7 +512,7 @@ func newService(mattermost *mattermostv1alpha1.ClusterInstallation, serviceName,
 			Annotations: annotations,
 		},
 		Spec: corev1.ServiceSpec{
-			Selector: ClusterInstallationSelectorLabels(selectorName),
+			Selector: mattermostv1alpha1.ClusterInstallationSelectorLabels(selectorName),
 		},
 	}
 }
