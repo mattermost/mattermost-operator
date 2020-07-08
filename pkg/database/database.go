@@ -8,17 +8,17 @@ import (
 
 // Info contains information on a database connection.
 type Info struct {
-	external            bool
-	hasDatabaseCheckURL bool
-	rootPassword        string
-	UserName            string
-	UserPassword        string
-	DatabaseName        string
+	External         bool
+	DatabaseCheckURL bool
+	rootPassword     string
+	UserName         string
+	UserPassword     string
+	DatabaseName     string
 }
 
 // IsValid returns if the database Info is valid or not.
 func (db *Info) IsValid() error {
-	if db.external {
+	if db.External {
 		return nil
 	}
 
@@ -40,12 +40,12 @@ func (db *Info) IsValid() error {
 
 // IsExternal defines if the database is external or not
 func (db *Info) IsExternal() bool {
-	return db.external
+	return db.External
 }
 
 // HasDatabaseCheckURL returns if the database has an endpoint check defined.
 func (db *Info) HasDatabaseCheckURL() bool {
-	return db.hasDatabaseCheckURL
+	return db.DatabaseCheckURL
 }
 
 // GenerateDatabaseInfoFromSecret takes a secret and returns database based on
@@ -53,22 +53,22 @@ func (db *Info) HasDatabaseCheckURL() bool {
 func GenerateDatabaseInfoFromSecret(secret *corev1.Secret) *Info {
 	if _, ok := secret.Data["DB_CONNECTION_STRING"]; ok {
 		// This is a secret for an external database.
-		databaseInfo := &Info{external: true}
+		databaseInfo := &Info{External: true}
 
 		if _, ok := secret.Data["DB_CONNECTION_CHECK_URL"]; ok {
 			// The optional endpoint check was provided.
-			databaseInfo.hasDatabaseCheckURL = true
+			databaseInfo.DatabaseCheckURL = true
 		}
 
 		return databaseInfo
 	}
 
 	return &Info{
-		external:            false,
-		hasDatabaseCheckURL: true,
-		rootPassword:        string(secret.Data["ROOT_PASSWORD"]),
-		UserName:            string(secret.Data["USER"]),
-		UserPassword:        string(secret.Data["PASSWORD"]),
-		DatabaseName:        string(secret.Data["DATABASE"]),
+		External:         false,
+		DatabaseCheckURL: true,
+		rootPassword:     string(secret.Data["ROOT_PASSWORD"]),
+		UserName:         string(secret.Data["USER"]),
+		UserPassword:     string(secret.Data["PASSWORD"]),
+		DatabaseName:     string(secret.Data["DATABASE"]),
 	}
 }
