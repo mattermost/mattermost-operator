@@ -77,7 +77,6 @@ gofmt: ## Runs gofmt against all packages.
 
 govet: ## Runs govet against all packages.
 	@echo Running GOVET
-	#$(GO) get golang.org/x/tools/go/analysis/passes/shadow/cmd/shadow
 	$(GO) vet $(GOFLAGS) $(PACKAGES)
 	$(GO) vet $(GOFLAGS) -vettool=$(SHADOW_GEN) $(PACKAGES)
 	@echo "govet success";

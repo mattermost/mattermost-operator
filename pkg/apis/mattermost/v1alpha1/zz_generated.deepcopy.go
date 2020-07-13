@@ -200,6 +200,7 @@ func (in *ClusterInstallationSpec) DeepCopyInto(out *ClusterInstallationSpec) {
 		}
 	}
 	in.LivenessProbe.DeepCopyInto(&out.LivenessProbe)
+	in.StartupProbe.DeepCopyInto(&out.StartupProbe)
 	in.ReadinessProbe.DeepCopyInto(&out.ReadinessProbe)
 	return
 }
