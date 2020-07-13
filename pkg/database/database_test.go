@@ -55,8 +55,8 @@ func TestDatabaseInfo(t *testing.T) {
 			}},
 			expectedInfo: &Info{
 				rootPassword:     "root",
-				UserName:         "user",
-				UserPassword:     "pass",
+				userName:         "user",
+				userPassword:     "pass",
 				DatabaseName:     "database1",
 				DatabaseCheckURL: true,
 			},
@@ -73,7 +73,7 @@ func TestDatabaseInfo(t *testing.T) {
 			}},
 			expectedInfo: &Info{
 				rootPassword:     "root",
-				UserPassword:     "pass",
+				userPassword:     "pass",
 				DatabaseName:     "database1",
 				DatabaseCheckURL: true,
 			},
@@ -90,7 +90,7 @@ func TestDatabaseInfo(t *testing.T) {
 			}},
 			expectedInfo: &Info{
 				rootPassword:     "root",
-				UserName:         "user",
+				userName:         "user",
 				DatabaseName:     "database1",
 				DatabaseCheckURL: true,
 			},
@@ -107,8 +107,8 @@ func TestDatabaseInfo(t *testing.T) {
 			}},
 			expectedInfo: &Info{
 				rootPassword:     "root",
-				UserName:         "user",
-				UserPassword:     "pass",
+				userName:         "user",
+				userPassword:     "pass",
 				DatabaseCheckURL: true,
 			},
 			isExternal:          false,
@@ -119,10 +119,20 @@ func TestDatabaseInfo(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Set the base secret name so it doesn't need to be specified for
+			// each test.
+			if len(tt.secret.Name) == 0 {
+				assert.Error(t, GenerateDatabaseInfoFromSecret(tt.secret).IsValid())
+				secretName := "database-secret"
+				tt.secret.Name = secretName
+				tt.expectedInfo.SecretName = secretName
+			}
+
 			info := GenerateDatabaseInfoFromSecret(tt.secret)
 			assert.Equal(t, tt.expectedInfo, info)
 			assert.Equal(t, tt.isExternal, info.IsExternal())
 			assert.Equal(t, tt.hasDatabaseCheckURL, info.HasDatabaseCheckURL())
+			assert.Equal(t, tt.secret.Name, info.SecretName)
 			if !tt.isValid {
 				assert.Error(t, info.IsValid())
 			} else {

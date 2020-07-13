@@ -16,7 +16,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.6.1
 	golang.org/x/net v0.0.0-20200625001655-4c5254603344
-	golang.org/x/tools v0.0.0-20200708183856-df98bc6d456c
+	golang.org/x/tools v0.0.0-20200713160548-f739c553ea89
 	k8s.io/api v0.18.2
 	k8s.io/apimachinery v0.18.2
 	k8s.io/client-go v12.0.0+incompatible
@@ -28,5 +28,6 @@ require (
 
 replace (
 	github.com/Azure/go-autorest => github.com/Azure/go-autorest v13.3.2+incompatible // Required by OLM
+	golang.org/x/tools => golang.org/x/tools v0.0.0-20200713011307-fd294ab11aed
 	k8s.io/client-go => k8s.io/client-go v0.18.2 // Required by prometheus-operator
 )

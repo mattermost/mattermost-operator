@@ -115,7 +115,6 @@ func GenerateIngress(mattermost *mattermostv1alpha1.ClusterInstallation, name, i
 // GenerateDeployment returns the deployment for Mattermost app.
 func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbInfo *database.Info, deploymentName, ingressName, containerImage string, minioURL string) *appsv1.Deployment {
 	var envVarDB []corev1.EnvVar
-	mysqlName := utils.HashWithPrefix("db", mattermost.Name)
 
 	masterDBEnvVar := corev1.EnvVar{
 		Name: "MM_CONFIG",
@@ -152,32 +151,61 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbIn
 				},
 				Command: []string{
 					"sh", "-c",
-					"until curl --max-time 5 $DB_CONNECTION_CHECK_URL; do echo waiting for mysql; sleep 5; done;",
+					"until curl --max-time 5 $DB_CONNECTION_CHECK_URL; do echo waiting for database; sleep 5; done;",
 				},
 			})
 		}
 	} else {
+		mysqlName := utils.HashWithPrefix("db", mattermost.Name)
+
 		masterDBEnvVar.Value = fmt.Sprintf(
-			"mysql://%s:%s@tcp(%s-mysql-master.%s:3306)/%s?charset=utf8mb4,utf8&readTimeout=30s&writeTimeout=30s",
-			dbInfo.UserName, dbInfo.UserPassword, mysqlName, mattermost.Namespace, dbInfo.DatabaseName,
+			"mysql://$(MYSQL_USERNAME):$(MYSQL_PASSWORD)@tcp(%s-mysql-master.%s:3306)/%s?charset=utf8mb4,utf8&readTimeout=30s&writeTimeout=30s",
+			mysqlName, mattermost.Namespace, dbInfo.DatabaseName,
 		)
 
-		envVarDB = append(envVarDB, corev1.EnvVar{
-			Name: "MM_SQLSETTINGS_DATASOURCEREPLICAS",
-			Value: fmt.Sprintf(
-				"%s:%s@tcp(%s-mysql.%s:3306)/%s?readTimeout=30s&writeTimeout=30s",
-				dbInfo.UserName, dbInfo.UserPassword, mysqlName, mattermost.Namespace, dbInfo.DatabaseName,
-			),
-		})
+		operatorEnv := []corev1.EnvVar{
+			{
+				Name: "MYSQL_USERNAME",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: dbInfo.SecretName,
+						},
+						Key: "USER",
+					},
+				},
+			},
+			{
+				Name: "MYSQL_PASSWORD",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: dbInfo.SecretName,
+						},
+						Key: "PASSWORD",
+					},
+				},
+			},
+			{
+				Name: "MM_SQLSETTINGS_DATASOURCEREPLICAS",
+				Value: fmt.Sprintf(
+					"$(MYSQL_USERNAME):$(MYSQL_PASSWORD)@tcp(%s-mysql.%s:3306)/%s?readTimeout=30s&writeTimeout=30s",
+					mysqlName, mattermost.Namespace, dbInfo.DatabaseName,
+				),
+			},
+		}
+		envVarDB = append(envVarDB, operatorEnv...)
 
 		// Create the init container to check that the DB is up and running
 		initContainers = append(initContainers, corev1.Container{
-			Name:            "init-check-mysql",
+			Name:            "init-check-operator-mysql",
 			Image:           "appropriate/curl:latest",
 			ImagePullPolicy: corev1.PullIfNotPresent,
 			Command: []string{
 				"sh", "-c",
-				fmt.Sprintf("until curl --max-time 5 http://%s-mysql-master.%s:3306; do echo waiting for mysql; sleep 5; done;", mysqlName, mattermost.Namespace),
+				fmt.Sprintf("until curl --max-time 5 http://%s-mysql-master.%s:3306; do echo waiting for mysql; sleep 5; done;",
+					mysqlName, mattermost.Namespace,
+				),
 			},
 		})
 	}
