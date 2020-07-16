@@ -41,13 +41,8 @@ jobs:
     steps:
       - checkout
       - run: |
-          go get golang.org/x/tools/cmd/cover
-          go get github.com/mattn/goveralls
-      - run: |
           make unittest
-      - run:
-          name: coveralls
-          command: goveralls -coverprofile=coverage.out -service=circle-ci -repotoken $COVERALLS_REPO_TOKEN || true
+          make goverall
 
   e2e:
     environment:

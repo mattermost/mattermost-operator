@@ -19,11 +19,30 @@ GO_LINKER_FLAGS ?= -ldflags\
 PACKAGES=$(shell go list ./...)
 TEST_PACKAGES=$(shell go list ./...| grep -v test/e2e)
 INSTALL_YAML=docs/mattermost-operator/mattermost-operator.yaml
+GO_INSTALL = ./scripts/go_install.sh
+
+# Binaries.
+TOOLS_BIN_DIR := $(abspath bin)
+
+SHADOW_BIN := shadow
+SHADOW_VER := master
+SHADOW_GEN := $(TOOLS_BIN_DIR)/$(SHADOW_BIN)
+
+OPENAPI_VER := master
+OPENAPI_BIN := openapi-gen
+OPENAPI_GEN := $(TOOLS_BIN_DIR)/$(OPENAPI_BIN)
+
+GOVERALLS_VER := master
+GOVERALLS_BIN := goveralls
+GOVERALLS_GEN := $(TOOLS_BIN_DIR)/$(GOVERALLS_BIN)
 
 all: check-style unittest build ## Run all the things
 
 unittest: ## Runs unit tests
-	go test -mod=vendor $(GO_LINKER_FLAGS) $(TEST_PACKAGES) -v -covermode=count -coverprofile=coverage.out
+	$(GO) test -mod=vendor $(GO_LINKER_FLAGS) $(TEST_PACKAGES) -v -covermode=count -coverprofile=coverage.out
+
+goverall: $(GOVERALLS_GEN) ## Runs goveralls
+	$(GOVERALLS_GEN) -coverprofile=coverage.out -service=circle-ci -repotoken ${COVERALLS_REPO_TOKEN} || true
 
 build: ## Build the mattermost-operator
 	@echo Building Mattermost-operator
@@ -37,7 +56,7 @@ build-image: operator-sdk ## Build the docker image for mattermost-operator
 	. -f build/Dockerfile -t $(OPERATOR_IMAGE) \
 	--no-cache
 
-check-style: gofmt govet ## Runs govet/gofmt
+check-style: $(SHADOW_GEN) gofmt govet ## Runs govet/gofmt
 
 gofmt: ## Runs gofmt against all packages.
 	@echo Running GOFMT
@@ -58,19 +77,18 @@ gofmt: ## Runs gofmt against all packages.
 
 govet: ## Runs govet against all packages.
 	@echo Running GOVET
-	$(GO) get golang.org/x/tools/go/analysis/passes/shadow/cmd/shadow
+	#$(GO) get golang.org/x/tools/go/analysis/passes/shadow/cmd/shadow
 	$(GO) vet $(GOFLAGS) $(PACKAGES)
-	$(GO) vet $(GOFLAGS) -vettool=$(GOPATH)/bin/shadow $(PACKAGES)
+	$(GO) vet $(GOFLAGS) -vettool=$(SHADOW_GEN) $(PACKAGES)
 	@echo "govet success";
 
-generate: operator-sdk ## Runs the kubernetes code-generators and openapi
+generate: $(OPENAPI_GEN) operator-sdk ## Runs the kubernetes code-generators and openapi
 	## We have to manually export GOROOT here to get around the following issue:
 	## https://github.com/operator-framework/operator-sdk/issues/1854#issuecomment-525132306
 	GOROOT=$(GOROOT) build/operator-sdk generate k8s
 	build/operator-sdk generate crds
 
-	which ./bin/openapi-gen > /dev/null || GO111MODULE=on go build -o ./bin/openapi-gen k8s.io/kube-openapi/cmd/openapi-gen
-	GOROOT=$(GOROOT) ./bin/openapi-gen --logtostderr=true -o "" -i ./pkg/apis/mattermost/v1alpha1 -O zz_generated.openapi -p ./pkg/apis/mattermost/v1alpha1 -h ./hack/boilerplate.go.txt -r "-"
+	GOROOT=$(GOROOT) $(OPENAPI_GEN) --logtostderr=true -o "" -i ./pkg/apis/mattermost/v1alpha1 -O zz_generated.openapi -p ./pkg/apis/mattermost/v1alpha1 -h ./hack/boilerplate.go.txt -r "-"
 
 	vendor/k8s.io/code-generator/generate-groups.sh all github.com/mattermost/mattermost-operator/pkg/client github.com/mattermost/mattermost-operator/pkg/apis "mattermost:v1alpha1" -h ./hack/boilerplate.go.txt
 
@@ -97,6 +115,23 @@ clean: ## Clean up everything
 	go clean $(GOFLAGS) -i ./...
 	rm -f *.out
 	rm -f *.test
+	rm -f bin/*
+
+
+## --------------------------------------
+## Tooling Binaries
+## --------------------------------------
+
+$(SHADOW_GEN): ## Build shadow
+	GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) golang.org/x/tools/go/analysis/passes/shadow/cmd/shadow $(SHADOW_BIN) $(SHADOW_VER)
+
+
+$(OPENAPI_GEN): ## Build open-api
+	GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) k8s.io/kube-openapi/cmd/openapi-gen $(OPENAPI_BIN) $(OPENAPI_VER)
+
+
+$(GOVERALLS_GEN): ## Build open-api
+	GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) github.com/mattn/goveralls $(GOVERALLS_BIN) $(GOVERALLS_VER)
 
 
 ## Help documentatin à la https://marmelab.com/blog/2016/02/29/auto-documented-makefile.html
