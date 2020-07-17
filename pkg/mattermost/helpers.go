@@ -44,7 +44,7 @@ func mergeEnvVars(original, new []corev1.EnvVar) []corev1.EnvVar {
 	return original
 }
 
-func setProbes(customLiveness corev1.Probe, customReadiness corev1.Probe) (*corev1.Probe, *corev1.Probe) {
+func setProbes(customLiveness, customStartup, customReadiness corev1.Probe) (*corev1.Probe, *corev1.Probe, *corev1.Probe) {
 	liveness := &corev1.Probe{
 		Handler: corev1.Handler{
 			HTTPGet: &corev1.HTTPGetAction{
@@ -77,8 +77,36 @@ func setProbes(customLiveness corev1.Probe, customReadiness corev1.Probe) (*core
 		liveness.SuccessThreshold = customLiveness.SuccessThreshold
 	}
 
-	if customLiveness.FailureThreshold != 0 {
-		liveness.FailureThreshold = customLiveness.FailureThreshold
+	startUp := &corev1.Probe{
+		Handler: corev1.Handler{
+			HTTPGet: &corev1.HTTPGetAction{
+				Path: "/api/v4/system/ping",
+				Port: intstr.FromInt(8065),
+			},
+		},
+		InitialDelaySeconds: 1,
+		PeriodSeconds:       10,
+		FailureThreshold:    60,
+	}
+
+	if customStartup.Handler != (corev1.Handler{}) {
+		startUp.Handler = customStartup.Handler
+	}
+
+	if customStartup.InitialDelaySeconds != 0 {
+		startUp.InitialDelaySeconds = customStartup.InitialDelaySeconds
+	}
+
+	if customStartup.PeriodSeconds != 0 {
+		startUp.PeriodSeconds = customStartup.PeriodSeconds
+	}
+
+	if customStartup.FailureThreshold != 0 {
+		startUp.FailureThreshold = customStartup.FailureThreshold
+	}
+
+	if customStartup.SuccessThreshold != 0 {
+		startUp.SuccessThreshold = customStartup.SuccessThreshold
 	}
 
 	readiness := &corev1.Probe{
@@ -113,9 +141,5 @@ func setProbes(customLiveness corev1.Probe, customReadiness corev1.Probe) (*core
 		readiness.SuccessThreshold = customReadiness.SuccessThreshold
 	}
 
-	if customReadiness.FailureThreshold != 0 {
-		readiness.FailureThreshold = customReadiness.FailureThreshold
-	}
-
-	return liveness, readiness
+	return liveness, startUp, readiness
 }
