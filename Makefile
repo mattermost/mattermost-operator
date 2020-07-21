@@ -36,6 +36,10 @@ GOVERALLS_VER := master
 GOVERALLS_BIN := goveralls
 GOVERALLS_GEN := $(TOOLS_BIN_DIR)/$(GOVERALLS_BIN)
 
+OUTDATED_VER := master
+OUTDATED_BIN := go-mod-outdated
+OUTDATED_GEN := $(TOOLS_BIN_DIR)/$(OUTDATED_BIN)
+
 all: check-style unittest build ## Run all the things
 
 unittest: ## Runs unit tests
@@ -124,14 +128,19 @@ clean: ## Clean up everything
 $(SHADOW_GEN): ## Build shadow
 	GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) golang.org/x/tools/go/analysis/passes/shadow/cmd/shadow $(SHADOW_BIN) $(SHADOW_VER)
 
-
 $(OPENAPI_GEN): ## Build open-api
 	GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) k8s.io/kube-openapi/cmd/openapi-gen $(OPENAPI_BIN) $(OPENAPI_VER)
-
 
 $(GOVERALLS_GEN): ## Build open-api
 	GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) github.com/mattn/goveralls $(GOVERALLS_BIN) $(GOVERALLS_VER)
 
+$(OUTDATED_GEN): ## Build open-api
+	GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) github.com/psampaz/go-mod-outdated $(OUTDATED_BIN) $(OUTDATED_VER)
+
+.PHONY: check-modules
+check-modules: $(OUTDATED_GEN) ## Check outdated modules
+	@echo Checking outdated modules
+	$(GO) list -mod=mod -u -m -json all | $(OUTDATED_GEN) -update -direct
 
 ## Help documentatin à la https://marmelab.com/blog/2016/02/29/auto-documented-makefile.html
 help:
