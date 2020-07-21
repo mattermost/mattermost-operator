@@ -166,6 +166,12 @@ func (mattermost *ClusterInstallation) GetMattermostAppContainer(deployment *app
 // GetImageName returns the container image name that matches the spec of the
 // ClusterInstallation.
 func (mattermost *ClusterInstallation) GetImageName() string {
+	// if user set the version using the Digest instead of tag like
+	// sha256:dd15a51ac7dafd213744d1ef23394e7532f71a90f477c969b94600e46da5a0cf
+	// we need to set the @ instead of : to split the image name and "tag"
+	if strings.Contains(mattermost.Spec.Version, "sha256:") {
+		return fmt.Sprintf("%s@%s", mattermost.Spec.Image, mattermost.Spec.Version)
+	}
 	return fmt.Sprintf("%s:%s", mattermost.Spec.Image, mattermost.Spec.Version)
 }
 
@@ -187,6 +193,9 @@ func (mattermost *ClusterInstallation) GetProductionDeploymentName() string {
 // GetDeploymentImageName returns the container image name that matches the spec
 // of the deployment.
 func (d *AppDeployment) GetDeploymentImageName() string {
+	if strings.Contains(d.Version, "sha256:") {
+		return fmt.Sprintf("%s@%s", d.Image, d.Version)
+	}
 	return fmt.Sprintf("%s:%s", d.Image, d.Version)
 }
 
