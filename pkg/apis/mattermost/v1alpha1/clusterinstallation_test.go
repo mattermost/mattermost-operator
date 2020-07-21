@@ -1,6 +1,7 @@
 package v1alpha1
 
 import (
+	"fmt"
 	"testing"
 
 	operatortest "github.com/mattermost/mattermost-operator/test"
@@ -117,6 +118,7 @@ func TestClusterInstallation(t *testing.T) {
 		assert.Contains(t, ci.GetImageName(), ci.Spec.Image)
 		assert.Contains(t, ci.GetImageName(), ci.Spec.Version)
 		assert.Contains(t, ci.GetImageName(), ":")
+		assert.Equal(t, ci.GetImageName(), fmt.Sprintf("%s:%s", ci.Spec.Image, ci.Spec.Version))
 	})
 
 	t.Run("bluegreen", func(t *testing.T) {
@@ -138,6 +140,13 @@ func TestClusterInstallation(t *testing.T) {
 			assert.Equal(t, ci.GetProductionDeploymentName(), ci.Spec.BlueGreen.Green.Name)
 		})
 	})
+
+	t.Run("using digest", func(t *testing.T) {
+		ci.Spec.Version = "sha256:dd15a51ac7dafd213744d1ef23394e7532f71a90f477c969b94600e46da5a0cf"
+		assert.Contains(t, ci.GetImageName(), ci.Spec.Image)
+		assert.Contains(t, ci.GetImageName(), ci.Spec.Version)
+		assert.Equal(t, ci.GetImageName(), fmt.Sprintf("%s@%s", ci.Spec.Image, ci.Spec.Version))
+	})
 }
 
 func TestGetDeploymentImageName(t *testing.T) {
@@ -150,6 +159,14 @@ func TestGetDeploymentImageName(t *testing.T) {
 		assert.Contains(t, d.GetDeploymentImageName(), d.Image)
 		assert.Contains(t, d.GetDeploymentImageName(), d.Version)
 		assert.Contains(t, d.GetDeploymentImageName(), ":")
+		assert.Equal(t, d.GetDeploymentImageName(), fmt.Sprintf("%s:%s", d.Image, d.Version))
+	})
+
+	t.Run("using digest", func(t *testing.T) {
+		d.Version = "sha256:dd15a51ac7dafd213744d1ef23394e7532f71a90f477c969b94600e46da5a0cf"
+		assert.Contains(t, d.GetDeploymentImageName(), d.Image)
+		assert.Contains(t, d.GetDeploymentImageName(), d.Version)
+		assert.Equal(t, d.GetDeploymentImageName(), fmt.Sprintf("%s@%s", d.Image, d.Version))
 	})
 }
 
