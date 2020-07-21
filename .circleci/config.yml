@@ -17,6 +17,13 @@ jobs:
       - checkout
       - run: make check-style
 
+  check-modules:
+    executor:
+      name: default
+    steps:
+    - checkout
+    - run: make check-modules
+
   generate:
     executor:
       name: default
@@ -101,6 +108,12 @@ workflows:
   version: 2
   untagged-build:
     jobs:
+      - check-modules:
+          filters:
+            branches:
+              ignore:
+                - master
+                - /^v.*/
       - shellcheck/check:
           exclude: ./vendor/*
           filters:
@@ -151,6 +164,11 @@ workflows:
 
   master-build:
     jobs:
+      - check-modules:
+          filters:
+            branches:
+              only:
+                - master
       - lint:
           filters:
             branches:

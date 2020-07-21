@@ -77,7 +77,4 @@ tags
 .vscode/*
 .history
 # End of https://www.gitignore.io/api/go,vim,emacs,visualstudiocode
-/bin/openapi-gen
-/bin/openapi-gen-master
-/bin/shadow
-/bin/shadow-master
+/bin/*
