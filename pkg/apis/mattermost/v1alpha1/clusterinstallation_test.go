@@ -70,9 +70,10 @@ func TestClusterInstallation(t *testing.T) {
 			assert.Equal(t, size1000.Minio.Resources.String(), tci.Spec.Minio.Resources.String())
 			assert.Equal(t, size1000.Database.Replicas, tci.Spec.Database.Replicas)
 			assert.Equal(t, size1000.Database.Resources.String(), tci.Spec.Database.Resources.String())
+			assert.Equal(t, "", tci.Spec.Size)
 		})
 
-		t.Run("should not override manually set replicas or resources", func(t *testing.T) {
+		t.Run("should override manually set replicas or resources when setting Size", func(t *testing.T) {
 			tci := ci.DeepCopy()
 			resources := corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
@@ -80,24 +81,38 @@ func TestClusterInstallation(t *testing.T) {
 					corev1.ResourceMemory: resource.MustParse("100Mi"),
 				},
 			}
-			expectedResources := resources.String()
 
-			expectedReplicas := int32(7)
-			tci.Spec.Replicas = expectedReplicas
+			overridenReplicas := int32(7)
+			tci.Spec.Replicas = overridenReplicas
 			tci.Spec.Resources = resources
-			tci.Spec.Minio.Replicas = expectedReplicas
+			tci.Spec.Minio.Replicas = overridenReplicas
 			tci.Spec.Minio.Resources = resources
-			tci.Spec.Database.Replicas = expectedReplicas
+			tci.Spec.Database.Replicas = overridenReplicas
 			tci.Spec.Database.Resources = resources
 
 			err := tci.SetReplicasAndResourcesFromSize()
 			require.NoError(t, err)
-			assert.Equal(t, expectedReplicas, tci.Spec.Replicas)
-			assert.Equal(t, expectedResources, tci.Spec.Resources.String())
-			assert.Equal(t, expectedReplicas, tci.Spec.Minio.Replicas)
-			assert.Equal(t, expectedResources, tci.Spec.Minio.Resources.String())
-			assert.Equal(t, expectedReplicas, tci.Spec.Database.Replicas)
-			assert.Equal(t, expectedResources, tci.Spec.Database.Resources.String())
+			assert.Equal(t, size1000.App.Replicas, tci.Spec.Replicas)
+			assert.Equal(t, size1000.App.Resources.String(), tci.Spec.Resources.String())
+			assert.Equal(t, size1000.Minio.Replicas, tci.Spec.Minio.Replicas)
+			assert.Equal(t, size1000.Minio.Resources.String(), tci.Spec.Minio.Resources.String())
+			assert.Equal(t, size1000.Database.Replicas, tci.Spec.Database.Replicas)
+			assert.Equal(t, size1000.Database.Resources.String(), tci.Spec.Database.Resources.String())
+			assert.Equal(t, "", tci.Spec.Size)
+		})
+
+		t.Run("should set defaults on size not specified", func(t *testing.T) {
+			tci := ci.DeepCopy()
+			tci.Spec.Size = ""
+			err := tci.SetReplicasAndResourcesFromSize()
+			assert.NoError(t, err)
+			assert.Equal(t, defaultSize.App.Replicas, tci.Spec.Replicas)
+			assert.Equal(t, defaultSize.App.Resources.String(), tci.Spec.Resources.String())
+			assert.Equal(t, defaultSize.Minio.Replicas, tci.Spec.Minio.Replicas)
+			assert.Equal(t, defaultSize.Minio.Resources.String(), tci.Spec.Minio.Resources.String())
+			assert.Equal(t, defaultSize.Database.Replicas, tci.Spec.Database.Replicas)
+			assert.Equal(t, defaultSize.Database.Resources.String(), tci.Spec.Database.Resources.String())
+			assert.Equal(t, "", tci.Spec.Size)
 		})
 
 		t.Run("should error on bad user count but set to default size", func(t *testing.T) {
@@ -111,6 +126,7 @@ func TestClusterInstallation(t *testing.T) {
 			assert.Equal(t, defaultSize.Minio.Resources.String(), tci.Spec.Minio.Resources.String())
 			assert.Equal(t, defaultSize.Database.Replicas, tci.Spec.Database.Replicas)
 			assert.Equal(t, defaultSize.Database.Resources.String(), tci.Spec.Database.Resources.String())
+			assert.Equal(t, "", tci.Spec.Size)
 		})
 	})
 

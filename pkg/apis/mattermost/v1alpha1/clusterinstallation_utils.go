@@ -54,9 +54,6 @@ func (mattermost *ClusterInstallation) SetDefaults() error {
 	if mattermost.Spec.Version == "" {
 		mattermost.Spec.Version = DefaultMattermostVersion
 	}
-	if mattermost.Spec.Size == "" {
-		mattermost.Spec.Size = DefaultMattermostSize
-	}
 
 	mattermost.Spec.Minio.SetDefaults()
 	mattermost.Spec.Database.SetDefaults()
