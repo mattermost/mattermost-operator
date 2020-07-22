@@ -30,8 +30,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// TODO: test with Size
-
 func TestReconcile(t *testing.T) {
 	// Setup logging for the reconciler so we can see what happened on failure.
 	logger := blubr.InitLogger()
@@ -120,7 +118,7 @@ func TestReconcile(t *testing.T) {
 			deployment := &appsv1.Deployment{}
 			err = c.Get(context.TODO(), ciKey, deployment)
 			require.NoError(t, err)
-			require.Equal(t, *deployment.Spec.Replicas, ci.Spec.Replicas)
+			require.Equal(t, deployment.Spec.Replicas, &ci.Spec.Replicas)
 		})
 	})
 

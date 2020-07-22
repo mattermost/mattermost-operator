@@ -5,7 +5,7 @@ metadata:
 spec:
   image: mattermost/mattermost-enterprise-edition # Docker image for the app servers.
   version: 5.19.1 # Docker tag for the image.
-  size: 5000users # Size of the Mattermost installation, typically based on the number of users. Automatically sets the replica and resource limits for Minio, databaes and app servers based on the number provided here. Accepts 100users, 1000users, 5000users, 10000users, or 25000users. Manually setting replicas or resources will override the values set by 'size'.
+  size: 5000users # Size of the Mattermost installation, typically based on the number of users. Write-only field erased after being processed. Automatically sets the replica and resource limits for Minio, databases and app servers based on the number provided here. Accepts 100users, 1000users, 5000users, 10000users, or 25000users. Manually setting replicas or resources will override the values set by 'size'.
   useServiceLoadBalancer: true # Set to true to use AWS or Azure load balancers instead of an NGINX controller.
   serviceAnnotations: {} # Service annotations to use with AWS or Azure load balancers.
   ingressName: example.mattermost-example.com # Set to your hostname, e.g. example.mattermost-example.com. Required when using an Ingress controller. Ignored if useServiceLoadBalancer is true.
