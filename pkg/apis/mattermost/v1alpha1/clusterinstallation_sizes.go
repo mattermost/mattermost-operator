@@ -339,8 +339,9 @@ func GetClusterSize(key string) (ClusterInstallationSize, error) {
 }
 
 // SetReplicasAndResourcesFromSize will use the Size field to determine the number of replicas
-// and resource requests to set for a ClusterInstallation. If Replicas or Resources for any components are
-// manually set in the spec then those values will not be changed.
+// and resource requests to set for a ClusterInstallation. If the Size field is not set, values for default size will be used.
+// Setting Size to new value will override current values for Replicas and Resources.
+// The Size field is erased after adjusting the values.
 func (mattermost *ClusterInstallation) SetReplicasAndResourcesFromSize() error {
 	if mattermost.Spec.Size == "" {
 		mattermost.setDefaultReplicasAndResources()
@@ -394,5 +395,3 @@ func (mattermost *ClusterInstallation) overrideReplicasAndResourcesFromSize(size
 	mattermost.Spec.Database.Replicas = size.Database.Replicas
 	mattermost.Spec.Database.Resources = size.Database.Resources
 }
-
-

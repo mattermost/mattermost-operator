@@ -82,12 +82,12 @@ func TestClusterInstallation(t *testing.T) {
 				},
 			}
 
-			overridenReplicas := int32(7)
-			tci.Spec.Replicas = overridenReplicas
+			overriddenReplicas := int32(7)
+			tci.Spec.Replicas = overriddenReplicas
 			tci.Spec.Resources = resources
-			tci.Spec.Minio.Replicas = overridenReplicas
+			tci.Spec.Minio.Replicas = overriddenReplicas
 			tci.Spec.Minio.Resources = resources
-			tci.Spec.Database.Replicas = overridenReplicas
+			tci.Spec.Database.Replicas = overriddenReplicas
 			tci.Spec.Database.Resources = resources
 
 			err := tci.SetReplicasAndResourcesFromSize()
