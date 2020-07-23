@@ -339,35 +339,59 @@ func GetClusterSize(key string) (ClusterInstallationSize, error) {
 }
 
 // SetReplicasAndResourcesFromSize will use the Size field to determine the number of replicas
-// and resource requests to set for a ClusterInstallation. If Replicas or Resources for any components are
-// manually set in the spec then those values will not be changed.
+// and resource requests to set for a ClusterInstallation. If the Size field is not set, values for default size will be used.
+// Setting Size to new value will override current values for Replicas and Resources.
+// The Size field is erased after adjusting the values.
 func (mattermost *ClusterInstallation) SetReplicasAndResourcesFromSize() error {
+	if mattermost.Spec.Size == "" {
+		mattermost.setDefaultReplicasAndResources()
+		return nil
+	}
+
 	size, err := GetClusterSize(mattermost.Spec.Size)
 	if err != nil {
 		err = errors.Wrap(err, "using default")
-		size = defaultSize
+		mattermost.setDefaultReplicasAndResources()
+		return err
 	}
 
+	mattermost.overrideReplicasAndResourcesFromSize(size)
+
+	return nil
+}
+
+func (mattermost *ClusterInstallation) setDefaultReplicasAndResources() {
+	mattermost.Spec.Size = ""
+
 	if mattermost.Spec.Replicas == 0 {
-		mattermost.Spec.Replicas = size.App.Replicas
+		mattermost.Spec.Replicas = defaultSize.App.Replicas
 	}
 	if mattermost.Spec.Resources.Size() == 0 {
-		mattermost.Spec.Resources = size.App.Resources
+		mattermost.Spec.Resources = defaultSize.App.Resources
 	}
 
 	if mattermost.Spec.Minio.Replicas == 0 {
-		mattermost.Spec.Minio.Replicas = size.Minio.Replicas
+		mattermost.Spec.Minio.Replicas = defaultSize.Minio.Replicas
 	}
 	if mattermost.Spec.Minio.Resources.Size() == 0 {
-		mattermost.Spec.Minio.Resources = size.Minio.Resources
+		mattermost.Spec.Minio.Resources = defaultSize.Minio.Resources
 	}
 
 	if mattermost.Spec.Database.Replicas == 0 && mattermost.Spec.Database.InitBucketURL == "" {
-		mattermost.Spec.Database.Replicas = size.Database.Replicas
+		mattermost.Spec.Database.Replicas = defaultSize.Database.Replicas
 	}
 	if mattermost.Spec.Database.Resources.Size() == 0 {
-		mattermost.Spec.Database.Resources = size.Database.Resources
+		mattermost.Spec.Database.Resources = defaultSize.Database.Resources
 	}
+}
 
-	return err
+func (mattermost *ClusterInstallation) overrideReplicasAndResourcesFromSize(size ClusterInstallationSize) {
+	mattermost.Spec.Size = ""
+
+	mattermost.Spec.Replicas = size.App.Replicas
+	mattermost.Spec.Resources = size.App.Resources
+	mattermost.Spec.Minio.Replicas = size.Minio.Replicas
+	mattermost.Spec.Minio.Resources = size.Minio.Resources
+	mattermost.Spec.Database.Replicas = size.Database.Replicas
+	mattermost.Spec.Database.Resources = size.Database.Resources
 }
