@@ -100,3 +100,13 @@ You don't need to push the mattermost-operator image to DockerHub or any other r
 ```bash
 $ kind load docker-image mattermost/mattermost-operator:test
 ```
+
+## 4 Notes
+
+### 4.1 Installation Size
+
+The `spec.Size` field was modified to be treated as a write-only field. 
+After adjusting values according to the size, the value of `spec.Size` is erased. 
+
+Replicas and resource requests/limits values can be overridden manually but setting new Size will override those values again regardless if set by the previous Size or adjusted manually. 
+
