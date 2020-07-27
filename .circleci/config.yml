@@ -7,7 +7,7 @@ executors:
   default:
     working_directory: /go/src/github.com/mattermost/mattermost-operator
     docker:
-      - image: circleci/golang:1.14.4
+      - image: circleci/golang:1.14.6
 
 jobs:
   lint:
@@ -57,7 +57,7 @@ jobs:
       - IMAGE_NAME=mattermost/mattermost-operator
       - IMAGE_TAG=test
       - KIND_VERSION=v0.8.1
-      - SDK_VERSION=v0.18.2
+      - SDK_VERSION=v0.19.0
     machine: true
     resource_class: 2xlarge
     working_directory: /home/circleci/.go_workspace/src/github.com/mattermost/mattermost-operator
