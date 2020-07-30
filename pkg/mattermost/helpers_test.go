@@ -110,16 +110,13 @@ func TestSetProbes(t *testing.T) {
 	tests := []struct {
 		name            string
 		customLiveness  corev1.Probe
-		customStartup   corev1.Probe
 		customReadiness corev1.Probe
 		wantLiveness    *corev1.Probe
-		wantStartup     *corev1.Probe
 		wantReadiness   *corev1.Probe
 	}{
 		{
 			name:            "No Custom probes",
 			customLiveness:  corev1.Probe{},
-			customStartup:   corev1.Probe{},
 			customReadiness: corev1.Probe{},
 			wantLiveness: &corev1.Probe{
 				Handler: corev1.Handler{
@@ -131,17 +128,6 @@ func TestSetProbes(t *testing.T) {
 				InitialDelaySeconds: 10,
 				PeriodSeconds:       10,
 				FailureThreshold:    3,
-			},
-			wantStartup: &corev1.Probe{
-				Handler: corev1.Handler{
-					HTTPGet: &corev1.HTTPGetAction{
-						Path: "/api/v4/system/ping",
-						Port: intstr.FromInt(8065),
-					},
-				},
-				InitialDelaySeconds: 1,
-				PeriodSeconds:       10,
-				FailureThreshold:    60,
 			},
 			wantReadiness: &corev1.Probe{
 				Handler: corev1.Handler{
@@ -160,9 +146,6 @@ func TestSetProbes(t *testing.T) {
 			customLiveness: corev1.Probe{
 				InitialDelaySeconds: 120,
 			},
-			customStartup: corev1.Probe{
-				InitialDelaySeconds: 1,
-			},
 			customReadiness: corev1.Probe{
 				InitialDelaySeconds: 90,
 			},
@@ -176,17 +159,6 @@ func TestSetProbes(t *testing.T) {
 				InitialDelaySeconds: 120,
 				PeriodSeconds:       10,
 				FailureThreshold:    3,
-			},
-			wantStartup: &corev1.Probe{
-				Handler: corev1.Handler{
-					HTTPGet: &corev1.HTTPGetAction{
-						Path: "/api/v4/system/ping",
-						Port: intstr.FromInt(8065),
-					},
-				},
-				InitialDelaySeconds: 1,
-				PeriodSeconds:       10,
-				FailureThreshold:    60,
 			},
 			wantReadiness: &corev1.Probe{
 				Handler: corev1.Handler{
@@ -206,10 +178,6 @@ func TestSetProbes(t *testing.T) {
 				InitialDelaySeconds: 20,
 				PeriodSeconds:       20,
 			},
-			customStartup: corev1.Probe{
-				InitialDelaySeconds: 20,
-				PeriodSeconds:       20,
-			},
 			customReadiness: corev1.Probe{
 				InitialDelaySeconds: 10,
 				FailureThreshold:    10,
@@ -224,17 +192,6 @@ func TestSetProbes(t *testing.T) {
 				InitialDelaySeconds: 20,
 				PeriodSeconds:       20,
 				FailureThreshold:    3,
-			},
-			wantStartup: &corev1.Probe{
-				Handler: corev1.Handler{
-					HTTPGet: &corev1.HTTPGetAction{
-						Path: "/api/v4/system/ping",
-						Port: intstr.FromInt(8065),
-					},
-				},
-				InitialDelaySeconds: 20,
-				PeriodSeconds:       20,
-				FailureThreshold:    60,
 			},
 			wantReadiness: &corev1.Probe{
 				Handler: corev1.Handler{
@@ -259,15 +216,6 @@ func TestSetProbes(t *testing.T) {
 				},
 				InitialDelaySeconds: 120,
 			},
-			customStartup: corev1.Probe{
-				Handler: corev1.Handler{
-					HTTPGet: &corev1.HTTPGetAction{
-						Path: "/api/v4/system/pong",
-						Port: intstr.FromInt(8080),
-					},
-				},
-				InitialDelaySeconds: 120,
-			},
 			customReadiness: corev1.Probe{
 				Handler: corev1.Handler{
 					HTTPGet: &corev1.HTTPGetAction{
@@ -287,17 +235,6 @@ func TestSetProbes(t *testing.T) {
 				PeriodSeconds:       10,
 				FailureThreshold:    3,
 			},
-			wantStartup: &corev1.Probe{
-				Handler: corev1.Handler{
-					HTTPGet: &corev1.HTTPGetAction{
-						Path: "/api/v4/system/pong",
-						Port: intstr.FromInt(8080),
-					},
-				},
-				InitialDelaySeconds: 120,
-				PeriodSeconds:       10,
-				FailureThreshold:    60,
-			},
 			wantReadiness: &corev1.Probe{
 				Handler: corev1.Handler{
 					HTTPGet: &corev1.HTTPGetAction{
@@ -314,9 +251,8 @@ func TestSetProbes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			liveness, startUp, readiness := setProbes(tt.customLiveness, tt.customStartup, tt.customReadiness)
+			liveness, readiness := setProbes(tt.customLiveness, tt.customReadiness)
 			require.Equal(t, tt.wantLiveness, liveness)
-			require.Equal(t, tt.wantStartup, startUp)
 			require.Equal(t, tt.wantReadiness, readiness)
 		})
 	}
