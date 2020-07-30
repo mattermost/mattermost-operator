@@ -54,7 +54,7 @@ func (r *ReconcileClusterInstallation) update(current, desired Object, reqLogger
 			reqLogger.Error(err, "error applying the annotation in the resource")
 			return err
 		}
-		reqLogger.Info("updating resource", "name", desired.GetName(), "namespace", desired.GetNamespace())
+		reqLogger.Info("updating resource", "name", desired.GetName(), "namespace", desired.GetNamespace(), "diff", patchResult.String())
 		// Resource version is required for the update, but need to be set after
 		// the last applied annotation to avoid unnecessary diffs
 		desired.SetResourceVersion(current.GetResourceVersion())
