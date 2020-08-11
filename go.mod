@@ -4,6 +4,7 @@ go 1.14
 
 require (
 	github.com/banzaicloud/k8s-objectmatcher v1.4.0
+	github.com/blang/semver/v4 v4.0.0
 	github.com/go-logr/logr v0.1.0
 	github.com/go-openapi/spec v0.19.9
 	github.com/mattermost/blubr v0.0.0-20200113232543-f0ce67760aeb
