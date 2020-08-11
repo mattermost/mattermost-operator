@@ -15,6 +15,7 @@ import (
 	"golang.org/x/net/context"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	kFake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -59,11 +60,45 @@ func TestReconcile(t *testing.T) {
 	s.AddKnownTypes(mattermostv1alpha1.SchemeGroupVersion, ci)
 	// Create a fake client to mock API calls.
 	c := fake.NewFakeClient()
+
+	testServer, _, _ := testServerEnv(t, 200)
+	defer testServer.Close()
+	rConfig := restConfig(testServer)
+	cs := kFake.NewSimpleClientset()
+
+	// cs.CoreV1().RESTClient().(*rest.RESTClient).Client = rFake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+	// 	switch _, m := req.URL.Path, req.Method; {
+	// 	case m == "POST":
+	// 		// body := cmdtesting.ObjBody(codec, test.pod)
+	// 		return &http.Response{StatusCode: http.StatusOK, Body: nil}, nil
+	// 	default:
+	// 		t.Errorf("%s: unexpected request: %#v\n%#v", req.Method, req.URL, req)
+	// 		return nil, fmt.Errorf("unexpected request")
+	// 	}
+	// })
+
 	// Create a ReconcileClusterInstallation object with the scheme and fake
-	// client.
-	r := &ReconcileClusterInstallation{client: c, scheme: s}
+	// client and config client.
+	r := &ReconcileClusterInstallation{client: c, config: rConfig, restClient: cs, scheme: s}
 
 	err := c.Create(context.TODO(), ci)
+	require.NoError(t, err)
+
+	mmVersionPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "mm-version-pod",
+			Namespace: ci.GetNamespace(),
+		},
+		Status: corev1.PodStatus{
+			Conditions: []corev1.PodCondition{
+				{
+					Type:   corev1.PodReady,
+					Status: corev1.ConditionTrue,
+				},
+			},
+		},
+	}
+	err = c.Create(context.TODO(), mmVersionPod)
 	require.NoError(t, err)
 
 	// Create the resources that would normally be created by other operators

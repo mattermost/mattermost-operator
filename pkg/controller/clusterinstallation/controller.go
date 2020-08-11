@@ -14,6 +14,8 @@ import (
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -36,7 +38,15 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileClusterInstallation{client: mgr.GetClient(), scheme: mgr.GetScheme()}
+	restClient, config := GenerateK8sClient()
+
+	return &ReconcileClusterInstallation{
+		client:     mgr.GetClient(),
+		config:     config,
+		restClient: restClient,
+		scheme:     mgr.GetScheme(),
+		state:      mattermostv1alpha1.Reconciling,
+	}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -85,6 +95,14 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &mattermostv1alpha1.ClusterInstallation{},
+	})
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -94,8 +112,11 @@ var _ reconcile.Reconciler = &ReconcileClusterInstallation{}
 type ReconcileClusterInstallation struct {
 	// This client, initialized using mgr.Client() above, is a split client
 	// that reads objects from the cache and writes to the apiserver.
-	client client.Client
-	scheme *runtime.Scheme
+	client     client.Client
+	config     *rest.Config
+	restClient kubernetes.Interface
+	scheme     *runtime.Scheme
+	state      mattermostv1alpha1.RunningState
 }
 
 // Reconcile reads the state of the cluster for a ClusterInstallation object and
@@ -155,6 +176,7 @@ func (r *ReconcileClusterInstallation) Reconcile(request reconcile.Request) (rec
 			r.setStateReconcilingAndLogError(mattermost, reqLogger)
 			return reconcile.Result{}, err
 		}
+
 	}
 
 	err = r.checkDatabase(mattermost, reqLogger)
@@ -198,6 +220,11 @@ func (r *ReconcileClusterInstallation) Reconcile(request reconcile.Request) (rec
 	if err != nil {
 		r.setStateReconcilingAndLogError(mattermost, reqLogger)
 		return reconcile.Result{}, err
+	}
+
+	err = r.cleanSupportPods(mattermost.GetNamespace())
+	if err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "failed to delete the temporary pod")
 	}
 
 	return reconcile.Result{}, nil

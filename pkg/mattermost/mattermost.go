@@ -113,7 +113,7 @@ func GenerateIngress(mattermost *mattermostv1alpha1.ClusterInstallation, name, i
 }
 
 // GenerateDeployment returns the deployment for Mattermost app.
-func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbInfo *database.Info, deploymentName, ingressName, containerImage string, minioURL string) *appsv1.Deployment {
+func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbInfo *database.Info, deploymentName, ingressName, containerImage, mmImageVersion, minioURL string) *appsv1.Deployment {
 	var envVarDB []corev1.EnvVar
 
 	masterDBEnvVar := corev1.EnvVar{
@@ -402,22 +402,40 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbIn
 	volumeMountLicense := []corev1.VolumeMount{}
 	podAnnotations := map[string]string{}
 	if len(mattermost.Spec.MattermostLicenseSecret) != 0 {
+
+		if mmImageVersion == "" {
+			// if mmImageVersion means we was not able to ge the actual MM image version
+			// so we add the old way to set the license
+			envVarGeneral = append(envVarGeneral, corev1.EnvVar{
+				Name:  "MM_SERVICESETTINGS_LICENSEFILELOCATION",
+				Value: "/mattermost-license/license",
+			})
+
+			volumeMountLicense = append(volumeMountLicense, corev1.VolumeMount{
+				MountPath: "/mattermost-license",
+				Name:      "mattermost-license",
+				ReadOnly:  true,
+			})
+
+			volumeLicense = append(volumeLicense, corev1.Volume{
+				Name: "mattermost-license",
+				VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{
+						SecretName: mattermost.Spec.MattermostLicenseSecret,
+					},
+				},
+			})
+		}
+		// Version is equal or greater then 5.26.0 so we can use the MM_LICENSE
+		// For previous releases this env var will not make difference
 		envVarGeneral = append(envVarGeneral, corev1.EnvVar{
-			Name:  "MM_SERVICESETTINGS_LICENSEFILELOCATION",
-			Value: "/mattermost-license/license",
-		})
-
-		volumeMountLicense = append(volumeMountLicense, corev1.VolumeMount{
-			MountPath: "/mattermost-license",
-			Name:      "mattermost-license",
-			ReadOnly:  true,
-		})
-
-		volumeLicense = append(volumeLicense, corev1.Volume{
-			Name: "mattermost-license",
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: mattermost.Spec.MattermostLicenseSecret,
+			Name: "MM_LICENSE",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: mattermost.Spec.MattermostLicenseSecret,
+					},
+					Key: "license",
 				},
 			},
 		})

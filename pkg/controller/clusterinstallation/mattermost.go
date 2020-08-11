@@ -132,7 +132,12 @@ func (r *ReconcileClusterInstallation) checkMattermostDeployment(mattermost *mat
 		}
 	}
 
-	desired := mattermostApp.GenerateDeployment(mattermost, dbInfo, resourceName, ingressName, imageName, minioURL)
+	mmImageVersion, err := r.getImageVersion(mattermost, imageName)
+	if err != nil {
+		reqLogger.Error(err, "not able to get the version from the image/version provided, will ignore this")
+	}
+
+	desired := mattermostApp.GenerateDeployment(mattermost, dbInfo, resourceName, ingressName, imageName, mmImageVersion, minioURL)
 	err = r.createDeploymentIfNotExists(mattermost, desired, reqLogger)
 	if err != nil {
 		return errors.Wrap(err, "failed to create mattermost deployment")

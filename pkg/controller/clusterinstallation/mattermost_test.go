@@ -2,6 +2,9 @@ package clusterinstallation
 
 import (
 	"context"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -18,8 +21,13 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
+	kFake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
+	utiltesting "k8s.io/client-go/util/testing"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -50,7 +58,14 @@ func TestCheckMattermost(t *testing.T) {
 	apis.AddToScheme(scheme.Scheme)
 	s := scheme.Scheme
 	s.AddKnownTypes(mattermostv1alpha1.SchemeGroupVersion, ci)
-	r := &ReconcileClusterInstallation{client: fake.NewFakeClient(), scheme: s}
+
+	testServer, _, _ := testServerEnv(t, 200)
+	defer testServer.Close()
+
+	config := restConfig(testServer)
+	cs := kFake.NewSimpleClientset()
+
+	r := &ReconcileClusterInstallation{client: fake.NewFakeClient(), config: config, restClient: cs, scheme: s}
 
 	err := prepAllDependencyTestResources(r.client, ci)
 	require.NoError(t, err)
@@ -164,6 +179,23 @@ func TestCheckMattermost(t *testing.T) {
 		err := r.client.Create(context.TODO(), job)
 		require.NoError(t, err)
 
+		mmVersionPod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mm-version-pod",
+				Namespace: ci.GetNamespace(),
+			},
+			Status: corev1.PodStatus{
+				Conditions: []corev1.PodCondition{
+					{
+						Type:   corev1.PodReady,
+						Status: corev1.ConditionTrue,
+					},
+				},
+			},
+		}
+		err = r.client.Create(context.TODO(), mmVersionPod)
+		require.NoError(t, err)
+
 		err = r.checkMattermostDeployment(ci, ci.Name, ci.Spec.IngressName, ci.GetImageName(), logger)
 		assert.NoError(t, err)
 
@@ -232,9 +264,17 @@ func TestCheckMattermostExternalDB(t *testing.T) {
 	apis.AddToScheme(scheme.Scheme)
 	s := scheme.Scheme
 	s.AddKnownTypes(mattermostv1alpha1.SchemeGroupVersion, ci)
-	r := &ReconcileClusterInstallation{client: fake.NewFakeClient(), scheme: s}
 
-	err := prepAllDependencyTestResources(r.client, ci)
+	testServer, _, _ := testServerEnv(t, 200)
+	defer testServer.Close()
+
+	c := restConfig(testServer)
+	rc, err := kubernetes.NewForConfig(c)
+	require.NoError(t, err)
+
+	r := &ReconcileClusterInstallation{client: fake.NewFakeClient(), config: c, restClient: rc, scheme: s}
+
+	err = prepAllDependencyTestResources(r.client, ci)
 	require.NoError(t, err)
 
 	externalDBSecret := &corev1.Secret{
@@ -352,4 +392,34 @@ func TestCheckMattermostExternalDB(t *testing.T) {
 			require.Error(t, err)
 		})
 	})
+}
+
+func testServerEnv(t *testing.T, statusCode int) (*httptest.Server, *utiltesting.FakeHandler, *metav1.Status) {
+	status := &metav1.Status{TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Status"}, Status: fmt.Sprintf("%s", metav1.StatusSuccess)}
+	expectedBody, _ := runtime.Encode(scheme.Codecs.LegacyCodec(corev1.SchemeGroupVersion), status)
+	fakeHandler := utiltesting.FakeHandler{
+		StatusCode:   http.StatusOK,
+		ResponseBody: string(expectedBody),
+		T:            t,
+	}
+	testServer := httptest.NewServer(&fakeHandler)
+	return testServer, &fakeHandler, status
+}
+
+func restConfig(testServer *httptest.Server) *rest.Config {
+	return &rest.Config{
+		Host: testServer.URL,
+		ContentConfig: rest.ContentConfig{
+			GroupVersion:         &corev1.SchemeGroupVersion,
+			NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+		},
+		Username: "user",
+		Password: "pass",
+	}
+}
+
+// func restClient(testServer *httptest.Server) (*RESTClient, error) {
+func restClient(config *rest.Config) *rest.RESTClient {
+	c, _ := rest.RESTClientFor(config)
+	return c
 }

@@ -1,19 +1,35 @@
 package clusterinstallation
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"reflect"
+	"regexp"
+	"strings"
+	"time"
 
+	"github.com/blang/semver/v4"
 	"github.com/go-logr/logr"
-	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
 	"github.com/pkg/errors"
+
+	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
+
 	corev1 "k8s.io/api/core/v1"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/remotecommand"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+const semVerRegex string = `^?([0-9]+)(\.[0-9]+)?(\.[0-9]+)`
 
 func (r *ReconcileClusterInstallation) handleCheckClusterInstallation(mattermost *mattermostv1alpha1.ClusterInstallation) (mattermostv1alpha1.ClusterInstallationStatus, error) {
 	if !mattermost.Spec.BlueGreen.Enable {
@@ -206,6 +222,76 @@ func (r *ReconcileClusterInstallation) checkSecret(secretName, keyName, namespac
 	return fmt.Errorf("secret %s is missing data key: %s", secretName, keyName)
 }
 
+func (r *ReconcileClusterInstallation) getImageVersion(mattermost *mattermostv1alpha1.ClusterInstallation, image string) (string, error) {
+	// start a one shot pod to get the version from the mattermost image, if fails we assume that is a bad image
+	mmVersionPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "mm-version-pod",
+			Namespace: mattermost.GetNamespace(),
+			OwnerReferences: []metav1.OwnerReference{
+				*metav1.NewControllerRef(mattermost, schema.GroupVersionKind{
+					Group:   mattermostv1alpha1.SchemeGroupVersion.Group,
+					Version: mattermostv1alpha1.SchemeGroupVersion.Version,
+					Kind:    "ClusterInstallation",
+				}),
+			},
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:            "mm-version-pod",
+					Image:           image,
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Command: []string{
+						"sleep",
+						"3600",
+					},
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("10m"),
+							corev1.ResourceMemory: resource.MustParse("10M"),
+						},
+					},
+				},
+			},
+			TerminationGracePeriodSeconds: pointer.Int64Ptr(5),
+		},
+	}
+
+	err := r.client.Create(context.TODO(), mmVersionPod)
+	if err != nil && !k8sErrors.IsAlreadyExists(err) {
+		return "", errors.Wrap(err, "failed to create the temporary pod")
+	}
+
+	command := []string{"./bin/mattermost", "version", "--skip-server-start"}
+	stdOut, err := r.execPod(mmVersionPod, command)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to execute the command in the temporary pod")
+	}
+
+	if stdOut != "" {
+		versionRegex := regexp.MustCompile(semVerRegex)
+		actualMMVersion := versionRegex.FindString(strings.TrimSpace(stdOut))
+
+		v, err := semver.Parse(actualMMVersion)
+		if err != nil {
+			return "", errors.Wrap(err, "failed to parse the version")
+		}
+
+		expectedRange, err := semver.ParseRange(">=5.28.0")
+		if err != nil {
+			return "", errors.Wrapf(err, "failed to parse the version range for %s", actualMMVersion)
+		}
+		if !expectedRange(v) {
+			return "", errors.Errorf("invalid Version option %s, must be greater than 5.26.0", actualMMVersion)
+		}
+
+		return v.String(), nil
+	}
+
+	return "", errors.New("failed to get the actual version")
+}
+
 func (r *ReconcileClusterInstallation) updateStatus(mattermost *mattermostv1alpha1.ClusterInstallation, status mattermostv1alpha1.ClusterInstallationStatus, reqLogger logr.Logger) error {
 	if !reflect.DeepEqual(mattermost.Status, status) {
 		if mattermost.Status.State != status.State {
@@ -250,6 +336,92 @@ func (r *ReconcileClusterInstallation) setState(mattermost *mattermostv1alpha1.C
 	}
 
 	return nil
+}
+
+func (r *ReconcileClusterInstallation) cleanSupportPods(namespace string) error {
+	mmPod := &corev1.Pod{}
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: "mm-version-pod", Namespace: namespace}, mmPod)
+	if err != nil {
+		return errors.Wrap(err, "failed to get the temporary pod")
+	}
+
+	policy := metav1.DeletePropagationForeground
+	opts := &client.DeleteOptions{
+		GracePeriodSeconds: pointer.Int64Ptr(0),
+		PropagationPolicy:  &policy,
+	}
+	err = r.client.Delete(context.TODO(), mmPod, opts)
+	if err != nil {
+		return errors.Wrap(err, "failed to delete the temporary pod")
+	}
+
+	return nil
+}
+
+func (r *ReconcileClusterInstallation) execPod(inputPod *corev1.Pod, command []string) (string, error) {
+	err := wait.Poll(500*time.Millisecond, 5*time.Minute, func() (bool, error) {
+		pod := &corev1.Pod{}
+		errPod := r.client.Get(context.TODO(), types.NamespacedName{Name: inputPod.GetName(), Namespace: inputPod.GetNamespace()}, pod)
+		if errPod != nil {
+			// This could be a connection error so we want to retry.
+			return false, nil
+		}
+		for _, condition := range pod.Status.Conditions {
+			if condition.Type == corev1.PodReady {
+				if condition.Status == corev1.ConditionTrue {
+					return true, nil
+				}
+			}
+		}
+		return false, nil
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to check the pod: %v", err)
+	}
+
+	req := r.restClient.CoreV1().RESTClient().Post().
+		Resource("pods").
+		Name(inputPod.GetName()).
+		Namespace(inputPod.GetNamespace()).
+		SubResource("exec")
+
+	option := &corev1.PodExecOptions{
+		Command: command,
+		Stdin:   false,
+		Stdout:  true,
+		Stderr:  true,
+		TTY:     true,
+	}
+	req.VersionedParams(
+		option,
+		scheme.ParameterCodec,
+	)
+
+	exec, err := remotecommand.NewSPDYExecutor(r.config, "POST", req.URL())
+	if err != nil {
+		return "", errors.Wrap(err, "failed to init the executor")
+	}
+
+	var (
+		execOut bytes.Buffer
+		execErr bytes.Buffer
+	)
+
+	err = exec.Stream(remotecommand.StreamOptions{
+		Stdout: &execOut,
+		Stderr: &execErr,
+		Tty:    false,
+	})
+
+	if err != nil {
+		return "", errors.Wrap(err, "could not execute the command")
+	}
+
+	if execErr.Len() > 0 {
+		return "", errors.Wrapf(err, "error executing the command, maybe not available in the version: %s", execErr.String())
+	}
+
+	return execOut.String(), nil
 }
 
 func ensureLabels(required, final map[string]string) map[string]string {

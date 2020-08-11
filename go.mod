@@ -17,15 +17,16 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.6.1
 	golang.org/x/net v0.0.0-20200625001655-4c5254603344
-	k8s.io/api v0.18.8
-	k8s.io/apimachinery v0.18.8
+	k8s.io/api v0.18.9
+	k8s.io/apimachinery v0.18.9
 	k8s.io/client-go v12.0.0+incompatible
-	k8s.io/code-generator v0.18.8
+	k8s.io/code-generator v0.18.9
 	k8s.io/kube-openapi v0.0.0-20200410145947-61e04a5be9a6
+	k8s.io/utils v0.0.0-20200603063816-c1c6865ac451
 	sigs.k8s.io/controller-runtime v0.6.1
 )
 
 replace (
 	github.com/Azure/go-autorest => github.com/Azure/go-autorest v13.3.2+incompatible // Required by OLM
-	k8s.io/client-go => k8s.io/client-go v0.18.8 // Required by prometheus-operator
+	k8s.io/client-go => k8s.io/client-go v0.18.9 // Required by prometheus-operator
 )

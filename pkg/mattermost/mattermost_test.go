@@ -118,6 +118,15 @@ func TestGenerateDeployment(t *testing.T) {
 			want: &appsv1.Deployment{},
 		},
 		{
+			name: "has license and version 5.26.0",
+			spec: mattermostv1alpha1.ClusterInstallationSpec{
+				MattermostLicenseSecret: "license-secret",
+				Version:                 "5.26.0",
+				Image:                   "mattermost/mattermost-team-edition",
+			},
+			want: &appsv1.Deployment{},
+		},
+		{
 			name: "external database",
 			spec: mattermostv1alpha1.ClusterInstallationSpec{
 				Database: mattermostv1alpha1.Database{
@@ -265,7 +274,13 @@ func TestGenerateDeployment(t *testing.T) {
 				databaseInfo = &database.Info{}
 			}
 
-			deployment := GenerateDeployment(mattermost, databaseInfo, "", "", "", "")
+			deployment := &appsv1.Deployment{}
+			if mattermost.Spec.Version != "5.26.0" {
+				deployment = GenerateDeployment(mattermost, databaseInfo, "", "", "", "", "")
+			} else {
+				deployment = GenerateDeployment(mattermost, databaseInfo, "", "", "", "honk", "")
+			}
+
 			require.NotNil(t, deployment)
 
 			assert.Equal(t, tt.want.Spec.Template.Spec.NodeSelector, deployment.Spec.Template.Spec.NodeSelector)
@@ -291,6 +306,33 @@ func TestGenerateDeployment(t *testing.T) {
 			if !databaseInfo.IsExternal() {
 				assertEnvVarExists(t, "MYSQL_USERNAME", mattermostAppContainer.Env)
 				assertEnvVarExists(t, "MYSQL_PASSWORD", mattermostAppContainer.Env)
+			}
+
+			// License check.
+			if len(mattermost.Spec.MattermostLicenseSecret) != 0 {
+				var hasClusterEnableEnv, hasClusterNameEnv, hasOldMMLicenseEnv, hasMMLicenseEnv bool
+
+				for _, env := range mattermostAppContainer.Env {
+					switch env.Name {
+					case "MM_CLUSTERSETTINGS_ENABLE":
+						hasClusterEnableEnv = true
+					case "MM_CLUSTERSETTINGS_CLUSTERNAME":
+						hasClusterNameEnv = true
+					case "MM_LICENSE":
+						hasMMLicenseEnv = true
+					case "MM_SERVICESETTINGS_LICENSEFILELOCATION":
+						hasOldMMLicenseEnv = true
+					}
+				}
+
+				assert.Truef(t, hasClusterEnableEnv, "Should have cluster enable env set")
+				assert.Truef(t, hasClusterNameEnv, "Should have cluster name env set")
+				assert.Truef(t, hasMMLicenseEnv, "Should have MM_LICENSE env set")
+				if mattermost.Spec.Version != "5.26.0" {
+					assert.Truef(t, hasOldMMLicenseEnv, "Should have MM_SERVICESETTINGS_LICENSEFILELOCATION env set")
+				} else {
+					assert.Falsef(t, hasOldMMLicenseEnv, "Should not have MM_SERVICESETTINGS_LICENSEFILELOCATION env set")
+				}
 			}
 
 			// Init container check.
