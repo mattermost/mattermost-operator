@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-var version = "1.6.0"
+var version = "1.6.2"
 var buildTime string
 var buildHash string
 
