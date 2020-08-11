@@ -28,12 +28,12 @@ var size100 = ClusterInstallationSize{
 		Replicas: 1,
 		Resources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("250m"),
-				corev1.ResourceMemory: resource.MustParse("512Mi"),
+				corev1.ResourceCPU:    resource.MustParse("100m"),
+				corev1.ResourceMemory: resource.MustParse("256Mi"),
 			},
 			Limits: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("1"),
-				corev1.ResourceMemory: resource.MustParse("1Gi"),
+				corev1.ResourceCPU:    resource.MustParse("2"),
+				corev1.ResourceMemory: resource.MustParse("4Gi"),
 			},
 		},
 	},
@@ -41,8 +41,8 @@ var size100 = ClusterInstallationSize{
 		Replicas: 1,
 		Resources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("250m"),
-				corev1.ResourceMemory: resource.MustParse("512Mi"),
+				corev1.ResourceCPU:    resource.MustParse("100m"),
+				corev1.ResourceMemory: resource.MustParse("256Mi"),
 			},
 		},
 	},
@@ -50,8 +50,8 @@ var size100 = ClusterInstallationSize{
 		Replicas: 1,
 		Resources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("500m"),
-				corev1.ResourceMemory: resource.MustParse("1Gi"),
+				corev1.ResourceCPU:    resource.MustParse("200m"),
+				corev1.ResourceMemory: resource.MustParse("512Mi"),
 			},
 		},
 	},
@@ -65,8 +65,8 @@ var size1000 = ClusterInstallationSize{
 		Replicas: 2,
 		Resources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("500m"),
-				corev1.ResourceMemory: resource.MustParse("1Gi"),
+				corev1.ResourceCPU:    resource.MustParse("150m"),
+				corev1.ResourceMemory: resource.MustParse("256Mi"),
 			},
 			Limits: corev1.ResourceList{
 				corev1.ResourceCPU:    resource.MustParse("2"),
@@ -78,7 +78,7 @@ var size1000 = ClusterInstallationSize{
 		Replicas: 4,
 		Resources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("250m"),
+				corev1.ResourceCPU:    resource.MustParse("150m"),
 				corev1.ResourceMemory: resource.MustParse("512Mi"),
 			},
 		},
@@ -87,8 +87,8 @@ var size1000 = ClusterInstallationSize{
 		Replicas: 2,
 		Resources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("1"),
-				corev1.ResourceMemory: resource.MustParse("1.5Gi"),
+				corev1.ResourceCPU:    resource.MustParse("250m"),
+				corev1.ResourceMemory: resource.MustParse("512Mi"),
 			},
 		},
 	},
@@ -102,8 +102,8 @@ var size5000 = ClusterInstallationSize{
 		Replicas: 2,
 		Resources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("1.5"),
-				corev1.ResourceMemory: resource.MustParse("3.5Gi"),
+				corev1.ResourceCPU:    resource.MustParse("500m"),
+				corev1.ResourceMemory: resource.MustParse("500Mi"),
 			},
 			Limits: corev1.ResourceList{
 				corev1.ResourceCPU:    resource.MustParse("4"),
@@ -115,8 +115,8 @@ var size5000 = ClusterInstallationSize{
 		Replicas: 4,
 		Resources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("1"),
-				corev1.ResourceMemory: resource.MustParse("1.5Gi"),
+				corev1.ResourceCPU:    resource.MustParse("200m"),
+				corev1.ResourceMemory: resource.MustParse("500Mi"),
 			},
 		},
 	},
@@ -124,8 +124,8 @@ var size5000 = ClusterInstallationSize{
 		Replicas: 3,
 		Resources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("3.5"),
-				corev1.ResourceMemory: resource.MustParse("7.5Gi"),
+				corev1.ResourceCPU:    resource.MustParse("500m"),
+				corev1.ResourceMemory: resource.MustParse("500Mi"),
 			},
 		},
 	},
@@ -136,15 +136,15 @@ const Size10000String = "10000users"
 
 var size10000 = ClusterInstallationSize{
 	App: ComponentSize{
-		Replicas: 3,
+		Replicas: 2,
 		Resources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("3.5"),
-				corev1.ResourceMemory: resource.MustParse("7.5Gi"),
+				corev1.ResourceCPU:    resource.MustParse("500m"),
+				corev1.ResourceMemory: resource.MustParse("500Mi"),
 			},
 			Limits: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("8"),
-				corev1.ResourceMemory: resource.MustParse("16Gi"),
+				corev1.ResourceCPU:    resource.MustParse("4"),
+				corev1.ResourceMemory: resource.MustParse("8Gi"),
 			},
 		},
 	},
@@ -152,8 +152,8 @@ var size10000 = ClusterInstallationSize{
 		Replicas: 4,
 		Resources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("1.5"),
-				corev1.ResourceMemory: resource.MustParse("3.5Gi"),
+				corev1.ResourceCPU:    resource.MustParse("200m"),
+				corev1.ResourceMemory: resource.MustParse("500Mi"),
 			},
 		},
 	},
@@ -161,8 +161,8 @@ var size10000 = ClusterInstallationSize{
 		Replicas: 3,
 		Resources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("3.5"),
-				corev1.ResourceMemory: resource.MustParse("15.5Gi"),
+				corev1.ResourceCPU:    resource.MustParse("500m"),
+				corev1.ResourceMemory: resource.MustParse("500Mi"),
 			},
 		},
 	},
@@ -173,15 +173,15 @@ const Size25000String = "25000users"
 
 var size25000 = ClusterInstallationSize{
 	App: ComponentSize{
-		Replicas: 4,
+		Replicas: 2,
 		Resources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("3.5"),
-				corev1.ResourceMemory: resource.MustParse("15.5Gi"),
+				corev1.ResourceCPU:    resource.MustParse("500m"),
+				corev1.ResourceMemory: resource.MustParse("500Mi"),
 			},
 			Limits: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("8"),
-				corev1.ResourceMemory: resource.MustParse("32Gi"),
+				corev1.ResourceCPU:    resource.MustParse("4"),
+				corev1.ResourceMemory: resource.MustParse("8Gi"),
 			},
 		},
 	},
@@ -189,17 +189,17 @@ var size25000 = ClusterInstallationSize{
 		Replicas: 4,
 		Resources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("3.5"),
-				corev1.ResourceMemory: resource.MustParse("15.5Gi"),
+				corev1.ResourceCPU:    resource.MustParse("200m"),
+				corev1.ResourceMemory: resource.MustParse("500Mi"),
 			},
 		},
 	},
 	Database: ComponentSize{
-		Replicas: 4,
+		Replicas: 3,
 		Resources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("3.5"),
-				corev1.ResourceMemory: resource.MustParse("15.5Gi"),
+				corev1.ResourceCPU:    resource.MustParse("500m"),
+				corev1.ResourceMemory: resource.MustParse("500Mi"),
 			},
 		},
 	},
@@ -215,12 +215,12 @@ var sizeMiniSingleton = ClusterInstallationSize{
 		Replicas: 1,
 		Resources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("250m"),
-				corev1.ResourceMemory: resource.MustParse("512Mi"),
+				corev1.ResourceCPU:    resource.MustParse("100m"),
+				corev1.ResourceMemory: resource.MustParse("256Mi"),
 			},
 			Limits: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("1"),
-				corev1.ResourceMemory: resource.MustParse("1Gi"),
+				corev1.ResourceCPU:    resource.MustParse("2"),
+				corev1.ResourceMemory: resource.MustParse("4Gi"),
 			},
 		},
 	},
@@ -228,7 +228,7 @@ var sizeMiniSingleton = ClusterInstallationSize{
 		Replicas: 1,
 		Resources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("250m"),
+				corev1.ResourceCPU:    resource.MustParse("200m"),
 				corev1.ResourceMemory: resource.MustParse("512Mi"),
 			},
 		},
@@ -237,7 +237,7 @@ var sizeMiniSingleton = ClusterInstallationSize{
 		Replicas: 1,
 		Resources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("500m"),
+				corev1.ResourceCPU:    resource.MustParse("200m"),
 				corev1.ResourceMemory: resource.MustParse("512Mi"),
 			},
 		},
@@ -252,12 +252,12 @@ var sizeMiniHA = ClusterInstallationSize{
 		Replicas: 2,
 		Resources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("250m"),
+				corev1.ResourceCPU:    resource.MustParse("200m"),
 				corev1.ResourceMemory: resource.MustParse("512Mi"),
 			},
 			Limits: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("1"),
-				corev1.ResourceMemory: resource.MustParse("1Gi"),
+				corev1.ResourceCPU:    resource.MustParse("2"),
+				corev1.ResourceMemory: resource.MustParse("4Gi"),
 			},
 		},
 	},
@@ -265,7 +265,7 @@ var sizeMiniHA = ClusterInstallationSize{
 		Replicas: 4,
 		Resources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("250m"),
+				corev1.ResourceCPU:    resource.MustParse("200m"),
 				corev1.ResourceMemory: resource.MustParse("512Mi"),
 			},
 		},
@@ -274,7 +274,7 @@ var sizeMiniHA = ClusterInstallationSize{
 		Replicas: 2,
 		Resources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("500m"),
+				corev1.ResourceCPU:    resource.MustParse("200m"),
 				corev1.ResourceMemory: resource.MustParse("512Mi"),
 			},
 		},
