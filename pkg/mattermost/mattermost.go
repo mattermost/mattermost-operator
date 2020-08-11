@@ -380,22 +380,41 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbIn
 	volumeMountLicense := []corev1.VolumeMount{}
 	podAnnotations := map[string]string{}
 	if len(mattermost.Spec.MattermostLicenseSecret) != 0 {
+
+		err := checkMattermostImageVersion(mattermost.Spec.Image, mattermost.Spec.Version)
+		if err != nil {
+			// error parsing the version or user requested to deploy an digest or another non released tag
+			// Maybe we deprecate this in future and only have MM_LICENSE
+			envVarGeneral = append(envVarGeneral, corev1.EnvVar{
+				Name:  "MM_SERVICESETTINGS_LICENSEFILELOCATION",
+				Value: "/mattermost-license/license",
+			})
+
+			volumeMountLicense = append(volumeMountLicense, corev1.VolumeMount{
+				MountPath: "/mattermost-license",
+				Name:      "mattermost-license",
+				ReadOnly:  true,
+			})
+
+			volumeLicense = append(volumeLicense, corev1.Volume{
+				Name: "mattermost-license",
+				VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{
+						SecretName: mattermost.Spec.MattermostLicenseSecret,
+					},
+				},
+			})
+		}
+		// Version is equal or greater then 5.26.0 so we can use the MM_LICENSE
+		// For previous releases this env var will not make difference
 		envVarGeneral = append(envVarGeneral, corev1.EnvVar{
-			Name:  "MM_SERVICESETTINGS_LICENSEFILELOCATION",
-			Value: "/mattermost-license/license",
-		})
-
-		volumeMountLicense = append(volumeMountLicense, corev1.VolumeMount{
-			MountPath: "/mattermost-license",
-			Name:      "mattermost-license",
-			ReadOnly:  true,
-		})
-
-		volumeLicense = append(volumeLicense, corev1.Volume{
-			Name: "mattermost-license",
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: mattermost.Spec.MattermostLicenseSecret,
+			Name: "MM_LICENSE",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: mattermost.Spec.MattermostLicenseSecret,
+					},
+					Key: "license",
 				},
 			},
 		})

@@ -1,6 +1,11 @@
 package mattermost
 
 import (
+	"regexp"
+
+	"github.com/blang/semver/v4"
+	"github.com/pkg/errors"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -142,4 +147,26 @@ func setProbes(customLiveness, customStartup, customReadiness corev1.Probe) (*co
 	}
 
 	return liveness, startUp, readiness
+}
+
+func checkMattermostImageVersion(imageName, version string) error {
+	var re = regexp.MustCompile(`mattermost/mattermost-.*[team|enterprise]-edition$`)
+	if !re.MatchString(imageName) {
+		return errors.Errorf("not using the mattermost official images so cannot validate the version")
+	}
+
+	v, err := semver.Parse(version)
+	if err != nil {
+		return errors.Wrap(err, "failed to parse the version, maybe it is using ")
+	}
+
+	expectedRange, err := semver.ParseRange(">=5.26.0")
+	if err != nil {
+		return errors.Wrapf(err, "failed to parse the version range for %s", version)
+	}
+	if !expectedRange(v) {
+		return errors.Errorf("invalid Version option %s, must be greater than 5.26.0", version)
+	}
+
+	return nil
 }
