@@ -208,11 +208,44 @@ func (r *ReconcileClusterInstallation) checkSecret(secretName, keyName, namespac
 
 func (r *ReconcileClusterInstallation) updateStatus(mattermost *mattermostv1alpha1.ClusterInstallation, status mattermostv1alpha1.ClusterInstallationStatus, reqLogger logr.Logger) error {
 	if !reflect.DeepEqual(mattermost.Status, status) {
+		if mattermost.Status.State != status.State {
+			reqLogger.Info(fmt.Sprintf("Updating ClusterInstallation state from '%s' to '%s'", mattermost.Status.State, status.State))
+		}
+
 		mattermost.Status = status
 		err := r.client.Status().Update(context.TODO(), mattermost)
 		if err != nil {
-			reqLogger.Error(err, "failed to update the clusterinstallation status")
-			return err
+			return errors.Wrap(err, "failed to update the clusterinstallation status")
+		}
+	}
+
+	return nil
+}
+
+// setStateReconciling sets the ClusterInstallation state to reconciling.
+func (r *ReconcileClusterInstallation) setStateReconciling(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
+	return r.setState(mattermost, mattermostv1alpha1.Reconciling, reqLogger)
+}
+
+// setStateReconcilingAndLogError attempts to set the ClusterInstallation state
+// to reconciling. Any errors attempting this are logged, but not returned. This
+// should only be used when the outcome of setting the state can be ignored.
+func (r *ReconcileClusterInstallation) setStateReconcilingAndLogError(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) {
+	err := r.setState(mattermost, mattermostv1alpha1.Reconciling, reqLogger)
+	if err != nil {
+		reqLogger.Error(err, "Failed to set state to reconciling")
+	}
+}
+
+// setState sets the provided ClusterInstallation to the provided state if that
+// is different from the current state.
+func (r *ReconcileClusterInstallation) setState(mattermost *mattermostv1alpha1.ClusterInstallation, desired mattermostv1alpha1.RunningState, reqLogger logr.Logger) error {
+	if mattermost.Status.State != desired {
+		status := mattermost.Status
+		status.State = desired
+		err := r.updateStatus(mattermost, status, reqLogger)
+		if err != nil {
+			return errors.Wrapf(err, "failed to set state to %s", desired)
 		}
 	}
 
