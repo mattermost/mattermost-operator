@@ -248,23 +248,20 @@ func (r *ReconcileClusterInstallation) isMainContainerImageSame(
 ) (bool, error) {
 	// Sanity check
 	if (a == nil) || (b == nil) {
-		return false, errors.New("Unable to find main container, no deployment provided")
+		return false, errors.New("failed to find main container, no deployment provided")
 	}
 
 	// Fetch containers to compare
-
 	containerA := mattermost.GetMattermostAppContainer(a)
 	if containerA == nil {
-		return false, errors.Errorf("Unable to find main container, incorrect deployment %s/%s", a.Namespace, a.Name)
+		return false, errors.Errorf("failed to find main container, incorrect deployment %s/%s", a.Namespace, a.Name)
 	}
-
 	containerB := mattermost.GetMattermostAppContainer(b)
 	if containerB == nil {
-		return false, errors.Errorf("Unable to find main container, incorrect deployment %s/%s", b.Namespace, b.Name)
+		return false, errors.Errorf("failed to find main container, incorrect deployment %s/%s", b.Namespace, b.Name)
 	}
 
 	// Both containers fetched, can compare images
-
 	return containerA.Image == containerB.Image, nil
 }
 
@@ -334,13 +331,13 @@ func (r *ReconcileClusterInstallation) checkUpdateJob(
 	// Job is either running or completed
 
 	if job.Status.CompletionTime == nil {
-		return nil, errors.New("Update image job still running")
+		return nil, errors.New("update image job still running")
 	}
 
 	// Job is completed, can check completion status
 
 	if job.Status.Failed > 0 {
-		return job, errors.New("Update image job failed")
+		return job, errors.New("update image job failed")
 	}
 
 	reqLogger.Info("Update image job ran successfully")

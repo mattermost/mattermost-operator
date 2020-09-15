@@ -77,7 +77,6 @@ func (r *ReconcileClusterInstallation) checkMattermostMinioSecret(mattermost *ma
 
 func (r *ReconcileClusterInstallation) checkMinioSecret(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
 	if mattermost.Spec.Minio.Secret != "" {
-		reqLogger.Info("skipping minio secret creation, using custom secret")
 		return r.checkCustomMinioSecret(mattermost, reqLogger)
 	}
 	return r.checkMattermostMinioSecret(mattermost, reqLogger)

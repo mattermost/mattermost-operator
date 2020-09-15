@@ -36,7 +36,7 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileClusterInstallation{client: mgr.GetClient(), scheme: mgr.GetScheme(), state: mattermostv1alpha1.Reconciling}
+	return &ReconcileClusterInstallation{client: mgr.GetClient(), scheme: mgr.GetScheme()}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -96,15 +96,6 @@ type ReconcileClusterInstallation struct {
 	// that reads objects from the cache and writes to the apiserver.
 	client client.Client
 	scheme *runtime.Scheme
-	state  mattermostv1alpha1.RunningState
-}
-
-func (r *ReconcileClusterInstallation) setReconciling() {
-	r.state = mattermostv1alpha1.Reconciling
-}
-
-func (r *ReconcileClusterInstallation) setStable() {
-	r.state = mattermostv1alpha1.Stable
 }
 
 // Reconcile reads the state of the cluster for a ClusterInstallation object and
@@ -118,27 +109,23 @@ func (r *ReconcileClusterInstallation) Reconcile(request reconcile.Request) (rec
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	reqLogger.Info("Reconciling ClusterInstallation")
 
-	// Fetch the ClusterInstallation instance
+	// Fetch the ClusterInstallation.
 	mattermost := &mattermostv1alpha1.ClusterInstallation{}
 	err := r.client.Get(context.TODO(), request.NamespacedName, mattermost)
 	if err != nil && k8sErrors.IsNotFound(err) {
-		// Request object not found, could have been deleted after reconcile request.
-		// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
-		// Return and don't requeue
-		r.setReconciling()
+		// Request object not found, could have been deleted after reconcile
+		// request. Owned objects are automatically garbage collected. For
+		// additional cleanup logic use finalizers. Return and don't requeue.
 		return reconcile.Result{}, nil
 	} else if err != nil {
 		// Error reading the object - requeue the request.
-		r.setReconciling()
 		return reconcile.Result{}, err
 	}
 
-	if mattermost.Status.State != r.state {
-		status := mattermost.Status
-		status.State = r.state
-		err = r.updateStatus(mattermost, status, reqLogger)
+	// Set a new ClusterInstallation's state to reconciling.
+	if len(mattermost.Status.State) == 0 {
+		err = r.setStateReconciling(mattermost, reqLogger)
 		if err != nil {
-			r.setReconciling()
 			return reconcile.Result{}, err
 		}
 	}
@@ -148,7 +135,7 @@ func (r *ReconcileClusterInstallation) Reconcile(request reconcile.Request) (rec
 	originalMattermost := mattermost.DeepCopy()
 	err = mattermost.SetDefaults()
 	if err != nil {
-		r.setReconciling()
+		r.setStateReconcilingAndLogError(mattermost, reqLogger)
 		return reconcile.Result{}, err
 	}
 
@@ -165,54 +152,53 @@ func (r *ReconcileClusterInstallation) Reconcile(request reconcile.Request) (rec
 		err = r.client.Update(context.TODO(), mattermost)
 		if err != nil {
 			reqLogger.Error(err, "failed to update the clusterinstallation spec")
-			r.setReconciling()
+			r.setStateReconcilingAndLogError(mattermost, reqLogger)
 			return reconcile.Result{}, err
 		}
 	}
 
 	err = r.checkDatabase(mattermost, reqLogger)
 	if err != nil {
-		r.setReconciling()
+		r.setStateReconcilingAndLogError(mattermost, reqLogger)
 		return reconcile.Result{}, err
 	}
 
 	err = r.checkMinio(mattermost, reqLogger)
 	if err != nil {
-		r.setReconciling()
+		r.setStateReconcilingAndLogError(mattermost, reqLogger)
 		return reconcile.Result{}, err
 	}
 
 	err = r.checkMattermost(mattermost, reqLogger)
 	if err != nil {
-		r.setReconciling()
+		r.setStateReconcilingAndLogError(mattermost, reqLogger)
 		return reconcile.Result{}, err
 	}
 
 	err = r.checkBlueGreen(mattermost, reqLogger)
 	if err != nil {
-		r.setReconciling()
+		r.setStateReconcilingAndLogError(mattermost, reqLogger)
 		return reconcile.Result{}, err
 	}
 
 	err = r.checkCanary(mattermost, reqLogger)
 	if err != nil {
-		r.setReconciling()
+		r.setStateReconcilingAndLogError(mattermost, reqLogger)
 		return reconcile.Result{}, err
 	}
 
 	status, err := r.handleCheckClusterInstallation(mattermost)
 	if err != nil {
-		r.setReconciling()
+		r.setStateReconcilingAndLogError(mattermost, reqLogger)
 		r.updateStatus(mattermost, status, reqLogger)
 		return reconcile.Result{RequeueAfter: time.Second * 3}, err
 	}
 
 	err = r.updateStatus(mattermost, status, reqLogger)
 	if err != nil {
-		r.setReconciling()
+		r.setStateReconcilingAndLogError(mattermost, reqLogger)
 		return reconcile.Result{}, err
 	}
-	r.setStable()
 
 	return reconcile.Result{}, nil
 }
@@ -227,12 +213,15 @@ func (r *ReconcileClusterInstallation) checkDatabase(mattermost *mattermostv1alp
 			return errors.Wrap(err, "failed to get database secret")
 		}
 
-		err = database.GenerateDatabaseInfoFromSecret(databaseSecret).IsValid()
+		dbInfo := database.GenerateDatabaseInfoFromSecret(databaseSecret)
+		err = dbInfo.IsValid()
 		if err != nil {
 			return errors.Wrap(err, "database secret is not valid")
 		}
 
-		// Proceed to MySQL cluster setup.
+		if dbInfo.External {
+			return nil
+		}
 	}
 
 	switch mattermost.Spec.Database.Type {

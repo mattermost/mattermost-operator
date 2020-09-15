@@ -429,7 +429,7 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbIn
 	maxUnavailable := intstr.FromInt(defaultMaxUnavailable)
 	maxSurge := intstr.FromInt(defaultMaxSurge)
 
-	liveness, startupProbe, readiness := setProbes(mattermost.Spec.LivenessProbe, mattermost.Spec.StartupProbe, mattermost.Spec.ReadinessProbe)
+	liveness, readiness := setProbes(mattermost.Spec.LivenessProbe, mattermost.Spec.ReadinessProbe)
 
 	replicas := mattermost.Spec.Replicas
 	if replicas < 0 {
@@ -485,7 +485,6 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbIn
 							},
 							ReadinessProbe: readiness,
 							LivenessProbe:  liveness,
-							StartupProbe:   startupProbe,
 							VolumeMounts:   volumeMountLicense,
 							Resources:      mattermost.Spec.Resources,
 						},
