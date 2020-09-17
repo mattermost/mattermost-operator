@@ -245,12 +245,6 @@ func schema_pkg_apis_mattermost_v1alpha1_ClusterInstallationSpec(ref common.Refe
 							Ref:         ref("k8s.io/api/core/v1.Probe"),
 						},
 					},
-					"startupProbe": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Defines the probe to check if the application is up and running during the start up process.",
-							Ref:         ref("k8s.io/api/core/v1.Probe"),
-						},
-					},
 					"readinessProbe": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Defines the probe to check if the application is ready to accept traffic.",
