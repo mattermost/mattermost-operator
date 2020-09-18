@@ -85,9 +85,6 @@ type ClusterInstallationSpec struct {
 	// Defines the probe to check if the application is up and running.
 	// +optional
 	LivenessProbe corev1.Probe `json:"livenessProbe,omitempty"`
-	// Defines the probe to check if the application is up and running during the start up process.
-	// +optional
-	StartupProbe corev1.Probe `json:"startupProbe,omitempty"`
 	// Defines the probe to check if the application is ready to accept traffic.
 	// +optional
 	ReadinessProbe corev1.Probe `json:"readinessProbe,omitempty"`
