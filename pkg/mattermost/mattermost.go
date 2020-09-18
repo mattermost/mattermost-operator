@@ -131,6 +131,20 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbIn
 			},
 		}
 
+		if dbInfo.HasReaderEndpoints() {
+			envVarDB = append(envVarDB, corev1.EnvVar{
+				Name: "MM_SQLSETTINGS_DATASOURCEREPLICAS",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: mattermost.Spec.Database.Secret,
+						},
+						Key: "MM_SQLSETTINGS_DATASOURCEREPLICAS",
+					},
+				},
+			})
+		}
+
 		if dbInfo.HasDatabaseCheckURL() {
 			initContainers = append(initContainers, corev1.Container{
 				Name:            "init-check-database",
@@ -163,7 +177,7 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbIn
 			mysqlName, mattermost.Namespace, dbInfo.DatabaseName,
 		)
 
-		operatorEnv := []corev1.EnvVar{
+		mysqlOperatorEnv := []corev1.EnvVar{
 			{
 				Name: "MYSQL_USERNAME",
 				ValueFrom: &corev1.EnvVarSource{
@@ -194,7 +208,7 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbIn
 				),
 			},
 		}
-		envVarDB = append(envVarDB, operatorEnv...)
+		envVarDB = append(envVarDB, mysqlOperatorEnv...)
 
 		// Create the init container to check that the DB is up and running
 		initContainers = append(initContainers, corev1.Container{
