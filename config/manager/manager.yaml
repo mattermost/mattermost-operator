@@ -1,11 +1,4 @@
 apiVersion: v1
-kind: Namespace
-metadata:
-  labels:
-    control-plane: controller-manager
-  name: mattermost-operator
----
-apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: mattermost-operator
