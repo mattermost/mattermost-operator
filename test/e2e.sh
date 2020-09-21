@@ -20,6 +20,7 @@ docker_exec() {
 
 
 run_kind() {
+    KIND_VERSION="v0.9.0"
     echo "Download kind binary..."
     curl -sSLo kind https://github.com/kubernetes-sigs/kind/releases/download/"${KIND_VERSION}"/kind-linux-amd64
     chmod +x kind
@@ -76,50 +77,11 @@ main() {
 
     install_operator-sdk
 
-    # Move the operator container inside Kind container so that the image is
-    # available to the docker in docker environment.
-    # Copy the image to the cluster to make a bit more fast to start
-    docker pull quay.io/presslabs/mysql-operator:0.3.3
-    docker pull quay.io/presslabs/mysql-operator-sidecar:0.3.3
-    docker pull quay.io/presslabs/mysql-operator-orchestrator:0.3.3
-    docker pull minio/k8s-operator:1.0.7
+    source ./test/setup_test.sh
 
-    kind load docker-image quay.io/presslabs/mysql-operator:0.3.3
-    kind load docker-image quay.io/presslabs/mysql-operator-sidecar:0.3.3
-    kind load docker-image quay.io/presslabs/mysql-operator-orchestrator:0.3.3
-    kind load docker-image minio/k8s-operator:1.0.7
-    sleep 10
-
-    # Create a namespace for testing operator.
-    # This is needed because the service account created using
-    # deploy/service_account.yaml has a static namespace. Creating operator in
-    # other namespace will result in permission errors.
-    kubectl create ns mattermost-operator
-
-    # Create the mysql operator
-    kubectl create ns mysql-operator
-    kubectl apply -n mysql-operator -f docs/mysql-operator/mysql-operator.yaml
-    sleep 10
-    # Create the minio operator
-    kubectl create ns minio-operator
-    kubectl apply -n minio-operator -f docs/minio-operator/minio-operator.yaml
-    sleep 10
-
-    kubectl get pods --all-namespaces
-    # Build the operator container image.
-    # This would build a container with tag mattermost/mattermost-operator:test,
-    # which is used in the e2e test setup below.
-    make build-image
-    kind load docker-image mattermost/mattermost-operator:test
-    sleep 5
-
-    kubectl get pods --all-namespaces
-    echo "Ready for testing"
-    # NOTE: Append this test command with `|| true` to debug by inspecting the
-    # resource details. Also comment `defer ctx.Cleanup()` in the cluster to
-    # avoid resouce cleanup.
     echo "Starting Operator Testing..."
-    docker_exec operator-sdk test local ./test/e2e --debug --verbose --operator-namespace mattermost-operator --kubeconfig /root/.kube/config --go-test-flags -timeout=30m
+    docker_exec go test ./test/e2e -timeout=30m
+#    docker_exec operator-sdk test local ./test/e2e --debug --verbose --operator-namespace mattermost-operator --kubeconfig /root/.kube/config --go-test-flags -timeout=30m
 
     echo "Done Testing!"
 }

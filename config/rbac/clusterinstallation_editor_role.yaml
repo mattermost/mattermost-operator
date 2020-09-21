@@ -1,0 +1,24 @@
+# permissions for end users to edit clusterinstallations.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: clusterinstallation-editor-role
+rules:
+- apiGroups:
+  - mattermost.com.mattermost.com
+  resources:
+  - clusterinstallations
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - mattermost.com.mattermost.com
+  resources:
+  - clusterinstallations/status
+  verbs:
+  - get

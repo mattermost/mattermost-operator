@@ -9,7 +9,7 @@ import (
 	"context"
 	"time"
 
-	v1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
+	v1alpha1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1"
 	scheme "github.com/mattermost/mattermost-operator/pkg/client/clientset/versioned/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"

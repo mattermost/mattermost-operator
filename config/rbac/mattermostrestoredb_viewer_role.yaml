@@ -1,0 +1,20 @@
+# permissions for end users to view mattermostrestoredbs.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: mattermostrestoredb-viewer-role
+rules:
+- apiGroups:
+  - mattermost.com.mattermost.com
+  resources:
+  - mattermostrestoredbs
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - mattermost.com.mattermost.com
+  resources:
+  - mattermostrestoredbs/status
+  verbs:
+  - get

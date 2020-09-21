@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    control-plane: controller-manager
+  name: mattermost-operator
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mattermost-operator
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mattermost-operator
+  namespace: mattermost-operator
+  labels:
+    control-plane: controller-manager
+spec:
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        control-plane: controller-manager
+    spec:
+      serviceAccountName: mattermost-operator
+      containers:
+      - command:
+        - /mattermost-operator
+        args:
+        - --enable-leader-election
+        image: mattermost-operator
+        imagePullPolicy: IfNotPresent
+        name: mattermost-operator
+        resources:
+          limits:
+            cpu: 100m
+            memory: 30Mi
+          requests:
+            cpu: 100m
+            memory: 20Mi
+      terminationGracePeriodSeconds: 10
