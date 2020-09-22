@@ -13,14 +13,16 @@ func TestDatabaseInfo(t *testing.T) {
 		secret              *corev1.Secret
 		expectedInfo        *Info
 		isExternal          bool
+		hasReaderEndpoints  bool
 		hasDatabaseCheckURL bool
 		isValid             bool
 	}{
 		{
 			name:                "empty",
 			secret:              &corev1.Secret{},
-			expectedInfo:        &Info{DatabaseCheckURL: true},
+			expectedInfo:        &Info{ReaderEndpoints: true, DatabaseCheckURL: true},
 			isExternal:          false,
+			hasReaderEndpoints:  true,
 			hasDatabaseCheckURL: true,
 			isValid:             false,
 		},
@@ -58,9 +60,11 @@ func TestDatabaseInfo(t *testing.T) {
 				userName:         "user",
 				userPassword:     "pass",
 				DatabaseName:     "database1",
+				ReaderEndpoints:  true,
 				DatabaseCheckURL: true,
 			},
 			isExternal:          false,
+			hasReaderEndpoints:  true,
 			hasDatabaseCheckURL: true,
 			isValid:             true,
 		},
@@ -75,9 +79,11 @@ func TestDatabaseInfo(t *testing.T) {
 				rootPassword:     "root",
 				userPassword:     "pass",
 				DatabaseName:     "database1",
+				ReaderEndpoints:  true,
 				DatabaseCheckURL: true,
 			},
 			isExternal:          false,
+			hasReaderEndpoints:  true,
 			hasDatabaseCheckURL: true,
 			isValid:             false,
 		},
@@ -92,9 +98,11 @@ func TestDatabaseInfo(t *testing.T) {
 				rootPassword:     "root",
 				userName:         "user",
 				DatabaseName:     "database1",
+				ReaderEndpoints:  true,
 				DatabaseCheckURL: true,
 			},
 			isExternal:          false,
+			hasReaderEndpoints:  true,
 			hasDatabaseCheckURL: true,
 			isValid:             false,
 		},
@@ -109,9 +117,11 @@ func TestDatabaseInfo(t *testing.T) {
 				rootPassword:     "root",
 				userName:         "user",
 				userPassword:     "pass",
+				ReaderEndpoints:  true,
 				DatabaseCheckURL: true,
 			},
 			isExternal:          false,
+			hasReaderEndpoints:  true,
 			hasDatabaseCheckURL: true,
 			isValid:             false,
 		},
@@ -131,6 +141,7 @@ func TestDatabaseInfo(t *testing.T) {
 			info := GenerateDatabaseInfoFromSecret(tt.secret)
 			assert.Equal(t, tt.expectedInfo, info)
 			assert.Equal(t, tt.isExternal, info.IsExternal())
+			assert.Equal(t, tt.hasReaderEndpoints, info.HasReaderEndpoints())
 			assert.Equal(t, tt.hasDatabaseCheckURL, info.HasDatabaseCheckURL())
 			assert.Equal(t, tt.secret.Name, info.SecretName)
 			if !tt.isValid {

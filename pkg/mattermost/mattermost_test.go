@@ -128,6 +128,16 @@ func TestGenerateDeployment(t *testing.T) {
 			want:     &appsv1.Deployment{},
 		},
 		{
+			name: "external database with reader endpoints",
+			spec: mattermostv1alpha1.ClusterInstallationSpec{
+				Database: mattermostv1alpha1.Database{
+					Secret: "database-secret",
+				},
+			},
+			database: &database.Info{External: true, ReaderEndpoints: true},
+			want:     &appsv1.Deployment{},
+		},
+		{
 			name: "external database with check url",
 			spec: mattermostv1alpha1.ClusterInstallationSpec{
 				Database: mattermostv1alpha1.Database{
@@ -264,21 +274,23 @@ func TestGenerateDeployment(t *testing.T) {
 			mattermostAppContainer := mattermost.GetMattermostAppContainer(deployment)
 			require.NotNil(t, mattermostAppContainer)
 
-			// License check.
-			if len(mattermost.Spec.MattermostLicenseSecret) != 0 {
-				var hasClusterEnableEnv, hasClusterNameEnv bool
+			// Basic env var check to ensure the key exists.
+			assertEnvVarExists(t, "MM_CONFIG", mattermostAppContainer.Env)
+			assertEnvVarExists(t, "MM_SERVICESETTINGS_SITEURL", mattermostAppContainer.Env)
+			assertEnvVarExists(t, "MM_METRICSSETTINGS_LISTENADDRESS", mattermostAppContainer.Env)
+			assertEnvVarExists(t, "MM_METRICSSETTINGS_ENABLE", mattermostAppContainer.Env)
+			assertEnvVarExists(t, "MM_PLUGINSETTINGS_ENABLEUPLOADS", mattermostAppContainer.Env)
+			assertEnvVarExists(t, "MM_CLUSTERSETTINGS_ENABLE", mattermostAppContainer.Env)
+			assertEnvVarExists(t, "MM_CLUSTERSETTINGS_CLUSTERNAME", mattermostAppContainer.Env)
+			assertEnvVarExists(t, "MM_FILESETTINGS_MAXFILESIZE", mattermostAppContainer.Env)
 
-				for _, env := range mattermostAppContainer.Env {
-					switch env.Name {
-					case "MM_CLUSTERSETTINGS_ENABLE":
-						hasClusterEnableEnv = true
-					case "MM_CLUSTERSETTINGS_CLUSTERNAME":
-						hasClusterNameEnv = true
-					}
-				}
+			if databaseInfo.HasReaderEndpoints() {
+				assertEnvVarExists(t, "MM_SQLSETTINGS_DATASOURCEREPLICAS", mattermostAppContainer.Env)
+			}
 
-				assert.Truef(t, hasClusterEnableEnv, "Should have cluster enable env set")
-				assert.Truef(t, hasClusterNameEnv, "Should have cluster name env set")
+			if !databaseInfo.IsExternal() {
+				assertEnvVarExists(t, "MYSQL_USERNAME", mattermostAppContainer.Env)
+				assertEnvVarExists(t, "MYSQL_PASSWORD", mattermostAppContainer.Env)
 			}
 
 			// Init container check.
@@ -297,4 +309,14 @@ func TestGenerateDeployment(t *testing.T) {
 			assert.Equal(t, 1, len(deployment.Spec.Template.Spec.Containers))
 		})
 	}
+}
+
+func assertEnvVarExists(t *testing.T, name string, env []corev1.EnvVar) {
+	for _, e := range env {
+		if e.Name == name {
+			return
+		}
+	}
+
+	assert.Fail(t, fmt.Sprintf("failed to find env var %s", name))
 }

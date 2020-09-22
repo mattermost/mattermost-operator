@@ -11,6 +11,7 @@ type Info struct {
 	SecretName       string
 	DatabaseName     string
 	External         bool
+	ReaderEndpoints  bool
 	DatabaseCheckURL bool
 
 	// These values should never be directly accessed or used. They are set only
@@ -46,9 +47,14 @@ func (db *Info) IsValid() error {
 	return nil
 }
 
-// IsExternal defines if the database is external or not
+// IsExternal defines if the database is external or not.
 func (db *Info) IsExternal() bool {
 	return db.External
+}
+
+// HasReaderEndpoints returns if the database has reader endpoints defined.
+func (db *Info) HasReaderEndpoints() bool {
+	return db.ReaderEndpoints
 }
 
 // HasDatabaseCheckURL returns if the database has an endpoint check defined.
@@ -66,6 +72,10 @@ func GenerateDatabaseInfoFromSecret(secret *corev1.Secret) *Info {
 			External:   true,
 		}
 
+		if _, ok := secret.Data["MM_SQLSETTINGS_DATASOURCEREPLICAS"]; ok {
+			databaseInfo.ReaderEndpoints = true
+		}
+
 		if _, ok := secret.Data["DB_CONNECTION_CHECK_URL"]; ok {
 			// The optional endpoint check was provided.
 			databaseInfo.DatabaseCheckURL = true
@@ -77,6 +87,7 @@ func GenerateDatabaseInfoFromSecret(secret *corev1.Secret) *Info {
 	return &Info{
 		SecretName:       secret.Name,
 		External:         false,
+		ReaderEndpoints:  true,
 		DatabaseCheckURL: true,
 		rootPassword:     string(secret.Data["ROOT_PASSWORD"]),
 		userName:         string(secret.Data["USER"]),
