@@ -1633,13 +1633,5 @@ spec:
         image: mattermost/mattermost-operator:latest
         imagePullPolicy: IfNotPresent
         name: mattermost-operator
-        resources:
-          limits:
-            cpu: 100m
-            memory: 30Mi
-          requests:
-            cpu: 100m
-            memory: 20Mi
       serviceAccountName: mattermost-operator
-      terminationGracePeriodSeconds: 10
 ---
