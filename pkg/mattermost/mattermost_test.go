@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
+	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1"
 	"github.com/mattermost/mattermost-operator/pkg/database"
 	"github.com/mattermost/mattermost-operator/pkg/utils"
 

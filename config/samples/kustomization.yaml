@@ -1,0 +1,5 @@
+## Append samples you want in your CSV to this file as resources ##
+resources:
+- mattermost.com_v1alpha1_mattermostrestoredb.yaml
+- mattermost.com_v1alpha1_clusterinstallation.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples

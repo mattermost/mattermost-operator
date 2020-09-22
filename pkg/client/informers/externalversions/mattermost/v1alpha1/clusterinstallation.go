@@ -9,7 +9,7 @@ import (
 	"context"
 	time "time"
 
-	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
+	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1"
 	versioned "github.com/mattermost/mattermost-operator/pkg/client/clientset/versioned"
 	internalinterfaces "github.com/mattermost/mattermost-operator/pkg/client/informers/externalversions/internalinterfaces"
 	v1alpha1 "github.com/mattermost/mattermost-operator/pkg/client/listers/mattermost/v1alpha1"

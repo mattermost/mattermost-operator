@@ -33,14 +33,14 @@ jobs:
           make clean
           make operator-sdk
       - run: |
-          mkdir -p /tmp/pkg/apis/mattermost/v1alpha1
-          cp -R pkg/apis/mattermost/v1alpha1/* /tmp/pkg/apis/mattermost/v1alpha1
+          mkdir -p /tmp/apis/mattermost/v1alpha1
+          cp -R apis/mattermost/v1alpha1/* /tmp/apis/mattermost/v1alpha1
       - run: |
-          mkdir -p /tmp/deploy/crds
-          cp -R deploy/crds/* /tmp/deploy/crds
-      - run: make generate
-      - run: diff /tmp/pkg/apis/mattermost/v1alpha1 pkg/apis/mattermost/v1alpha1
-      - run: diff /tmp/deploy/crds deploy/crds
+          mkdir -p /tmp/config/crd/bases
+          cp -R config/crd/bases/* /tmp/config/crd/bases
+      - run: make generate manifests
+      - run: diff /tmp/apis/mattermost/v1alpha1 apis/mattermost/v1alpha1
+      - run: diff /tmp/config/crd/bases config/crd/bases
 
   unittest:
     executor:
@@ -57,7 +57,7 @@ jobs:
       - IMAGE_NAME=mattermost/mattermost-operator
       - IMAGE_TAG=test
       - KIND_VERSION=v0.8.1
-      - SDK_VERSION=v0.19.0
+      - SDK_VERSION=v1.0.1
     machine: true
     resource_class: 2xlarge
     working_directory: /home/circleci/.go_workspace/src/github.com/mattermost/mattermost-operator

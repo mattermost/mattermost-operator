@@ -1,15 +1,38 @@
 .PHONY: all check-style unittest generate build clean build-image operator-sdk yaml
 
+# Current Operator version - used for bundle
+VERSION ?= 1.6.0
+# Default bundle image tag
+BUNDLE_IMG ?= controller-bundle:$(VERSION)
+# Options for 'bundle-build'
+ifneq ($(origin CHANNELS), undefined)
+BUNDLE_CHANNELS := --channels=$(CHANNELS)
+endif
+ifneq ($(origin DEFAULT_CHANNEL), undefined)
+BUNDLE_DEFAULT_CHANNEL := --default-channel=$(DEFAULT_CHANNEL)
+endif
+BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
+
+# Image URL to use all building/pushing image targets
 OPERATOR_IMAGE ?= mattermost/mattermost-operator:test
-SDK_VERSION = v0.19.0
+# Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
+CRD_OPTIONS ?= "crd:trivialVersions=true"
+
+# Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
+ifeq (,$(shell go env GOBIN))
+GOBIN=$(shell go env GOPATH)/bin
+else
+GOBIN=$(shell go env GOBIN)
+endif
+
+SDK_VERSION = v1.0.1
 MACHINE = $(shell uname -m)
 BUILD_IMAGE = golang:1.14.6
-BASE_IMAGE = alpine:3.12
+BASE_IMAGE = gcr.io/distroless/static:nonroot
 GOROOT ?= $(shell go env GOROOT)
 GOPATH ?= $(shell go env GOPATH)
 GOFLAGS ?= $(GOFLAGS:) -mod=vendor
 GO=go
-IMAGE_TAG=
 BUILD_TIME := $(shell date -u +%Y%m%d.%H%M%S)
 BUILD_HASH := $(shell git rev-parse HEAD)
 GO_LINKER_FLAGS ?= -ldflags\
@@ -40,7 +63,15 @@ OUTDATED_VER := master
 OUTDATED_BIN := go-mod-outdated
 OUTDATED_GEN := $(TOOLS_BIN_DIR)/$(OUTDATED_BIN)
 
-all: check-style unittest build ## Run all the things
+YQ_VER := master
+YQ_BIN := yq
+YQ_GEN := $(TOOLS_BIN_DIR)/$(YQ_BIN)
+
+## --------------------------------------
+## Rules
+## --------------------------------------
+
+all: generate check-style unittest build
 
 unittest: ## Runs unit tests
 	$(GO) test -mod=vendor $(GO_LINKER_FLAGS) $(TEST_PACKAGES) -v -covermode=count -coverprofile=coverage.out
@@ -50,19 +81,19 @@ goverall: $(GOVERALLS_GEN) ## Runs goveralls
 
 build: ## Build the mattermost-operator
 	@echo Building Mattermost-operator
-	GO111MODULE=on GOOS=linux GOARCH=amd64 CGO_ENABLED=0 $(GO) build $(GOFLAGS) -gcflags all=-trimpath=$(GOPATH) -asmflags all=-trimpath=$(GOPATH) -a -installsuffix cgo -o build/_output/bin/mattermost-operator $(GO_LINKER_FLAGS) ./cmd/manager/main.go
+	GO111MODULE=on GOOS=linux GOARCH=amd64 CGO_ENABLED=0 $(GO) build $(GOFLAGS) -gcflags all=-trimpath=$(GOPATH) -asmflags all=-trimpath=$(GOPATH) -a -installsuffix cgo -o build/_output/bin/mattermost-operator $(GO_LINKER_FLAGS) ./main.go
 
-build-image: operator-sdk ## Build the docker image for mattermost-operator
+build-image:  ## Build the docker image for mattermost-operator
 	@echo Building Mattermost-operator Docker Image
 	docker build \
 	--build-arg BUILD_IMAGE=$(BUILD_IMAGE) \
 	--build-arg BASE_IMAGE=$(BASE_IMAGE) \
-	. -f build/Dockerfile -t $(OPERATOR_IMAGE) \
+	. -f Dockerfile -t $(OPERATOR_IMAGE) \
 	--no-cache
 
-check-style: $(SHADOW_GEN) gofmt govet ## Runs govet/gofmt
+check-style: $(SHADOW_GEN) gofmt vet ## Runs go vet, gofmt
 
-gofmt: ## Runs gofmt against all packages.
+gofmt: ## Validates gofmt against all packages.
 	@echo Running GOFMT
 
 	@for package in $(PACKAGES); do \
@@ -79,37 +110,16 @@ gofmt: ## Runs gofmt against all packages.
 	done
 	@echo "gofmt success"; \
 
-govet: ## Runs govet against all packages.
-	@echo Running GOVET
-	$(GO) vet $(GOFLAGS) $(PACKAGES)
-	$(GO) vet $(GOFLAGS) -vettool=$(SHADOW_GEN) $(PACKAGES)
-	@echo "govet success";
+yaml: $(YQ_GEN) kustomize manifests ## Generate the YAML file for easy operator installation
+	cd config/manager && $(KUSTOMIZE) edit set image mattermost-operator="mattermost/mattermost-operator:latest"
 
-generate: $(OPENAPI_GEN) operator-sdk ## Runs the kubernetes code-generators and openapi
-	## We have to manually export GOROOT here to get around the following issue:
-	## https://github.com/operator-framework/operator-sdk/issues/1854#issuecomment-525132306
-	GOROOT=$(GOROOT) build/operator-sdk generate k8s
-	build/operator-sdk generate crds
+	$(KUSTOMIZE) build config/default > $(INSTALL_YAML)
 
-	GOROOT=$(GOROOT) $(OPENAPI_GEN) --logtostderr=true -o "" -i ./pkg/apis/mattermost/v1alpha1 -O zz_generated.openapi -p ./pkg/apis/mattermost/v1alpha1 -h ./hack/boilerplate.go.txt -r "-"
+	## Remove "metadata.namespace" keys to allow configuration
+	$(YQ_GEN) d -d'*' --inplace $(INSTALL_YAML) metadata.namespace
+	echo --- >> $(INSTALL_YAML)
 
-	vendor/k8s.io/code-generator/generate-groups.sh all github.com/mattermost/mattermost-operator/pkg/client github.com/mattermost/mattermost-operator/pkg/apis "mattermost:v1alpha1" -h ./hack/boilerplate.go.txt
-
-yaml: ## Generate the YAML file for easy operator installation
-	cat deploy/service_account.yaml > $(INSTALL_YAML)
-	echo --- >> $(INSTALL_YAML)
-	cat deploy/crds/mattermost.com_clusterinstallations_crd.yaml >> $(INSTALL_YAML)
-	echo --- >> $(INSTALL_YAML)
-	cat deploy/crds/mattermost.com_mattermostrestoredbs_crd.yaml >> $(INSTALL_YAML)
-	echo --- >> $(INSTALL_YAML)
-	cat deploy/role.yaml >> $(INSTALL_YAML)
-	echo --- >> $(INSTALL_YAML)
-	cat deploy/role_binding.yaml >> $(INSTALL_YAML)
-	echo --- >> $(INSTALL_YAML)
-	cat deploy/operator.yaml >> $(INSTALL_YAML)
-	sed -i '' 's/mattermost-operator:test/mattermost-operator:latest/g' ./$(INSTALL_YAML)
-
-operator-sdk: ## Download sdk only if it's not available. Used in the docker build
+operator-sdk: ## Download sdk only if it's not available. Used when creating bundle.
 	build/get-operator-sdk.sh $(SDK_VERSION)
 
 clean: ## Clean up everything
@@ -119,6 +129,92 @@ clean: ## Clean up everything
 	rm -f *.out
 	rm -f *.test
 	rm -f bin/*
+
+## -------------------------------------------------------------
+## Below - modified rules generated by operator-sdk/kubebuilder
+## -------------------------------------------------------------
+
+manager: generate fmt vet ## Build manager binary
+	go build -o bin/manager main.go
+
+run: generate fmt vet manifests ## Run against the configured Kubernetes cluster in ~/.kube/config
+	go run ./main.go
+
+install: manifests kustomize ## Install CRDs into a cluster
+	$(KUSTOMIZE) build config/crd | kubectl apply -f -
+
+uninstall: manifests kustomize ## Uninstall CRDs from a cluster
+	$(KUSTOMIZE) build config/crd | kubectl delete -f -
+
+deploy: manifests kustomize ## Deploy controller in the configured Kubernetes cluster in ~/.kube/config
+	cd config/manager && $(KUSTOMIZE) edit set image mattermost-operator="mattermost/mattermost-operator:test"
+	$(KUSTOMIZE) build config/default | kubectl apply -f -
+
+manifests: controller-gen ## Runs CRD generator
+	$(CONTROLLER_GEN) $(CRD_OPTIONS) paths="./..." output:crd:artifacts:config=config/crd/bases
+
+fmt: ## Run go fmt against code
+	go fmt ./...
+
+vet: ## Run go vet against against all packages.
+	@echo Running GOVET
+	$(GO) vet $(GOFLAGS) $(PACKAGES)
+	$(GO) vet $(GOFLAGS) -vettool=$(SHADOW_GEN) $(PACKAGES)
+	@echo "govet success";
+
+generate: $(OPENAPI_GEN) controller-gen ## Runs the kubernetes code-generators and openapi
+	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+
+	GOROOT=$(GOROOT) $(OPENAPI_GEN) --logtostderr=true -o "" -i ./apis/mattermost/v1alpha1 -O zz_generated.openapi -p ./apis/mattermost/v1alpha1 -h ./hack/boilerplate.go.txt -r "-"
+
+	## Do not generate deepcopy as it is handled by controller-gen
+	vendor/k8s.io/code-generator/generate-groups.sh client github.com/mattermost/mattermost-operator/pkg/client github.com/mattermost/mattermost-operator/apis "mattermost:v1alpha1" -h ./hack/boilerplate.go.txt
+	vendor/k8s.io/code-generator/generate-groups.sh lister github.com/mattermost/mattermost-operator/pkg/client github.com/mattermost/mattermost-operator/apis "mattermost:v1alpha1" -h ./hack/boilerplate.go.txt
+	vendor/k8s.io/code-generator/generate-groups.sh informer github.com/mattermost/mattermost-operator/pkg/client github.com/mattermost/mattermost-operator/apis "mattermost:v1alpha1" -h ./hack/boilerplate.go.txt
+
+docker-push: ## Push the docker image
+	docker push ${OPERATOR_IMAGE}
+
+controller-gen: ## Find or download controller-gen
+ifeq (, $(shell which controller-gen))
+	@{ \
+	set -e ;\
+	CONTROLLER_GEN_TMP_DIR=$$(mktemp -d) ;\
+	cd $$CONTROLLER_GEN_TMP_DIR ;\
+	go mod init tmp ;\
+	go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.4.0 ;\
+	rm -rf $$CONTROLLER_GEN_TMP_DIR ;\
+	}
+CONTROLLER_GEN=$(GOBIN)/controller-gen
+else
+CONTROLLER_GEN=$(shell which controller-gen)
+endif
+
+kustomize:
+ifeq (, $(shell which kustomize))
+	@{ \
+	set -e ;\
+	KUSTOMIZE_GEN_TMP_DIR=$$(mktemp -d) ;\
+	cd $$KUSTOMIZE_GEN_TMP_DIR ;\
+	go mod init tmp ;\
+	go get sigs.k8s.io/kustomize/kustomize/v3@v3.5.4 ;\
+	rm -rf $$KUSTOMIZE_GEN_TMP_DIR ;\
+	}
+KUSTOMIZE=$(GOBIN)/kustomize
+else
+KUSTOMIZE=$(shell which kustomize)
+endif
+
+.PHONY: bundle
+bundle: operator-sdk manifests ## Generate bundle manifests and metadata, then validate generated files.
+	build/operator-sdk generate kustomize manifests -q
+	cd config/manager && $(KUSTOMIZE) edit set image controller=$(OPERATOR_IMAGE)
+	$(KUSTOMIZE) build config/manifests | build/operator-sdk generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
+	build/operator-sdk bundle validate ./bundle
+
+.PHONY: bundle-build
+bundle-build: ## Build the bundle image.
+	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
 
 
 ## --------------------------------------
@@ -131,11 +227,14 @@ $(SHADOW_GEN): ## Build shadow
 $(OPENAPI_GEN): ## Build open-api
 	GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) k8s.io/kube-openapi/cmd/openapi-gen $(OPENAPI_BIN) $(OPENAPI_VER)
 
-$(GOVERALLS_GEN): ## Build open-api
+$(GOVERALLS_GEN): ## Build goveralls
 	GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) github.com/mattn/goveralls $(GOVERALLS_BIN) $(GOVERALLS_VER)
 
-$(OUTDATED_GEN): ## Build open-api
+$(OUTDATED_GEN): ## Build go-mod-outdated
 	GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) github.com/psampaz/go-mod-outdated $(OUTDATED_BIN) $(OUTDATED_VER)
+
+$(YQ_GEN): ## Build yq
+	GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) github.com/mikefarah/yq $(YQ_BIN) $(YQ_VER)
 
 .PHONY: check-modules
 check-modules: $(OUTDATED_GEN) ## Check outdated modules

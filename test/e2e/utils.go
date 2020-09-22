@@ -2,10 +2,13 @@ package e2e
 
 import (
 	"context"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
 	"testing"
 	"time"
 
-	operator "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
+	operator "github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1"
 
 	mysqlOperator "github.com/presslabs/mysql-operator/pkg/apis/mysql/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -80,5 +83,59 @@ func waitForStatefulSet(t *testing.T, dynclient client.Client, namespace, name s
 		return err
 	}
 	t.Logf("%s Pod available\n", name)
+	return nil
+}
+
+func waitForDeployment(t *testing.T, kubeclient kubernetes.Interface, namespace, name string, replicas int,
+	retryInterval, timeout time.Duration) error {
+	err := wait.Poll(retryInterval, timeout, func() (done bool, err error) {
+		deployment, err := kubeclient.AppsV1().Deployments(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				t.Logf("Waiting for availability of Deployment: %s in Namespace: %s \n", name, namespace)
+				return false, nil
+			}
+			return false, err
+		}
+
+		if int(deployment.Status.AvailableReplicas) >= replicas {
+			return true, nil
+		}
+		t.Logf("Waiting for full availability of %s deployment (%d/%d)\n", name,
+			deployment.Status.AvailableReplicas, replicas)
+		return false, nil
+	})
+	if err != nil {
+		return err
+	}
+	t.Logf("Deployment available (%d/%d)\n", replicas, replicas)
+	return nil
+}
+
+func waitForDeletion(t *testing.T, dynclient client.Client, obj runtime.Object, retryInterval,
+	timeout time.Duration) error {
+	key, err := client.ObjectKeyFromObject(obj)
+	if err != nil {
+		return err
+	}
+
+	kind := obj.GetObjectKind().GroupVersionKind().Kind
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	err = wait.Poll(retryInterval, timeout, func() (done bool, err error) {
+		err = dynclient.Get(ctx, key, obj)
+		if apierrors.IsNotFound(err) {
+			return true, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		t.Logf("Waiting for %s %s to be deleted\n", kind, key)
+		return false, nil
+	})
+	if err != nil {
+		return err
+	}
+	t.Logf("%s %s was deleted\n", kind, key)
 	return nil
 }
