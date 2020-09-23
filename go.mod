@@ -10,8 +10,6 @@ require (
 	github.com/mattn/goveralls v0.0.7
 	github.com/mikefarah/yq/v3 v3.0.0-20200916054308-65cb4726048d
 	github.com/minio/minio-operator v0.0.0-20200214142425-158e343f1f19
-	github.com/onsi/ginkgo v1.12.1
-	github.com/onsi/gomega v1.10.1
 	github.com/pborman/uuid v1.2.1
 	github.com/pkg/errors v0.9.1
 	github.com/presslabs/mysql-operator v0.4.0
