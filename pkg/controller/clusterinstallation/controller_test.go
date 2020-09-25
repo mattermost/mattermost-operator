@@ -15,7 +15,6 @@ import (
 	"golang.org/x/net/context"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
-	kFake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -54,6 +53,8 @@ func TestReconcile(t *testing.T) {
 		},
 	}
 
+	fakeExecutor := newFakePodExecutor("5.28.0", nil) // We can add further checks for failures
+
 	// Register operator types with the runtime scheme.
 	apis.AddToScheme(scheme.Scheme)
 	s := scheme.Scheme
@@ -64,7 +65,7 @@ func TestReconcile(t *testing.T) {
 	testServer, _, _ := testServerEnv(t, 200)
 	defer testServer.Close()
 	rConfig := restConfig(testServer)
-	cs := kFake.NewSimpleClientset()
+	//cs := kFake.NewSimpleClientset()
 
 	// cs.CoreV1().RESTClient().(*rest.RESTClient).Client = rFake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 	// 	switch _, m := req.URL.Path, req.Method; {
@@ -79,7 +80,7 @@ func TestReconcile(t *testing.T) {
 
 	// Create a ReconcileClusterInstallation object with the scheme and fake
 	// client and config client.
-	r := &ReconcileClusterInstallation{client: c, config: rConfig, restClient: cs, scheme: s}
+	r := &ReconcileClusterInstallation{client: c, config: rConfig, podExecutor: fakeExecutor, scheme: s}
 
 	err := c.Create(context.TODO(), ci)
 	require.NoError(t, err)
@@ -469,3 +470,21 @@ func prepAllDependencyTestResources(client client.Client, ci *mattermostv1alpha1
 
 	return client.Create(context.TODO(), minioService)
 }
+
+func newFakePodExecutor(result string, err error) PodExecutor {
+	return &fakePodExecutor{
+		result: result,
+		err: err,
+	}
+}
+
+type fakePodExecutor struct {
+	result string
+	err error
+}
+
+func (f *fakePodExecutor) Exec(inputPod *corev1.Pod, command []string) (string, error) {
+	// Can do further assertions here about the inputPod and command
+	return f.result, f.err
+}
+

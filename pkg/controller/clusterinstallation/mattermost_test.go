@@ -23,8 +23,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes"
-	kFake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	utiltesting "k8s.io/client-go/util/testing"
@@ -55,6 +53,8 @@ func TestCheckMattermost(t *testing.T) {
 		},
 	}
 
+	fakeExecutor := newFakePodExecutor("5.28.0", nil)
+
 	apis.AddToScheme(scheme.Scheme)
 	s := scheme.Scheme
 	s.AddKnownTypes(mattermostv1alpha1.SchemeGroupVersion, ci)
@@ -63,9 +63,9 @@ func TestCheckMattermost(t *testing.T) {
 	defer testServer.Close()
 
 	config := restConfig(testServer)
-	cs := kFake.NewSimpleClientset()
+	//cs := kFake.NewSimpleClientset()
 
-	r := &ReconcileClusterInstallation{client: fake.NewFakeClient(), config: config, restClient: cs, scheme: s}
+	r := &ReconcileClusterInstallation{client: fake.NewFakeClient(), config: config, podExecutor: fakeExecutor, scheme: s}
 
 	err := prepAllDependencyTestResources(r.client, ci)
 	require.NoError(t, err)
@@ -260,6 +260,7 @@ func TestCheckMattermostExternalDB(t *testing.T) {
 			},
 		},
 	}
+	fakeExecutor := newFakePodExecutor("5.28.0", nil)
 
 	apis.AddToScheme(scheme.Scheme)
 	s := scheme.Scheme
@@ -269,12 +270,12 @@ func TestCheckMattermostExternalDB(t *testing.T) {
 	defer testServer.Close()
 
 	c := restConfig(testServer)
-	rc, err := kubernetes.NewForConfig(c)
-	require.NoError(t, err)
+	//rc, err := kubernetes.NewForConfig(c)
+	//require.NoError(t, err)
 
-	r := &ReconcileClusterInstallation{client: fake.NewFakeClient(), config: c, restClient: rc, scheme: s}
+	r := &ReconcileClusterInstallation{client: fake.NewFakeClient(), config: c, podExecutor: fakeExecutor, scheme: s}
 
-	err = prepAllDependencyTestResources(r.client, ci)
+	err := prepAllDependencyTestResources(r.client, ci)
 	require.NoError(t, err)
 
 	externalDBSecret := &corev1.Secret{

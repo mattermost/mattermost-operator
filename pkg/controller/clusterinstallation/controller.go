@@ -3,6 +3,7 @@ package clusterinstallation
 import (
 	"context"
 	"fmt"
+	"github.com/mattermost/mattermost-operator/pkg/components/utils"
 	"reflect"
 	"time"
 
@@ -14,7 +15,6 @@ import (
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -30,23 +30,35 @@ import (
 
 var log = logf.Log.WithName("clusterinstallation.controller")
 
+type PodExecutor interface {
+	Exec(inputPod *corev1.Pod, command []string) (string, error)
+}
+
 // Add creates a new ClusterInstallation Controller and adds it to the Manager. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
-	return add(mgr, newReconciler(mgr))
+	reconciler, err := newReconciler(mgr)
+	if err != nil {
+		return err
+	}
+
+	return add(mgr, reconciler)
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	restClient, config := GenerateK8sClient()
+func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
+	podExecutor, err := utils.NewPodExecutor(mgr.GetConfig())
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to initialize Reconciler")
+	}
 
 	return &ReconcileClusterInstallation{
 		client:     mgr.GetClient(),
-		config:     config,
-		restClient: restClient,
+		config:     mgr.GetConfig(),
+		podExecutor: podExecutor,
 		scheme:     mgr.GetScheme(),
 		state:      mattermostv1alpha1.Reconciling,
-	}
+	}, nil
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -114,9 +126,10 @@ type ReconcileClusterInstallation struct {
 	// that reads objects from the cache and writes to the apiserver.
 	client     client.Client
 	config     *rest.Config
-	restClient kubernetes.Interface
+	podExecutor PodExecutor
 	scheme     *runtime.Scheme
 	state      mattermostv1alpha1.RunningState
+
 }
 
 // Reconcile reads the state of the cluster for a ClusterInstallation object and

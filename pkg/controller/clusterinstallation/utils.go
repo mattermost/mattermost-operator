@@ -1,13 +1,11 @@
 package clusterinstallation
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"reflect"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/blang/semver/v4"
 	"github.com/go-logr/logr"
@@ -22,9 +20,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -264,7 +259,7 @@ func (r *ReconcileClusterInstallation) getImageVersion(mattermost *mattermostv1a
 	}
 
 	command := []string{"./bin/mattermost", "version", "--skip-server-start"}
-	stdOut, err := r.execPod(mmVersionPod, command)
+	stdOut, err := r.podExecutor.Exec(mmVersionPod, command)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to execute the command in the temporary pod")
 	}
@@ -356,72 +351,6 @@ func (r *ReconcileClusterInstallation) cleanSupportPods(namespace string) error 
 	}
 
 	return nil
-}
-
-func (r *ReconcileClusterInstallation) execPod(inputPod *corev1.Pod, command []string) (string, error) {
-	err := wait.Poll(500*time.Millisecond, 5*time.Minute, func() (bool, error) {
-		pod := &corev1.Pod{}
-		errPod := r.client.Get(context.TODO(), types.NamespacedName{Name: inputPod.GetName(), Namespace: inputPod.GetNamespace()}, pod)
-		if errPod != nil {
-			// This could be a connection error so we want to retry.
-			return false, nil
-		}
-		for _, condition := range pod.Status.Conditions {
-			if condition.Type == corev1.PodReady {
-				if condition.Status == corev1.ConditionTrue {
-					return true, nil
-				}
-			}
-		}
-		return false, nil
-	})
-	if err != nil {
-		return "", fmt.Errorf("failed to check the pod: %v", err)
-	}
-
-	req := r.restClient.CoreV1().RESTClient().Post().
-		Resource("pods").
-		Name(inputPod.GetName()).
-		Namespace(inputPod.GetNamespace()).
-		SubResource("exec")
-
-	option := &corev1.PodExecOptions{
-		Command: command,
-		Stdin:   false,
-		Stdout:  true,
-		Stderr:  true,
-		TTY:     true,
-	}
-	req.VersionedParams(
-		option,
-		scheme.ParameterCodec,
-	)
-
-	exec, err := remotecommand.NewSPDYExecutor(r.config, "POST", req.URL())
-	if err != nil {
-		return "", errors.Wrap(err, "failed to init the executor")
-	}
-
-	var (
-		execOut bytes.Buffer
-		execErr bytes.Buffer
-	)
-
-	err = exec.Stream(remotecommand.StreamOptions{
-		Stdout: &execOut,
-		Stderr: &execErr,
-		Tty:    false,
-	})
-
-	if err != nil {
-		return "", errors.Wrap(err, "could not execute the command")
-	}
-
-	if execErr.Len() > 0 {
-		return "", errors.Wrapf(err, "error executing the command, maybe not available in the version: %s", execErr.String())
-	}
-
-	return execOut.String(), nil
 }
 
 func ensureLabels(required, final map[string]string) map[string]string {
