@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -12,13 +14,11 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
-	"time"
 )
 
 type PodExecutor struct {
 	config     *rest.Config
 	restClient kubernetes.Interface
-
 }
 
 func NewPodExecutor(config *rest.Config) (*PodExecutor, error) {
@@ -28,7 +28,7 @@ func NewPodExecutor(config *rest.Config) (*PodExecutor, error) {
 	}
 
 	return &PodExecutor{
-		config: config,
+		config:     config,
 		restClient: client,
 	}, nil
 }
@@ -37,7 +37,7 @@ func (pe *PodExecutor) Exec(inputPod *corev1.Pod, command []string) (string, err
 	podClient := pe.restClient.CoreV1().Pods(inputPod.GetNamespace())
 
 	err := wait.Poll(500*time.Millisecond, 5*time.Minute, func() (bool, error) {
-		pod, errPod := podClient.Get(context.TODO(),inputPod.GetName(), v1.GetOptions{})
+		pod, errPod := podClient.Get(context.TODO(), inputPod.GetName(), v1.GetOptions{})
 		if errPod != nil {
 			// This could be a connection error so we want to retry.
 			return false, nil

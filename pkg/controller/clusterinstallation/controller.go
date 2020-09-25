@@ -3,9 +3,10 @@ package clusterinstallation
 import (
 	"context"
 	"fmt"
-	"github.com/mattermost/mattermost-operator/pkg/components/utils"
 	"reflect"
 	"time"
+
+	"github.com/mattermost/mattermost-operator/pkg/components/utils"
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
@@ -53,11 +54,11 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 	}
 
 	return &ReconcileClusterInstallation{
-		client:     mgr.GetClient(),
-		config:     mgr.GetConfig(),
+		client:      mgr.GetClient(),
+		config:      mgr.GetConfig(),
 		podExecutor: podExecutor,
-		scheme:     mgr.GetScheme(),
-		state:      mattermostv1alpha1.Reconciling,
+		scheme:      mgr.GetScheme(),
+		state:       mattermostv1alpha1.Reconciling,
 	}, nil
 }
 
@@ -124,12 +125,11 @@ var _ reconcile.Reconciler = &ReconcileClusterInstallation{}
 type ReconcileClusterInstallation struct {
 	// This client, initialized using mgr.Client() above, is a split client
 	// that reads objects from the cache and writes to the apiserver.
-	client     client.Client
-	config     *rest.Config
+	client      client.Client
+	config      *rest.Config
 	podExecutor PodExecutor
-	scheme     *runtime.Scheme
-	state      mattermostv1alpha1.RunningState
-
+	scheme      *runtime.Scheme
+	state       mattermostv1alpha1.RunningState
 }
 
 // Reconcile reads the state of the cluster for a ClusterInstallation object and
