@@ -371,6 +371,10 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbIn
 			Name:  "MM_CLUSTERSETTINGS_CLUSTERNAME",
 			Value: "production",
 		},
+		{
+			Name:  "MM_INSTALL_TYPE",
+			Value: "operator",
+		},
 	}
 
 	valueSize := strconv.Itoa(defaultMaxFileSize * sizeMB)
@@ -402,16 +406,10 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbIn
 	volumeMountLicense := []corev1.VolumeMount{}
 	podAnnotations := map[string]string{}
 	if len(mattermost.Spec.MattermostLicenseSecret) != 0 {
-		envVarGeneral = append(
-			envVarGeneral,
-			corev1.EnvVar{
-				Name:  "MM_SERVICESETTINGS_LICENSEFILELOCATION",
-				Value: "/mattermost-license/license",
-			},
-			corev1.EnvVar{
-				Name:  "MM_INSTALL_TYPE",
-				Value: "operator",
-			})
+		envVarGeneral = append(envVarGeneral, corev1.EnvVar{
+			Name:  "MM_SERVICESETTINGS_LICENSEFILELOCATION",
+			Value: "/mattermost-license/license",
+		})
 
 		volumeMountLicense = append(volumeMountLicense, corev1.VolumeMount{
 			MountPath: "/mattermost-license",
