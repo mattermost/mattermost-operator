@@ -373,7 +373,7 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbIn
 		},
 		{
 			Name:  "MM_INSTALL_TYPE",
-			Value: "kubernetes",
+			Value: "kubernetes-operator",
 		},
 	}
 
