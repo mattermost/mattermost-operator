@@ -65,18 +65,6 @@ func TestReconcile(t *testing.T) {
 	testServer, _, _ := testServerEnv(t, 200)
 	defer testServer.Close()
 	rConfig := restConfig(testServer)
-	//cs := kFake.NewSimpleClientset()
-
-	// cs.CoreV1().RESTClient().(*rest.RESTClient).Client = rFake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-	// 	switch _, m := req.URL.Path, req.Method; {
-	// 	case m == "POST":
-	// 		// body := cmdtesting.ObjBody(codec, test.pod)
-	// 		return &http.Response{StatusCode: http.StatusOK, Body: nil}, nil
-	// 	default:
-	// 		t.Errorf("%s: unexpected request: %#v\n%#v", req.Method, req.URL, req)
-	// 		return nil, fmt.Errorf("unexpected request")
-	// 	}
-	// })
 
 	// Create a ReconcileClusterInstallation object with the scheme and fake
 	// client and config client.
@@ -474,17 +462,16 @@ func prepAllDependencyTestResources(client client.Client, ci *mattermostv1alpha1
 func newFakePodExecutor(result string, err error) PodExecutor {
 	return &fakePodExecutor{
 		result: result,
-		err: err,
+		err:    err,
 	}
 }
 
 type fakePodExecutor struct {
 	result string
-	err error
+	err    error
 }
 
 func (f *fakePodExecutor) Exec(inputPod *corev1.Pod, command []string) (string, error) {
 	// Can do further assertions here about the inputPod and command
 	return f.result, f.err
 }
-
