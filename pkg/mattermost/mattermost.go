@@ -371,6 +371,10 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbIn
 			Name:  "MM_CLUSTERSETTINGS_CLUSTERNAME",
 			Value: "production",
 		},
+		{
+			Name:  "MM_INSTALL_TYPE",
+			Value: "kubernetes-operator",
+		},
 	}
 
 	valueSize := strconv.Itoa(defaultMaxFileSize * sizeMB)

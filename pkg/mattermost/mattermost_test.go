@@ -283,6 +283,7 @@ func TestGenerateDeployment(t *testing.T) {
 			assertEnvVarExists(t, "MM_CLUSTERSETTINGS_ENABLE", mattermostAppContainer.Env)
 			assertEnvVarExists(t, "MM_CLUSTERSETTINGS_CLUSTERNAME", mattermostAppContainer.Env)
 			assertEnvVarExists(t, "MM_FILESETTINGS_MAXFILESIZE", mattermostAppContainer.Env)
+			assertEnvVarExists(t, "MM_INSTALL_TYPE", mattermostAppContainer.Env)
 
 			if databaseInfo.HasReaderEndpoints() {
 				assertEnvVarExists(t, "MM_SQLSETTINGS_DATASOURCEREPLICAS", mattermostAppContainer.Env)
