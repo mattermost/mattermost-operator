@@ -3,89 +3,64 @@ package e2e
 import (
 	"context"
 	"fmt"
-	"testing"
-	"time"
-
-	"github.com/stretchr/testify/require"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	apis "github.com/mattermost/mattermost-operator/pkg/apis"
-	operator "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
+	operator "github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1"
 	"github.com/mattermost/mattermost-operator/pkg/components/utils"
 	operatortest "github.com/mattermost/mattermost-operator/test"
-
-	framework "github.com/operator-framework/operator-sdk/pkg/test"
-	"github.com/operator-framework/operator-sdk/pkg/test/e2eutil"
 	appsv1 "k8s.io/api/apps/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
+
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"testing"
+	"time"
 )
 
 var (
 	// retryInterval is an interval between check attempts
 	retryInterval = time.Second * 5
 	// timeout to wait for k8s objects to be created
-	timeout              = time.Second * 900
-	cleanupRetryInterval = time.Second * 5
-	cleanupTimeout       = time.Second * 60
+	timeout = time.Second * 900
+
+	mmNamespace = "mattermost-operator"
 )
 
 func TestMattermost(t *testing.T) {
-	mattermostList := &operator.ClusterInstallationList{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "ClusterInstallation",
-			APIVersion: "mattermost.com/v1alpha1",
-		},
-	}
-	err := framework.AddToFrameworkScheme(apis.AddToScheme, mattermostList)
+
+	k8sTypedClient, err := kubernetes.NewForConfig(cfg)
 	require.NoError(t, err)
-
-	ctx := framework.NewContext(t)
-	defer ctx.Cleanup()
-
-	t.Run("initialize cluster resources", func(t *testing.T) {
-		err = ctx.InitializeClusterResources(&framework.CleanupOptions{TestContext: ctx, Timeout: cleanupTimeout, RetryInterval: cleanupRetryInterval})
-		require.NoError(t, err)
-	})
-
-	namespace, err := ctx.GetOperatorNamespace()
-	require.NoError(t, err)
-
-	// get global framework variables
-	f := framework.Global
 
 	t.Run("mysql operator ready", func(t *testing.T) {
-		err = waitForStatefulSet(t, f.Client.Client, "mysql-operator", "mysql-operator", 1, retryInterval, timeout)
+		err = waitForStatefulSet(t, k8sClient, "mysql-operator", "mysql-operator", 1, retryInterval, timeout)
 		require.NoError(t, err)
 	})
 	t.Run("minio operator ready", func(t *testing.T) {
-		err = e2eutil.WaitForDeployment(t, f.KubeClient, "minio-operator", "minio-operator", 1, retryInterval, timeout)
+		err = waitForDeployment(t, k8sTypedClient, "minio-operator", "minio-operator", 1, retryInterval, timeout)
 		require.NoError(t, err)
 	})
 	t.Run("mattermost operator ready", func(t *testing.T) {
-		err = e2eutil.WaitForDeployment(t, f.KubeClient, namespace, "mattermost-operator", 1, retryInterval, timeout)
+		err = waitForDeployment(t, k8sTypedClient, mmNamespace, "mattermost-operator", 1, retryInterval, timeout)
 		require.NoError(t, err)
 	})
 
 	t.Run("mattermost scale test", func(t *testing.T) {
-		mattermostScaleTest(t, f, ctx)
+		mattermostScaleTest(t, k8sClient, k8sTypedClient)
 	})
 
 	t.Run("mattermost upgrade test", func(t *testing.T) {
-		mattermostUpgradeTest(t, f, ctx)
+		mattermostUpgradeTest(t, k8sClient, k8sTypedClient)
 	})
 
 	t.Run("mattermost with mysql replicas", func(t *testing.T) {
-		mattermostWithMySQLReplicas(t, f, ctx)
+		mattermostWithMySQLReplicas(t, k8sClient, k8sTypedClient)
 	})
 }
 
-func mattermostScaleTest(t *testing.T, f *framework.Framework, ctx *framework.Context) {
-	namespace, err := ctx.GetWatchNamespace()
-	require.NoError(t, err)
-
+func mattermostScaleTest(t *testing.T, k8sClient client.Client, k8sTypedClient kubernetes.Interface) {
 	// create ClusterInstallation custom resource
 	exampleMattermost := &operator.ClusterInstallation{
 		TypeMeta: metav1.TypeMeta{
@@ -94,7 +69,7 @@ func mattermostScaleTest(t *testing.T, f *framework.Framework, ctx *framework.Co
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-mm",
-			Namespace: namespace,
+			Namespace: mmNamespace,
 		},
 		Spec: operator.ClusterInstallationSpec{
 			IngressName: "test-example.mattermost.dev",
@@ -128,57 +103,53 @@ func mattermostScaleTest(t *testing.T, f *framework.Framework, ctx *framework.Co
 		},
 	}
 
-	// use Context's create helper to create the object and add a cleanup function for the new object
-	err = f.Client.Create(context.TODO(), exampleMattermost, &framework.CleanupOptions{TestContext: ctx, Timeout: cleanupTimeout, RetryInterval: cleanupRetryInterval})
+	err := k8sClient.Create(context.TODO(), exampleMattermost)
 	require.NoError(t, err)
 
-	err = waitForStatefulSet(t, f.Client.Client, namespace, "test-mm-minio", 1, retryInterval, timeout)
+	err = waitForStatefulSet(t, k8sClient, mmNamespace, "test-mm-minio", 1, retryInterval, timeout)
 	require.NoError(t, err)
 
-	err = waitForStatefulSet(t, f.Client.Client, namespace, fmt.Sprintf("%s-mysql", utils.HashWithPrefix("db", "test-mm")), 1, retryInterval, timeout)
+	err = waitForStatefulSet(t, k8sClient, mmNamespace, fmt.Sprintf("%s-mysql", utils.HashWithPrefix("db", "test-mm")), 1, retryInterval, timeout)
 	require.NoError(t, err)
 
 	// wait for test-mm to reach 1 replicas
-	err = e2eutil.WaitForDeployment(t, f.KubeClient, namespace, "test-mm", 1, retryInterval, timeout)
+	err = waitForDeployment(t, k8sTypedClient, mmNamespace, "test-mm", 1, retryInterval, timeout)
 	require.NoError(t, err)
 
-	err = f.Client.Get(context.TODO(), types.NamespacedName{Name: "test-mm", Namespace: namespace}, exampleMattermost)
+	err = k8sClient.Get(context.TODO(), types.NamespacedName{Name: "test-mm", Namespace: mmNamespace}, exampleMattermost)
 	require.NoError(t, err)
 
 	exampleMattermost.Spec.Replicas = 2
-	err = f.Client.Update(context.TODO(), exampleMattermost)
+	err = k8sClient.Update(context.TODO(), exampleMattermost)
 	require.NoError(t, err)
 
 	// wait for test-mm to reach 2 replicas
-	err = e2eutil.WaitForDeployment(t, f.KubeClient, namespace, "test-mm", 2, retryInterval, timeout)
+	err = waitForDeployment(t, k8sTypedClient, mmNamespace, "test-mm", 2, retryInterval, timeout)
 	require.NoError(t, err)
 
-	err = waitForReconcilicationComplete(t, f.Client.Client, namespace, "test-mm", retryInterval, timeout)
+	err = waitForReconcilicationComplete(t, k8sClient, mmNamespace, "test-mm", retryInterval, timeout)
 	require.NoError(t, err)
 
 	// scale down again
-	err = f.Client.Get(context.TODO(), types.NamespacedName{Name: "test-mm", Namespace: namespace}, exampleMattermost)
+	err = k8sClient.Get(context.TODO(), types.NamespacedName{Name: "test-mm", Namespace: mmNamespace}, exampleMattermost)
 	require.NoError(t, err)
 
 	exampleMattermost.Spec.Replicas = 1
-	err = f.Client.Update(context.TODO(), exampleMattermost)
+	err = k8sClient.Update(context.TODO(), exampleMattermost)
 	require.NoError(t, err)
 
 	// wait for test-mm to reach 1 replicas
-	err = e2eutil.WaitForDeployment(t, f.KubeClient, namespace, "test-mm", 1, retryInterval, timeout)
+	err = waitForDeployment(t, k8sTypedClient, mmNamespace, "test-mm", 1, retryInterval, timeout)
 	require.NoError(t, err)
 
-	err = waitForReconcilicationComplete(t, f.Client.Client, namespace, "test-mm", retryInterval, timeout)
+	err = waitForReconcilicationComplete(t, k8sClient, mmNamespace, "test-mm", retryInterval, timeout)
 	require.NoError(t, err)
 
-	err = f.Client.Delete(context.TODO(), exampleMattermost)
+	err = k8sClient.Delete(context.TODO(), exampleMattermost)
 	require.NoError(t, err)
 }
 
-func mattermostUpgradeTest(t *testing.T, f *framework.Framework, ctx *framework.Context) {
-	namespace, err := ctx.GetWatchNamespace()
-	require.NoError(t, err)
-
+func mattermostUpgradeTest(t *testing.T, k8sClient client.Client, k8sTypedClient kubernetes.Interface) {
 	testName := "test-mm2"
 
 	// create ClusterInstallation custom resource
@@ -189,7 +160,7 @@ func mattermostUpgradeTest(t *testing.T, f *framework.Framework, ctx *framework.
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      testName,
-			Namespace: namespace,
+			Namespace: mmNamespace,
 		},
 		Spec: operator.ClusterInstallationSpec{
 			Image:       "mattermost/mattermost-enterprise-edition",
@@ -225,73 +196,69 @@ func mattermostUpgradeTest(t *testing.T, f *framework.Framework, ctx *framework.
 		},
 	}
 
-	// use Context's create helper to create the object and add a cleanup function for the new object
-	err = f.Client.Create(context.TODO(), exampleMattermost, &framework.CleanupOptions{TestContext: ctx, Timeout: cleanupTimeout, RetryInterval: cleanupRetryInterval})
+	err := k8sClient.Create(context.TODO(), exampleMattermost)
 	require.NoError(t, err)
 
-	err = waitForStatefulSet(t, f.Client.Client, namespace, fmt.Sprintf("%s-minio", testName), 1, retryInterval, timeout)
+	err = waitForStatefulSet(t, k8sClient, mmNamespace, fmt.Sprintf("%s-minio", testName), 1, retryInterval, timeout)
 	require.NoError(t, err)
 
-	err = waitForStatefulSet(t, f.Client.Client, namespace, fmt.Sprintf("%s-mysql", utils.HashWithPrefix("db", testName)), 1, retryInterval, timeout)
+	err = waitForStatefulSet(t, k8sClient, mmNamespace, fmt.Sprintf("%s-mysql", utils.HashWithPrefix("db", testName)), 1, retryInterval, timeout)
 	require.NoError(t, err)
 
 	// wait for test-mm2 to reach 1 replicas
-	err = e2eutil.WaitForDeployment(t, f.KubeClient, namespace, testName, 1, retryInterval, timeout)
+	err = waitForDeployment(t, k8sTypedClient, mmNamespace, testName, 1, retryInterval, timeout)
 	require.NoError(t, err)
 
-	err = f.Client.Get(context.TODO(), types.NamespacedName{Name: testName, Namespace: namespace}, exampleMattermost)
+	err = k8sClient.Get(context.TODO(), types.NamespacedName{Name: testName, Namespace: mmNamespace}, exampleMattermost)
 	require.NoError(t, err)
 
 	// Get the current pod
 	pods := corev1.PodList{}
 	listOptions := []client.ListOption{
-		client.InNamespace(namespace),
+		client.InNamespace(mmNamespace),
 		client.MatchingLabels(map[string]string{"app": "mattermost"}),
 	}
 
-	err = f.Client.List(context.TODO(), &pods, listOptions...)
+	err = k8sClient.List(context.TODO(), &pods, listOptions...)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(pods.Items))
 
 	mmOldPod := &corev1.Pod{}
-	err = f.Client.Get(context.TODO(), types.NamespacedName{Name: pods.Items[0].Name, Namespace: namespace}, mmOldPod)
+	err = k8sClient.Get(context.TODO(), types.NamespacedName{Name: pods.Items[0].Name, Namespace: mmNamespace}, mmOldPod)
 	require.NoError(t, err)
 
 	// Apply the new version
 	exampleMattermost.Spec.Version = operatortest.LatestStableMattermostVersion
-	err = f.Client.Update(context.TODO(), exampleMattermost)
+	err = k8sClient.Update(context.TODO(), exampleMattermost)
 	require.NoError(t, err)
 
 	// Wait for this pod be terminated
-	err = e2eutil.WaitForDeletion(t, f.Client.Client, mmOldPod, retryInterval, timeout)
+	err = waitForDeletion(t, k8sClient, mmOldPod, retryInterval, timeout)
 	require.NoError(t, err)
 
 	// wait for deployment be completed
-	err = e2eutil.WaitForDeployment(t, f.KubeClient, namespace, testName, 1, retryInterval, timeout)
+	err = waitForDeployment(t, k8sTypedClient, mmNamespace, testName, 1, retryInterval, timeout)
 	require.NoError(t, err)
 
-	err = waitForReconcilicationComplete(t, f.Client.Client, namespace, testName, retryInterval, timeout)
+	err = waitForReconcilicationComplete(t, k8sClient, mmNamespace, testName, retryInterval, timeout)
 	require.NoError(t, err)
 
 	newMattermost := &operator.ClusterInstallation{}
-	err = f.Client.Get(context.TODO(), types.NamespacedName{Name: testName, Namespace: namespace}, newMattermost)
+	err = k8sClient.Get(context.TODO(), types.NamespacedName{Name: testName, Namespace: mmNamespace}, newMattermost)
 	require.NoError(t, err)
 	require.Equal(t, "mattermost/mattermost-enterprise-edition", newMattermost.Status.Image)
 	require.Equal(t, operatortest.LatestStableMattermostVersion, newMattermost.Status.Version)
 
 	mmDeployment := &appsv1.Deployment{}
-	err = f.Client.Get(context.TODO(), types.NamespacedName{Name: testName, Namespace: namespace}, mmDeployment)
+	err = k8sClient.Get(context.TODO(), types.NamespacedName{Name: testName, Namespace: mmNamespace}, mmDeployment)
 	require.NoError(t, err)
 	require.Equal(t, "mattermost/mattermost-enterprise-edition:"+operatortest.LatestStableMattermostVersion, mmDeployment.Spec.Template.Spec.Containers[0].Image)
 
-	err = f.Client.Delete(context.TODO(), newMattermost)
+	err = k8sClient.Delete(context.TODO(), exampleMattermost)
 	require.NoError(t, err)
 }
 
-func mattermostWithMySQLReplicas(t *testing.T, f *framework.Framework, ctx *framework.Context) {
-	namespace, err := ctx.GetWatchNamespace()
-	require.NoError(t, err)
-
+func mattermostWithMySQLReplicas(t *testing.T, client client.Client, typedClient kubernetes.Interface) {
 	testName := "test-mm3"
 
 	// create ClusterInstallation custom resource
@@ -302,7 +269,7 @@ func mattermostWithMySQLReplicas(t *testing.T, f *framework.Framework, ctx *fram
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      testName,
-			Namespace: namespace,
+			Namespace: mmNamespace,
 		},
 		Spec: operator.ClusterInstallationSpec{
 			IngressName: "test-example.mattermost.dev",
@@ -337,18 +304,18 @@ func mattermostWithMySQLReplicas(t *testing.T, f *framework.Framework, ctx *fram
 	}
 
 	// use Context's create helper to create the object and add a cleanup function for the new object
-	err = f.Client.Create(context.TODO(), exampleMattermost, &framework.CleanupOptions{TestContext: ctx, Timeout: cleanupTimeout, RetryInterval: cleanupRetryInterval})
+	err := client.Create(context.TODO(), exampleMattermost)
 	require.NoError(t, err)
 
-	err = waitForStatefulSet(t, f.Client.Client, namespace, fmt.Sprintf("%s-minio", testName), 1, retryInterval, timeout)
+	err = waitForStatefulSet(t, client, mmNamespace, fmt.Sprintf("%s-minio", testName), 1, retryInterval, timeout)
 	require.NoError(t, err)
 
-	err = waitForStatefulSet(t, f.Client.Client, namespace, fmt.Sprintf("%s-mysql", utils.HashWithPrefix("db", testName)), 2, retryInterval, timeout)
+	err = waitForStatefulSet(t, client, mmNamespace, fmt.Sprintf("%s-mysql", utils.HashWithPrefix("db", testName)), 2, retryInterval, timeout)
 	require.NoError(t, err)
 
-	err = waitForMySQLStatusReady(t, f.Client.Client, namespace, utils.HashWithPrefix("db", testName), 2, retryInterval, timeout)
+	err = waitForMySQLStatusReady(t, client, mmNamespace, utils.HashWithPrefix("db", testName), 2, retryInterval, timeout)
 	require.NoError(t, err)
 
-	err = f.Client.Delete(context.TODO(), exampleMattermost)
+	err = client.Delete(context.TODO(), exampleMattermost)
 	require.NoError(t, err)
 }

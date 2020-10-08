@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
+	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1"
 	"github.com/mattermost/mattermost-operator/pkg/components/utils"
 	"github.com/mattermost/mattermost-operator/pkg/database"
 
@@ -71,8 +71,8 @@ func GenerateIngress(mattermost *mattermostv1alpha1.ClusterInstallation, name, i
 			Labels:    mattermost.ClusterInstallationLabels(name),
 			OwnerReferences: []metav1.OwnerReference{
 				*metav1.NewControllerRef(mattermost, schema.GroupVersionKind{
-					Group:   mattermostv1alpha1.SchemeGroupVersion.Group,
-					Version: mattermostv1alpha1.SchemeGroupVersion.Version,
+					Group:   mattermostv1alpha1.GroupVersion.Group,
+					Version: mattermostv1alpha1.GroupVersion.Version,
 					Kind:    "ClusterInstallation",
 				}),
 			},
@@ -461,8 +461,8 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbIn
 			Labels:    mattermost.ClusterInstallationLabels(deploymentName),
 			OwnerReferences: []metav1.OwnerReference{
 				*metav1.NewControllerRef(mattermost, schema.GroupVersionKind{
-					Group:   mattermostv1alpha1.SchemeGroupVersion.Group,
-					Version: mattermostv1alpha1.SchemeGroupVersion.Version,
+					Group:   mattermostv1alpha1.GroupVersion.Group,
+					Version: mattermostv1alpha1.GroupVersion.Version,
 					Kind:    "ClusterInstallation",
 				}),
 			},
@@ -525,8 +525,8 @@ func GenerateSecret(mattermost *mattermostv1alpha1.ClusterInstallation, secretNa
 			Namespace: mattermost.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
 				*metav1.NewControllerRef(mattermost, schema.GroupVersionKind{
-					Group:   mattermostv1alpha1.SchemeGroupVersion.Group,
-					Version: mattermostv1alpha1.SchemeGroupVersion.Version,
+					Group:   mattermostv1alpha1.GroupVersion.Group,
+					Version: mattermostv1alpha1.GroupVersion.Version,
 					Kind:    "ClusterInstallation",
 				}),
 			},
@@ -545,8 +545,8 @@ func newService(mattermost *mattermostv1alpha1.ClusterInstallation, serviceName,
 			Namespace: mattermost.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
 				*metav1.NewControllerRef(mattermost, schema.GroupVersionKind{
-					Group:   mattermostv1alpha1.SchemeGroupVersion.Group,
-					Version: mattermostv1alpha1.SchemeGroupVersion.Version,
+					Group:   mattermostv1alpha1.GroupVersion.Group,
+					Version: mattermostv1alpha1.GroupVersion.Version,
 					Kind:    "ClusterInstallation",
 				}),
 			},

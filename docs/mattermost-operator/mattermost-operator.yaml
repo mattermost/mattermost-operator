@@ -1,11 +1,9 @@
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: mattermost-operator
----
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.4.0
+  creationTimestamp: null
   name: clusterinstallations.mattermost.com
 spec:
   group: mattermost.com
@@ -824,6 +822,8 @@ spec:
                     pattern: ^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$
                     type: string
                   type:
+                    description: Defines the type of database to use for an Operator-Managed
+                      database. This value is ignored when using a User-Managed database.
                     type: string
                 type: object
               elasticSearch:
@@ -1284,12 +1284,17 @@ spec:
                 type: object
               size:
                 description: 'Size defines the size of the ClusterInstallation. This
-                  is typically specified in number of users. This will set replica
+                  is typically specified in number of users. This will override replica
                   and resource requests/limits appropriately for the provided number
-                  of users. Accepted values are: 100users, 1000users, 5000users, 10000users,
-                  250000users. Defaults to 5000users. Setting ''Replicas'', ''Resources'',
-                  ''Minio.Replicas'', ''Minio.Resource'', ''Database.Replicas'', or
-                  ''Database.Resources'' will override the values set by Size.'
+                  of users. This is a write-only field - its value is erased after
+                  setting appropriate values of resources. Accepted values are: 100users,
+                  1000users, 5000users, 10000users, 250000users. If replicas and resource
+                  requests/limits are not specified, and Size is not provided the
+                  configuration for 5000users will be applied. Setting ''Replicas'',
+                  ''Resources'', ''Minio.Replicas'', ''Minio.Resource'', ''Database.Replicas'',
+                  or ''Database.Resources'' will override the values set by Size.
+                  Setting new Size will override previous values regardless if set
+                  by Size or manually.'
                 type: string
               useIngressTLS:
                 type: boolean
@@ -1343,10 +1348,19 @@ spec:
     storage: true
     subresources:
       status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.4.0
+  creationTimestamp: null
   name: mattermostrestoredbs.mattermost.com
 spec:
   group: mattermost.com
@@ -1429,6 +1443,17 @@ spec:
     storage: true
     subresources:
       status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mattermost-operator
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -1573,18 +1598,18 @@ rules:
   - create
   - get
 ---
-kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
 metadata:
+  name: mattermost-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
   name: mattermost-operator
 subjects:
 - kind: ServiceAccount
   name: mattermost-operator
   namespace: mattermost-operator
-roleRef:
-  kind: ClusterRole
-  name: mattermost-operator
-  apiGroup: rbac.authorization.k8s.io
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -1600,19 +1625,13 @@ spec:
       labels:
         name: mattermost-operator
     spec:
-      serviceAccountName: mattermost-operator
       containers:
-        - name: mattermost-operator
-          image: mattermost/mattermost-operator:latest
-          command:
-          - mattermost-operator
-          imagePullPolicy: IfNotPresent
-          env:
-            - name: WATCH_NAMESPACE
-              value: ""
-            - name: POD_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
-            - name: OPERATOR_NAME
-              value: "mattermost-operator"
+      - args:
+        - --enable-leader-election
+        command:
+        - /mattermost-operator
+        image: mattermost/mattermost-operator:latest
+        imagePullPolicy: IfNotPresent
+        name: mattermost-operator
+      serviceAccountName: mattermost-operator
+---

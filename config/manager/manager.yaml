@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mattermost-operator
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mattermost-operator
+  namespace: mattermost-operator
+spec:
+  selector:
+    matchLabels:
+      name: mattermost-operator
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        name: mattermost-operator
+    spec:
+      serviceAccountName: mattermost-operator
+      containers:
+      - command:
+        - /mattermost-operator
+        args:
+        - --enable-leader-election
+        image: mattermost-operator
+        imagePullPolicy: IfNotPresent
+        name: mattermost-operator

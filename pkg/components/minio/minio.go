@@ -3,7 +3,7 @@ package minio
 import (
 	"fmt"
 
-	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/pkg/apis/mattermost/v1alpha1"
+	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1"
 	"github.com/mattermost/mattermost-operator/pkg/components/utils"
 	mattermostApp "github.com/mattermost/mattermost-operator/pkg/mattermost"
 
@@ -31,8 +31,8 @@ func Instance(mattermost *mattermostv1alpha1.ClusterInstallation) *minioOperator
 			Labels:    mattermostv1alpha1.ClusterInstallationResourceLabels(mattermost.Name),
 			OwnerReferences: []metav1.OwnerReference{
 				*metav1.NewControllerRef(mattermost, schema.GroupVersionKind{
-					Group:   mattermostv1alpha1.SchemeGroupVersion.Group,
-					Version: mattermostv1alpha1.SchemeGroupVersion.Version,
+					Group:   mattermostv1alpha1.GroupVersion.Group,
+					Version: mattermostv1alpha1.GroupVersion.Version,
 					Kind:    "ClusterInstallation",
 				}),
 			},
