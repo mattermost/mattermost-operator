@@ -1,7 +1,7 @@
 .PHONY: all check-style unittest generate build clean build-image operator-sdk yaml
 
 # Current Operator version - used for bundle
-VERSION ?= 1.6.0
+VERSION ?= 1.8.0
 # Default bundle image tag
 BUNDLE_IMG ?= controller-bundle:$(VERSION)
 # Options for 'bundle-build'
