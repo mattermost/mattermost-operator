@@ -54,7 +54,13 @@ func GenerateService(mattermost *mattermostv1alpha1.ClusterInstallation, service
 	service.Spec.Ports = []corev1.ServicePort{
 		{
 			Port:       8065,
+			Name:       "app",
 			TargetPort: intstr.FromString("app"),
+		},
+		{
+			Port:       8067,
+			Name:       "metrics",
+			TargetPort: intstr.FromString("metrics"),
 		},
 	}
 	service.Spec.ClusterIP = corev1.ClusterIPNone
@@ -499,6 +505,10 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbIn
 								{
 									ContainerPort: 8065,
 									Name:          "app",
+								},
+								{
+									ContainerPort: 8067,
+									Name:          "metrics",
 								},
 							},
 							ReadinessProbe: readiness,
