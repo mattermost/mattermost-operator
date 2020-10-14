@@ -63,6 +63,7 @@ func TestGenerateService(t *testing.T) {
 				expectPort(t, service, 443)
 			} else {
 				expectPort(t, service, 8065)
+				expectPort(t, service, 8067)
 			}
 		})
 	}
