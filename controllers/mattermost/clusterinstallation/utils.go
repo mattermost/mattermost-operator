@@ -208,7 +208,7 @@ func (r *ClusterInstallationReconciler) checkRolloutStarted(name, namespace stri
 	deploymentKey := types.NamespacedName{Name: name, Namespace: namespace}
 	err := r.NonCachedAPIReader.Get(context.TODO(), deploymentKey, deployment)
 	if err != nil {
-		return errors.Wrap(err, "Failed to get deployment")
+		return errors.Wrap(err, "failed to get deployment")
 	}
 	if deployment.Generation != deployment.Status.ObservedGeneration {
 		return fmt.Errorf("mattermost deployment not yet picked up by the Deployment controller")

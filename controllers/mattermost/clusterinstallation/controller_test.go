@@ -130,10 +130,10 @@ func TestReconcile(t *testing.T) {
 
 	t.Run("final check", func(t *testing.T) {
 
-		// TODO: add contains msgs
 		t.Run("replica set does not exist", func(t *testing.T) {
 			res, err = r.Reconcile(req)
 			require.Error(t, err)
+			assert.Contains(t, err.Error(), "replicaSet did not start rolling pods")
 		})
 
 		replicaSet := &appsv1.ReplicaSet{
@@ -150,6 +150,7 @@ func TestReconcile(t *testing.T) {
 		t.Run("replica set not observed", func(t *testing.T) {
 			res, err = r.Reconcile(req)
 			require.Error(t, err)
+			assert.Contains(t, err.Error(), "replicaSet did not start rolling pods")
 		})
 		replicaSet.Status.ObservedGeneration = 1
 		err = c.Update(context.TODO(), replicaSet)
