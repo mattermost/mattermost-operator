@@ -25,8 +25,11 @@ import (
 // ClusterInstallationReconciler reconciles a ClusterInstallation object
 type ClusterInstallationReconciler struct {
 	client.Client
-	Log    logr.Logger
-	Scheme *runtime.Scheme
+	NonCachedAPIReader  client.Reader
+	Log                 logr.Logger
+	Scheme              *runtime.Scheme
+	MaxReconciling      int
+	RequeueOnLimitDelay time.Duration
 }
 
 // +kubebuilder:rbac:groups=mattermost.com,resources=clusterinstallations,verbs=get;list;watch;create;update;patch;delete
@@ -64,6 +67,20 @@ func (r *ClusterInstallationReconciler) Reconcile(request ctrl.Request) (ctrl.Re
 	} else if err != nil {
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
+	}
+
+	if mattermost.Status.State != mattermostv1alpha1.Reconciling {
+		var clusterInstallations mattermostv1alpha1.ClusterInstallationList
+		err = r.Client.List(context.TODO(), &clusterInstallations)
+		if err != nil {
+			return reconcile.Result{}, errors.Wrap(err, "Failed to list clusterInstallations")
+		}
+
+		// Check if limit of Cluster Installations reconciling at the same time is reached.
+		if countReconciling(clusterInstallations.Items) >= r.MaxReconciling {
+			reqLogger.Info(fmt.Sprintf("Reached limit of reconciling installations, requeuing in %s", r.RequeueOnLimitDelay.String()))
+			return ctrl.Result{RequeueAfter: r.RequeueOnLimitDelay}, nil
+		}
 	}
 
 	// Set a new ClusterInstallation's state to reconciling.
@@ -133,9 +150,11 @@ func (r *ClusterInstallationReconciler) Reconcile(request ctrl.Request) (ctrl.Re
 
 	status, err := r.handleCheckClusterInstallation(mattermost)
 	if err != nil {
-		r.setStateReconcilingAndLogError(mattermost, reqLogger)
-		r.updateStatus(mattermost, status, reqLogger)
-		return reconcile.Result{RequeueAfter: time.Second * 3}, err
+		statusErr := r.updateStatus(mattermost, status, reqLogger)
+		if statusErr != nil {
+			reqLogger.Error(statusErr, "Error updating status")
+		}
+		return reconcile.Result{}, err
 	}
 
 	err = r.updateStatus(mattermost, status, reqLogger)
@@ -176,4 +195,14 @@ func (r *ClusterInstallationReconciler) checkDatabase(mattermost *mattermostv1al
 	}
 
 	return k8sErrors.NewInvalid(mattermostv1alpha1.GroupVersion.WithKind("ClusterInstallation").GroupKind(), "Database type invalid", nil)
+}
+
+func countReconciling(clusterInstallations []mattermostv1alpha1.ClusterInstallation) int {
+	sum := 0
+	for _, ci := range clusterInstallations {
+		if ci.Status.State == mattermostv1alpha1.Reconciling {
+			sum++
+		}
+	}
+	return sum
 }

@@ -14,6 +14,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/presslabs/mysql-operator v0.4.0
 	github.com/stretchr/testify v1.6.1
+	github.com/vrischmann/envconfig v1.3.0
 	golang.org/x/net v0.0.0-20200625001655-4c5254603344
 	k8s.io/api v0.18.8
 	k8s.io/apimachinery v0.18.8

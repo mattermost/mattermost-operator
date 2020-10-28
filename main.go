@@ -3,22 +3,23 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/mattermost/mattermost-operator/controllers/mattermost/clusterinstallation"
-	v1beta1Minio "github.com/minio/minio-operator/pkg/apis/miniocontroller/v1beta1"
 	"os"
 	"runtime"
+	"time"
 
 	blubr "github.com/mattermost/blubr"
 	mattermostcomv1alpha1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1"
+	"github.com/mattermost/mattermost-operator/controllers/mattermost/clusterinstallation"
 	"github.com/mattermost/mattermost-operator/controllers/mattermost/mattermostrestoredb"
+	v1beta1Minio "github.com/minio/minio-operator/pkg/apis/miniocontroller/v1beta1"
 	v1alpha1MySQL "github.com/presslabs/mysql-operator/pkg/apis/mysql/v1alpha1"
+	"github.com/vrischmann/envconfig"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -45,6 +46,11 @@ func init() {
 	utilruntime.Must(v1alpha1MySQL.SchemeBuilder.AddToScheme(scheme))
 }
 
+type Config struct {
+	MaxReconcilingInstallations int           `envconfig:"default=20"`
+	RequeueOnLimitDelay         time.Duration `envconfig:"default=20s"`
+}
+
 func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
@@ -54,17 +60,23 @@ func main() {
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.Parse()
 
-	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
-
 	// Setup logging.
 	// This logger wraps logrus in a 'logr.Logger' interface. This is required
 	// for the deferred logging required by the various operator packages.
 	logger := blubr.InitLogger()
 	logger = logger.WithName("opr")
 	logf.SetLogger(logger)
+	ctrl.SetLogger(logger)
 
 	logger.Info(fmt.Sprintf("Go Version: %s", runtime.Version()))
 	logger.Info(fmt.Sprintf("Go OS/Arch: %s/%s", runtime.GOOS, runtime.GOARCH))
+
+	var config Config
+	err := envconfig.Init(&config)
+	if err != nil {
+		logger.Error(err, "Unable to read environment configuration")
+		os.Exit(1)
+	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,
@@ -80,9 +92,12 @@ func main() {
 	logger.Info("Registering Components")
 
 	if err = (&clusterinstallation.ClusterInstallationReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("ClusterInstallation"),
-		Scheme: mgr.GetScheme(),
+		Client:              mgr.GetClient(),
+		NonCachedAPIReader:  mgr.GetAPIReader(),
+		Log:                 ctrl.Log.WithName("controllers").WithName("ClusterInstallation"),
+		Scheme:              mgr.GetScheme(),
+		MaxReconciling:      config.MaxReconcilingInstallations,
+		RequeueOnLimitDelay: config.RequeueOnLimitDelay,
 	}).SetupWithManager(mgr); err != nil {
 		logger.Error(err, "Unable to create controller", "controller", "ClusterInstallation")
 		os.Exit(1)

@@ -8,6 +8,7 @@ import (
 	"github.com/go-logr/logr"
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1"
 	"github.com/pkg/errors"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -85,6 +86,16 @@ func (r *ClusterInstallationReconciler) checkClusterInstallation(namespace, name
 		UpdatedReplicas: 0,
 	}
 
+	listOptions := []client.ListOption{
+		client.InNamespace(namespace),
+		client.MatchingLabels(labels),
+	}
+
+	err := r.checkRolloutStarted(name, namespace, listOptions)
+	if err != nil {
+		return status, errors.Wrap(err, "rollout not yet started")
+	}
+
 	pods := &corev1.PodList{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -92,11 +103,9 @@ func (r *ClusterInstallationReconciler) checkClusterInstallation(namespace, name
 		},
 	}
 
-	listOptions := []client.ListOption{
-		client.InNamespace(namespace),
-		client.MatchingLabels(labels),
-	}
-	err := r.Client.List(context.TODO(), pods, listOptions...)
+	// We use non-cached client to make sure we get the real state of pods instead of
+	// potentially outdated cached data.
+	err = r.NonCachedAPIReader.List(context.TODO(), pods, listOptions...)
 	if err != nil {
 		return status, errors.Wrap(err, "unable to get pod list")
 	}
@@ -190,6 +199,45 @@ func (r *ClusterInstallationReconciler) checkClusterInstallation(namespace, name
 	return status, nil
 }
 
+func (r *ClusterInstallationReconciler) checkRolloutStarted(name, namespace string, listOpts []client.ListOption) error {
+	// To prevent race condition that new pods did not start rolling out and
+	// old ones are still ready, we need to check if Deployment was picked up by controller.
+	// We use non-cached client to make sure it won't return old Deployment where
+	// the generation and observedGeneration still match.
+	deployment := &appsv1.Deployment{}
+	deploymentKey := types.NamespacedName{Name: name, Namespace: namespace}
+	err := r.NonCachedAPIReader.Get(context.TODO(), deploymentKey, deployment)
+	if err != nil {
+		return errors.Wrap(err, "Failed to get deployment")
+	}
+	if deployment.Generation != deployment.Status.ObservedGeneration {
+		return fmt.Errorf("mattermost deployment not yet picked up by the Deployment controller")
+	}
+
+	// We check if new ReplicaSet was created and it was observed by the controller
+	// to guarantee that new pods are created.
+	replicaSets := &appsv1.ReplicaSetList{}
+	err = r.Client.List(context.TODO(), replicaSets, listOpts...)
+	if err != nil {
+		return errors.Wrap(err, "failed to list replicaSets")
+	}
+
+	replicaSetReady := false
+	for _, rep := range replicaSets.Items {
+		if getRevision(rep.Annotations) == getRevision(deployment.Annotations) {
+			if rep.Status.ObservedGeneration > 0 {
+				replicaSetReady = true
+				break
+			}
+		}
+	}
+	if !replicaSetReady {
+		return fmt.Errorf("replicaSet did not start rolling pods")
+	}
+
+	return nil
+}
+
 func (r *ClusterInstallationReconciler) checkSecret(secretName, keyName, namespace string) error {
 	foundSecret := &corev1.Secret{}
 	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: secretName, Namespace: namespace}, foundSecret)
@@ -266,4 +314,11 @@ func ensureLabels(required, final map[string]string) map[string]string {
 	}
 
 	return final
+}
+
+func getRevision(annotations map[string]string) string {
+	if annotations == nil {
+		return ""
+	}
+	return annotations["deployment.kubernetes.io/revision"]
 }
