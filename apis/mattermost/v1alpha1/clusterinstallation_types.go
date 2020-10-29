@@ -92,7 +92,11 @@ type ClusterInstallationSpec struct {
 	// Defines the probe to check if the application is ready to accept traffic.
 	// +optional
 	ReadinessProbe corev1.Probe `json:"readinessProbe,omitempty"`
+	// Defines additional volumes to add to mattermost application pods
+	// +optional
 	Volumes []corev1.Volume `json:"volumes,omitempty"`
+	// Defines additional volumeMounts to add to mattermost application pods
+	// +optional
 	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
 }
 
