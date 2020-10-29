@@ -92,6 +92,8 @@ type ClusterInstallationSpec struct {
 	// Defines the probe to check if the application is ready to accept traffic.
 	// +optional
 	ReadinessProbe corev1.Probe `json:"readinessProbe,omitempty"`
+	Volumes []corev1.Volume `json:"volumes,omitempty"`
+	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
 }
 
 // Canary defines the configuration of Canary deployment for a ClusterInstallation

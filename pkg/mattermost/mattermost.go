@@ -408,8 +408,8 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbIn
 	})
 
 	// Mattermost License
-	volumeLicense := []corev1.Volume{}
-	volumeMountLicense := []corev1.VolumeMount{}
+	volumes := []corev1.Volume{}
+	volumeMounts := []corev1.VolumeMount{}
 	podAnnotations := map[string]string{}
 	if len(mattermost.Spec.MattermostLicenseSecret) != 0 {
 		envVarGeneral = append(envVarGeneral, corev1.EnvVar{
@@ -417,13 +417,13 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbIn
 			Value: "/mattermost-license/license",
 		})
 
-		volumeMountLicense = append(volumeMountLicense, corev1.VolumeMount{
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
 			MountPath: "/mattermost-license",
 			Name:      "mattermost-license",
 			ReadOnly:  true,
 		})
 
-		volumeLicense = append(volumeLicense, corev1.Volume{
+		volumes = append(volumes, corev1.Volume{
 			Name: "mattermost-license",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
@@ -458,6 +458,13 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbIn
 	replicas := mattermost.Spec.Replicas
 	if replicas < 0 {
 		replicas = 0
+	}
+
+	if len(mattermost.Spec.Volumes) > 0 {
+		volumes = append(volumes, mattermost.Spec.Volumes...)
+	}
+	if len(mattermost.Spec.VolumeMounts) > 0 {
+		volumeMounts = append(volumeMounts, mattermost.Spec.VolumeMounts...)
 	}
 
 	return &appsv1.Deployment{
@@ -513,11 +520,11 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbIn
 							},
 							ReadinessProbe: readiness,
 							LivenessProbe:  liveness,
-							VolumeMounts:   volumeMountLicense,
+							VolumeMounts:   volumeMounts,
 							Resources:      mattermost.Spec.Resources,
 						},
 					},
-					Volumes:      volumeLicense,
+					Volumes:      volumes,
 					Affinity:     mattermost.Spec.Affinity,
 					NodeSelector: mattermost.Spec.NodeSelector,
 				},
