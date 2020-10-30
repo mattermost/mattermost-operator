@@ -73,7 +73,7 @@ func (r *ClusterInstallationReconciler) Reconcile(request ctrl.Request) (ctrl.Re
 		var clusterInstallations mattermostv1alpha1.ClusterInstallationList
 		err = r.Client.List(context.TODO(), &clusterInstallations)
 		if err != nil {
-			return reconcile.Result{}, errors.Wrap(err, "Failed to list clusterInstallations")
+			return reconcile.Result{}, errors.Wrap(err, "failed to list ClusterInstallations")
 		}
 
 		// Check if limit of Cluster Installations reconciling at the same time is reached.
