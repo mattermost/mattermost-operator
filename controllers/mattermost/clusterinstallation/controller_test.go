@@ -84,8 +84,8 @@ func TestReconcile(t *testing.T) {
 	// We expect an error on the first reconciliation due to the deployment pods
 	// not running yet.
 	res, err := r.Reconcile(req)
-	require.Error(t, err)
-	require.Equal(t, res, reconcile.Result{})
+	require.NoError(t, err)
+	require.Equal(t, res, reconcile.Result{RequeueAfter: 6 * time.Second})
 
 	// Define the NamespacedName objects that will be used to lookup the
 	// cluster resources.
@@ -187,7 +187,8 @@ func TestReconcile(t *testing.T) {
 
 		t.Run("pods not ready", func(t *testing.T) {
 			res, err = r.Reconcile(req)
-			require.Error(t, err)
+			require.NoError(t, err)
+			require.Equal(t, res, reconcile.Result{RequeueAfter: 6 * time.Second})
 		})
 
 		// Make pods ready
@@ -233,7 +234,8 @@ func TestReconcile(t *testing.T) {
 
 		t.Run("pods not running", func(t *testing.T) {
 			res, err = r.Reconcile(req)
-			require.Error(t, err)
+			require.NoError(t, err)
+			require.Equal(t, res, reconcile.Result{RequeueAfter: 6 * time.Second})
 		})
 
 		// Make pods running

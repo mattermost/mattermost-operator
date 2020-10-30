@@ -22,6 +22,8 @@ import (
 	"github.com/mattermost/mattermost-operator/pkg/database"
 )
 
+const healthCheckRequeueDelay = 6 * time.Second
+
 // ClusterInstallationReconciler reconciles a ClusterInstallation object
 type ClusterInstallationReconciler struct {
 	client.Client
@@ -154,7 +156,8 @@ func (r *ClusterInstallationReconciler) Reconcile(request ctrl.Request) (ctrl.Re
 		if statusErr != nil {
 			reqLogger.Error(statusErr, "Error updating status")
 		}
-		return reconcile.Result{}, err
+		reqLogger.Error(err, "Error checking ClusterInstallation health")
+		return reconcile.Result{RequeueAfter: healthCheckRequeueDelay}, nil
 	}
 
 	err = r.updateStatus(mattermost, status, reqLogger)
