@@ -132,8 +132,8 @@ func TestReconcile(t *testing.T) {
 
 		t.Run("replica set does not exist", func(t *testing.T) {
 			res, err = r.Reconcile(req)
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), "replicaSet did not start rolling pods")
+			require.NoError(t, err)
+			require.Equal(t, res, reconcile.Result{RequeueAfter: 6 * time.Second})
 		})
 
 		replicaSet := &appsv1.ReplicaSet{
@@ -149,8 +149,8 @@ func TestReconcile(t *testing.T) {
 
 		t.Run("replica set not observed", func(t *testing.T) {
 			res, err = r.Reconcile(req)
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), "replicaSet did not start rolling pods")
+			require.NoError(t, err)
+			require.Equal(t, res, reconcile.Result{RequeueAfter: 6 * time.Second})
 		})
 		replicaSet.Status.ObservedGeneration = 1
 		err = c.Update(context.TODO(), replicaSet)
