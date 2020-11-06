@@ -2,19 +2,18 @@ package clusterinstallation
 
 import (
 	"fmt"
-	"k8s.io/api/extensions/v1beta1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"testing"
 	"time"
 
-	"github.com/mattermost/mattermost-operator/pkg/components/utils"
-
 	blubr "github.com/mattermost/blubr"
+	"github.com/mattermost/mattermost-operator/pkg/components/utils"
 	operatortest "github.com/mattermost/mattermost-operator/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"
+	"k8s.io/api/extensions/v1beta1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -62,7 +61,13 @@ func TestReconcile(t *testing.T) {
 	c := fake.NewFakeClient()
 	// Create a ReconcileClusterInstallation object with the scheme and fake
 	// client.
-	r := &ClusterInstallationReconciler{Client: c, Scheme: s, Log: logger}
+	r := &ClusterInstallationReconciler{
+		Client:             c,
+		NonCachedAPIReader: c,
+		Scheme:             s,
+		Log:                logger,
+		MaxReconciling:     5,
+	}
 
 	err := c.Create(context.TODO(), ci)
 	require.NoError(t, err)
@@ -79,8 +84,8 @@ func TestReconcile(t *testing.T) {
 	// We expect an error on the first reconciliation due to the deployment pods
 	// not running yet.
 	res, err := r.Reconcile(req)
-	require.Error(t, err)
-	require.Equal(t, res, reconcile.Result{RequeueAfter: time.Second * 3})
+	require.NoError(t, err)
+	require.Equal(t, res, reconcile.Result{RequeueAfter: 6 * time.Second})
 
 	// Define the NamespacedName objects that will be used to lookup the
 	// cluster resources.
@@ -124,6 +129,33 @@ func TestReconcile(t *testing.T) {
 	})
 
 	t.Run("final check", func(t *testing.T) {
+
+		t.Run("replica set does not exist", func(t *testing.T) {
+			res, err = r.Reconcile(req)
+			require.NoError(t, err)
+			require.Equal(t, res, reconcile.Result{RequeueAfter: 6 * time.Second})
+		})
+
+		replicaSet := &appsv1.ReplicaSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      ciName,
+				Namespace: ciNamespace,
+				Labels:    ci.ClusterInstallationLabels(ciName),
+			},
+			Status: appsv1.ReplicaSetStatus{},
+		}
+		err = c.Create(context.TODO(), replicaSet)
+		require.NoError(t, err)
+
+		t.Run("replica set not observed", func(t *testing.T) {
+			res, err = r.Reconcile(req)
+			require.NoError(t, err)
+			require.Equal(t, res, reconcile.Result{RequeueAfter: 6 * time.Second})
+		})
+		replicaSet.Status.ObservedGeneration = 1
+		err = c.Update(context.TODO(), replicaSet)
+		require.NoError(t, err)
+
 		// Create expected mattermost pods.
 		podTemplate := corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -155,7 +187,8 @@ func TestReconcile(t *testing.T) {
 
 		t.Run("pods not ready", func(t *testing.T) {
 			res, err = r.Reconcile(req)
-			require.Error(t, err)
+			require.NoError(t, err)
+			require.Equal(t, res, reconcile.Result{RequeueAfter: 6 * time.Second})
 		})
 
 		// Make pods ready
@@ -201,7 +234,8 @@ func TestReconcile(t *testing.T) {
 
 		t.Run("pods not running", func(t *testing.T) {
 			res, err = r.Reconcile(req)
-			require.Error(t, err)
+			require.NoError(t, err)
+			require.Equal(t, res, reconcile.Result{RequeueAfter: 6 * time.Second})
 		})
 
 		// Make pods running
@@ -265,6 +299,17 @@ func TestReconcile(t *testing.T) {
 
 		blueGreen := []mattermostv1alpha1.AppDeployment{ci.Spec.BlueGreen.Blue, ci.Spec.BlueGreen.Green}
 		for _, deployment := range blueGreen {
+			replicaSet := &appsv1.ReplicaSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      deployment.Name,
+					Namespace: ciNamespace,
+					Labels:    ci.ClusterInstallationLabels(deployment.Name),
+				},
+				Status: appsv1.ReplicaSetStatus{ObservedGeneration: 1},
+			}
+			err = c.Create(context.TODO(), replicaSet)
+			require.NoError(t, err)
+
 			podTemplate := corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: ciNamespace,
@@ -419,6 +464,177 @@ func TestReconcile(t *testing.T) {
 			})
 		})
 	})
+}
+
+func TestReconcilingLimit(t *testing.T) {
+	// Setup logging for the reconciler so we can see what happened on failure.
+	logger := blubr.InitLogger()
+	logger = logger.WithName("test.opr")
+	logf.SetLogger(logger)
+
+	ciNamespace := "default"
+	replicas := int32(4)
+	requeueOnLimitDelay := 35 * time.Second
+
+	newClusterInstallation := func(name string, uid string, state mattermostv1alpha1.RunningState) *mattermostv1alpha1.ClusterInstallation {
+		return &mattermostv1alpha1.ClusterInstallation{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: ciNamespace,
+				UID:       types.UID(uid),
+			},
+			Spec: mattermostv1alpha1.ClusterInstallationSpec{
+				Replicas:    replicas,
+				Image:       "mattermost/mattermost-enterprise-edition",
+				Version:     operatortest.LatestStableMattermostVersion,
+				IngressName: "foo.mattermost.dev",
+			},
+			Status: mattermostv1alpha1.ClusterInstallationStatus{State: state},
+		}
+	}
+
+	ci1 := newClusterInstallation("first", "1", mattermostv1alpha1.Reconciling)
+
+	// Register operator types with the runtime scheme.
+	s := prepareSchema(t, scheme.Scheme)
+	s.AddKnownTypes(mattermostv1alpha1.GroupVersion, ci1)
+	// Create a fake client to mock API calls.
+	c := fake.NewFakeClient()
+	// Create a ReconcileClusterInstallation object with the scheme and fake client.
+	r := &ClusterInstallationReconciler{
+		Client:              c,
+		Scheme:              s,
+		Log:                 logger,
+		MaxReconciling:      2,
+		RequeueOnLimitDelay: requeueOnLimitDelay,
+	}
+
+	assertInstallationsCount := func(t *testing.T, expectedCIs, expectedReconciling int) {
+		var ciList mattermostv1alpha1.ClusterInstallationList
+		err := c.List(context.TODO(), &ciList)
+		require.NoError(t, err)
+
+		assert.Equal(t, expectedCIs, len(ciList.Items))
+		assert.Equal(t, expectedReconciling, countReconciling(ciList.Items))
+	}
+
+	err := c.Create(context.TODO(), ci1)
+	require.NoError(t, err)
+
+	ci2 := newClusterInstallation("second", "2", mattermostv1alpha1.Reconciling)
+	err = c.Create(context.TODO(), ci2)
+	require.NoError(t, err)
+
+	ci3 := newClusterInstallation("third", "3", mattermostv1alpha1.Reconciling)
+	err = c.Create(context.TODO(), ci3)
+	require.NoError(t, err)
+
+	ci4 := newClusterInstallation("forth", "4", "")
+	err = c.Create(context.TODO(), ci4)
+	require.NoError(t, err)
+
+	ci5 := newClusterInstallation("fifth", "5", mattermostv1alpha1.Stable)
+	err = c.Create(context.TODO(), ci5)
+	require.NoError(t, err)
+
+	req1 := requestForCI(ci1)
+	_, err = r.Reconcile(req1)
+	require.Error(t, err)
+	assertInstallationsCount(t, 5, 3)
+
+	req2 := requestForCI(ci2)
+	_, err = r.Reconcile(req2)
+	require.Error(t, err)
+
+	t.Run("should pick up Installation in Reconciling state even if limit reached", func(t *testing.T) {
+		req3 := requestForCI(ci3)
+		_, err = r.Reconcile(req3)
+		require.Error(t, err)
+	})
+
+	var result reconcile.Result
+	t.Run("should not pick up Installation without state if limit reached", func(t *testing.T) {
+		req4 := requestForCI(ci4)
+		result, err = r.Reconcile(req4)
+		require.NoError(t, err)
+		assert.Equal(t, requeueOnLimitDelay, result.RequeueAfter)
+
+		result, err = r.Reconcile(req4)
+		require.NoError(t, err)
+		assert.Equal(t, requeueOnLimitDelay, result.RequeueAfter)
+	})
+
+	t.Run("should not pick up Installation in Stable state if limit reached", func(t *testing.T) {
+		req5 := requestForCI(ci5)
+		result, err = r.Reconcile(req5)
+		require.NoError(t, err)
+		assert.Equal(t, requeueOnLimitDelay, result.RequeueAfter)
+	})
+
+	err = c.Delete(context.TODO(), ci1)
+	require.NoError(t, err)
+	_, err = r.Reconcile(req1)
+	require.NoError(t, err)
+	assertInstallationsCount(t, 4, 2)
+
+	err = c.Delete(context.TODO(), ci2)
+	require.NoError(t, err)
+	_, err = r.Reconcile(req2)
+	require.NoError(t, err)
+	assertInstallationsCount(t, 3, 1)
+
+	t.Run("should pick up Installation without state when cache freed", func(t *testing.T) {
+		req4 := requestForCI(ci4)
+		_, err = r.Reconcile(req4)
+		require.Error(t, err)
+		assertInstallationsCount(t, 3, 2)
+	})
+
+	err = c.Delete(context.TODO(), ci4)
+	require.NoError(t, err)
+	req4 := requestForCI(ci4)
+	_, err = r.Reconcile(req4)
+	require.NoError(t, err)
+	assertInstallationsCount(t, 2, 1)
+
+	t.Run("should pick up Installation in Stable state when cache freed", func(t *testing.T) {
+		req5 := requestForCI(ci5)
+		_, err = r.Reconcile(req5)
+		require.Error(t, err)
+		assertInstallationsCount(t, 2, 2)
+	})
+
+	err = c.Delete(context.TODO(), ci5)
+	require.NoError(t, err)
+	req5 := requestForCI(ci5)
+	_, err = r.Reconcile(req5)
+	require.NoError(t, err)
+	assertInstallationsCount(t, 1, 1)
+
+	t.Run("should add new installations to cache", func(t *testing.T) {
+		// Pick up first for reconciling
+		ci6 := newClusterInstallation("sixth", "6", "")
+		err = c.Create(context.TODO(), ci6)
+		require.NoError(t, err)
+		req6 := requestForCI(ci6)
+		_, err = r.Reconcile(req6)
+		require.Error(t, err)
+		assertInstallationsCount(t, 2, 2)
+
+		// Do not pick up second
+		ci7 := newClusterInstallation("seventh", "7", "")
+		err = c.Create(context.TODO(), ci7)
+		require.NoError(t, err)
+		req7 := requestForCI(ci7)
+		result, err = r.Reconcile(req7)
+		require.NoError(t, err)
+		assert.Equal(t, requeueOnLimitDelay, result.RequeueAfter)
+		assertInstallationsCount(t, 3, 2)
+	})
+}
+
+func requestForCI(ci *mattermostv1alpha1.ClusterInstallation) reconcile.Request {
+	return reconcile.Request{NamespacedName: types.NamespacedName{Name: ci.Name, Namespace: ci.Namespace}}
 }
 
 func prepAllDependencyTestResources(client client.Client, ci *mattermostv1alpha1.ClusterInstallation) error {

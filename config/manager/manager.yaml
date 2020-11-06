@@ -27,3 +27,8 @@ spec:
         image: mattermost-operator
         imagePullPolicy: IfNotPresent
         name: mattermost-operator
+        env:
+          - name: "MAX_RECONCILING_INSTALLATIONS"
+            value: "20"
+          - name: "REQUEUE_ON_LIMIT_DELAY"
+            value: "20s"

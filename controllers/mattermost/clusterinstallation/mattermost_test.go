@@ -49,7 +49,7 @@ func TestCheckMattermost(t *testing.T) {
 	s := prepareSchema(t, scheme.Scheme)
 	s.AddKnownTypes(mattermostv1alpha1.GroupVersion, ci)
 	c := fake.NewFakeClient()
-	r := &ClusterInstallationReconciler{Client: c, Scheme: s, Log: logger}
+	r := &ClusterInstallationReconciler{Client: c, Scheme: s, Log: logger, MaxReconciling: 5}
 
 	err := prepAllDependencyTestResources(r.Client, ci)
 	require.NoError(t, err)
@@ -231,7 +231,7 @@ func TestCheckMattermostExternalDB(t *testing.T) {
 	s := prepareSchema(t, scheme.Scheme)
 	s.AddKnownTypes(mattermostv1alpha1.GroupVersion, ci)
 	c := fake.NewFakeClient()
-	r := &ClusterInstallationReconciler{Client: c, Scheme: s, Log: logger}
+	r := &ClusterInstallationReconciler{Client: c, Scheme: s, Log: logger, MaxReconciling: 5}
 
 	err := prepAllDependencyTestResources(r.Client, ci)
 	require.NoError(t, err)
