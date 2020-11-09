@@ -4,6 +4,9 @@ import (
 	"context"
 	"testing"
 
+	"github.com/mattermost/mattermost-operator/pkg/mattermost"
+	rbacv1 "k8s.io/api/rbac/v1"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -79,6 +82,71 @@ func TestCheckMattermost(t *testing.T) {
 		assert.Equal(t, original.GetNamespace(), found.GetNamespace())
 		assert.Equal(t, original.Spec.Selector, found.Spec.Selector)
 		assert.Equal(t, original.Spec.Ports, found.Spec.Ports)
+	})
+
+	t.Run("service account", func(t *testing.T) {
+		err = r.checkMattermostSA(ci, ci.Name, logger)
+		assert.NoError(t, err)
+
+		found := &corev1.ServiceAccount{}
+		err = r.Client.Get(context.TODO(), types.NamespacedName{Name: ciName, Namespace: ciNamespace}, found)
+		require.NoError(t, err)
+		require.NotNil(t, found)
+
+		err = r.Client.Delete(context.TODO(), found)
+		require.NoError(t, err)
+		err = r.checkMattermostSA(ci, ci.Name, logger)
+		require.NoError(t, err)
+		err = r.Client.Get(context.TODO(), types.NamespacedName{Name: ciName, Namespace: ciNamespace}, found)
+		require.NoError(t, err)
+	})
+
+	t.Run("role", func(t *testing.T) {
+		err = r.checkMattermostRole(ci, ci.Name, logger)
+		assert.NoError(t, err)
+
+		found := &rbacv1.Role{}
+		err = r.Client.Get(context.TODO(), types.NamespacedName{Name: ciName, Namespace: ciNamespace}, found)
+		require.NoError(t, err)
+		require.NotNil(t, found)
+
+		original := found.DeepCopy()
+		modified := found.DeepCopy()
+		modified.Rules = nil
+
+		err = r.Client.Update(context.TODO(), modified)
+		require.NoError(t, err)
+		err = r.checkMattermostRole(ci, ci.Name, logger)
+		require.NoError(t, err)
+		err = r.Client.Get(context.TODO(), types.NamespacedName{Name: ciName, Namespace: ciNamespace}, found)
+		require.NoError(t, err)
+		assert.Equal(t, original.GetName(), found.GetName())
+		assert.Equal(t, original.GetNamespace(), found.GetNamespace())
+		assert.Equal(t, original.Rules, found.Rules)
+	})
+
+	t.Run("role binding", func(t *testing.T) {
+		err = r.checkMattermostRoleBinding(ci, ci.Name, ci.Name, logger)
+		assert.NoError(t, err)
+
+		found := &rbacv1.RoleBinding{}
+		err = r.Client.Get(context.TODO(), types.NamespacedName{Name: ciName, Namespace: ciNamespace}, found)
+		require.NoError(t, err)
+		require.NotNil(t, found)
+
+		original := found.DeepCopy()
+		modified := found.DeepCopy()
+		modified.Subjects = nil
+
+		err = r.Client.Update(context.TODO(), modified)
+		require.NoError(t, err)
+		err = r.checkMattermostRoleBinding(ci, ci.Name, ci.Name, logger)
+		require.NoError(t, err)
+		err = r.Client.Get(context.TODO(), types.NamespacedName{Name: ciName, Namespace: ciNamespace}, found)
+		require.NoError(t, err)
+		assert.Equal(t, original.GetName(), found.GetName())
+		assert.Equal(t, original.GetNamespace(), found.GetNamespace())
+		assert.Equal(t, original.Subjects, found.Subjects)
 	})
 
 	t.Run("ingress no tls", func(t *testing.T) {
@@ -163,13 +231,22 @@ func TestCheckMattermost(t *testing.T) {
 		err := r.Client.Create(context.TODO(), job)
 		require.NoError(t, err)
 
-		err = r.checkMattermostDeployment(ci, ci.Name, ci.Spec.IngressName, ci.GetImageName(), logger)
+		err = r.checkMattermostDeployment(ci, ci.Name, ci.Spec.IngressName, ci.Name, ci.GetImageName(), logger)
 		assert.NoError(t, err)
+
+		dbSetupJob := &batchv1.Job{}
+		err = r.Client.Get(context.TODO(), types.NamespacedName{Name: mattermost.SetupJobName, Namespace: ciNamespace}, dbSetupJob)
+		require.NoError(t, err)
+		require.Equal(t, 1, len(dbSetupJob.Spec.Template.Spec.Containers))
+		require.Equal(t, ci.GetImageName(), dbSetupJob.Spec.Template.Spec.Containers[0].Image)
+		_, containerFound := findContainer(mattermost.WaitForDBSetupContainerName, dbSetupJob.Spec.Template.Spec.InitContainers)
+		require.False(t, containerFound)
 
 		found := &appsv1.Deployment{}
 		err = r.Client.Get(context.TODO(), types.NamespacedName{Name: ciName, Namespace: ciNamespace}, found)
 		require.NoError(t, err)
 		require.NotNil(t, found)
+		assert.Equal(t, ci.Name, found.Spec.Template.Spec.ServiceAccountName)
 
 		original := found.DeepCopy()
 		modified := found.DeepCopy()
@@ -180,7 +257,7 @@ func TestCheckMattermost(t *testing.T) {
 
 		err = r.Client.Update(context.TODO(), modified)
 		require.NoError(t, err)
-		err = r.checkMattermostDeployment(ci, ci.Name, ci.Spec.IngressName, ci.GetImageName(), logger)
+		err = r.checkMattermostDeployment(ci, ci.Name, ci.Spec.IngressName, ci.Name, ci.GetImageName(), logger)
 		require.NoError(t, err)
 		err = r.Client.Get(context.TODO(), types.NamespacedName{Name: ciName, Namespace: ciNamespace}, found)
 		require.NoError(t, err)
@@ -318,7 +395,7 @@ func TestCheckMattermostExternalDB(t *testing.T) {
 		err := r.Client.Create(context.TODO(), job)
 		require.NoError(t, err)
 
-		err = r.checkMattermostDeployment(ci, ci.Name, ci.Spec.IngressName, ci.GetImageName(), logger)
+		err = r.checkMattermostDeployment(ci, ci.Name, ci.Spec.IngressName, ci.Name, ci.GetImageName(), logger)
 		assert.NoError(t, err)
 
 		found := &appsv1.Deployment{}
@@ -335,7 +412,7 @@ func TestCheckMattermostExternalDB(t *testing.T) {
 
 		err = r.Client.Update(context.TODO(), modified)
 		require.NoError(t, err)
-		err = r.checkMattermostDeployment(ci, ci.Name, ci.Spec.IngressName, ci.GetImageName(), logger)
+		err = r.checkMattermostDeployment(ci, ci.Name, ci.Spec.IngressName, ci.Name, ci.GetImageName(), logger)
 		require.NoError(t, err)
 		err = r.Client.Get(context.TODO(), types.NamespacedName{Name: ciName, Namespace: ciNamespace}, found)
 		require.NoError(t, err)

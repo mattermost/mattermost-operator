@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"strings"
 
+	rbacv1 "k8s.io/api/rbac/v1"
+
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1"
 	"github.com/mattermost/mattermost-operator/pkg/components/utils"
 	"github.com/mattermost/mattermost-operator/pkg/database"
@@ -16,6 +18,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
+)
+
+const (
+	SetupJobName                = "mattermost-db-setup"
+	WaitForDBSetupContainerName = "init-wait-for-db-setup"
 )
 
 // GenerateService returns the service for the Mattermost app.
@@ -119,7 +126,7 @@ func GenerateIngress(mattermost *mattermostv1alpha1.ClusterInstallation, name, i
 }
 
 // GenerateDeployment returns the deployment for Mattermost app.
-func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbInfo *database.Info, deploymentName, ingressName, containerImage string, minioURL string) *appsv1.Deployment {
+func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbInfo *database.Info, deploymentName, ingressName, serviceAccountName, containerImage string, minioURL string) *appsv1.Deployment {
 	var envVarDB []corev1.EnvVar
 
 	masterDBEnvVar := corev1.EnvVar{
@@ -231,6 +238,17 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbIn
 	}
 
 	envVarDB = append(envVarDB, masterDBEnvVar)
+
+	// Add init container to wait for DB setup job to complete
+	initContainers = append(initContainers, corev1.Container{
+		Name:            WaitForDBSetupContainerName,
+		Image:           "bitnami/kubectl:1.17",
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		Command: []string{
+			"sh", "-c",
+			fmt.Sprintf("kubectl wait --for=condition=complete --timeout 5m job/%s", SetupJobName),
+		},
+	})
 
 	minioName := fmt.Sprintf("%s-minio", mattermost.Name)
 
@@ -492,7 +510,8 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbIn
 					Annotations: podAnnotations,
 				},
 				Spec: corev1.PodSpec{
-					InitContainers: initContainers,
+					ServiceAccountName: serviceAccountName,
+					InitContainers:     initContainers,
 					Containers: []corev1.Container{
 						{
 							Name:                     mattermostv1alpha1.MattermostAppContainerName,
@@ -542,6 +561,61 @@ func GenerateSecret(mattermost *mattermostv1alpha1.ClusterInstallation, secretNa
 			},
 		},
 		Data: values,
+	}
+}
+
+// GenerateServiceAccount returns the Service Account for Mattermost
+func GenerateServiceAccount(mattermost *mattermostv1alpha1.ClusterInstallation, saName string) *corev1.ServiceAccount {
+	return &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            saName,
+			Namespace:       mattermost.Namespace,
+			OwnerReferences: clusterInstallationOwerReference(mattermost),
+		},
+	}
+}
+
+// GenerateRole returns the Role for Mattermost
+func GenerateRole(mattermost *mattermostv1alpha1.ClusterInstallation, roleName string) *rbacv1.Role {
+	return &rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            roleName,
+			Namespace:       mattermost.Namespace,
+			OwnerReferences: clusterInstallationOwerReference(mattermost),
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				Verbs:         []string{"get", "list", "watch"},
+				APIGroups:     []string{"batch"},
+				Resources:     []string{"jobs"},
+				ResourceNames: []string{SetupJobName},
+			},
+		},
+	}
+}
+
+// GenerateRoleBinding returns the RoleBinding for Mattermost
+func GenerateRoleBinding(mattermost *mattermostv1alpha1.ClusterInstallation, roleName, saName string) *rbacv1.RoleBinding {
+	return &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            roleName,
+			Namespace:       mattermost.Namespace,
+			OwnerReferences: clusterInstallationOwerReference(mattermost),
+		},
+		Subjects: []rbacv1.Subject{
+			{Kind: "ServiceAccount", Name: saName, Namespace: mattermost.Namespace},
+		},
+		RoleRef: rbacv1.RoleRef{Kind: "Role", Name: roleName},
+	}
+}
+
+func clusterInstallationOwerReference(mattermost *mattermostv1alpha1.ClusterInstallation) []metav1.OwnerReference {
+	return []metav1.OwnerReference{
+		*metav1.NewControllerRef(mattermost, schema.GroupVersionKind{
+			Group:   mattermostv1alpha1.GroupVersion.Group,
+			Version: mattermostv1alpha1.GroupVersion.Version,
+			Kind:    "ClusterInstallation",
+		}),
 	}
 }
 

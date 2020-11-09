@@ -22,7 +22,7 @@ func (r *ClusterInstallationReconciler) checkBlueGreen(mattermost *mattermostv1a
 					return err
 				}
 			}
-			err = r.checkMattermostDeployment(mattermost, deployment.Name, deployment.IngressName, deployment.GetDeploymentImageName(), reqLogger)
+			err = r.checkMattermostDeployment(mattermost, deployment.Name, deployment.IngressName, mattermost.Name, deployment.GetDeploymentImageName(), reqLogger)
 			if err != nil {
 				return err
 			}
