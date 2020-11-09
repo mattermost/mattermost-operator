@@ -57,6 +57,80 @@ var size100 = ClusterInstallationSize{
 	},
 }
 
+// CloudSize10String represents estimated Mattermost Cloud installation sizing for 10 users.
+const CloudSize10String = "cloud10users"
+
+var cloudSize10 = ClusterInstallationSize{
+	App: ComponentSize{
+		Replicas: 2,
+		Resources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("10m"),
+				corev1.ResourceMemory: resource.MustParse("200Mi"),
+			},
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("2"),
+				corev1.ResourceMemory: resource.MustParse("4Gi"),
+			},
+		},
+	},
+	Minio: ComponentSize{
+		Replicas: 4,
+		Resources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("100m"),
+				corev1.ResourceMemory: resource.MustParse("256Mi"),
+			},
+		},
+	},
+	Database: ComponentSize{
+		Replicas: 2,
+		Resources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("200m"),
+				corev1.ResourceMemory: resource.MustParse("512Mi"),
+			},
+		},
+	},
+}
+
+// CloudSize100String represents estimated Mattermost Cloud installation sizing for 100 users.
+const CloudSize100String = "cloud100users"
+
+var cloudSize100 = ClusterInstallationSize{
+	App: ComponentSize{
+		Replicas: 2,
+		Resources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("50m"),
+				corev1.ResourceMemory: resource.MustParse("256Mi"),
+			},
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("2"),
+				corev1.ResourceMemory: resource.MustParse("4Gi"),
+			},
+		},
+	},
+	Minio: ComponentSize{
+		Replicas: 4,
+		Resources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("100m"),
+				corev1.ResourceMemory: resource.MustParse("256Mi"),
+			},
+		},
+	},
+	Database: ComponentSize{
+		Replicas: 2,
+		Resources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("200m"),
+				corev1.ResourceMemory: resource.MustParse("512Mi"),
+			},
+		},
+	},
+}
+
 // Size1000String represents estimated installation sizing for 1000 users.
 const Size1000String = "1000users"
 
@@ -282,6 +356,8 @@ var sizeMiniHA = ClusterInstallationSize{
 }
 
 var validSizes = map[string]ClusterInstallationSize{
+	CloudSize10String:       cloudSize10,
+	CloudSize100String:      cloudSize100,
 	Size100String:           size100,
 	Size1000String:          size1000,
 	Size5000String:          size5000,
