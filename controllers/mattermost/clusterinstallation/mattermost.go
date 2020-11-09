@@ -92,7 +92,7 @@ func (r *ClusterInstallationReconciler) checkMattermostRBAC(mattermost *mattermo
 	}
 	err = r.checkMattermostRoleBinding(mattermost, roleName, saName, reqLogger)
 	if err != nil {
-		return errors.Wrap(err, "failed to check mattermost Role")
+		return errors.Wrap(err, "failed to check mattermost RoleBinding")
 	}
 
 	return nil
@@ -208,7 +208,7 @@ func (r *ClusterInstallationReconciler) checkMattermostDeployment(mattermost *ma
 
 	err = r.checkMattermostDBSetupJob(mattermost, desired, reqLogger)
 	if err != nil {
-		return errors.Wrap(err, "failed to check mattermost DB setup job.")
+		return errors.Wrap(err, "failed to check mattermost DB setup job")
 	}
 
 	err = r.createDeploymentIfNotExists(mattermost, desired, reqLogger)
@@ -240,7 +240,7 @@ func (r *ClusterInstallationReconciler) checkMattermostDBSetupJob(mattermost *ma
 			reqLogger.Info("Creating DB setup job", "name", desiredJob.Name)
 			return r.create(mattermost, desiredJob, reqLogger)
 		}
-		return errors.Wrapf(err, "failed to get current db setup job")
+		return errors.Wrap(err, "failed to get current db setup job")
 	}
 	// For now, there is no need to perform job update, so just return.
 	return nil
