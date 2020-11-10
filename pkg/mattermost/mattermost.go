@@ -239,17 +239,6 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbIn
 
 	envVarDB = append(envVarDB, masterDBEnvVar)
 
-	// Add init container to wait for DB setup job to complete
-	initContainers = append(initContainers, corev1.Container{
-		Name:            WaitForDBSetupContainerName,
-		Image:           "bitnami/kubectl:1.17",
-		ImagePullPolicy: corev1.PullIfNotPresent,
-		Command: []string{
-			"sh", "-c",
-			fmt.Sprintf("kubectl wait --for=condition=complete --timeout 5m job/%s", SetupJobName),
-		},
-	})
-
 	minioName := fmt.Sprintf("%s-minio", mattermost.Name)
 
 	// Check if custom secret was passed
@@ -341,6 +330,17 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbIn
 			Value: "false",
 		},
 	}
+
+	// Add init container to wait for DB setup job to complete
+	initContainers = append(initContainers, corev1.Container{
+		Name:            WaitForDBSetupContainerName,
+		Image:           "bitnami/kubectl:1.17",
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		Command: []string{
+			"sh", "-c",
+			fmt.Sprintf("kubectl wait --for=condition=complete --timeout 5m job/%s", SetupJobName),
+		},
+	})
 
 	// ES section vars
 	envVarES := []corev1.EnvVar{}

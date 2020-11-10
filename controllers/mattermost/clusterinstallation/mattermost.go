@@ -310,6 +310,8 @@ func (r *ClusterInstallationReconciler) launchUpdateJob(
 }
 
 func prepareJobTemplate(mm *mattermostv1alpha1.ClusterInstallation, deployment *appsv1.Deployment, name string) *batchv1.Job {
+	backoffLimit := int32(10)
+
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -322,6 +324,7 @@ func prepareJobTemplate(mm *mattermostv1alpha1.ClusterInstallation, deployment *
 				},
 				Spec: *deployment.Spec.Template.Spec.DeepCopy(),
 			},
+			BackoffLimit: &backoffLimit,
 		},
 	}
 
