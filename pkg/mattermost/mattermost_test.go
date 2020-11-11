@@ -266,9 +266,10 @@ func TestGenerateDeployment(t *testing.T) {
 				databaseInfo = &database.Info{}
 			}
 
-			deployment := GenerateDeployment(mattermost, databaseInfo, "", "", "", "")
+			deployment := GenerateDeployment(mattermost, databaseInfo, "", "", "service-account", "", "")
 			require.NotNil(t, deployment)
 
+			assert.Equal(t, "service-account", deployment.Spec.Template.Spec.ServiceAccountName)
 			assert.Equal(t, tt.want.Spec.Template.Spec.NodeSelector, deployment.Spec.Template.Spec.NodeSelector)
 			assert.Equal(t, tt.want.Spec.Template.Spec.Affinity, deployment.Spec.Template.Spec.Affinity)
 
@@ -296,7 +297,7 @@ func TestGenerateDeployment(t *testing.T) {
 			}
 
 			// Init container check.
-			var expectedInitContainers int
+			expectedInitContainers := 1
 			if !databaseInfo.IsExternal() {
 				expectedInitContainers++
 			} else if databaseInfo.IsExternal() && databaseInfo.HasDatabaseCheckURL() {
@@ -311,6 +312,36 @@ func TestGenerateDeployment(t *testing.T) {
 			assert.Equal(t, 1, len(deployment.Spec.Template.Spec.Containers))
 		})
 	}
+}
+
+func TestGenerateRBACResources(t *testing.T) {
+	roleName := "role"
+	saName := "service-account"
+	mattermost := &mattermostv1alpha1.ClusterInstallation{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-mm",
+			Namespace: "test-namespace",
+		},
+	}
+
+	serviceAccount := GenerateServiceAccount(mattermost, saName)
+	require.Equal(t, saName, serviceAccount.Name)
+	require.Equal(t, mattermost.Namespace, serviceAccount.Namespace)
+	require.Equal(t, 1, len(serviceAccount.OwnerReferences))
+
+	role := GenerateRole(mattermost, roleName)
+	require.Equal(t, roleName, role.Name)
+	require.Equal(t, mattermost.Namespace, role.Namespace)
+	require.Equal(t, 1, len(role.OwnerReferences))
+	require.Equal(t, 1, len(role.Rules))
+
+	roleBinding := GenerateRoleBinding(mattermost, roleName, saName)
+	require.Equal(t, roleName, roleBinding.Name)
+	require.Equal(t, mattermost.Namespace, roleBinding.Namespace)
+	require.Equal(t, 1, len(roleBinding.OwnerReferences))
+	require.Equal(t, 1, len(roleBinding.Subjects))
+	require.Equal(t, saName, roleBinding.Subjects[0].Name)
+	require.Equal(t, roleName, roleBinding.RoleRef.Name)
 }
 
 func assertEnvVarExists(t *testing.T, name string, env []corev1.EnvVar) {

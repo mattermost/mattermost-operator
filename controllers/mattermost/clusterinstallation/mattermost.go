@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	rbacv1 "k8s.io/api/rbac/v1"
+
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
@@ -32,6 +34,11 @@ func (r *ClusterInstallationReconciler) checkMattermost(mattermost *mattermostv1
 		return err
 	}
 
+	err = r.checkMattermostRBAC(mattermost, mattermost.Name, mattermost.Name, reqLogger)
+	if err != nil {
+		return err
+	}
+
 	if !mattermost.Spec.UseServiceLoadBalancer {
 		ingressAnnotations := map[string]string{
 			"kubernetes.io/ingress.class":                 "nginx",
@@ -48,7 +55,7 @@ func (r *ClusterInstallationReconciler) checkMattermost(mattermost *mattermostv1
 	}
 
 	if !mattermost.Spec.BlueGreen.Enable {
-		err = r.checkMattermostDeployment(mattermost, mattermost.Name, mattermost.Spec.IngressName, mattermost.GetImageName(), reqLogger)
+		err = r.checkMattermostDeployment(mattermost, mattermost.Name, mattermost.Spec.IngressName, mattermost.Name, mattermost.GetImageName(), reqLogger)
 		if err != nil {
 			return err
 		}
@@ -74,6 +81,71 @@ func (r *ClusterInstallationReconciler) checkMattermostService(mattermost *matte
 	return r.update(current, desired, reqLogger)
 }
 
+func (r *ClusterInstallationReconciler) checkMattermostRBAC(mattermost *mattermostv1alpha1.ClusterInstallation, roleName, saName string, reqLogger logr.Logger) error {
+	err := r.checkMattermostSA(mattermost, saName, reqLogger)
+	if err != nil {
+		return errors.Wrap(err, "failed to check mattermost ServiceAccount")
+	}
+	err = r.checkMattermostRole(mattermost, roleName, reqLogger)
+	if err != nil {
+		return errors.Wrap(err, "failed to check mattermost Role")
+	}
+	err = r.checkMattermostRoleBinding(mattermost, roleName, saName, reqLogger)
+	if err != nil {
+		return errors.Wrap(err, "failed to check mattermost RoleBinding")
+	}
+
+	return nil
+}
+
+func (r *ClusterInstallationReconciler) checkMattermostSA(mattermost *mattermostv1alpha1.ClusterInstallation, saName string, reqLogger logr.Logger) error {
+	desired := mattermostApp.GenerateServiceAccount(mattermost, saName)
+	err := r.createServiceAccountIfNotExists(mattermost, desired, reqLogger)
+	if err != nil {
+		return err
+	}
+
+	current := &corev1.ServiceAccount{}
+	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: desired.Name, Namespace: desired.Namespace}, current)
+	if err != nil {
+		return err
+	}
+
+	return r.update(current, desired, reqLogger)
+}
+
+func (r *ClusterInstallationReconciler) checkMattermostRole(mattermost *mattermostv1alpha1.ClusterInstallation, roleName string, reqLogger logr.Logger) error {
+	desired := mattermostApp.GenerateRole(mattermost, roleName)
+	err := r.createRoleIfNotExists(mattermost, desired, reqLogger)
+	if err != nil {
+		return err
+	}
+
+	current := &rbacv1.Role{}
+	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: desired.Name, Namespace: desired.Namespace}, current)
+	if err != nil {
+		return err
+	}
+
+	return r.update(current, desired, reqLogger)
+}
+
+func (r *ClusterInstallationReconciler) checkMattermostRoleBinding(mattermost *mattermostv1alpha1.ClusterInstallation, roleName, saName string, reqLogger logr.Logger) error {
+	desired := mattermostApp.GenerateRoleBinding(mattermost, roleName, saName)
+	err := r.createRoleBindingIfNotExists(mattermost, desired, reqLogger)
+	if err != nil {
+		return err
+	}
+
+	current := &rbacv1.RoleBinding{}
+	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: desired.Name, Namespace: desired.Namespace}, current)
+	if err != nil {
+		return err
+	}
+
+	return r.update(current, desired, reqLogger)
+}
+
 func (r *ClusterInstallationReconciler) checkMattermostIngress(mattermost *mattermostv1alpha1.ClusterInstallation, resourceName, ingressName string, ingressAnnotations map[string]string, reqLogger logr.Logger) error {
 	desired := mattermostApp.GenerateIngress(mattermost, resourceName, ingressName, ingressAnnotations)
 
@@ -91,7 +163,7 @@ func (r *ClusterInstallationReconciler) checkMattermostIngress(mattermost *matte
 	return r.update(current, desired, reqLogger)
 }
 
-func (r *ClusterInstallationReconciler) checkMattermostDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, resourceName, ingressName, imageName string, reqLogger logr.Logger) error {
+func (r *ClusterInstallationReconciler) checkMattermostDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, resourceName, ingressName, saName, imageName string, reqLogger logr.Logger) error {
 	var err error
 	dbInfo := &database.Info{}
 
@@ -132,7 +204,13 @@ func (r *ClusterInstallationReconciler) checkMattermostDeployment(mattermost *ma
 		}
 	}
 
-	desired := mattermostApp.GenerateDeployment(mattermost, dbInfo, resourceName, ingressName, imageName, minioURL)
+	desired := mattermostApp.GenerateDeployment(mattermost, dbInfo, resourceName, ingressName, saName, imageName, minioURL)
+
+	err = r.checkMattermostDBSetupJob(mattermost, desired, reqLogger)
+	if err != nil {
+		return errors.Wrap(err, "failed to check mattermost DB setup job")
+	}
+
 	err = r.createDeploymentIfNotExists(mattermost, desired, reqLogger)
 	if err != nil {
 		return errors.Wrap(err, "failed to create mattermost deployment")
@@ -149,6 +227,23 @@ func (r *ClusterInstallationReconciler) checkMattermostDeployment(mattermost *ma
 		return errors.Wrap(err, "failed to update mattermost deployment")
 	}
 
+	return nil
+}
+
+func (r *ClusterInstallationReconciler) checkMattermostDBSetupJob(mattermost *mattermostv1alpha1.ClusterInstallation, deployment *appsv1.Deployment, reqLogger logr.Logger) error {
+	desiredJob := prepareJobTemplate(mattermost, deployment, mattermostApp.SetupJobName)
+	desiredJob.OwnerReferences = mattermostApp.ClusterInstallationOwnerReference(mattermost)
+
+	currentJob := &batchv1.Job{}
+	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: desiredJob.Name, Namespace: desiredJob.Namespace}, currentJob)
+	if err != nil {
+		if k8sErrors.IsNotFound(err) {
+			reqLogger.Info("Creating DB setup job", "name", desiredJob.Name)
+			return r.create(mattermost, desiredJob, reqLogger)
+		}
+		return errors.Wrap(err, "failed to get current db setup job")
+	}
+	// For now, there is no need to perform job update, so just return.
 	return nil
 }
 
@@ -205,10 +300,23 @@ func (r *ClusterInstallationReconciler) launchUpdateJob(
 	mi *mattermostv1alpha1.ClusterInstallation,
 	deployment *appsv1.Deployment,
 ) error {
+	job := prepareJobTemplate(mi, deployment, updateJobName)
+
+	err := r.Client.Create(context.TODO(), job)
+	if err != nil && !k8sErrors.IsAlreadyExists(err) {
+		return err
+	}
+
+	return nil
+}
+
+func prepareJobTemplate(mm *mattermostv1alpha1.ClusterInstallation, deployment *appsv1.Deployment, name string) *batchv1.Job {
+	backoffLimit := int32(10)
+
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      updateJobName,
-			Namespace: mi.GetNamespace(),
+			Name:      name,
+			Namespace: mm.GetNamespace(),
 		},
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
@@ -217,7 +325,16 @@ func (r *ClusterInstallationReconciler) launchUpdateJob(
 				},
 				Spec: *deployment.Spec.Template.Spec.DeepCopy(),
 			},
+			BackoffLimit: &backoffLimit,
 		},
+	}
+
+	// Remove init container that waits for db setup job.
+	containerToRemove, found := findContainer(mattermostApp.WaitForDBSetupContainerName, job.Spec.Template.Spec.InitContainers)
+	if found {
+		job.Spec.Template.Spec.InitContainers = append(
+			job.Spec.Template.Spec.InitContainers[:containerToRemove],
+			job.Spec.Template.Spec.InitContainers[containerToRemove+1:]...)
 	}
 
 	// We dont need to validate the readiness/liveness for this short lived job.
@@ -232,12 +349,7 @@ func (r *ClusterInstallationReconciler) launchUpdateJob(
 		job.Spec.Template.Spec.Containers[i].Command = []string{"mattermost", "version"}
 	}
 
-	err := r.Client.Create(context.TODO(), job)
-	if err != nil && !k8sErrors.IsAlreadyExists(err) {
-		return err
-	}
-
-	return nil
+	return job
 }
 
 // isMainContainerImageSame checks whether main containers of specified deployments are the same or not.
@@ -383,4 +495,13 @@ func (r *ClusterInstallationReconciler) fetchRunningUpdateJob(mi *mattermostv1al
 		job,
 	)
 	return job, err
+}
+
+func findContainer(name string, containers []corev1.Container) (int, bool) {
+	for i, cont := range containers {
+		if cont.Name == name {
+			return i, true
+		}
+	}
+	return -1, false
 }

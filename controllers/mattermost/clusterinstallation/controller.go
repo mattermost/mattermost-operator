@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"time"
 
+	batchv1 "k8s.io/api/batch/v1"
+
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
@@ -44,6 +46,7 @@ func (r *ClusterInstallationReconciler) SetupWithManager(mgr ctrl.Manager) error
 		Owns(&corev1.Secret{}).
 		Owns(&v1beta1.Ingress{}).
 		Owns(&appsv1.Deployment{}).
+		Owns(&batchv1.Job{}).
 		Complete(r)
 }
 

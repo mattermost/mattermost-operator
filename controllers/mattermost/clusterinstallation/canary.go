@@ -23,7 +23,7 @@ func (r *ClusterInstallationReconciler) checkCanary(mattermost *mattermostv1alph
 		if err != nil {
 			return err
 		}
-		err = r.checkMattermostDeployment(mattermost, c.Name, mattermost.Spec.IngressName, c.GetDeploymentImageName(), reqLogger)
+		err = r.checkMattermostDeployment(mattermost, c.Name, mattermost.Spec.IngressName, mattermost.Name, c.GetDeploymentImageName(), reqLogger)
 		if err != nil {
 			return err
 		}

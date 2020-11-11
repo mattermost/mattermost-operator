@@ -3,6 +3,8 @@ package clusterinstallation
 import (
 	"context"
 
+	rbacv1 "k8s.io/api/rbac/v1"
+
 	"github.com/pkg/errors"
 
 	objectMatcher "github.com/banzaicloud/k8s-objectmatcher/patch"
@@ -10,7 +12,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
-	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -79,8 +80,8 @@ func (r *ClusterInstallationReconciler) createServiceAccountIfNotExists(owner v1
 	return nil
 }
 
-func (r *ClusterInstallationReconciler) createRoleBindingIfNotExists(owner v1.Object, roleBinding *rbacv1beta1.RoleBinding, reqLogger logr.Logger) error {
-	foundRoleBinding := &rbacv1beta1.RoleBinding{}
+func (r *ClusterInstallationReconciler) createRoleBindingIfNotExists(owner v1.Object, roleBinding *rbacv1.RoleBinding, reqLogger logr.Logger) error {
+	foundRoleBinding := &rbacv1.RoleBinding{}
 	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: roleBinding.Name, Namespace: roleBinding.Namespace}, foundRoleBinding)
 	if err != nil && k8sErrors.IsNotFound(err) {
 		reqLogger.Info("Creating role binding", "name", roleBinding.Name)
@@ -126,6 +127,19 @@ func (r *ClusterInstallationReconciler) createDeploymentIfNotExists(owner v1.Obj
 		return r.create(owner, deployment, reqLogger)
 	} else if err != nil {
 		return errors.Wrap(err, "failed to check if deployment exists")
+	}
+
+	return nil
+}
+
+func (r *ClusterInstallationReconciler) createRoleIfNotExists(owner v1.Object, role *rbacv1.Role, reqLogger logr.Logger) error {
+	foundRole := &rbacv1.Role{}
+	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: role.Name, Namespace: role.Namespace}, foundRole)
+	if err != nil && k8sErrors.IsNotFound(err) {
+		reqLogger.Info("Creating role", "name", role.Name)
+		return r.create(owner, role, reqLogger)
+	} else if err != nil {
+		return errors.Wrap(err, "failed to check if role exists")
 	}
 
 	return nil

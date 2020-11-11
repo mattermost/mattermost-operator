@@ -52,6 +52,7 @@ rules:
       - rbac.authorization.k8s.io
     resources:
       - rolebindings
+      - roles
     verbs:
       - get
       - create
