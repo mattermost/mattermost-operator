@@ -570,7 +570,7 @@ func GenerateServiceAccount(mattermost *mattermostv1alpha1.ClusterInstallation, 
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            saName,
 			Namespace:       mattermost.Namespace,
-			OwnerReferences: clusterInstallationOwerReference(mattermost),
+			OwnerReferences: ClusterInstallationOwnerReference(mattermost),
 		},
 	}
 }
@@ -581,7 +581,7 @@ func GenerateRole(mattermost *mattermostv1alpha1.ClusterInstallation, roleName s
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            roleName,
 			Namespace:       mattermost.Namespace,
-			OwnerReferences: clusterInstallationOwerReference(mattermost),
+			OwnerReferences: ClusterInstallationOwnerReference(mattermost),
 		},
 		Rules: []rbacv1.PolicyRule{
 			{
@@ -600,7 +600,7 @@ func GenerateRoleBinding(mattermost *mattermostv1alpha1.ClusterInstallation, rol
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            roleName,
 			Namespace:       mattermost.Namespace,
-			OwnerReferences: clusterInstallationOwerReference(mattermost),
+			OwnerReferences: ClusterInstallationOwnerReference(mattermost),
 		},
 		Subjects: []rbacv1.Subject{
 			{Kind: "ServiceAccount", Name: saName, Namespace: mattermost.Namespace},
@@ -609,7 +609,7 @@ func GenerateRoleBinding(mattermost *mattermostv1alpha1.ClusterInstallation, rol
 	}
 }
 
-func clusterInstallationOwerReference(mattermost *mattermostv1alpha1.ClusterInstallation) []metav1.OwnerReference {
+func ClusterInstallationOwnerReference(mattermost *mattermostv1alpha1.ClusterInstallation) []metav1.OwnerReference {
 	return []metav1.OwnerReference{
 		*metav1.NewControllerRef(mattermost, schema.GroupVersionKind{
 			Group:   mattermostv1alpha1.GroupVersion.Group,

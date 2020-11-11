@@ -232,6 +232,7 @@ func (r *ClusterInstallationReconciler) checkMattermostDeployment(mattermost *ma
 
 func (r *ClusterInstallationReconciler) checkMattermostDBSetupJob(mattermost *mattermostv1alpha1.ClusterInstallation, deployment *appsv1.Deployment, reqLogger logr.Logger) error {
 	desiredJob := prepareJobTemplate(mattermost, deployment, mattermostApp.SetupJobName)
+	desiredJob.OwnerReferences = mattermostApp.ClusterInstallationOwnerReference(mattermost)
 
 	currentJob := &batchv1.Job{}
 	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: desiredJob.Name, Namespace: desiredJob.Namespace}, currentJob)
