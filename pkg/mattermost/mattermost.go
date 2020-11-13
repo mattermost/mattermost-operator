@@ -159,28 +159,10 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbIn
 		}
 
 		if dbInfo.HasDatabaseCheckURL() {
-			initContainers = append(initContainers, corev1.Container{
-				Name:            "init-check-database",
-				Image:           "appropriate/curl:latest",
-				ImagePullPolicy: corev1.PullIfNotPresent,
-				Env: []corev1.EnvVar{
-					{
-						Name: "DB_CONNECTION_CHECK_URL",
-						ValueFrom: &corev1.EnvVarSource{
-							SecretKeyRef: &corev1.SecretKeySelector{
-								LocalObjectReference: corev1.LocalObjectReference{
-									Name: mattermost.Spec.Database.Secret,
-								},
-								Key: "DB_CONNECTION_CHECK_URL",
-							},
-						},
-					},
-				},
-				Command: []string{
-					"sh", "-c",
-					"until curl --max-time 5 $DB_CONNECTION_CHECK_URL; do echo waiting for database; sleep 5; done;",
-				},
-			})
+			dbCheckContainer := getDBCheckInitContainer(dbInfo)
+			if dbCheckContainer != nil {
+				initContainers = append(initContainers, *dbCheckContainer)
+			}
 		}
 	} else {
 		mysqlName := utils.HashWithPrefix("db", mattermost.Name)
@@ -639,5 +621,50 @@ func newService(mattermost *mattermostv1alpha1.ClusterInstallation, serviceName,
 		Spec: corev1.ServiceSpec{
 			Selector: mattermostv1alpha1.ClusterInstallationSelectorLabels(selectorName),
 		},
+	}
+}
+
+// getDBCheckInitContainer tries to prepare init container that checks database readiness.
+// Returns nil if database type is unknown.
+func getDBCheckInitContainer(dbInfo *database.Info) *corev1.Container {
+	envVars := []corev1.EnvVar{
+		{
+			Name: "DB_CONNECTION_CHECK_URL",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: dbInfo.SecretName,
+					},
+					Key: "DB_CONNECTION_CHECK_URL",
+				},
+			},
+		},
+	}
+
+	switch dbInfo.ExternalDBType {
+	case database.MySQLDatabase:
+		return &corev1.Container{
+			Name:            "init-check-database",
+			Image:           "appropriate/curl:latest",
+			ImagePullPolicy: corev1.PullIfNotPresent,
+			Env:             envVars,
+			Command: []string{
+				"sh", "-c",
+				"until curl --max-time 5 $DB_CONNECTION_CHECK_URL; do echo waiting for database; sleep 5; done;",
+			},
+		}
+	case database.PostgreSQLDatabase:
+		return &corev1.Container{
+			Name:            "init-check-database",
+			Image:           "postgres:13",
+			ImagePullPolicy: corev1.PullIfNotPresent,
+			Env:             envVars,
+			Command: []string{
+				"sh", "-c",
+				"until pg_isready --dbname=\"$DB_CONNECTION_CHECK_URL\"; do echo waiting for database; sleep 5; done;",
+			},
+		}
+	default:
+		return nil
 	}
 }

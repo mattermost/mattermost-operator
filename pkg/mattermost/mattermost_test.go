@@ -139,13 +139,23 @@ func TestGenerateDeployment(t *testing.T) {
 			want:     &appsv1.Deployment{},
 		},
 		{
-			name: "external database with check url",
+			name: "external known database with check url",
 			spec: mattermostv1alpha1.ClusterInstallationSpec{
 				Database: mattermostv1alpha1.Database{
 					Secret: "database-secret",
 				},
 			},
-			database: &database.Info{External: true, DatabaseCheckURL: true},
+			database: &database.Info{External: true, DatabaseCheckURL: true, ExternalDBType: database.PostgreSQLDatabase},
+			want:     &appsv1.Deployment{},
+		},
+		{
+			name: "external unknown database with check url",
+			spec: mattermostv1alpha1.ClusterInstallationSpec{
+				Database: mattermostv1alpha1.Database{
+					Secret: "database-secret",
+				},
+			},
+			database: &database.Info{External: true, DatabaseCheckURL: true, ExternalDBType: "cockroach"},
 			want:     &appsv1.Deployment{},
 		},
 		{
@@ -301,7 +311,10 @@ func TestGenerateDeployment(t *testing.T) {
 			if !databaseInfo.IsExternal() {
 				expectedInitContainers++
 			} else if databaseInfo.IsExternal() && databaseInfo.HasDatabaseCheckURL() {
-				expectedInitContainers++
+				if databaseInfo.ExternalDBType == database.MySQLDatabase ||
+					databaseInfo.ExternalDBType == database.PostgreSQLDatabase {
+					expectedInitContainers++
+				}
 			}
 			if !mattermost.Spec.Minio.IsExternal() {
 				expectedInitContainers += 2
