@@ -2,14 +2,21 @@ package database
 
 import (
 	"errors"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+)
+
+const (
+	MySQLDatabase      string = "mysql"
+	PostgreSQLDatabase string = "postgres"
 )
 
 // Info contains information on a database connection.
 type Info struct {
 	SecretName       string
 	DatabaseName     string
+	ExternalDBType   string
 	External         bool
 	ReaderEndpoints  bool
 	DatabaseCheckURL bool
@@ -66,10 +73,13 @@ func (db *Info) HasDatabaseCheckURL() bool {
 // the characteristics of the secret.
 func GenerateDatabaseInfoFromSecret(secret *corev1.Secret) *Info {
 	if _, ok := secret.Data["DB_CONNECTION_STRING"]; ok {
+		dbType := getTypeFromConnectionString(string(secret.Data["DB_CONNECTION_STRING"]))
+
 		// This is a secret for an external database.
 		databaseInfo := &Info{
-			SecretName: secret.Name,
-			External:   true,
+			SecretName:     secret.Name,
+			ExternalDBType: dbType,
+			External:       true,
 		}
 
 		if _, ok := secret.Data["MM_SQLSETTINGS_DATASOURCEREPLICAS"]; ok {
@@ -94,4 +104,14 @@ func GenerateDatabaseInfoFromSecret(secret *corev1.Secret) *Info {
 		userPassword:     string(secret.Data["PASSWORD"]),
 		DatabaseName:     string(secret.Data["DATABASE"]),
 	}
+}
+
+func getTypeFromConnectionString(connectionString string) string {
+	if strings.HasPrefix(connectionString, "mysql") {
+		return MySQLDatabase
+	}
+	if strings.HasPrefix(connectionString, "postgres") {
+		return PostgreSQLDatabase
+	}
+	return "unknown"
 }

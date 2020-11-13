@@ -27,11 +27,21 @@ func TestDatabaseInfo(t *testing.T) {
 			isValid:             false,
 		},
 		{
-			name: "external",
+			name: "external mysql",
 			secret: &corev1.Secret{Data: map[string][]byte{
 				"DB_CONNECTION_STRING": []byte("mysql://endpoint"),
 			}},
-			expectedInfo:        &Info{External: true},
+			expectedInfo:        &Info{External: true, ExternalDBType: MySQLDatabase},
+			isExternal:          true,
+			hasDatabaseCheckURL: false,
+			isValid:             true,
+		},
+		{
+			name: "external postgres",
+			secret: &corev1.Secret{Data: map[string][]byte{
+				"DB_CONNECTION_STRING": []byte("postgres://endpoint"),
+			}},
+			expectedInfo:        &Info{External: true, ExternalDBType: PostgreSQLDatabase},
 			isExternal:          true,
 			hasDatabaseCheckURL: false,
 			isValid:             true,
@@ -42,7 +52,7 @@ func TestDatabaseInfo(t *testing.T) {
 				"DB_CONNECTION_STRING":    []byte("mysql://endpoint"),
 				"DB_CONNECTION_CHECK_URL": []byte("http://endpoint"),
 			}},
-			expectedInfo:        &Info{External: true, DatabaseCheckURL: true},
+			expectedInfo:        &Info{External: true, DatabaseCheckURL: true, ExternalDBType: MySQLDatabase},
 			isExternal:          true,
 			hasDatabaseCheckURL: true,
 			isValid:             true,
