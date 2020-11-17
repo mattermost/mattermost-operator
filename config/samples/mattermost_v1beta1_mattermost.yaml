@@ -1,0 +1,7 @@
+apiVersion: mattermost.mattermost.com/v1beta1
+kind: Mattermost
+metadata:
+  name: mattermost-sample
+spec:
+  # Add fields here
+  foo: bar

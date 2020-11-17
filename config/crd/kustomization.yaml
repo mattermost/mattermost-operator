@@ -4,6 +4,7 @@
 resources:
 - bases/mattermost.com_clusterinstallations.yaml
 - bases/mattermost.com_mattermostrestoredbs.yaml
+- bases/mattermost.mattermost.com_mattermosts.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 # the following config is for teaching kustomize how to do kustomization for CRDs.
