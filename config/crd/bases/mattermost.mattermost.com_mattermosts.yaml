@@ -55,6 +55,7 @@ spec:
             properties:
               advanced:
                 description: Advanced contains additional advanced settings for Mattermost.
+                  These settings generally don't need to be changed.
                 properties:
                   affinity:
                     description: If specified, affinity will define the pod's scheduling
@@ -1207,8 +1208,8 @@ spec:
                   type: object
                 type: array
               mattermostLicenseSecret:
-                description: MattermostLicenseSecret is the name of the secret containing
-                  a license.
+                description: LicenseSecret is the name of the secret containing a
+                  Mattermost license.
                 type: string
               replicas:
                 description: Replicas defines the number of replicas to use for the
@@ -1244,9 +1245,49 @@ spec:
               version:
                 description: Version defines the Mattermost Docker image version.
                 type: string
+              volumeMounts:
+                description: Defines additional volumeMounts to add to mattermost
+                  application pods.
+                items:
+                  description: VolumeMount describes a mounting of a Volume within
+                    a container.
+                  properties:
+                    mountPath:
+                      description: Path within the container at which the volume should
+                        be mounted.  Must not contain ':'.
+                      type: string
+                    mountPropagation:
+                      description: mountPropagation determines how mounts are propagated
+                        from the host to container and the other way around. When
+                        not set, MountPropagationNone is used. This field is beta
+                        in 1.10.
+                      type: string
+                    name:
+                      description: This must match the Name of a Volume.
+                      type: string
+                    readOnly:
+                      description: Mounted read-only if true, read-write otherwise
+                        (false or unspecified). Defaults to false.
+                      type: boolean
+                    subPath:
+                      description: Path within the volume from which the container's
+                        volume should be mounted. Defaults to "" (volume's root).
+                      type: string
+                    subPathExpr:
+                      description: Expanded path within the volume from which the
+                        container's volume should be mounted. Behaves similarly to
+                        SubPath but environment variable references $(VAR_NAME) are
+                        expanded using the container's environment. Defaults to ""
+                        (volume's root). SubPathExpr and SubPath are mutually exclusive.
+                      type: string
+                  required:
+                  - mountPath
+                  - name
+                  type: object
+                type: array
               volumes:
                 description: Volumes allows for mounting volumes from various sources
-                  into the Mattermost application containers.
+                  into the Mattermost application pods.
                 items:
                   description: Volume represents a named volume in a pod that may
                     be accessed by any container in the pod.

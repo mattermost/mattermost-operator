@@ -42,13 +42,13 @@ type MattermostSpec struct {
 	Version string `json:"version,omitempty"`
 	// Replicas defines the number of replicas to use for the Mattermost app
 	// servers.
-	Replicas int32 `json:"replicas,omitempty"`
+	Replicas *int32 `json:"replicas,omitempty"`
 	// Optional environment variables to set in the Mattermost application pods.
 	// +optional
 	MattermostEnv []v1.EnvVar `json:"mattermostEnv,omitempty"`
-	// MattermostLicenseSecret is the name of the secret containing a license.
+	// LicenseSecret is the name of the secret containing a Mattermost license.
 	// +optional
-	MattermostLicenseSecret string `json:"mattermostLicenseSecret,omitempty"`
+	LicenseSecret string `json:"mattermostLicenseSecret,omitempty"`
 	// IngressName defines the name to be used when creating the ingress rules
 	IngressName string `json:"ingressName"`
 	// +optional
@@ -62,11 +62,15 @@ type MattermostSpec struct {
 	// +optional
 	ResourceLabels map[string]string `json:"resourceLabels,omitempty"`
 	// Volumes allows for mounting volumes from various sources into the
-	// Mattermost application containers.
+	// Mattermost application pods.
 	// +optional
-	Volumes []*v1.Volume `json:"volumes,omitempty"`
+	Volumes []v1.Volume `json:"volumes,omitempty"`
+	// Defines additional volumeMounts to add to mattermost application pods.
+	// +optional
+	VolumeMounts []v1.VolumeMount `json:"volumeMounts,omitempty"`
 
-	// Advanced contains additional advanced settings for Mattermost.
+	// Advanced contains additional advanced settings for Mattermost. These
+	// settings generally don't need to be changed.
 	Advanced Advanced `json:"advanced,omitempty"`
 
 	// External Services
