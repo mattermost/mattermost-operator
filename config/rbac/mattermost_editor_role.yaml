@@ -1,0 +1,24 @@
+# permissions for end users to edit mattermosts.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: mattermost-editor-role
+rules:
+- apiGroups:
+  - mattermost.mattermost.com
+  resources:
+  - mattermosts
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - mattermost.mattermost.com
+  resources:
+  - mattermosts/status
+  verbs:
+  - get

@@ -8,9 +8,6 @@ import (
 	"time"
 
 	blubr "github.com/mattermost/blubr"
-	mattermostcomv1alpha1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1"
-	"github.com/mattermost/mattermost-operator/controllers/mattermost/clusterinstallation"
-	"github.com/mattermost/mattermost-operator/controllers/mattermost/mattermostrestoredb"
 	v1beta1Minio "github.com/minio/minio-operator/pkg/apis/miniocontroller/v1beta1"
 	v1alpha1MySQL "github.com/presslabs/mysql-operator/pkg/apis/mysql/v1alpha1"
 	"github.com/vrischmann/envconfig"
@@ -20,6 +17,11 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
+
+	mattermostcomv1alpha1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1"
+	mattermostv1beta1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
+	"github.com/mattermost/mattermost-operator/controllers/mattermost/clusterinstallation"
+	"github.com/mattermost/mattermost-operator/controllers/mattermost/mattermostrestoredb"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -40,6 +42,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(mattermostcomv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(mattermostv1beta1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 
 	utilruntime.Must(v1beta1Minio.AddToScheme(scheme))
