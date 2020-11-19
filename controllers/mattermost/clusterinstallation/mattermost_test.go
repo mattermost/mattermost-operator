@@ -235,7 +235,7 @@ func TestCheckMattermost(t *testing.T) {
 				CompletionTime: &now,
 			},
 		}
-		err := r.Client.Create(context.TODO(), job)
+		err = r.Client.Create(context.TODO(), job)
 		require.NoError(t, err)
 
 		err = r.checkMattermostDeployment(ci, ci.Name, ci.Spec.IngressName, ci.Name, ci.GetImageName(), logger)
@@ -276,7 +276,7 @@ func TestCheckMattermost(t *testing.T) {
 	t.Run("final check", func(t *testing.T) {
 		t.Run("database secret", func(t *testing.T) {
 			dbSecret := &corev1.Secret{}
-			err := r.Client.Get(context.TODO(), types.NamespacedName{Name: mattermostmysql.DefaultDatabaseSecretName(ciName), Namespace: ciNamespace}, dbSecret)
+			err = r.Client.Get(context.TODO(), types.NamespacedName{Name: mattermostmysql.DefaultDatabaseSecretName(ciName), Namespace: ciNamespace}, dbSecret)
 			require.NoError(t, err)
 
 			dbInfo := database.GenerateDatabaseInfoFromSecret(dbSecret)
