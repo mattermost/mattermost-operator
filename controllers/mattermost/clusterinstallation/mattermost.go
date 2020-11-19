@@ -324,7 +324,7 @@ func (r *ClusterInstallationReconciler) restartUpdateJob(
 	job := prepareJobTemplate(mi, deployment, updateJobName)
 
 	err = r.Client.Create(context.TODO(), job)
-	if err != nil && !k8sErrors.IsAlreadyExists(err) {
+	if err != nil {
 		return err
 	}
 
@@ -396,7 +396,7 @@ func (r *ClusterInstallationReconciler) isMainDeploymentContainerImageSame(
 	return isSameImage, nil
 }
 
-// isMainContainerImageSame checks whether main containers of specified Pod spec are the same or not.
+// isMainContainerImageSame checks whether main containers of specified slices are the same or not.
 func (r *ClusterInstallationReconciler) isMainContainerImageSame(
 	mattermost *mattermostv1alpha1.ClusterInstallation,
 	a []corev1.Container,
