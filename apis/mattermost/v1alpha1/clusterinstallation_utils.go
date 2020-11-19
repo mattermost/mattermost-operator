@@ -137,25 +137,40 @@ func (db *Database) SetDefaults() {
 	}
 }
 
-// GetContainerByName gets container from a deployment by name
-func (mattermost *ClusterInstallation) GetContainerByName(deployment *appsv1.Deployment, containerName string) *corev1.Container {
-	for i := range deployment.Spec.Template.Spec.Containers {
-		container := &deployment.Spec.Template.Spec.Containers[i]
+// getDeploymentContainerByName gets container from a deployment by name
+func (mattermost *ClusterInstallation) getDeploymentContainerByName(deployment *appsv1.Deployment, containerName string) *corev1.Container {
+	return getContainerByName(deployment.Spec.Template.Spec.Containers, containerName)
+}
+
+// getContainerByName gets container from a slice of containers by name
+func getContainerByName(containers []corev1.Container, containerName string) *corev1.Container {
+	for _, container := range containers {
 		if container.Name == containerName {
-			return container
+			return &container
 		}
 	}
 	return nil
 }
 
-// GetMattermostAppContainer gets container which runs Mattermost application
+// GetMattermostAppContainerFromDeployment gets container from Deployment which runs Mattermost application
 // from a deployment.
-func (mattermost *ClusterInstallation) GetMattermostAppContainer(deployment *appsv1.Deployment) *corev1.Container {
+func (mattermost *ClusterInstallation) GetMattermostAppContainerFromDeployment(deployment *appsv1.Deployment) *corev1.Container {
 	// Check new-style - fixed name
-	container := mattermost.GetContainerByName(deployment, MattermostAppContainerName)
+	container := mattermost.getDeploymentContainerByName(deployment, MattermostAppContainerName)
 	if container == nil {
 		// Check old-style - name of the container == name of the deployment
-		container = mattermost.GetContainerByName(deployment, deployment.Name)
+		container = mattermost.getDeploymentContainerByName(deployment, deployment.Name)
+	}
+	return container
+}
+
+// GetMattermostAppContainer gets container from PodSpec which runs Mattermost application
+// from a deployment.
+func (mattermost *ClusterInstallation) GetMattermostAppContainer(containers []corev1.Container) *corev1.Container {
+	container := getContainerByName(containers, MattermostAppContainerName)
+	if container == nil {
+		// Check old-style - name of the container == name of the deployment
+		container = getContainerByName(containers, mattermost.Name)
 	}
 	return container
 }
