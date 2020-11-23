@@ -152,8 +152,7 @@ func getContainerByName(containers []corev1.Container, containerName string) *co
 	return nil
 }
 
-// GetMattermostAppContainerFromDeployment gets container from Deployment which runs Mattermost application
-// from a deployment.
+// GetMattermostAppContainerFromDeployment gets container which runs Mattermost application from a deployment.
 func (mattermost *ClusterInstallation) GetMattermostAppContainerFromDeployment(deployment *appsv1.Deployment) *corev1.Container {
 	// Check new-style - fixed name
 	container := mattermost.getDeploymentContainerByName(deployment, MattermostAppContainerName)
