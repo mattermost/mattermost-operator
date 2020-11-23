@@ -318,7 +318,7 @@ func (r *ClusterInstallationReconciler) restartUpdateJob(
 ) error {
 	err := r.Client.Delete(context.TODO(), currentJob, k8sClient.PropagationPolicy(metav1.DeletePropagationBackground))
 	if err != nil && !k8sErrors.IsNotFound(err) {
-		return errors.Wrapf(err, "failed to delete outdated update job")
+		return errors.Wrap(err, "failed to delete outdated update job")
 	}
 
 	job := prepareJobTemplate(mi, deployment, updateJobName)
