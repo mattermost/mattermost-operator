@@ -223,12 +223,19 @@ func TestCheckMattermost(t *testing.T) {
 				Name:      updateName,
 				Namespace: ci.GetNamespace(),
 			},
+			Spec: batchv1.JobSpec{Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: mattermostv1alpha1.MattermostAppContainerName, Image: ci.GetImageName()},
+					},
+				},
+			}},
 			Status: batchv1.JobStatus{
 				Succeeded:      1,
 				CompletionTime: &now,
 			},
 		}
-		err := r.Client.Create(context.TODO(), job)
+		err = r.Client.Create(context.TODO(), job)
 		require.NoError(t, err)
 
 		err = r.checkMattermostDeployment(ci, ci.Name, ci.Spec.IngressName, ci.Name, ci.GetImageName(), logger)
@@ -269,12 +276,67 @@ func TestCheckMattermost(t *testing.T) {
 	t.Run("final check", func(t *testing.T) {
 		t.Run("database secret", func(t *testing.T) {
 			dbSecret := &corev1.Secret{}
-			err := r.Client.Get(context.TODO(), types.NamespacedName{Name: mattermostmysql.DefaultDatabaseSecretName(ciName), Namespace: ciNamespace}, dbSecret)
+			err = r.Client.Get(context.TODO(), types.NamespacedName{Name: mattermostmysql.DefaultDatabaseSecretName(ciName), Namespace: ciNamespace}, dbSecret)
 			require.NoError(t, err)
 
 			dbInfo := database.GenerateDatabaseInfoFromSecret(dbSecret)
 			require.NoError(t, dbInfo.IsValid())
 		})
+	})
+
+	t.Run("restart update job", func(t *testing.T) {
+		// create deployment
+		err = r.checkMattermostDeployment(ci, ci.Name, ci.Spec.IngressName, ci.Name, ci.GetImageName(), logger)
+		assert.NoError(t, err)
+
+		// create update job with invalid image
+		updateName := "mattermost-update-check"
+		now := metav1.Now()
+		invalidUpdateJob := &batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      updateName,
+				Namespace: ci.GetNamespace(),
+			},
+			Spec: batchv1.JobSpec{Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: mattermostv1alpha1.MattermostAppContainerName, Image: "invalid-image"},
+					},
+				},
+			}},
+			Status: batchv1.JobStatus{
+				Succeeded:      1,
+				CompletionTime: &now,
+			},
+		}
+		err := r.Client.Create(context.TODO(), invalidUpdateJob)
+		require.NoError(t, err)
+
+		// should delete update job and create new and return error
+		newImage := "mattermost/new-image"
+		err = r.checkMattermostDeployment(ci, ci.Name, ci.Spec.IngressName, ci.Name, newImage, logger)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "Restarted update image job")
+
+		// get new job, assert new image and change status to completed
+		restartedUpdateJob := batchv1.Job{}
+		updateJobKey := types.NamespacedName{Namespace: ci.GetNamespace(), Name: updateJobName}
+		err = r.Client.Get(context.TODO(), updateJobKey, &restartedUpdateJob)
+		require.NoError(t, err)
+		assert.Equal(t, newImage, restartedUpdateJob.Spec.Template.Spec.Containers[0].Image)
+		assert.Equal(t, int32(0), restartedUpdateJob.Status.Succeeded)
+
+		restartedUpdateJob.Status = batchv1.JobStatus{
+			Succeeded:      1,
+			CompletionTime: &now,
+		}
+
+		err = r.Client.Update(context.TODO(), &restartedUpdateJob)
+		require.NoError(t, err)
+
+		// should succeed now
+		err = r.checkMattermostDeployment(ci, ci.Name, ci.Spec.IngressName, ci.Name, newImage, logger)
+		assert.NoError(t, err)
 	})
 }
 
@@ -387,6 +449,13 @@ func TestCheckMattermostExternalDB(t *testing.T) {
 				Name:      updateName,
 				Namespace: ci.GetNamespace(),
 			},
+			Spec: batchv1.JobSpec{Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: mattermostv1alpha1.MattermostAppContainerName, Image: ci.GetImageName()},
+					},
+				},
+			}},
 			Status: batchv1.JobStatus{
 				Succeeded:      1,
 				CompletionTime: &now,

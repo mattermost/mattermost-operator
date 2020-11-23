@@ -310,6 +310,27 @@ func (r *ClusterInstallationReconciler) launchUpdateJob(
 	return nil
 }
 
+// restartUpdateJob removes existing update job if it exists and creates new one.
+func (r *ClusterInstallationReconciler) restartUpdateJob(
+	mi *mattermostv1alpha1.ClusterInstallation,
+	currentJob *batchv1.Job,
+	deployment *appsv1.Deployment,
+) error {
+	err := r.Client.Delete(context.TODO(), currentJob, k8sClient.PropagationPolicy(metav1.DeletePropagationBackground))
+	if err != nil && !k8sErrors.IsNotFound(err) {
+		return errors.Wrap(err, "failed to delete outdated update job")
+	}
+
+	job := prepareJobTemplate(mi, deployment, updateJobName)
+
+	err = r.Client.Create(context.TODO(), job)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func prepareJobTemplate(mm *mattermostv1alpha1.ClusterInstallation, deployment *appsv1.Deployment, name string) *batchv1.Job {
 	backoffLimit := int32(10)
 
@@ -352,8 +373,8 @@ func prepareJobTemplate(mm *mattermostv1alpha1.ClusterInstallation, deployment *
 	return job
 }
 
-// isMainContainerImageSame checks whether main containers of specified deployments are the same or not.
-func (r *ClusterInstallationReconciler) isMainContainerImageSame(
+// isMainDeploymentContainerImageSame checks whether main containers of specified deployments are the same or not.
+func (r *ClusterInstallationReconciler) isMainDeploymentContainerImageSame(
 	mattermost *mattermostv1alpha1.ClusterInstallation,
 	a *appsv1.Deployment,
 	b *appsv1.Deployment,
@@ -363,14 +384,32 @@ func (r *ClusterInstallationReconciler) isMainContainerImageSame(
 		return false, errors.New("failed to find main container, no deployment provided")
 	}
 
+	isSameImage, err := r.isMainContainerImageSame(
+		mattermost,
+		a.Spec.Template.Spec.Containers,
+		b.Spec.Template.Spec.Containers,
+	)
+	if err != nil {
+		return false, errors.Wrapf(err, "failed to compare deployment images, deployments: %s/%s, %s/%s", a.Namespace, a.Name, b.Namespace, b.Name)
+	}
+
+	return isSameImage, nil
+}
+
+// isMainContainerImageSame checks whether main containers of specified slices are the same or not.
+func (r *ClusterInstallationReconciler) isMainContainerImageSame(
+	mattermost *mattermostv1alpha1.ClusterInstallation,
+	a []corev1.Container,
+	b []corev1.Container,
+) (bool, error) {
 	// Fetch containers to compare
 	containerA := mattermost.GetMattermostAppContainer(a)
 	if containerA == nil {
-		return false, errors.Errorf("failed to find main container, incorrect deployment %s/%s", a.Namespace, a.Name)
+		return false, errors.Errorf("failed to find main container in a list while comparing images")
 	}
 	containerB := mattermost.GetMattermostAppContainer(b)
 	if containerB == nil {
-		return false, errors.Errorf("failed to find main container, incorrect deployment %s/%s", b.Namespace, b.Name)
+		return false, errors.Errorf("failed to find main container in a list while comparing images")
 	}
 
 	// Both containers fetched, can compare images
@@ -386,7 +425,7 @@ func (r *ClusterInstallationReconciler) updateMattermostDeployment(
 	imageName string,
 	reqLogger logr.Logger,
 ) error {
-	sameImage, err := r.isMainContainerImageSame(mattermost, current, desired)
+	sameImage, err := r.isMainDeploymentContainerImageSame(mattermost, current, desired)
 	if err != nil {
 		return err
 	}
@@ -424,7 +463,7 @@ func (r *ClusterInstallationReconciler) checkUpdateJob(
 	desired *appsv1.Deployment,
 	reqLogger logr.Logger,
 ) (*batchv1.Job, error) {
-	reqLogger.Info(fmt.Sprintf("Running Mattermost update image job check for image %s", mattermost.GetMattermostAppContainer(desired).Image))
+	reqLogger.Info(fmt.Sprintf("Running Mattermost update image job check for image %s", mattermost.GetMattermostAppContainerFromDeployment(desired).Image))
 	job, err := r.fetchRunningUpdateJob(mattermost)
 	if err != nil {
 		// Unable to fetch job
@@ -441,6 +480,25 @@ func (r *ClusterInstallationReconciler) checkUpdateJob(
 	}
 
 	// Job is either running or completed
+
+	// If desired deployment image does not match the one used by update job, restart it.
+	isSameImage, err := r.isMainContainerImageSame(
+		mattermost,
+		desired.Spec.Template.Spec.Containers,
+		job.Spec.Template.Spec.Containers,
+	)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to compare image of update job and desired deployment")
+	}
+	if !isSameImage {
+		reqLogger.Info("Mattermost image changed, restarting update job")
+		err := r.restartUpdateJob(mattermost, job, desired)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to restart update job")
+		}
+
+		return nil, errors.New("Restarted update image job")
+	}
 
 	if job.Status.CompletionTime == nil {
 		return nil, errors.New("update image job still running")

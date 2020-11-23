@@ -283,7 +283,7 @@ func TestGenerateDeployment(t *testing.T) {
 			assert.Equal(t, tt.want.Spec.Template.Spec.NodeSelector, deployment.Spec.Template.Spec.NodeSelector)
 			assert.Equal(t, tt.want.Spec.Template.Spec.Affinity, deployment.Spec.Template.Spec.Affinity)
 
-			mattermostAppContainer := mattermost.GetMattermostAppContainer(deployment)
+			mattermostAppContainer := mattermost.GetMattermostAppContainerFromDeployment(deployment)
 			require.NotNil(t, mattermostAppContainer)
 
 			// Basic env var check to ensure the key exists.
