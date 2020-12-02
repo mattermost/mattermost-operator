@@ -3,7 +3,10 @@
 
 package v1beta1
 
-import "github.com/mattermost/mattermost-operator/pkg/utils"
+import (
+	"github.com/mattermost/mattermost-operator/pkg/utils"
+	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1"
+)
 
 // FileStore utils
 
@@ -45,14 +48,14 @@ func (fs *FileStore) SetDefaultReplicasAndResources() {
 
 func (omm *OperatorManagedMinio) SetDefaultReplicasAndResources() {
 	if omm.Replicas == nil {
-		omm.Replicas = &defaultSize.Minio.Replicas
+		omm.Replicas = &mattermostv1alpha1.DefaultSize.Minio.Replicas
 	}
 	if omm.Resources.Size() == 0 {
-		omm.Resources = defaultSize.Minio.Resources
+		omm.Resources = mattermostv1alpha1.DefaultSize.Minio.Resources
 	}
 }
 
-func (fs *FileStore) OverrideReplicasAndResourcesFromSize(size MattermostSize) {
+func (fs *FileStore) OverrideReplicasAndResourcesFromSize(size mattermostv1alpha1.ClusterInstallationSize) {
 	if fs.IsExternal() {
 		return
 	}
@@ -60,7 +63,7 @@ func (fs *FileStore) OverrideReplicasAndResourcesFromSize(size MattermostSize) {
 	fs.OperatorManaged.OverrideReplicasAndResourcesFromSize(size)
 }
 
-func (omm *OperatorManagedMinio) OverrideReplicasAndResourcesFromSize(size MattermostSize) {
+func (omm *OperatorManagedMinio) OverrideReplicasAndResourcesFromSize(size mattermostv1alpha1.ClusterInstallationSize) {
 	omm.Replicas = utils.NewInt32(size.Minio.Replicas)
 	omm.Resources = size.Minio.Resources
 }

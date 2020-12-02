@@ -5,6 +5,7 @@ package v1beta1
 
 import (
 	"fmt"
+	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1"
 	"github.com/mattermost/mattermost-operator/pkg/utils"
 	appsv1 "k8s.io/api/apps/v1"
 	"testing"
@@ -65,6 +66,9 @@ func TestMattermost(t *testing.T) {
 			},
 		}
 
+		size1000,err := mattermostv1alpha1.GetClusterSize(mattermostv1alpha1.Size1000String)
+		require.NoError(t,err)
+
 		t.Run("should set correctly", func(t *testing.T) {
 			tmm := mm.DeepCopy()
 			err := tmm.SetReplicasAndResourcesFromSize()
@@ -115,12 +119,12 @@ func TestMattermost(t *testing.T) {
 			tmm.Spec.Size = ""
 			err := tmm.SetReplicasAndResourcesFromSize()
 			assert.NoError(t, err)
-			assert.Equal(t, defaultSize.App.Replicas, *tmm.Spec.Replicas)
-			assert.Equal(t, defaultSize.App.Resources.String(), tmm.Spec.Scheduling.Resources.String())
-			assert.Equal(t, defaultSize.Minio.Replicas, *tmm.Spec.FileStore.OperatorManaged.Replicas)
-			assert.Equal(t, defaultSize.Minio.Resources.String(), tmm.Spec.FileStore.OperatorManaged.Resources.String())
-			assert.Equal(t, defaultSize.Database.Replicas, *tmm.Spec.Database.OperatorManaged.Replicas)
-			assert.Equal(t, defaultSize.Database.Resources.String(), tmm.Spec.Database.OperatorManaged.Resources.String())
+			assert.Equal(t, mattermostv1alpha1.DefaultSize.App.Replicas, *tmm.Spec.Replicas)
+			assert.Equal(t, mattermostv1alpha1.DefaultSize.App.Resources.String(), tmm.Spec.Scheduling.Resources.String())
+			assert.Equal(t, mattermostv1alpha1.DefaultSize.Minio.Replicas, *tmm.Spec.FileStore.OperatorManaged.Replicas)
+			assert.Equal(t, mattermostv1alpha1.DefaultSize.Minio.Resources.String(), tmm.Spec.FileStore.OperatorManaged.Resources.String())
+			assert.Equal(t, mattermostv1alpha1.DefaultSize.Database.Replicas, *tmm.Spec.Database.OperatorManaged.Replicas)
+			assert.Equal(t, mattermostv1alpha1.DefaultSize.Database.Resources.String(), tmm.Spec.Database.OperatorManaged.Resources.String())
 			assert.Equal(t, "", tmm.Spec.Size)
 		})
 
@@ -129,12 +133,12 @@ func TestMattermost(t *testing.T) {
 			tmm.Spec.Size = "junk"
 			err := tmm.SetReplicasAndResourcesFromSize()
 			assert.Error(t, err)
-			assert.Equal(t, defaultSize.App.Replicas, *tmm.Spec.Replicas)
-			assert.Equal(t, defaultSize.App.Resources.String(), tmm.Spec.Scheduling.Resources.String())
-			assert.Equal(t, defaultSize.Minio.Replicas, *tmm.Spec.FileStore.OperatorManaged.Replicas)
-			assert.Equal(t, defaultSize.Minio.Resources.String(), tmm.Spec.FileStore.OperatorManaged.Resources.String())
-			assert.Equal(t, defaultSize.Database.Replicas, *tmm.Spec.Database.OperatorManaged.Replicas)
-			assert.Equal(t, defaultSize.Database.Resources.String(), tmm.Spec.Database.OperatorManaged.Resources.String())
+			assert.Equal(t, mattermostv1alpha1.DefaultSize.App.Replicas, *tmm.Spec.Replicas)
+			assert.Equal(t, mattermostv1alpha1.DefaultSize.App.Resources.String(), tmm.Spec.Scheduling.Resources.String())
+			assert.Equal(t, mattermostv1alpha1.DefaultSize.Minio.Replicas, *tmm.Spec.FileStore.OperatorManaged.Replicas)
+			assert.Equal(t, mattermostv1alpha1.DefaultSize.Minio.Resources.String(), tmm.Spec.FileStore.OperatorManaged.Resources.String())
+			assert.Equal(t, mattermostv1alpha1.DefaultSize.Database.Replicas, *tmm.Spec.Database.OperatorManaged.Replicas)
+			assert.Equal(t, mattermostv1alpha1.DefaultSize.Database.Resources.String(), tmm.Spec.Database.OperatorManaged.Resources.String())
 			assert.Equal(t, "", tmm.Spec.Size)
 		})
 	})
@@ -152,86 +156,6 @@ func TestMattermost(t *testing.T) {
 		assert.Contains(t, mm.GetImageName(), mm.Spec.Version)
 		assert.Equal(t, mm.GetImageName(), fmt.Sprintf("%s@%s", mm.Spec.Image, mm.Spec.Version))
 	})
-}
-
-func TestCalculateResourceMilliRequirements(t *testing.T) {
-	cis := MattermostSize{
-		App: ComponentSize{
-			Replicas: 3,
-			Resources: corev1.ResourceRequirements{
-				Requests: corev1.ResourceList{
-					corev1.ResourceCPU:    resource.MustParse("100m"),
-					corev1.ResourceMemory: resource.MustParse("100k"),
-				},
-			},
-		},
-		Minio: ComponentSize{
-			Replicas: 6,
-			Resources: corev1.ResourceRequirements{
-				Requests: corev1.ResourceList{
-					corev1.ResourceCPU:    resource.MustParse("100m"),
-					corev1.ResourceMemory: resource.MustParse("100k"),
-				},
-			},
-		},
-		Database: ComponentSize{
-			Replicas: 2,
-			Resources: corev1.ResourceRequirements{
-				Requests: corev1.ResourceList{
-					corev1.ResourceCPU:    resource.MustParse("100m"),
-					corev1.ResourceMemory: resource.MustParse("100k"),
-				},
-			},
-		},
-	}
-
-	t.Run("baseline", func(t *testing.T) {
-		t.Run("all components", func(t *testing.T) {
-			cpu, memory := cis.CalculateResourceMilliRequirements(true, true)
-			assert.Equal(t, int64(1100), cpu)
-			assert.Equal(t, int64(1100000000), memory)
-		})
-		t.Run("no database", func(t *testing.T) {
-			cpu, memory := cis.CalculateResourceMilliRequirements(false, true)
-			assert.Equal(t, int64(900), cpu)
-			assert.Equal(t, int64(900000000), memory)
-		})
-		t.Run("no minio", func(t *testing.T) {
-			cpu, memory := cis.CalculateResourceMilliRequirements(true, false)
-			assert.Equal(t, int64(500), cpu)
-			assert.Equal(t, int64(500000000), memory)
-		})
-		t.Run("no database or minio", func(t *testing.T) {
-			cpu, memory := cis.CalculateResourceMilliRequirements(false, false)
-			assert.Equal(t, int64(300), cpu)
-			assert.Equal(t, int64(300000000), memory)
-		})
-	})
-
-	t.Run("updated", func(t *testing.T) {
-		cis.App.Replicas = 10
-		cis.App.Resources.Requests = corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse("1"),
-			corev1.ResourceMemory: resource.MustParse("100G"),
-		}
-
-		cpu, memory := cis.CalculateResourceMilliRequirements(false, false)
-		assert.Equal(t, int64(10000), cpu)
-		assert.Equal(t, int64(1000000000000000), memory)
-	})
-}
-
-// This is a basic sanity check on any cluster size we define as valid.
-func TestCalculateResourceMilliRequirementsOnAllValidClusterSizes(t *testing.T) {
-	for name, mmSize := range validSizes {
-		t.Run(name, func(t *testing.T) {
-			cpu, memory := mmSize.CalculateResourceMilliRequirements(true, true)
-			assert.True(t, cpu > 0)
-			assert.True(t, memory > 0)
-			assert.Equal(t, cpu, mmSize.CalculateCPUMilliRequirement(true, true))
-			assert.Equal(t, memory, mmSize.CalculateMemoryMilliRequirement(true, true))
-		})
-	}
 }
 
 func TestOtherUtils(t *testing.T) {

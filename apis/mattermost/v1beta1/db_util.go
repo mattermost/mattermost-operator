@@ -1,6 +1,9 @@
 package v1beta1
 
-import "github.com/mattermost/mattermost-operator/pkg/utils"
+import (
+	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1"
+	"github.com/mattermost/mattermost-operator/pkg/utils"
+)
 
 // Database utils
 
@@ -48,14 +51,14 @@ func (db *Database) SetDefaultReplicasAndResources() {
 
 func (omd *OperatorManagedDatabase) SetDefaultReplicasAndResources() {
 	if omd.Replicas == nil {
-		omd.Replicas = &defaultSize.Database.Replicas
+		omd.Replicas = &mattermostv1alpha1.DefaultSize.Database.Replicas
 	}
 	if omd.Resources.Size() == 0 {
-		omd.Resources = defaultSize.Database.Resources
+		omd.Resources = mattermostv1alpha1.DefaultSize.Database.Resources
 	}
 }
 
-func (db *Database) OverrideReplicasAndResourcesFromSize(size MattermostSize) {
+func (db *Database) OverrideReplicasAndResourcesFromSize(size mattermostv1alpha1.ClusterInstallationSize) {
 	if db.IsExternal() {
 		return
 	}
@@ -63,7 +66,7 @@ func (db *Database) OverrideReplicasAndResourcesFromSize(size MattermostSize) {
 	db.OperatorManaged.OverrideReplicasAndResourcesFromSize(size)
 }
 
-func (omd *OperatorManagedDatabase) OverrideReplicasAndResourcesFromSize(size MattermostSize) {
+func (omd *OperatorManagedDatabase) OverrideReplicasAndResourcesFromSize(size mattermostv1alpha1.ClusterInstallationSize) {
 	omd.Replicas = utils.NewInt32(size.Database.Replicas)
 	omd.Resources = size.Database.Resources
 }
