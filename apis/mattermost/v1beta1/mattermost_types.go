@@ -118,7 +118,7 @@ type Probes struct {
 type Database struct {
 	// Defines the configuration of and external database.
 	// +optional
-	External        *ExternalDatabase        `json:"external,omitempty"`
+	External *ExternalDatabase `json:"external,omitempty"`
 	// Defines the configuration of database managed by Kubernetes operator.
 	// +optional
 	OperatorManaged *OperatorManagedDatabase `json:"operatorManaged,omitempty"`
@@ -176,7 +176,7 @@ type OperatorManagedDatabase struct {
 type FileStore struct {
 	// Defines the configuration of an external file store.
 	// +optional
-	External        *ExternalFilestore    `json:"external,omitempty"`
+	External *ExternalFilestore `json:"external,omitempty"`
 	// Defines the configuration of file store managed by Kubernetes operator.
 	// +optional
 	OperatorManaged *OperatorManagedMinio `json:"operatorManaged,omitempty"`

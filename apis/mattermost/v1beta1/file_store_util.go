@@ -4,8 +4,8 @@
 package v1beta1
 
 import (
-	"github.com/mattermost/mattermost-operator/pkg/utils"
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1"
+	"github.com/mattermost/mattermost-operator/pkg/utils"
 )
 
 // FileStore utils

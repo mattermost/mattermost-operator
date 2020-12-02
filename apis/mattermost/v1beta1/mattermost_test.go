@@ -66,8 +66,8 @@ func TestMattermost(t *testing.T) {
 			},
 		}
 
-		size1000,err := mattermostv1alpha1.GetClusterSize(mattermostv1alpha1.Size1000String)
-		require.NoError(t,err)
+		size1000, err := mattermostv1alpha1.GetClusterSize(mattermostv1alpha1.Size1000String)
+		require.NoError(t, err)
 
 		t.Run("should set correctly", func(t *testing.T) {
 			tmm := mm.DeepCopy()
