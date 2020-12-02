@@ -10,7 +10,7 @@ resources:
 - group: mattermost.com
   kind: ClusterInstallation
   version: v1alpha1
-- group: mattermost
+- group: installation
   kind: Mattermost
   version: v1beta1
 version: 3-alpha

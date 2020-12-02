@@ -21,6 +21,7 @@ import (
 ////////////////////////////////////////////////////////////////////////////////
 
 // MattermostSpec defines the desired state of Mattermost
+// +k8s:openapi-gen=true
 type MattermostSpec struct {
 	// Size defines the size of the Mattermost. This is typically specified in
 	// number of users. This will override replica and resource requests/limits
@@ -29,8 +30,8 @@ type MattermostSpec struct {
 	// Accepted values are: 100users, 1000users, 5000users, 10000users,
 	// and 250000users. If replicas and resource requests/limits are not
 	// specified, and Size is not provided the configuration for 5000users will
-	// be applied. Setting 'Replicas', 'Advanced.Resources', 'Filestore.Replicas',
-	// 'Filestore.Resource', 'Database.Replicas', or 'Database.Resources' will
+	// be applied. Setting 'Replicas', 'Scheduling.Resources', 'FileStore.Replicas',
+	// 'FileStore.Resource', 'Database.Replicas', or 'Database.Resources' will
 	// override the values set by Size. Setting new Size will override previous
 	// values regardless if set by Size or manually.
 	// +optional
@@ -48,7 +49,7 @@ type MattermostSpec struct {
 	MattermostEnv []v1.EnvVar `json:"mattermostEnv,omitempty"`
 	// LicenseSecret is the name of the secret containing a Mattermost license.
 	// +optional
-	LicenseSecret string `json:"mattermostLicenseSecret,omitempty"`
+	LicenseSecret string `json:"licenseSecret,omitempty"`
 	// IngressName defines the name to be used when creating the ingress rules
 	IngressName string `json:"ingressName"`
 	// +optional
@@ -65,23 +66,31 @@ type MattermostSpec struct {
 	// Mattermost application pods.
 	// +optional
 	Volumes []v1.Volume `json:"volumes,omitempty"`
-	// Defines additional volumeMounts to add to mattermost application pods.
+	// Defines additional volumeMounts to add to Mattermost application pods.
 	// +optional
 	VolumeMounts []v1.VolumeMount `json:"volumeMounts,omitempty"`
 
-	// Advanced contains additional advanced settings for Mattermost. These
-	// settings generally don't need to be changed.
-	Advanced Advanced `json:"advanced,omitempty"`
-
 	// External Services
 	Database      Database      `json:"database,omitempty"`
-	Filestore     Filestore     `json:"filestore,omitempty"`
+	FileStore     FileStore     `json:"fileStore,omitempty"`
 	ElasticSearch ElasticSearch `json:"elasticSearch,omitempty"`
+
+	// Advanced settings - it is recommended to leave the default configuration
+	// for below settings, unless a very specific use case arises.
+
+	// Scheduling defines the configuration related to scheduling of the Mattermost pods
+	// as well as resource constraints. These settings generally don't need to be changed.
+	// +optional
+	Scheduling Scheduling `json:"scheduling,omitempty"`
+	// Probes defines configuration of liveness and readiness probe for Mattermost pods.
+	// These settings generally don't need to be changed.
+	// +optional
+	Probes Probes `json:"probes,omitempty"`
 }
 
-// Advanced defines the advanced configuration for Mattermost. These settings
-// should be correct for most types of deployments.
-type Advanced struct {
+// Scheduling defines the configuration related to scheduling of the Mattermost pods
+// as well as resource constraints.
+type Scheduling struct {
 	// Defines the resource requests and limits for the Mattermost app server pods.
 	// +optional
 	Resources v1.ResourceRequirements `json:"resources,omitempty"`
@@ -93,6 +102,10 @@ type Advanced struct {
 	// If specified, affinity will define the pod's scheduling constraints
 	// +optional
 	Affinity *v1.Affinity `json:"affinity,omitempty"`
+}
+
+// Probes defines configuration of liveness and readiness probe for Mattermost pods.
+type Probes struct {
 	// Defines the probe to check if the application is up and running.
 	// +optional
 	LivenessProbe v1.Probe `json:"livenessProbe,omitempty"`
@@ -103,28 +116,29 @@ type Advanced struct {
 
 // Database defines the database configuration for Mattermost.
 type Database struct {
-	// Defines the type of database to use for an Operator-Managed database. This
-	// value is ignored when using a User-Managed database.
-	Type string `json:"type,omitempty"`
-	// Optionally enter the name of an already-existing Secret for connecting to
-	// the database. This secret should be configured as follows:
-	//
-	// User-Managed Database
-	//   - Key: DB_CONNECTION_STRING | Value: <FULL_DATABASE_CONNECTION_STRING>
-	// Operator-Managed Database
-	//   - Key: ROOT_PASSWORD | Value: <ROOT_DATABASE_PASSWORD>
-	//   - Key: USER | Value: <USER_NAME>
-	//   - Key: PASSWORD | Value: <USER_PASSWORD>
-	//   - Key: DATABASE Value: <DATABASE_NAME>
-	//
-	// Notes:
-	//   If you define all secret values for both User-Managed and
-	//   Operator-Managed database types, the User-Managed connection string will
-	//   take precedence and the Operator-Managed values will be ignored. If the
-	//   secret is left blank, the default behavior is to use an Operator-Managed
-	//   database with strong randomly-generated database credentials.
+	// Defines the configuration of and external database.
 	// +optional
+	External        *ExternalDatabase        `json:"external,omitempty"`
+	// Defines the configuration of database managed by Kubernetes operator.
+	// +optional
+	OperatorManaged *OperatorManagedDatabase `json:"operatorManaged,omitempty"`
+}
+
+// ExternalDatabase defines the configuration of the external database that should be used by Mattermost.
+type ExternalDatabase struct {
+	// Secret contains data necessary to connect to the external database.
+	// The Kubernetes Secret should contain:
+	//   - Key: DB_CONNECTION_STRING | Value: Full database connection string.
+	// It can also contain optional fields, such as:
+	//   - Key: MM_SQLSETTINGS_DATASOURCEREPLICAS | Value: Connection string to read replicas of the database.
+	//   - Key: DB_CONNECTION_CHECK_URL | Value: The URL used for checking that the database is accessible.
 	Secret string `json:"secret,omitempty"`
+}
+
+// OperatorManagedDatabase defines the configuration of a database managed by Kubernetes Operator.
+type OperatorManagedDatabase struct {
+	// Defines the type of database to use for an Operator-Managed database.
+	Type string `json:"type,omitempty"`
 	// Defines the storage size for the database. ie 50Gi
 	// +optional
 	// +kubebuilder:validation:Pattern=^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$
@@ -133,7 +147,7 @@ type Database struct {
 	// For redundancy use at least 2 replicas.
 	// Setting this will override the number of replicas set by 'Size'.
 	// +optional
-	Replicas int32 `json:"replicas,omitempty"`
+	Replicas *int32 `json:"replicas,omitempty"`
 	// Defines the resource requests and limits for the database pods.
 	// +optional
 	Resources v1.ResourceRequirements `json:"resources,omitempty"`
@@ -158,8 +172,29 @@ type Database struct {
 	BackupRestoreSecretName string `json:"backupRestoreSecretName,omitempty"`
 }
 
-// Filestore defines the filestore configuration for Mattermost.
-type Filestore struct {
+// FileStore defines the file store configuration for Mattermost.
+type FileStore struct {
+	// Defines the configuration of an external file store.
+	// +optional
+	External        *ExternalFilestore    `json:"external,omitempty"`
+	// Defines the configuration of file store managed by Kubernetes operator.
+	// +optional
+	OperatorManaged *OperatorManagedMinio `json:"operatorManaged,omitempty"`
+}
+
+// ExternalFilestore defines the configuration of the external file store that should be used by Mattermost.
+type ExternalFilestore struct {
+	// Set to use an external MinIO deployment or S3.
+	URL string `json:"url,omitempty"`
+	// Set to the bucket name of your external MinIO or S3.
+	Bucket string `json:"bucket,omitempty"`
+	// Optionally enter the name of already existing secret.
+	// Secret should have two values: "accesskey" and "secretkey".
+	Secret string `json:"secret,omitempty"`
+}
+
+// OperatorManagedMinio defines the configuration of a Minio file store managed by Kubernetes Operator.
+type OperatorManagedMinio struct {
 	// Defines the storage size for Minio. ie 50Gi
 	// +optional
 	// +kubebuilder:validation:Pattern=^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$
@@ -171,21 +206,10 @@ type Filestore struct {
 	// Setting this will override the number of replicas set by 'Size'.
 	// More info: https://docs.min.io/docs/distributed-minio-quickstart-guide.html
 	// +optional
-	Replicas int32 `json:"replicas,omitempty"`
+	Replicas *int32 `json:"replicas,omitempty"`
 	// Defines the resource requests and limits for the Minio pods.
 	// +optional
 	Resources v1.ResourceRequirements `json:"resources,omitempty"`
-	// Set to use an external MinIO deployment or S3. Must also set 'Secret' and 'ExternalBucket'.
-	// +optional
-	ExternalURL string `json:"externalURL,omitempty"`
-	// Set to the bucket name of your external MinIO or S3.
-	// +optional
-	ExternalBucket string `json:"externalBucket,omitempty"`
-	// Optionally enter the name of already existing secret.
-	// Secret should have two values: "accesskey" and "secretkey".
-	// Required when "ExternalURL" is set.
-	// +optional
-	Secret string `json:"secret,omitempty"`
 }
 
 // ElasticSearch defines the ElasticSearch configuration for Mattermost.
@@ -235,11 +259,12 @@ type MattermostStatus struct {
 	UpdatedReplicas int32 `json:"updatedReplicas,omitempty"`
 }
 
-// +kubebuilder:object:root=true
-// +kubebuilder:subresource:status
+// +genclient
 
 // Mattermost is the Schema for the mattermosts API
+// +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
+// +kubebuilder:resource:shortName="mm"
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:priority=0,name="State",type=string,JSONPath=".status.state",description="State of Mattermost"
 // +kubebuilder:printcolumn:priority=0,name="Image",type=string,JSONPath=".status.image",description="Image of Mattermost"
