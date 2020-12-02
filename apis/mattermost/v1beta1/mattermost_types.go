@@ -176,14 +176,14 @@ type OperatorManagedDatabase struct {
 type FileStore struct {
 	// Defines the configuration of an external file store.
 	// +optional
-	External *ExternalFilestore `json:"external,omitempty"`
+	External *ExternalFileStore `json:"external,omitempty"`
 	// Defines the configuration of file store managed by Kubernetes operator.
 	// +optional
 	OperatorManaged *OperatorManagedMinio `json:"operatorManaged,omitempty"`
 }
 
-// ExternalFilestore defines the configuration of the external file store that should be used by Mattermost.
-type ExternalFilestore struct {
+// ExternalFileStore defines the configuration of the external file store that should be used by Mattermost.
+type ExternalFileStore struct {
 	// Set to use an external MinIO deployment or S3.
 	URL string `json:"url,omitempty"`
 	// Set to the bucket name of your external MinIO or S3.
