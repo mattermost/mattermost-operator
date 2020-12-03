@@ -307,7 +307,7 @@ func TestGenerateDeployment(t *testing.T) {
 			}
 
 			// Init container check.
-			expectedInitContainers := 1
+			expectedInitContainers := 0 // Due to disabling DB setup job we start with 0 init containers
 			if !databaseInfo.IsExternal() {
 				expectedInitContainers++
 			} else if databaseInfo.IsExternal() && databaseInfo.HasDatabaseCheckURL() {
