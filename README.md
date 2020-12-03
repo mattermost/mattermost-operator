@@ -81,7 +81,7 @@ $ make install
 ```
 
 ### 3.2 Building mattermost-operator
-To start contributing to mattermost-operator you need to clone this repo to your local workspace. 
+To start contributing to mattermost-operator you need to clone this repo to your local workspace.
 
 ```bash
 $ mkdir -p $GOPATH/src/github.com/mattermost
@@ -105,8 +105,27 @@ $ kind load docker-image mattermost/mattermost-operator:test
 
 ### 4.1 Installation Size
 
-The `spec.Size` field was modified to be treated as a write-only field. 
-After adjusting values according to the size, the value of `spec.Size` is erased. 
+The `spec.Size` field was modified to be treated as a write-only field.
+After adjusting values according to the size, the value of `spec.Size` is erased.
 
-Replicas and resource requests/limits values can be overridden manually but setting new Size will override those values again regardless if set by the previous Size or adjusted manually. 
+Replicas and resource requests/limits values can be overridden manually but setting new Size will override those values again regardless if set by the previous Size or adjusted manually.
 
+## 5 Release
+
+To release a new version of Mattermost Operator you need to:
+
+- Have the repository up-to-date
+- Have the remote upstream configured
+- Have a clean repo, not pending commits and changes
+
+We have a script that changes some files, commit those changes and then tag the main branch.
+
+To run you can issue the following command:
+
+```console
+./scripts --tag=<DESIRED_TAG>
+````
+
+where:
+
+- <DESIRED_TAG> can be 1.10.1 for example
