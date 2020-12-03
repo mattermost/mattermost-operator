@@ -313,16 +313,10 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbIn
 		},
 	}
 
+	// TODO: DB setup job is temporarily disabled as `mattermost version` command
+	// does not account for the custom configuration
 	// Add init container to wait for DB setup job to complete
-	initContainers = append(initContainers, corev1.Container{
-		Name:            WaitForDBSetupContainerName,
-		Image:           "bitnami/kubectl:1.17",
-		ImagePullPolicy: corev1.PullIfNotPresent,
-		Command: []string{
-			"sh", "-c",
-			fmt.Sprintf("kubectl wait --for=condition=complete --timeout 5m job/%s", SetupJobName),
-		},
-	})
+	//initContainers = append(initContainers, waitForSetupJobContainer())
 
 	// ES section vars
 	envVarES := []corev1.EnvVar{}
@@ -620,6 +614,18 @@ func newService(mattermost *mattermostv1alpha1.ClusterInstallation, serviceName,
 		},
 		Spec: corev1.ServiceSpec{
 			Selector: mattermostv1alpha1.ClusterInstallationSelectorLabels(selectorName),
+		},
+	}
+}
+
+func waitForSetupJobContainer() corev1.Container {
+	return corev1.Container{
+		Name:            WaitForDBSetupContainerName,
+		Image:           "bitnami/kubectl:1.17",
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		Command: []string{
+			"sh", "-c",
+			fmt.Sprintf("kubectl wait --for=condition=complete --timeout 5m job/%s", SetupJobName),
 		},
 	}
 }

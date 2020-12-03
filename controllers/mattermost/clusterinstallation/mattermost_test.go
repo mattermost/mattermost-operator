@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/mattermost/mattermost-operator/pkg/mattermost"
 	rbacv1 "k8s.io/api/rbac/v1"
 
 	"github.com/stretchr/testify/assert"
@@ -241,13 +240,14 @@ func TestCheckMattermost(t *testing.T) {
 		err = r.checkMattermostDeployment(ci, ci.Name, ci.Spec.IngressName, ci.Name, ci.GetImageName(), logger)
 		assert.NoError(t, err)
 
-		dbSetupJob := &batchv1.Job{}
-		err = r.Client.Get(context.TODO(), types.NamespacedName{Name: mattermost.SetupJobName, Namespace: ciNamespace}, dbSetupJob)
-		require.NoError(t, err)
-		require.Equal(t, 1, len(dbSetupJob.Spec.Template.Spec.Containers))
-		require.Equal(t, ci.GetImageName(), dbSetupJob.Spec.Template.Spec.Containers[0].Image)
-		_, containerFound := findContainer(mattermost.WaitForDBSetupContainerName, dbSetupJob.Spec.Template.Spec.InitContainers)
-		require.False(t, containerFound)
+		// TODO: uncomment when enabling back the db setup job
+		//dbSetupJob := &batchv1.Job{}
+		//err = r.Client.Get(context.TODO(), types.NamespacedName{Name: mattermost.SetupJobName, Namespace: ciNamespace}, dbSetupJob)
+		//require.NoError(t, err)
+		//require.Equal(t, 1, len(dbSetupJob.Spec.Template.Spec.Containers))
+		//require.Equal(t, ci.GetImageName(), dbSetupJob.Spec.Template.Spec.Containers[0].Image)
+		//_, containerFound := findContainer(mattermost.WaitForDBSetupContainerName, dbSetupJob.Spec.Template.Spec.InitContainers)
+		//require.False(t, containerFound)
 
 		found := &appsv1.Deployment{}
 		err = r.Client.Get(context.TODO(), types.NamespacedName{Name: ciName, Namespace: ciNamespace}, found)
