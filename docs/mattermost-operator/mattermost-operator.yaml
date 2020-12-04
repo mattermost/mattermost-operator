@@ -1636,7 +1636,7 @@ spec:
           value: "20"
         - name: REQUEUE_ON_LIMIT_DELAY
           value: 20s
-        image: mattermost/mattermost-operator:latest
+        image: mattermost/mattermost-operator:v1.11.1
         imagePullPolicy: IfNotPresent
         name: mattermost-operator
       serviceAccountName: mattermost-operator
