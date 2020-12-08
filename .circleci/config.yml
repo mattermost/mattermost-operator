@@ -35,11 +35,14 @@ jobs:
       - run: |
           mkdir -p /tmp/apis/mattermost/v1alpha1
           cp -R apis/mattermost/v1alpha1/* /tmp/apis/mattermost/v1alpha1
+          mkdir -p /tmp/apis/mattermost/v1beta1
+          cp -R apis/mattermost/v1beta1/* /tmp/apis/mattermost/v1beta1
       - run: |
           mkdir -p /tmp/config/crd/bases
           cp -R config/crd/bases/* /tmp/config/crd/bases
       - run: make generate manifests
       - run: diff /tmp/apis/mattermost/v1alpha1 apis/mattermost/v1alpha1
+      - run: diff /tmp/apis/mattermost/v1beta1 apis/mattermost/v1beta1
       - run: diff /tmp/config/crd/bases config/crd/bases
 
   unittest:

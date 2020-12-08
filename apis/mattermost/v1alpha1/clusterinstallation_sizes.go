@@ -367,7 +367,7 @@ var validSizes = map[string]ClusterInstallationSize{
 	SizeMiniHAString:        sizeMiniHA,
 }
 
-var defaultSize = size5000
+var DefaultSize = size5000
 
 // CalculateResourceMilliRequirements returns the milli values for the CPU and
 // memory requests of the cluster size.
@@ -440,24 +440,24 @@ func (mattermost *ClusterInstallation) setDefaultReplicasAndResources() {
 	mattermost.Spec.Size = ""
 
 	if mattermost.Spec.Replicas == 0 {
-		mattermost.Spec.Replicas = defaultSize.App.Replicas
+		mattermost.Spec.Replicas = DefaultSize.App.Replicas
 	}
 	if mattermost.Spec.Resources.Size() == 0 {
-		mattermost.Spec.Resources = defaultSize.App.Resources
+		mattermost.Spec.Resources = DefaultSize.App.Resources
 	}
 
 	if mattermost.Spec.Minio.Replicas == 0 {
-		mattermost.Spec.Minio.Replicas = defaultSize.Minio.Replicas
+		mattermost.Spec.Minio.Replicas = DefaultSize.Minio.Replicas
 	}
 	if mattermost.Spec.Minio.Resources.Size() == 0 {
-		mattermost.Spec.Minio.Resources = defaultSize.Minio.Resources
+		mattermost.Spec.Minio.Resources = DefaultSize.Minio.Resources
 	}
 
 	if mattermost.Spec.Database.Replicas == 0 && mattermost.Spec.Database.InitBucketURL == "" {
-		mattermost.Spec.Database.Replicas = defaultSize.Database.Replicas
+		mattermost.Spec.Database.Replicas = DefaultSize.Database.Replicas
 	}
 	if mattermost.Spec.Database.Resources.Size() == 0 {
-		mattermost.Spec.Database.Resources = defaultSize.Database.Resources
+		mattermost.Spec.Database.Resources = DefaultSize.Database.Resources
 	}
 }
 
