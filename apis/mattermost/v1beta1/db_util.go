@@ -13,10 +13,7 @@ func (db *Database) SetDefaults() {
 		return
 	}
 
-	if db.OperatorManaged == nil {
-		db.OperatorManaged = &OperatorManagedDatabase{}
-	}
-
+	db.ensureDefault()
 	db.OperatorManaged.SetDefaults()
 }
 
