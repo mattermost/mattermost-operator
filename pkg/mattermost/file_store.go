@@ -33,7 +33,7 @@ type OperatorManagedMinioConfig struct {
 func (e *OperatorManagedMinioConfig) InitContainers(mattermost *mattermostv1beta1.Mattermost) []corev1.Container {
 	initContainers := []corev1.Container{
 		// Create the init container to create the MinIO bucket
-		corev1.Container{
+		{
 			Name:            "create-minio-bucket",
 			Image:           "minio/mc:latest",
 			ImagePullPolicy: corev1.PullIfNotPresent,
@@ -53,7 +53,7 @@ func (e *OperatorManagedMinioConfig) InitContainers(mattermost *mattermostv1beta
 			},
 		},
 		// Create the init container to check that MinIO is up and running
-		corev1.Container{
+		{
 			Name:            "init-check-minio",
 			Image:           "appropriate/curl:latest",
 			ImagePullPolicy: corev1.PullIfNotPresent,

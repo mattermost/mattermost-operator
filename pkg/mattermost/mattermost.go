@@ -131,7 +131,7 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbIn
 		}
 
 		if dbInfo.HasDatabaseCheckURL() {
-			dbCheckContainer := getDBCheckDatabaseConfigInitContainer(dbInfo.SecretName, dbInfo.ExternalDBType)
+			dbCheckContainer := getDBCheckInitContainer(dbInfo.SecretName, dbInfo.ExternalDBType)
 			if dbCheckContainer != nil {
 				initContainers = append(initContainers, *dbCheckContainer)
 			}
