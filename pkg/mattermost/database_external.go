@@ -49,14 +49,14 @@ func NewExternalDBInfo(mattermost *mattermostv1beta1.Mattermost, secret corev1.S
 func (e *ExternalDBConfig) EnvVars(_ *mattermostv1beta1.Mattermost) []corev1.EnvVar {
 	dbEnvVars := []corev1.EnvVar{
 		{
-			Name: "MM_CONFIG",
+			Name:      "MM_CONFIG",
 			ValueFrom: EnvSourceFromSecret(e.secretName, "DB_CONNECTION_STRING"),
 		},
 	}
 
 	if e.hasReaderEndpoints {
 		dbEnvVars = append(dbEnvVars, corev1.EnvVar{
-			Name: "MM_SQLSETTINGS_DATASOURCEREPLICAS",
+			Name:      "MM_SQLSETTINGS_DATASOURCEREPLICAS",
 			ValueFrom: EnvSourceFromSecret(e.secretName, "MM_SQLSETTINGS_DATASOURCEREPLICAS"),
 		})
 	}
@@ -81,7 +81,7 @@ func (e *ExternalDBConfig) InitContainers(_ *mattermostv1beta1.Mattermost) []cor
 func getDBCheckInitContainer(secretName, dbType string) *corev1.Container {
 	envVars := []corev1.EnvVar{
 		{
-			Name: "DB_CONNECTION_CHECK_URL",
+			Name:      "DB_CONNECTION_CHECK_URL",
 			ValueFrom: EnvSourceFromSecret(secretName, "DB_CONNECTION_CHECK_URL"),
 		},
 	}

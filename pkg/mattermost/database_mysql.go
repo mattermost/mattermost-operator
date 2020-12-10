@@ -49,11 +49,11 @@ func (m *MySQLDBConfig) EnvVars(mattermost *mattermostv1beta1.Mattermost) []core
 
 	dbEnvVars := []corev1.EnvVar{
 		{
-			Name: "MYSQL_USERNAME",
+			Name:      "MYSQL_USERNAME",
 			ValueFrom: EnvSourceFromSecret(m.secretName, "USER"),
 		},
 		{
-			Name: "MYSQL_PASSWORD",
+			Name:      "MYSQL_PASSWORD",
 			ValueFrom: EnvSourceFromSecret(m.secretName, "PASSWORD"),
 		},
 		{
