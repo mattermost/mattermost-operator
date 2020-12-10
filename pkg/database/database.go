@@ -73,7 +73,7 @@ func (db *Info) HasDatabaseCheckURL() bool {
 // the characteristics of the secret.
 func GenerateDatabaseInfoFromSecret(secret *corev1.Secret) *Info {
 	if _, ok := secret.Data["DB_CONNECTION_STRING"]; ok {
-		dbType := getTypeFromConnectionString(string(secret.Data["DB_CONNECTION_STRING"]))
+		dbType := GetTypeFromConnectionString(string(secret.Data["DB_CONNECTION_STRING"]))
 
 		// This is a secret for an external database.
 		databaseInfo := &Info{
@@ -106,7 +106,7 @@ func GenerateDatabaseInfoFromSecret(secret *corev1.Secret) *Info {
 	}
 }
 
-func getTypeFromConnectionString(connectionString string) string {
+func GetTypeFromConnectionString(connectionString string) string {
 	if strings.HasPrefix(connectionString, "mysql") {
 		return MySQLDatabase
 	}

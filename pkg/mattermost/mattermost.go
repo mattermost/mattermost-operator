@@ -38,41 +38,13 @@ func GenerateService(mattermost *mattermostv1alpha1.ClusterInstallation, service
 		service := newService(mattermost, serviceName, selectorName,
 			mergeStringMaps(baseAnnotations, mattermost.Spec.ServiceAnnotations),
 		)
-		service.Spec.Ports = []corev1.ServicePort{
-			{
-				Name:       "http",
-				Port:       80,
-				TargetPort: intstr.FromString("app"),
-			},
-			{
-				Name:       "https",
-				Port:       443,
-				TargetPort: intstr.FromString("app"),
-			},
-		}
-		service.Spec.Type = corev1.ServiceTypeLoadBalancer
-
-		return service
+		return configureMattermostLoadBalancerService(service)
 	}
 
 	// Create a headless service which is not directly accessible from outside
 	// the cluster and thus exposes a custom port.
 	service := newService(mattermost, serviceName, selectorName, baseAnnotations)
-	service.Spec.Ports = []corev1.ServicePort{
-		{
-			Port:       8065,
-			Name:       "app",
-			TargetPort: intstr.FromString("app"),
-		},
-		{
-			Port:       8067,
-			Name:       "metrics",
-			TargetPort: intstr.FromString("metrics"),
-		},
-	}
-	service.Spec.ClusterIP = corev1.ClusterIPNone
-
-	return service
+	return configureMattermostService(service)
 }
 
 // GenerateIngress returns the ingress for the Mattermost app.
@@ -159,7 +131,7 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbIn
 		}
 
 		if dbInfo.HasDatabaseCheckURL() {
-			dbCheckContainer := getDBCheckInitContainer(dbInfo)
+			dbCheckContainer := getDBCheckInitContainer(dbInfo.SecretName, dbInfo.ExternalDBType)
 			if dbCheckContainer != nil {
 				initContainers = append(initContainers, *dbCheckContainer)
 			}
@@ -321,80 +293,19 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbIn
 	// ES section vars
 	envVarES := []corev1.EnvVar{}
 	if mattermost.Spec.ElasticSearch.Host != "" {
-		envVarES = []corev1.EnvVar{
-			{
-				Name:  "MM_ELASTICSEARCHSETTINGS_ENABLEINDEXING",
-				Value: "true",
-			},
-			{
-				Name:  "MM_ELASTICSEARCHSETTINGS_ENABLESEARCHING",
-				Value: "true",
-			},
-			{
-				Name:  "MM_ELASTICSEARCHSETTINGS_CONNECTIONURL",
-				Value: mattermost.Spec.ElasticSearch.Host,
-			},
-			{
-				Name:  "MM_ELASTICSEARCHSETTINGS_USERNAME",
-				Value: mattermost.Spec.ElasticSearch.UserName,
-			},
-			{
-				Name:  "MM_ELASTICSEARCHSETTINGS_PASSWORD",
-				Value: mattermost.Spec.ElasticSearch.Password,
-			},
-		}
+		envVarES = elasticSearchEnvVars(
+			mattermost.Spec.ElasticSearch.Host,
+			mattermost.Spec.ElasticSearch.UserName,
+			mattermost.Spec.ElasticSearch.Password,
+		)
 	}
 
 	siteURL := fmt.Sprintf("https://%s", ingressName)
-	envVarGeneral := []corev1.EnvVar{
-		{
-			Name:  "MM_SERVICESETTINGS_SITEURL",
-			Value: siteURL,
-		},
-		{
-			Name:  "MM_PLUGINSETTINGS_ENABLEUPLOADS",
-			Value: "true",
-		},
-		{
-			Name:  "MM_METRICSSETTINGS_ENABLE",
-			Value: "true",
-		},
-		{
-			Name:  "MM_METRICSSETTINGS_LISTENADDRESS",
-			Value: ":8067",
-		},
-		{
-			Name:  "MM_CLUSTERSETTINGS_ENABLE",
-			Value: "true",
-		},
-		{
-			Name:  "MM_CLUSTERSETTINGS_CLUSTERNAME",
-			Value: "production",
-		},
-		{
-			Name:  "MM_INSTALL_TYPE",
-			Value: "kubernetes-operator",
-		},
-	}
+	envVarGeneral := generalMattermostEnvVars(siteURL)
 
 	valueSize := strconv.Itoa(defaultMaxFileSize * sizeMB)
 	if !mattermost.Spec.UseServiceLoadBalancer {
-		if _, ok := mattermost.Spec.IngressAnnotations["nginx.ingress.kubernetes.io/proxy-body-size"]; ok {
-			size := mattermost.Spec.IngressAnnotations["nginx.ingress.kubernetes.io/proxy-body-size"]
-			if strings.HasSuffix(size, "M") {
-				maxFileSize, _ := strconv.Atoi(strings.TrimSuffix(size, "M"))
-				valueSize = strconv.Itoa(maxFileSize * sizeMB)
-			} else if strings.HasSuffix(size, "m") {
-				maxFileSize, _ := strconv.Atoi(strings.TrimSuffix(size, "m"))
-				valueSize = strconv.Itoa(maxFileSize * sizeMB)
-			} else if strings.HasSuffix(size, "G") {
-				maxFileSize, _ := strconv.Atoi(strings.TrimSuffix(size, "G"))
-				valueSize = strconv.Itoa(maxFileSize * sizeGB)
-			} else if strings.HasSuffix(size, "g") {
-				maxFileSize, _ := strconv.Atoi(strings.TrimSuffix(size, "g"))
-				valueSize = strconv.Itoa(maxFileSize * sizeGB)
-			}
-		}
+		valueSize = determineMaxBodySize(mattermost.Spec.IngressAnnotations, valueSize)
 	}
 	envVarGeneral = append(envVarGeneral, corev1.EnvVar{
 		Name:  "MM_FILESETTINGS_MAXFILESIZE",
@@ -406,31 +317,11 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbIn
 	volumeMountLicense := []corev1.VolumeMount{}
 	podAnnotations := map[string]string{}
 	if len(mattermost.Spec.MattermostLicenseSecret) != 0 {
-		envVarGeneral = append(envVarGeneral, corev1.EnvVar{
-			Name:  "MM_SERVICESETTINGS_LICENSEFILELOCATION",
-			Value: "/mattermost-license/license",
-		})
-
-		volumeMountLicense = append(volumeMountLicense, corev1.VolumeMount{
-			MountPath: "/mattermost-license",
-			Name:      "mattermost-license",
-			ReadOnly:  true,
-		})
-
-		volumeLicense = append(volumeLicense, corev1.Volume{
-			Name: "mattermost-license",
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: mattermost.Spec.MattermostLicenseSecret,
-				},
-			},
-		})
-
-		podAnnotations = map[string]string{
-			"prometheus.io/scrape": "true",
-			"prometheus.io/path":   "/metrics",
-			"prometheus.io/port":   "8067",
-		}
+		env, vMount, volume, annotations := mattermostLicenceConfig(mattermost.Spec.MattermostLicenseSecret)
+		envVarGeneral = append(envVarGeneral, env)
+		volumeMountLicense = append(volumeMountLicense, vMount)
+		volumeLicense = append(volumeLicense, volume)
+		podAnnotations = annotations
 	}
 
 	// EnvVars Section
@@ -559,14 +450,7 @@ func GenerateRole(mattermost *mattermostv1alpha1.ClusterInstallation, roleName s
 			Namespace:       mattermost.Namespace,
 			OwnerReferences: ClusterInstallationOwnerReference(mattermost),
 		},
-		Rules: []rbacv1.PolicyRule{
-			{
-				Verbs:         []string{"get", "list", "watch"},
-				APIGroups:     []string{"batch"},
-				Resources:     []string{"jobs"},
-				ResourceNames: []string{SetupJobName},
-			},
-		},
+		Rules: mattermostRolePermissions(),
 	}
 }
 
@@ -630,47 +514,3 @@ func waitForSetupJobContainer() corev1.Container {
 	}
 }
 
-// getDBCheckInitContainer tries to prepare init container that checks database readiness.
-// Returns nil if database type is unknown.
-func getDBCheckInitContainer(dbInfo *database.Info) *corev1.Container {
-	envVars := []corev1.EnvVar{
-		{
-			Name: "DB_CONNECTION_CHECK_URL",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: dbInfo.SecretName,
-					},
-					Key: "DB_CONNECTION_CHECK_URL",
-				},
-			},
-		},
-	}
-
-	switch dbInfo.ExternalDBType {
-	case database.MySQLDatabase:
-		return &corev1.Container{
-			Name:            "init-check-database",
-			Image:           "appropriate/curl:latest",
-			ImagePullPolicy: corev1.PullIfNotPresent,
-			Env:             envVars,
-			Command: []string{
-				"sh", "-c",
-				"until curl --max-time 5 $DB_CONNECTION_CHECK_URL; do echo waiting for database; sleep 5; done;",
-			},
-		}
-	case database.PostgreSQLDatabase:
-		return &corev1.Container{
-			Name:            "init-check-database",
-			Image:           "postgres:13",
-			ImagePullPolicy: corev1.PullIfNotPresent,
-			Env:             envVars,
-			Command: []string{
-				"sh", "-c",
-				"until pg_isready --dbname=\"$DB_CONNECTION_CHECK_URL\"; do echo waiting for database; sleep 5; done;",
-			},
-		}
-	default:
-		return nil
-	}
-}
