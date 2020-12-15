@@ -31,7 +31,7 @@ func TestNewMySQLDB(t *testing.T) {
 	}
 
 	t.Run("create config", func(t *testing.T) {
-		config, err := NewMySQLDB(secret)
+		config, err := NewMySQLDBConfig(secret)
 		require.NoError(t, err)
 		assert.Equal(t, "secret", config.secretName)
 		assert.Equal(t, "root-pass", config.rootPassword)
@@ -81,7 +81,7 @@ func TestNewMySQLDB(t *testing.T) {
 
 				delete(secret.Data, testCase.missingKey)
 
-				_, err := NewMySQLDB(secret)
+				_, err := NewMySQLDBConfig(secret)
 				require.Error(t, err)
 			})
 		}

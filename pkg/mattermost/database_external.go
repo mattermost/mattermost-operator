@@ -15,7 +15,7 @@ type ExternalDBConfig struct {
 	hasDBCheckURL      bool
 }
 
-func NewExternalDBInfo(mattermost *mattermostv1beta1.Mattermost, secret corev1.Secret) (*ExternalDBConfig, error) {
+func NewExternalDBConfig(mattermost *mattermostv1beta1.Mattermost, secret corev1.Secret) (*ExternalDBConfig, error) {
 	if mattermost.Spec.Database.External == nil {
 		return nil, fmt.Errorf("external database config not provided")
 	}

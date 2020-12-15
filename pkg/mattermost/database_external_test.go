@@ -28,7 +28,7 @@ func TestNewExternalDBInfo(t *testing.T) {
 	}
 
 	t.Run("connection string only", func(t *testing.T) {
-		config, err := NewExternalDBInfo(mattermost, secret)
+		config, err := NewExternalDBConfig(mattermost, secret)
 		require.NoError(t, err)
 		assert.Equal(t, "secret", config.secretName)
 		assert.Equal(t, "postgres", config.dbType)
@@ -46,7 +46,7 @@ func TestNewExternalDBInfo(t *testing.T) {
 	secret.Data["DB_CONNECTION_CHECK_URL"] = []byte("postgres://my-postgres")
 
 	t.Run("with db check url and reader and endpoints", func(t *testing.T) {
-		config, err := NewExternalDBInfo(mattermost, secret)
+		config, err := NewExternalDBConfig(mattermost, secret)
 		require.NoError(t, err)
 		assert.Equal(t, "secret", config.secretName)
 		assert.Equal(t, "postgres", config.dbType)
@@ -63,13 +63,13 @@ func TestNewExternalDBInfo(t *testing.T) {
 
 	secret.Data["DB_CONNECTION_STRING"] = []byte{}
 	t.Run("fail if connection string is empty", func(t *testing.T) {
-		_, err := NewExternalDBInfo(mattermost, secret)
+		_, err := NewExternalDBConfig(mattermost, secret)
 		require.Error(t, err)
 	})
 
 	delete(secret.Data, "DB_CONNECTION_STRING")
 	t.Run("fail if connection string not present", func(t *testing.T) {
-		_, err := NewExternalDBInfo(mattermost, secret)
+		_, err := NewExternalDBConfig(mattermost, secret)
 		require.Error(t, err)
 	})
 }

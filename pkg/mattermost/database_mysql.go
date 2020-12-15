@@ -16,7 +16,7 @@ type MySQLDBConfig struct {
 	databaseName string
 }
 
-func NewMySQLDB(secret corev1.Secret) (*MySQLDBConfig, error) {
+func NewMySQLDBConfig(secret corev1.Secret) (*MySQLDBConfig, error) {
 	rootPassword := string(secret.Data["ROOT_PASSWORD"])
 	if rootPassword == "" {
 		return nil, fmt.Errorf("database root password shouldn't be empty")
