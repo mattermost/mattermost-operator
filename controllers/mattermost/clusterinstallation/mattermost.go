@@ -187,6 +187,13 @@ func (r *ClusterInstallationReconciler) checkMattermostDeployment(mattermost *ma
 		return errors.Wrap(err, "database secret is not valid")
 	}
 
+	var pullPolicy corev1.PullPolicy
+	if mattermost.Spec.ImagePullPolicy != "" {
+		pullPolicy = mattermost.Spec.ImagePullPolicy
+	} else {
+		pullPolicy = corev1.PullIfNotPresent
+	}
+
 	var minioURL string
 	if mattermost.Spec.Minio.IsExternal() {
 		minioURL = mattermost.Spec.Minio.ExternalURL
@@ -204,7 +211,7 @@ func (r *ClusterInstallationReconciler) checkMattermostDeployment(mattermost *ma
 		}
 	}
 
-	desired := mattermostApp.GenerateDeployment(mattermost, dbInfo, resourceName, ingressName, saName, imageName, minioURL)
+	desired := mattermostApp.GenerateDeployment(mattermost, dbInfo, resourceName, ingressName, saName, imageName, minioURL, pullPolicy)
 
 	// TODO: DB setup job is temporarily disabled as `mattermost version` command
 	// does not account for the custom configuration
