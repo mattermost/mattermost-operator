@@ -842,6 +842,9 @@ spec:
               image:
                 description: Image defines the ClusterInstallation Docker image.
                 type: string
+              imagePullPolicy:
+                description: Specify deployment pull policy
+                type: string
               ingressAnnotations:
                 additionalProperties:
                   type: string
