@@ -270,7 +270,7 @@ func schema_mattermost_operator_apis_mattermost_v1alpha1_ClusterInstallationSpec
 					},
 					"imagePullPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Specify deployment pull policy",
+							Description: "Specify deployment pull policy.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
