@@ -383,7 +383,7 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbIn
 						{
 							Name:                     mattermostv1alpha1.MattermostAppContainerName,
 							Image:                    containerImage,
-							ImagePullPolicy:          corev1.PullIfNotPresent,
+							ImagePullPolicy:          mattermost.Spec.ImagePullPolicy,
 							TerminationMessagePolicy: corev1.TerminationMessageFallbackToLogsOnError,
 							Command:                  []string{"mattermost"},
 							Env:                      envVars,

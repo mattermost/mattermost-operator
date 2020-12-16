@@ -268,6 +268,13 @@ func schema_mattermost_operator_apis_mattermost_v1alpha1_ClusterInstallationSpec
 							Ref:         ref("k8s.io/api/core/v1.Probe"),
 						},
 					},
+					"imagePullPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Specify deployment pull policy.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 				Required: []string{"ingressName"},
 			},

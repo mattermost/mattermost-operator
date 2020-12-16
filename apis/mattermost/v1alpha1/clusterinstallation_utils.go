@@ -24,6 +24,8 @@ const (
 	DefaultMinioStorageSize = "50Gi"
 	// DefaultStorageSize is the default Storage size for the Database
 	DefaultStorageSize = "50Gi"
+	// DefaultPullPolicy is ifNotPresetnt
+	DefaultPullPolicy = corev1.PullIfNotPresent
 
 	// ClusterLabel is the label applied across all compoments
 	ClusterLabel = "v1alpha1.mattermost.com/installation"
@@ -53,6 +55,10 @@ func (mattermost *ClusterInstallation) SetDefaults() error {
 	}
 	if mattermost.Spec.Version == "" {
 		mattermost.Spec.Version = DefaultMattermostVersion
+	}
+
+	if mattermost.Spec.ImagePullPolicy == "" {
+		mattermost.Spec.ImagePullPolicy = DefaultPullPolicy
 	}
 
 	mattermost.Spec.Minio.SetDefaults()
