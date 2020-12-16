@@ -1,6 +1,7 @@
 package mattermost
 
 import (
+	"errors"
 	"fmt"
 
 	mattermostv1beta1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
@@ -19,19 +20,19 @@ type MySQLDBConfig struct {
 func NewMySQLDBConfig(secret corev1.Secret) (*MySQLDBConfig, error) {
 	rootPassword := string(secret.Data["ROOT_PASSWORD"])
 	if rootPassword == "" {
-		return nil, fmt.Errorf("database root password shouldn't be empty")
+		return nil, errors.New("database root password shouldn't be empty")
 	}
 	userName := string(secret.Data["USER"])
 	if userName == "" {
-		return nil, fmt.Errorf("database username shouldn't be empty")
+		return nil, errors.New("database username shouldn't be empty")
 	}
 	userPassword := string(secret.Data["PASSWORD"])
 	if userPassword == "" {
-		return nil, fmt.Errorf("database password shouldn't be empty")
+		return nil, errors.New("database password shouldn't be empty")
 	}
 	databaseName := string(secret.Data["DATABASE"])
 	if databaseName == "" {
-		return nil, fmt.Errorf("database name shouldn't be empty")
+		return nil, errors.New("database name shouldn't be empty")
 	}
 
 	return &MySQLDBConfig{

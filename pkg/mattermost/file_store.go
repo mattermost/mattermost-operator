@@ -1,6 +1,7 @@
 package mattermost
 
 import (
+	"errors"
 	"fmt"
 
 	mattermostv1beta1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
@@ -69,17 +70,17 @@ func (e *OperatorManagedMinioConfig) InitContainers(mattermost *mattermostv1beta
 
 func NewExternalFileStoreInfo(mattermost *mattermostv1beta1.Mattermost, secret corev1.Secret) (*FileStoreInfo, error) {
 	if mattermost.Spec.FileStore.External == nil {
-		return nil, fmt.Errorf("external file store configuration not provided")
+		return nil, errors.New("external file store configuration not provided")
 	}
 
 	bucket := mattermost.Spec.FileStore.External.Bucket
 	if bucket == "" {
-		return nil, fmt.Errorf("external file store bucket is empty")
+		return nil, errors.New("external file store bucket is empty")
 	}
 
 	url := mattermost.Spec.FileStore.External.URL
 	if url == "" {
-		return nil, fmt.Errorf("external file store URL is empty")
+		return nil, errors.New("external file store URL is empty")
 	}
 
 	if _, ok := secret.Data["accesskey"]; !ok {

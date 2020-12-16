@@ -35,7 +35,7 @@ func Instance(mattermost *mattermostv1alpha1.ClusterInstallation) *minioOperator
 	)
 }
 
-// Secret returns the secret name created to use togehter with Minio deployment
+// Secret returns the secret name created to use together with Minio deployment
 func Secret(mattermost *mattermostv1alpha1.ClusterInstallation) *corev1.Secret {
 	secretName := DefaultMinioSecretName(mattermost.Name)
 	data := minioSecretData()

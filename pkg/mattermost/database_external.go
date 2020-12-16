@@ -1,8 +1,7 @@
 package mattermost
 
 import (
-	"fmt"
-
+	"errors"
 	mattermostv1beta1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	"github.com/mattermost/mattermost-operator/pkg/database"
 	corev1 "k8s.io/api/core/v1"
@@ -17,18 +16,18 @@ type ExternalDBConfig struct {
 
 func NewExternalDBConfig(mattermost *mattermostv1beta1.Mattermost, secret corev1.Secret) (*ExternalDBConfig, error) {
 	if mattermost.Spec.Database.External == nil {
-		return nil, fmt.Errorf("external database config not provided")
+		return nil, errors.New("external database config not provided")
 	}
 	if mattermost.Spec.Database.External.Secret == "" {
-		return nil, fmt.Errorf("external database Secret not provided")
+		return nil, errors.New("external database Secret not provided")
 	}
 
 	connectionStr, ok := secret.Data["DB_CONNECTION_STRING"]
 	if !ok {
-		return nil, fmt.Errorf("external database Secret does not containt DB_CONNECTION_STRING key")
+		return nil, errors.New("external database Secret does not containt DB_CONNECTION_STRING key")
 	}
 	if len(connectionStr) == 0 {
-		return nil, fmt.Errorf("external database connection string is empty")
+		return nil, errors.New("external database connection string is empty")
 	}
 
 	externalDB := &ExternalDBConfig{
@@ -109,7 +108,7 @@ func getDBCheckInitContainer(secretName, dbType string) *corev1.Container {
 				"until pg_isready --dbname=\"$DB_CONNECTION_CHECK_URL\"; do echo waiting for database; sleep 5; done;",
 			},
 		}
-	default:
-		return nil
 	}
+
+	return nil
 }
