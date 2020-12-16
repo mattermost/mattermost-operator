@@ -98,7 +98,7 @@ func GenerateIngress(mattermost *mattermostv1alpha1.ClusterInstallation, name, i
 }
 
 // GenerateDeployment returns the deployment for Mattermost app.
-func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbInfo *database.Info, deploymentName, ingressName, serviceAccountName, containerImage string, minioURL string, ImagePullPolicy corev1.PullPolicy) *appsv1.Deployment {
+func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbInfo *database.Info, deploymentName, ingressName, serviceAccountName, containerImage string, minioURL string) *appsv1.Deployment {
 	var envVarDB []corev1.EnvVar
 
 	masterDBEnvVar := corev1.EnvVar{
@@ -383,7 +383,7 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbIn
 						{
 							Name:                     mattermostv1alpha1.MattermostAppContainerName,
 							Image:                    containerImage,
-							ImagePullPolicy:          ImagePullPolicy,
+							ImagePullPolicy:          mattermost.Spec.ImagePullPolicy,
 							TerminationMessagePolicy: corev1.TerminationMessageFallbackToLogsOnError,
 							Command:                  []string{"mattermost"},
 							Env:                      envVars,
