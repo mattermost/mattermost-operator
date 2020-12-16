@@ -1,6 +1,8 @@
 package mattermost
 
 import (
+	"strconv"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -42,6 +44,25 @@ func mergeEnvVars(original, new []corev1.EnvVar) []corev1.EnvVar {
 	}
 
 	return original
+}
+
+func determineMaxBodySize(ingressAnnotations map[string]string, defaultSize string) string {
+	size, ok := ingressAnnotations["nginx.ingress.kubernetes.io/proxy-body-size"]
+	if !ok {
+		return defaultSize
+	}
+
+	sizeUnit := size[len(size)-1]
+	maxFileSize, _ := strconv.Atoi(size[:len(size)-1])
+
+	switch sizeUnit {
+	case 'M', 'm':
+		return strconv.Itoa(maxFileSize * sizeMB)
+	case 'G', 'g':
+		return strconv.Itoa(maxFileSize * sizeGB)
+	}
+
+	return defaultSize
 }
 
 func setProbes(customLiveness, customReadiness corev1.Probe) (*corev1.Probe, *corev1.Probe) {

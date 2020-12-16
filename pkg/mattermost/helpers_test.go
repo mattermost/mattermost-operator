@@ -3,6 +3,8 @@ package mattermost
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -102,6 +104,69 @@ func TestMergeEnvVars(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require.Equal(t, tt.want, mergeEnvVars(tt.original, tt.new))
+		})
+	}
+}
+
+func TestDetermineMaxBodySize(t *testing.T) {
+	defaultSize := "1000"
+
+	for _, testCase := range []struct {
+		description        string
+		ingressAnnotations map[string]string
+		expectedSize       string
+	}{
+		{
+			description:        "use default size when no annotation",
+			ingressAnnotations: nil,
+			expectedSize:       defaultSize,
+		},
+		{
+			description: "use default size when cannot parse size",
+			ingressAnnotations: map[string]string{
+				"nginx.ingress.kubernetes.io/proxy-body-size": "nan",
+			},
+			expectedSize: defaultSize,
+		},
+		{
+			description: "use default size when unit not recognized",
+			ingressAnnotations: map[string]string{
+				"nginx.ingress.kubernetes.io/proxy-body-size": "800K",
+			},
+			expectedSize: defaultSize,
+		},
+		{
+			description: "use GB size when lowercase 'g'",
+			ingressAnnotations: map[string]string{
+				"nginx.ingress.kubernetes.io/proxy-body-size": "1g",
+			},
+			expectedSize: "1048576000",
+		},
+		{
+			description: "use GB size when capital 'G",
+			ingressAnnotations: map[string]string{
+				"nginx.ingress.kubernetes.io/proxy-body-size": "1G",
+			},
+			expectedSize: "1048576000",
+		},
+		{
+			description: "use MB size when lowercase 'm",
+			ingressAnnotations: map[string]string{
+				"nginx.ingress.kubernetes.io/proxy-body-size": "10m",
+			},
+			expectedSize: "10485760",
+		},
+		{
+			description: "use MB size when capital 'M",
+			ingressAnnotations: map[string]string{
+				"nginx.ingress.kubernetes.io/proxy-body-size": "10M",
+			},
+			expectedSize: "10485760",
+		},
+	} {
+		t.Run(testCase.description, func(t *testing.T) {
+			size := determineMaxBodySize(testCase.ingressAnnotations, defaultSize)
+			assert.Equal(t, testCase.expectedSize, size)
 		})
 	}
 }
