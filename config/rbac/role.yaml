@@ -43,9 +43,9 @@ rules:
     verbs:
       - '*'
   - apiGroups:
-      - extensions
+      - networking.k8s.io
     resources:
-      - '*'
+      - ingresses
     verbs:
       - '*'
   - apiGroups:
@@ -81,6 +81,12 @@ rules:
       - '*'
       - clusterinstallations
       - mattermostrestoredbs
+    verbs:
+      - '*'
+  - apiGroups:
+      - installation.mattermost.com
+    resources:
+      - mattermosts
     verbs:
       - '*'
   - apiGroups:
