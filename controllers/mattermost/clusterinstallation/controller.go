@@ -6,13 +6,15 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/mattermost/mattermost-operator/pkg/resources"
+
 	batchv1 "k8s.io/api/batch/v1"
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	v1beta1 "k8s.io/api/extensions/v1beta1"
+	v1beta1 "k8s.io/api/networking/v1beta1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -34,6 +36,7 @@ type ClusterInstallationReconciler struct {
 	Scheme              *runtime.Scheme
 	MaxReconciling      int
 	RequeueOnLimitDelay time.Duration
+	Resources           *resources.ResourceHelper
 }
 
 // +kubebuilder:rbac:groups=mattermost.com,resources=clusterinstallations,verbs=get;list;watch;create;update;patch;delete
@@ -153,7 +156,7 @@ func (r *ClusterInstallationReconciler) Reconcile(request ctrl.Request) (ctrl.Re
 		return reconcile.Result{}, err
 	}
 
-	status, err := r.handleCheckClusterInstallation(mattermost)
+	status, err := r.handleCheckClusterInstallation(mattermost, reqLogger)
 	if err != nil {
 		statusErr := r.updateStatus(mattermost, status, reqLogger)
 		if statusErr != nil {

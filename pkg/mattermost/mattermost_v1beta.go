@@ -13,7 +13,7 @@ import (
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	v1beta1 "k8s.io/api/extensions/v1beta1"
+	v1beta1 "k8s.io/api/networking/v1beta1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -30,7 +30,7 @@ type FileStoreConfig interface {
 }
 
 // GenerateService returns the service for the Mattermost app.
-func GenerateServiceV1Beta(mattermost *mattermostv1beta1.Mattermost, serviceName, selectorName string) *corev1.Service {
+func GenerateServiceV1Beta(mattermost *mattermostv1beta1.Mattermost) *corev1.Service {
 	baseAnnotations := map[string]string{
 		"service.alpha.kubernetes.io/tolerate-unready-endpoints": "true",
 	}
@@ -39,15 +39,13 @@ func GenerateServiceV1Beta(mattermost *mattermostv1beta1.Mattermost, serviceName
 		// Create a LoadBalancer service with additional annotations provided in
 		// the Mattermost Spec. The LoadBalancer is directly accessible from
 		// outside the cluster thus exposes ports 80 and 443.
-		service := newServiceV1Beta(mattermost, serviceName, selectorName,
-			mergeStringMaps(baseAnnotations, mattermost.Spec.ServiceAnnotations),
-		)
+		service := newServiceV1Beta(mattermost, mergeStringMaps(baseAnnotations, mattermost.Spec.ServiceAnnotations))
 		return configureMattermostLoadBalancerService(service)
 	}
 
 	// Create a headless service which is not directly accessible from outside
 	// the cluster and thus exposes a custom port.
-	service := newServiceV1Beta(mattermost, serviceName, selectorName, baseAnnotations)
+	service := newServiceV1Beta(mattermost, baseAnnotations)
 	return configureMattermostService(service)
 }
 
@@ -334,17 +332,17 @@ func MattermostOwnerReference(mattermost *mattermostv1beta1.Mattermost) []metav1
 
 // newService returns semi-finished service with common parts filled.
 // Returned service is expected to be completed by the caller.
-func newServiceV1Beta(mattermost *mattermostv1beta1.Mattermost, serviceName, selectorName string, annotations map[string]string) *corev1.Service {
+func newServiceV1Beta(mattermost *mattermostv1beta1.Mattermost, annotations map[string]string) *corev1.Service {
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:          mattermost.MattermostLabels(serviceName),
-			Name:            serviceName,
+			Labels:          mattermost.MattermostLabels(mattermost.Name),
+			Name:            mattermost.Name,
 			Namespace:       mattermost.Namespace,
 			OwnerReferences: MattermostOwnerReference(mattermost),
 			Annotations:     annotations,
 		},
 		Spec: corev1.ServiceSpec{
-			Selector: mattermostv1beta1.MattermostSelectorLabels(selectorName),
+			Selector: mattermostv1beta1.MattermostSelectorLabels(mattermost.Name),
 		},
 	}
 }

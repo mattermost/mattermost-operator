@@ -2,6 +2,7 @@ package mattermost
 
 import (
 	"errors"
+
 	mattermostv1beta1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	"github.com/mattermost/mattermost-operator/pkg/database"
 	corev1 "k8s.io/api/core/v1"

@@ -7,6 +7,11 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/mattermost/mattermost-operator/controllers/mattermost/clusterinstallation"
+	"github.com/mattermost/mattermost-operator/controllers/mattermost/mattermost"
+	"github.com/mattermost/mattermost-operator/controllers/mattermost/mattermostrestoredb"
+	"github.com/mattermost/mattermost-operator/pkg/resources"
+
 	blubr "github.com/mattermost/blubr"
 	v1beta1Minio "github.com/minio/minio-operator/pkg/apis/miniocontroller/v1beta1"
 	v1alpha1MySQL "github.com/presslabs/mysql-operator/pkg/apis/mysql/v1alpha1"
@@ -20,8 +25,6 @@ import (
 
 	mattermostcomv1alpha1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1"
 	mattermostv1beta1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
-	"github.com/mattermost/mattermost-operator/controllers/mattermost/clusterinstallation"
-	"github.com/mattermost/mattermost-operator/controllers/mattermost/mattermostrestoredb"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -101,6 +104,7 @@ func main() {
 		Scheme:              mgr.GetScheme(),
 		MaxReconciling:      config.MaxReconcilingInstallations,
 		RequeueOnLimitDelay: config.RequeueOnLimitDelay,
+		Resources:           resources.NewResourceHelper(mgr.GetClient(), mgr.GetScheme()),
 	}).SetupWithManager(mgr); err != nil {
 		logger.Error(err, "Unable to create controller", "controller", "ClusterInstallation")
 		os.Exit(1)
@@ -113,6 +117,16 @@ func main() {
 		logger.Error(err, "Unable to create controller", "controller", "MattermostRestoreDB")
 		os.Exit(1)
 	}
+	if err = mattermost.NewMattermostReconciler(
+		mgr,
+		config.MaxReconcilingInstallations,
+		config.RequeueOnLimitDelay,
+	).
+		SetupWithManager(mgr); err != nil {
+		logger.Error(err, "Unable to create controller", "controller", "Mattermost")
+		os.Exit(1)
+	}
+
 	// +kubebuilder:scaffold:builder
 
 	logger.Info("Starting manager")

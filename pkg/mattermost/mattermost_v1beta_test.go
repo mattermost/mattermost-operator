@@ -52,7 +52,7 @@ func TestGenerateService_V1Beta(t *testing.T) {
 				Spec: tt.spec,
 			}
 
-			service := GenerateServiceV1Beta(mattermost, "", "")
+			service := GenerateServiceV1Beta(mattermost)
 			require.NotNil(t, service)
 
 			if mattermost.Spec.UseServiceLoadBalancer {
