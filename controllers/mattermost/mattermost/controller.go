@@ -119,9 +119,9 @@ func (r *MattermostReconciler) Reconcile(request ctrl.Request) (ctrl.Result, err
 	}
 
 	if !reflect.DeepEqual(originalMattermost.Spec, mattermost.Spec) {
-		result, err := r.updateSpec(reqLogger, originalMattermost, mattermost)
+		err = r.updateSpec(reqLogger, originalMattermost, mattermost)
 		if err != nil {
-			return result, err
+			return reconcile.Result{}, err
 		}
 	}
 
@@ -162,7 +162,7 @@ func (r *MattermostReconciler) Reconcile(request ctrl.Request) (ctrl.Result, err
 	return reconcile.Result{}, nil
 }
 
-func (r *MattermostReconciler) updateSpec(reqLogger logr.Logger, originalMattermost *mattermostv1beta1.Mattermost, updated *mattermostv1beta1.Mattermost) (ctrl.Result, error) {
+func (r *MattermostReconciler) updateSpec(reqLogger logr.Logger, originalMattermost *mattermostv1beta1.Mattermost, updated *mattermostv1beta1.Mattermost) error {
 	reqLogger.Info(fmt.Sprintf("Updating spec"),
 		"Old", fmt.Sprintf("%+v", originalMattermost.Spec),
 		"New", fmt.Sprintf("%+v", updated.Spec),
@@ -171,9 +171,9 @@ func (r *MattermostReconciler) updateSpec(reqLogger logr.Logger, originalMatterm
 	if err != nil {
 		reqLogger.Error(err, "failed to update the Mattermost spec")
 		r.setStateReconcilingAndLogError(updated, reqLogger)
-		return reconcile.Result{}, err
+		return err
 	}
-	return ctrl.Result{}, nil
+	return nil
 }
 
 func countReconciling(mattermosts []mattermostv1beta1.Mattermost) int {
