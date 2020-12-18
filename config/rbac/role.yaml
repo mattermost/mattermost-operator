@@ -86,7 +86,7 @@ rules:
   - apiGroups:
       - installation.mattermost.com
     resources:
-      - mattermosts
+      - '*'
     verbs:
       - '*'
   - apiGroups:
