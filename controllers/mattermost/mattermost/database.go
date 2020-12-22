@@ -8,14 +8,14 @@ import (
 	mysqlOperator "github.com/presslabs/mysql-operator/pkg/apis/mysql/v1alpha1"
 
 	"github.com/go-logr/logr"
-	mattermostv1beta1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
+	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	mattermostApp "github.com/mattermost/mattermost-operator/pkg/mattermost"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func (r *MattermostReconciler) checkDatabase(mattermost *mattermostv1beta1.Mattermost, reqLogger logr.Logger) (mattermostApp.DatabaseConfig, error) {
+func (r *MattermostReconciler) checkDatabase(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) (mattermostApp.DatabaseConfig, error) {
 	reqLogger = reqLogger.WithValues("Reconcile", "database")
 
 	if mattermost.Spec.Database.IsExternal() {
@@ -25,7 +25,7 @@ func (r *MattermostReconciler) checkDatabase(mattermost *mattermostv1beta1.Matte
 	return r.checkOperatorManagedDB(mattermost, reqLogger)
 }
 
-func (r *MattermostReconciler) readExternalDBSecret(mattermost *mattermostv1beta1.Mattermost) (mattermostApp.DatabaseConfig, error) {
+func (r *MattermostReconciler) readExternalDBSecret(mattermost *mmv1beta.Mattermost) (mattermostApp.DatabaseConfig, error) {
 	secretName := types.NamespacedName{Name: mattermost.Spec.Database.External.Secret, Namespace: mattermost.Namespace}
 
 	var secret corev1.Secret
@@ -37,7 +37,7 @@ func (r *MattermostReconciler) readExternalDBSecret(mattermost *mattermostv1beta
 	return mattermostApp.NewExternalDBConfig(mattermost, secret)
 }
 
-func (r *MattermostReconciler) checkOperatorManagedDB(mattermost *mattermostv1beta1.Mattermost, reqLogger logr.Logger) (mattermostApp.DatabaseConfig, error) {
+func (r *MattermostReconciler) checkOperatorManagedDB(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) (mattermostApp.DatabaseConfig, error) {
 	if mattermost.Spec.Database.OperatorManaged == nil {
 		return nil, fmt.Errorf("configuration for Operator managed database not provided")
 	}
@@ -52,7 +52,7 @@ func (r *MattermostReconciler) checkOperatorManagedDB(mattermost *mattermostv1be
 	return nil, fmt.Errorf("database of type '%s' is not supported", mattermost.Spec.Database.OperatorManaged.Type)
 }
 
-func (r *MattermostReconciler) checkOperatorManagedMySQL(mattermost *mattermostv1beta1.Mattermost, reqLogger logr.Logger) (mattermostApp.DatabaseConfig, error) {
+func (r *MattermostReconciler) checkOperatorManagedMySQL(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) (mattermostApp.DatabaseConfig, error) {
 	reqLogger = reqLogger.WithValues("Reconcile", "mysql")
 
 	err := r.checkMySQLCluster(mattermost, reqLogger)
@@ -70,7 +70,7 @@ func (r *MattermostReconciler) checkOperatorManagedMySQL(mattermost *mattermostv
 	return mattermostApp.NewMySQLDBConfig(*dbSecret)
 }
 
-func (r *MattermostReconciler) checkMySQLCluster(mattermost *mattermostv1beta1.Mattermost, reqLogger logr.Logger) error {
+func (r *MattermostReconciler) checkMySQLCluster(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) error {
 	desired := mattermostmysql.ClusterV1Beta(mattermost)
 
 	err := r.Resources.CreateMySQLClusterIfNotExists(mattermost, desired, reqLogger)

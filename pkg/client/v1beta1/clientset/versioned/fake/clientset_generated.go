@@ -7,8 +7,8 @@ package fake
 
 import (
 	clientset "github.com/mattermost/mattermost-operator/pkg/client/v1beta1/clientset/versioned"
-	mattermostv1beta1 "github.com/mattermost/mattermost-operator/pkg/client/v1beta1/clientset/versioned/typed/mattermost/v1beta1"
-	fakemattermostv1beta1 "github.com/mattermost/mattermost-operator/pkg/client/v1beta1/clientset/versioned/typed/mattermost/v1beta1/fake"
+	mmv1beta "github.com/mattermost/mattermost-operator/pkg/client/v1beta1/clientset/versioned/typed/mattermost/v1beta1"
+	fakemmv1beta "github.com/mattermost/mattermost-operator/pkg/client/v1beta1/clientset/versioned/typed/mattermost/v1beta1/fake"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
@@ -64,6 +64,6 @@ func (c *Clientset) Tracker() testing.ObjectTracker {
 var _ clientset.Interface = &Clientset{}
 
 // MattermostV1beta1 retrieves the MattermostV1beta1Client
-func (c *Clientset) MattermostV1beta1() mattermostv1beta1.MattermostV1beta1Interface {
-	return &fakemattermostv1beta1.FakeMattermostV1beta1{Fake: &c.Fake}
+func (c *Clientset) MattermostV1beta1() mmv1beta.MattermostV1beta1Interface {
+	return &fakemmv1beta.FakeMattermostV1beta1{Fake: &c.Fake}
 }

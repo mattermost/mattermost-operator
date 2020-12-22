@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	mattermostv1beta1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
+	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -22,7 +22,7 @@ type FileStoreInfo struct {
 
 type ExternalFileStore struct{}
 
-func (e *ExternalFileStore) InitContainers(_ *mattermostv1beta1.Mattermost) []corev1.Container {
+func (e *ExternalFileStore) InitContainers(_ *mmv1beta.Mattermost) []corev1.Container {
 	return []corev1.Container{}
 }
 
@@ -31,7 +31,7 @@ type OperatorManagedMinioConfig struct {
 	minioURL   string
 }
 
-func (e *OperatorManagedMinioConfig) InitContainers(mattermost *mattermostv1beta1.Mattermost) []corev1.Container {
+func (e *OperatorManagedMinioConfig) InitContainers(mattermost *mmv1beta.Mattermost) []corev1.Container {
 	initContainers := []corev1.Container{
 		// Create the init container to create the MinIO bucket
 		{
@@ -68,7 +68,7 @@ func (e *OperatorManagedMinioConfig) InitContainers(mattermost *mattermostv1beta
 	return initContainers
 }
 
-func NewExternalFileStoreInfo(mattermost *mattermostv1beta1.Mattermost, secret corev1.Secret) (*FileStoreInfo, error) {
+func NewExternalFileStoreInfo(mattermost *mmv1beta.Mattermost, secret corev1.Secret) (*FileStoreInfo, error) {
 	if mattermost.Spec.FileStore.External == nil {
 		return nil, errors.New("external file store configuration not provided")
 	}
@@ -98,7 +98,7 @@ func NewExternalFileStoreInfo(mattermost *mattermostv1beta1.Mattermost, secret c
 	}, nil
 }
 
-func NewOperatorManagedFileStoreInfo(mattermost *mattermostv1beta1.Mattermost, secret, minioURL string) *FileStoreInfo {
+func NewOperatorManagedFileStoreInfo(mattermost *mmv1beta.Mattermost, secret, minioURL string) *FileStoreInfo {
 	return &FileStoreInfo{
 		secretName: secret,
 		bucketName: mattermost.Name,

@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	mattermostv1beta1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
+	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	pkgUtils "github.com/mattermost/mattermost-operator/pkg/utils"
 
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -21,16 +21,16 @@ import (
 )
 
 type DatabaseConfig interface {
-	EnvVars(mattermost *mattermostv1beta1.Mattermost) []corev1.EnvVar
-	InitContainers(mattermost *mattermostv1beta1.Mattermost) []corev1.Container
+	EnvVars(mattermost *mmv1beta.Mattermost) []corev1.EnvVar
+	InitContainers(mattermost *mmv1beta.Mattermost) []corev1.Container
 }
 
 type FileStoreConfig interface {
-	InitContainers(mattermost *mattermostv1beta1.Mattermost) []corev1.Container
+	InitContainers(mattermost *mmv1beta.Mattermost) []corev1.Container
 }
 
 // GenerateService returns the service for the Mattermost app.
-func GenerateServiceV1Beta(mattermost *mattermostv1beta1.Mattermost) *corev1.Service {
+func GenerateServiceV1Beta(mattermost *mmv1beta.Mattermost) *corev1.Service {
 	baseAnnotations := map[string]string{
 		"service.alpha.kubernetes.io/tolerate-unready-endpoints": "true",
 	}
@@ -86,7 +86,7 @@ func configureMattermostService(service *corev1.Service) *corev1.Service {
 }
 
 // GenerateIngress returns the ingress for the Mattermost app.
-func GenerateIngressV1Beta(mattermost *mattermostv1beta1.Mattermost, name, ingressName string, ingressAnnotations map[string]string) *v1beta1.Ingress {
+func GenerateIngressV1Beta(mattermost *mmv1beta.Mattermost, name, ingressName string, ingressAnnotations map[string]string) *v1beta1.Ingress {
 	ingress := &v1beta1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            name,
@@ -130,7 +130,7 @@ func GenerateIngressV1Beta(mattermost *mattermostv1beta1.Mattermost, name, ingre
 }
 
 // GenerateDeployment returns the deployment for Mattermost app.
-func GenerateDeploymentV1Beta(mattermost *mattermostv1beta1.Mattermost, db DatabaseConfig, fileStore *FileStoreInfo, deploymentName, ingressName, serviceAccountName, containerImage string) *appsv1.Deployment {
+func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig, fileStore *FileStoreInfo, deploymentName, ingressName, serviceAccountName, containerImage string) *appsv1.Deployment {
 	// DB
 	envVarDB := db.EnvVars(mattermost)
 	initContainers := db.InitContainers(mattermost)
@@ -215,7 +215,7 @@ func GenerateDeploymentV1Beta(mattermost *mattermostv1beta1.Mattermost, db Datab
 			RevisionHistoryLimit: pkgUtils.NewInt32(defaultRevHistoryLimit),
 			Replicas:             mattermost.Spec.Replicas,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: mattermostv1beta1.MattermostSelectorLabels(deploymentName),
+				MatchLabels: mmv1beta.MattermostSelectorLabels(deploymentName),
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -259,7 +259,7 @@ func GenerateDeploymentV1Beta(mattermost *mattermostv1beta1.Mattermost, db Datab
 }
 
 // GenerateSecret returns the secret for Mattermost
-func GenerateSecretV1Beta(mattermost *mattermostv1beta1.Mattermost, secretName string, labels map[string]string, values map[string][]byte) *corev1.Secret {
+func GenerateSecretV1Beta(mattermost *mmv1beta.Mattermost, secretName string, labels map[string]string, values map[string][]byte) *corev1.Secret {
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:          labels,
@@ -272,7 +272,7 @@ func GenerateSecretV1Beta(mattermost *mattermostv1beta1.Mattermost, secretName s
 }
 
 // GenerateServiceAccount returns the Service Account for Mattermost
-func GenerateServiceAccountV1Beta(mattermost *mattermostv1beta1.Mattermost, saName string) *corev1.ServiceAccount {
+func GenerateServiceAccountV1Beta(mattermost *mmv1beta.Mattermost, saName string) *corev1.ServiceAccount {
 	return &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            saName,
@@ -283,7 +283,7 @@ func GenerateServiceAccountV1Beta(mattermost *mattermostv1beta1.Mattermost, saNa
 }
 
 // GenerateRole returns the Role for Mattermost
-func GenerateRoleV1Beta(mattermost *mattermostv1beta1.Mattermost, roleName string) *rbacv1.Role {
+func GenerateRoleV1Beta(mattermost *mmv1beta.Mattermost, roleName string) *rbacv1.Role {
 	return &rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            roleName,
@@ -306,7 +306,7 @@ func mattermostRolePermissions() []rbacv1.PolicyRule {
 }
 
 // GenerateRoleBinding returns the RoleBinding for Mattermost
-func GenerateRoleBindingV1Beta(mattermost *mattermostv1beta1.Mattermost, roleName, saName string) *rbacv1.RoleBinding {
+func GenerateRoleBindingV1Beta(mattermost *mmv1beta.Mattermost, roleName, saName string) *rbacv1.RoleBinding {
 	return &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            roleName,
@@ -320,11 +320,11 @@ func GenerateRoleBindingV1Beta(mattermost *mattermostv1beta1.Mattermost, roleNam
 	}
 }
 
-func MattermostOwnerReference(mattermost *mattermostv1beta1.Mattermost) []metav1.OwnerReference {
+func MattermostOwnerReference(mattermost *mmv1beta.Mattermost) []metav1.OwnerReference {
 	return []metav1.OwnerReference{
 		*metav1.NewControllerRef(mattermost, schema.GroupVersionKind{
-			Group:   mattermostv1beta1.GroupVersion.Group,
-			Version: mattermostv1beta1.GroupVersion.Version,
+			Group:   mmv1beta.GroupVersion.Group,
+			Version: mmv1beta.GroupVersion.Version,
 			Kind:    "Mattermost",
 		}),
 	}
@@ -332,7 +332,7 @@ func MattermostOwnerReference(mattermost *mattermostv1beta1.Mattermost) []metav1
 
 // newService returns semi-finished service with common parts filled.
 // Returned service is expected to be completed by the caller.
-func newServiceV1Beta(mattermost *mattermostv1beta1.Mattermost, annotations map[string]string) *corev1.Service {
+func newServiceV1Beta(mattermost *mmv1beta.Mattermost, annotations map[string]string) *corev1.Service {
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:          mattermost.MattermostLabels(mattermost.Name),
@@ -342,7 +342,7 @@ func newServiceV1Beta(mattermost *mattermostv1beta1.Mattermost, annotations map[
 			Annotations:     annotations,
 		},
 		Spec: corev1.ServiceSpec{
-			Selector: mattermostv1beta1.MattermostSelectorLabels(mattermost.Name),
+			Selector: mmv1beta.MattermostSelectorLabels(mattermost.Name),
 		},
 	}
 }

@@ -7,7 +7,7 @@ import (
 
 	"github.com/mattermost/mattermost-operator/pkg/resources"
 
-	mattermostv1beta1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
+	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 
 	blubr "github.com/mattermost/blubr"
 	"github.com/mattermost/mattermost-operator/pkg/components/utils"
@@ -42,13 +42,13 @@ func TestReconcile(t *testing.T) {
 	mmName := "foo"
 	mmNamespace := "default"
 	replicas := int32(4)
-	mm := &mattermostv1beta1.Mattermost{
+	mm := &mmv1beta.Mattermost{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      mmName,
 			Namespace: mmNamespace,
 			UID:       types.UID("test"),
 		},
-		Spec: mattermostv1beta1.MattermostSpec{
+		Spec: mmv1beta.MattermostSpec{
 			Replicas:    &replicas,
 			Image:       "mattermost/mattermost-enterprise-edition",
 			Version:     operatortest.LatestStableMattermostVersion,
@@ -58,7 +58,7 @@ func TestReconcile(t *testing.T) {
 
 	// Register operator types with the runtime scheme.
 	s := prepareSchema(t, scheme.Scheme)
-	s.AddKnownTypes(mattermostv1beta1.GroupVersion, mm)
+	s.AddKnownTypes(mmv1beta.GroupVersion, mm)
 	// Create a fake client to mock API calls.
 	c := fake.NewFakeClient()
 	// Create a ReconcileMattermost object with the scheme and fake
@@ -264,7 +264,7 @@ func TestReconcile(t *testing.T) {
 		t.Run("correct status", func(t *testing.T) {
 			err = c.Get(context.TODO(), mmKey, mm)
 			require.NoError(t, err)
-			assert.Equal(t, mm.Status.State, mattermostv1beta1.Stable)
+			assert.Equal(t, mm.Status.State, mmv1beta.Stable)
 			assert.Equal(t, mm.Status.Replicas, *mm.Spec.Replicas)
 			assert.Equal(t, mm.Status.Version, mm.Spec.Version)
 			assert.Equal(t, mm.Status.Image, mm.Spec.Image)
@@ -283,28 +283,28 @@ func TestReconcilingLimit(t *testing.T) {
 	replicas := int32(4)
 	requeueOnLimitDelay := 35 * time.Second
 
-	newMattermost := func(name string, uid string, state mattermostv1beta1.RunningState) *mattermostv1beta1.Mattermost {
-		return &mattermostv1beta1.Mattermost{
+	newMattermost := func(name string, uid string, state mmv1beta.RunningState) *mmv1beta.Mattermost {
+		return &mmv1beta.Mattermost{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      name,
 				Namespace: mmNamespace,
 				UID:       types.UID(uid),
 			},
-			Spec: mattermostv1beta1.MattermostSpec{
+			Spec: mmv1beta.MattermostSpec{
 				Replicas:    &replicas,
 				Image:       "mattermost/mattermost-enterprise-edition",
 				Version:     operatortest.LatestStableMattermostVersion,
 				IngressName: "foo.mattermost.dev",
 			},
-			Status: mattermostv1beta1.MattermostStatus{State: state},
+			Status: mmv1beta.MattermostStatus{State: state},
 		}
 	}
 
-	mm1 := newMattermost("first", "1", mattermostv1beta1.Reconciling)
+	mm1 := newMattermost("first", "1", mmv1beta.Reconciling)
 
 	// Register operator types with the runtime scheme.
 	s := prepareSchema(t, scheme.Scheme)
-	s.AddKnownTypes(mattermostv1beta1.GroupVersion, mm1)
+	s.AddKnownTypes(mmv1beta.GroupVersion, mm1)
 	// Create a fake client to mock API calls.
 	c := fake.NewFakeClient()
 	// Create a ReconcileMattermost object with the scheme and fake client.
@@ -318,7 +318,7 @@ func TestReconcilingLimit(t *testing.T) {
 	}
 
 	assertInstallationsCount := func(t *testing.T, expectedCIs, expectedReconciling int) {
-		var mmList mattermostv1beta1.MattermostList
+		var mmList mmv1beta.MattermostList
 		err := c.List(context.TODO(), &mmList)
 		require.NoError(t, err)
 
@@ -329,11 +329,11 @@ func TestReconcilingLimit(t *testing.T) {
 	err := c.Create(context.TODO(), mm1)
 	require.NoError(t, err)
 
-	mm2 := newMattermost("second", "2", mattermostv1beta1.Reconciling)
+	mm2 := newMattermost("second", "2", mmv1beta.Reconciling)
 	err = c.Create(context.TODO(), mm2)
 	require.NoError(t, err)
 
-	mm3 := newMattermost("third", "3", mattermostv1beta1.Reconciling)
+	mm3 := newMattermost("third", "3", mmv1beta.Reconciling)
 	err = c.Create(context.TODO(), mm3)
 	require.NoError(t, err)
 
@@ -341,7 +341,7 @@ func TestReconcilingLimit(t *testing.T) {
 	err = c.Create(context.TODO(), mm4)
 	require.NoError(t, err)
 
-	mm5 := newMattermost("fifth", "5", mattermostv1beta1.Stable)
+	mm5 := newMattermost("fifth", "5", mmv1beta.Stable)
 	err = c.Create(context.TODO(), mm5)
 	require.NoError(t, err)
 
@@ -441,11 +441,11 @@ func TestReconcilingLimit(t *testing.T) {
 	})
 }
 
-func requestForCI(mattermost *mattermostv1beta1.Mattermost) reconcile.Request {
+func requestForCI(mattermost *mmv1beta.Mattermost) reconcile.Request {
 	return reconcile.Request{NamespacedName: types.NamespacedName{Name: mattermost.Name, Namespace: mattermost.Namespace}}
 }
 
-func prepAllDependencyTestResources(client client.Client, mattermost *mattermostv1beta1.Mattermost) error {
+func prepAllDependencyTestResources(client client.Client, mattermost *mmv1beta.Mattermost) error {
 	minioService := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      mattermost.Name + "-minio-hl-svc",
@@ -461,7 +461,7 @@ func prepAllDependencyTestResources(client client.Client, mattermost *mattermost
 }
 
 func prepareSchema(t *testing.T, scheme *runtime.Scheme) *runtime.Scheme {
-	err := mattermostv1beta1.AddToScheme(scheme)
+	err := mmv1beta.AddToScheme(scheme)
 	require.NoError(t, err)
 	err = v1beta1Minio.AddToScheme(scheme)
 	require.NoError(t, err)

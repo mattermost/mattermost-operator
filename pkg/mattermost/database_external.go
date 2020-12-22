@@ -3,7 +3,7 @@ package mattermost
 import (
 	"errors"
 
-	mattermostv1beta1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
+	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	"github.com/mattermost/mattermost-operator/pkg/database"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -15,7 +15,7 @@ type ExternalDBConfig struct {
 	hasDBCheckURL      bool
 }
 
-func NewExternalDBConfig(mattermost *mattermostv1beta1.Mattermost, secret corev1.Secret) (*ExternalDBConfig, error) {
+func NewExternalDBConfig(mattermost *mmv1beta.Mattermost, secret corev1.Secret) (*ExternalDBConfig, error) {
 	if mattermost.Spec.Database.External == nil {
 		return nil, errors.New("external database config not provided")
 	}
@@ -46,7 +46,7 @@ func NewExternalDBConfig(mattermost *mattermostv1beta1.Mattermost, secret corev1
 	return externalDB, nil
 }
 
-func (e *ExternalDBConfig) EnvVars(_ *mattermostv1beta1.Mattermost) []corev1.EnvVar {
+func (e *ExternalDBConfig) EnvVars(_ *mmv1beta.Mattermost) []corev1.EnvVar {
 	dbEnvVars := []corev1.EnvVar{
 		{
 			Name:      "MM_CONFIG",
@@ -64,7 +64,7 @@ func (e *ExternalDBConfig) EnvVars(_ *mattermostv1beta1.Mattermost) []corev1.Env
 	return dbEnvVars
 }
 
-func (e *ExternalDBConfig) InitContainers(_ *mattermostv1beta1.Mattermost) []corev1.Container {
+func (e *ExternalDBConfig) InitContainers(_ *mmv1beta.Mattermost) []corev1.Container {
 	var initContainers []corev1.Container
 	if e.hasDBCheckURL {
 		container := getDBCheckInitContainer(e.secretName, e.dbType)

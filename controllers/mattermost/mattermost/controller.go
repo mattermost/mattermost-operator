@@ -8,7 +8,7 @@ import (
 
 	"github.com/mattermost/mattermost-operator/pkg/resources"
 
-	mattermostv1beta1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
+	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 
 	batchv1 "k8s.io/api/batch/v1"
 
@@ -51,7 +51,7 @@ func NewMattermostReconciler(mgr ctrl.Manager, maxReconciling int, requeueOnLimi
 
 func (r *MattermostReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&mattermostv1beta1.Mattermost{}).
+		For(&mmv1beta.Mattermost{}).
 		Owns(&corev1.Service{}).
 		Owns(&corev1.Secret{}).
 		Owns(&v1beta1.Ingress{}).
@@ -72,7 +72,7 @@ func (r *MattermostReconciler) Reconcile(request ctrl.Request) (ctrl.Result, err
 	reqLogger.Info("Reconciling Mattermost")
 
 	// Fetch the Mattermost.
-	mattermost := &mattermostv1beta1.Mattermost{}
+	mattermost := &mmv1beta.Mattermost{}
 	err := r.Client.Get(context.TODO(), request.NamespacedName, mattermost)
 	if err != nil && k8sErrors.IsNotFound(err) {
 		// Request object not found, could have been deleted after reconcile
@@ -82,8 +82,8 @@ func (r *MattermostReconciler) Reconcile(request ctrl.Request) (ctrl.Result, err
 		return reconcile.Result{}, err
 	}
 
-	if mattermost.Status.State != mattermostv1beta1.Reconciling {
-		var mmListInstallations mattermostv1beta1.MattermostList
+	if mattermost.Status.State != mmv1beta.Reconciling {
+		var mmListInstallations mmv1beta.MattermostList
 		err = r.Client.List(context.TODO(), &mmListInstallations)
 		if err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "failed to list Mattermosts")
@@ -162,7 +162,7 @@ func (r *MattermostReconciler) Reconcile(request ctrl.Request) (ctrl.Result, err
 	return reconcile.Result{}, nil
 }
 
-func (r *MattermostReconciler) updateSpec(reqLogger logr.Logger, originalMattermost *mattermostv1beta1.Mattermost, updated *mattermostv1beta1.Mattermost) error {
+func (r *MattermostReconciler) updateSpec(reqLogger logr.Logger, originalMattermost *mmv1beta.Mattermost, updated *mmv1beta.Mattermost) error {
 	reqLogger.Info(fmt.Sprintf("Updating spec"),
 		"Old", fmt.Sprintf("%+v", originalMattermost.Spec),
 		"New", fmt.Sprintf("%+v", updated.Spec),
@@ -176,10 +176,10 @@ func (r *MattermostReconciler) updateSpec(reqLogger logr.Logger, originalMatterm
 	return nil
 }
 
-func countReconciling(mattermosts []mattermostv1beta1.Mattermost) int {
+func countReconciling(mattermosts []mmv1beta.Mattermost) int {
 	sum := 0
 	for _, ci := range mattermosts {
-		if ci.Status.State == mattermostv1beta1.Reconciling {
+		if ci.Status.State == mmv1beta.Reconciling {
 			sum++
 		}
 	}

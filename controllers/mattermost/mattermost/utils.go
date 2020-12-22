@@ -6,7 +6,7 @@ import (
 	"reflect"
 
 	"github.com/go-logr/logr"
-	mattermostv1beta1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
+	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -29,14 +29,14 @@ func (r *MattermostReconciler) assertSecretContains(secretName, keyName, namespa
 }
 
 // setStateReconciling sets the Mattermost state to reconciling.
-func (r *MattermostReconciler) setStateReconciling(mattermost *mattermostv1beta1.Mattermost, reqLogger logr.Logger) error {
-	return r.setState(mattermost, mattermostv1beta1.Reconciling, reqLogger)
+func (r *MattermostReconciler) setStateReconciling(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) error {
+	return r.setState(mattermost, mmv1beta.Reconciling, reqLogger)
 }
 
 // setStateReconcilingAndLogError attempts to set the Mattermost state
 // to reconciling. Any errors attempting this are logged, but not returned. This
 // should only be used when the outcome of setting the state can be ignored.
-func (r *MattermostReconciler) setStateReconcilingAndLogError(mattermost *mattermostv1beta1.Mattermost, reqLogger logr.Logger) {
+func (r *MattermostReconciler) setStateReconcilingAndLogError(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) {
 	err := r.setStateReconciling(mattermost, reqLogger)
 	if err != nil {
 		reqLogger.Error(err, "Failed to set state to reconciling")
@@ -45,7 +45,7 @@ func (r *MattermostReconciler) setStateReconcilingAndLogError(mattermost *matter
 
 // setState sets the provided Mattermost to the provided state if that
 // is different from the current state.
-func (r *MattermostReconciler) setState(mattermost *mattermostv1beta1.Mattermost, desired mattermostv1beta1.RunningState, reqLogger logr.Logger) error {
+func (r *MattermostReconciler) setState(mattermost *mmv1beta.Mattermost, desired mmv1beta.RunningState, reqLogger logr.Logger) error {
 	if mattermost.Status.State == desired {
 		return nil
 	}
@@ -60,7 +60,7 @@ func (r *MattermostReconciler) setState(mattermost *mattermostv1beta1.Mattermost
 	return nil
 }
 
-func (r *MattermostReconciler) updateStatus(mattermost *mattermostv1beta1.Mattermost, status mattermostv1beta1.MattermostStatus, reqLogger logr.Logger) error {
+func (r *MattermostReconciler) updateStatus(mattermost *mmv1beta.Mattermost, status mmv1beta.MattermostStatus, reqLogger logr.Logger) error {
 	if reflect.DeepEqual(mattermost.Status, status) {
 		return nil
 	}

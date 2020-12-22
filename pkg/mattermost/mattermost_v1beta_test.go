@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	mattermostv1beta1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
+	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	"github.com/mattermost/mattermost-operator/pkg/database"
 	"github.com/mattermost/mattermost-operator/pkg/utils"
 	appsv1 "k8s.io/api/apps/v1"
@@ -22,15 +22,15 @@ import (
 func TestGenerateService_V1Beta(t *testing.T) {
 	tests := []struct {
 		name string
-		spec mattermostv1beta1.MattermostSpec
+		spec mmv1beta.MattermostSpec
 	}{
 		{
 			name: "type headless",
-			spec: mattermostv1beta1.MattermostSpec{},
+			spec: mmv1beta.MattermostSpec{},
 		},
 		{
 			name: "type load-balancer",
-			spec: mattermostv1beta1.MattermostSpec{
+			spec: mmv1beta.MattermostSpec{
 				UseServiceLoadBalancer: true,
 			},
 		},
@@ -48,7 +48,7 @@ func TestGenerateService_V1Beta(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mattermost := &mattermostv1beta1.Mattermost{
+			mattermost := &mmv1beta.Mattermost{
 				Spec: tt.spec,
 			}
 
@@ -70,15 +70,15 @@ func TestGenerateService_V1Beta(t *testing.T) {
 func TestGenerateIngress_V1Beta(t *testing.T) {
 	tests := []struct {
 		name string
-		spec mattermostv1beta1.MattermostSpec
+		spec mmv1beta.MattermostSpec
 	}{
 		{
 			name: "no tls",
-			spec: mattermostv1beta1.MattermostSpec{},
+			spec: mmv1beta.MattermostSpec{},
 		},
 		{
 			name: "use tls",
-			spec: mattermostv1beta1.MattermostSpec{
+			spec: mmv1beta.MattermostSpec{
 				UseIngressTLS: true,
 			},
 		},
@@ -86,7 +86,7 @@ func TestGenerateIngress_V1Beta(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mattermost := &mattermostv1beta1.Mattermost{
+			mattermost := &mmv1beta.Mattermost{
 				Spec: tt.spec,
 			}
 
@@ -105,7 +105,7 @@ func TestGenerateIngress_V1Beta(t *testing.T) {
 func TestGenerateDeployment_V1Beta(t *testing.T) {
 	tests := []struct {
 		name        string
-		spec        mattermostv1beta1.MattermostSpec
+		spec        mmv1beta.MattermostSpec
 		database    DatabaseConfig
 		fileStore   *FileStoreInfo
 		want        *appsv1.Deployment
@@ -113,7 +113,7 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 	}{
 		{
 			name: "has license",
-			spec: mattermostv1beta1.MattermostSpec{
+			spec: mmv1beta.MattermostSpec{
 				LicenseSecret: "license-secret",
 			},
 			want: &appsv1.Deployment{
@@ -138,20 +138,20 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 		},
 		{
 			name:     "external database",
-			spec:     mattermostv1beta1.MattermostSpec{},
+			spec:     mmv1beta.MattermostSpec{},
 			database: &ExternalDBConfig{secretName: "database-secret"},
 			want:     &appsv1.Deployment{},
 		},
 		{
 			name:        "external database with reader endpoints",
-			spec:        mattermostv1beta1.MattermostSpec{},
+			spec:        mmv1beta.MattermostSpec{},
 			database:    &ExternalDBConfig{secretName: "database-secret", hasReaderEndpoints: true},
 			want:        &appsv1.Deployment{},
 			requiredEnv: []string{"MM_SQLSETTINGS_DATASOURCEREPLICAS"},
 		},
 		{
 			name: "external known database with check url",
-			spec: mattermostv1beta1.MattermostSpec{},
+			spec: mmv1beta.MattermostSpec{},
 			database: &ExternalDBConfig{
 				secretName:    "database-secret",
 				hasDBCheckURL: true,
@@ -161,7 +161,7 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 		},
 		{
 			name: "external unknown database with check url",
-			spec: mattermostv1beta1.MattermostSpec{},
+			spec: mmv1beta.MattermostSpec{},
 			database: &ExternalDBConfig{
 				secretName:    "database-secret",
 				hasDBCheckURL: true,
@@ -171,7 +171,7 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 		},
 		{
 			name: "external file store",
-			spec: mattermostv1beta1.MattermostSpec{},
+			spec: mmv1beta.MattermostSpec{},
 			fileStore: &FileStoreInfo{
 				secretName: "file-store-secret",
 				bucketName: "file-store-bucket",
@@ -182,8 +182,8 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 		},
 		{
 			name: "node selector 1",
-			spec: mattermostv1beta1.MattermostSpec{
-				Scheduling: mattermostv1beta1.Scheduling{
+			spec: mmv1beta.MattermostSpec{
+				Scheduling: mmv1beta.Scheduling{
 					NodeSelector: map[string]string{"type": "compute"},
 				},
 			},
@@ -199,8 +199,8 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 		},
 		{
 			name: "node selector 2",
-			spec: mattermostv1beta1.MattermostSpec{
-				Scheduling: mattermostv1beta1.Scheduling{
+			spec: mmv1beta.MattermostSpec{
+				Scheduling: mmv1beta.Scheduling{
 					NodeSelector: map[string]string{"type": "compute", "size": "big", "region": "iceland"},
 				},
 			},
@@ -216,8 +216,8 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 		},
 		{
 			name: "node selector nil",
-			spec: mattermostv1beta1.MattermostSpec{
-				Scheduling: mattermostv1beta1.Scheduling{
+			spec: mmv1beta.MattermostSpec{
+				Scheduling: mmv1beta.Scheduling{
 					NodeSelector: nil,
 				},
 			},
@@ -233,8 +233,8 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 		},
 		{
 			name: "affinity 1",
-			spec: mattermostv1beta1.MattermostSpec{
-				Scheduling: mattermostv1beta1.Scheduling{
+			spec: mmv1beta.MattermostSpec{
+				Scheduling: mmv1beta.Scheduling{
 					Affinity: &corev1.Affinity{
 						PodAffinity: &corev1.PodAffinity{
 							RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
@@ -270,8 +270,8 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 		},
 		{
 			name: "affinity nil",
-			spec: mattermostv1beta1.MattermostSpec{
-				Scheduling: mattermostv1beta1.Scheduling{
+			spec: mmv1beta.MattermostSpec{
+				Scheduling: mmv1beta.Scheduling{
 					Affinity: nil,
 				},
 			},
@@ -287,7 +287,7 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 		},
 		{
 			name: "negative app replica",
-			spec: mattermostv1beta1.MattermostSpec{
+			spec: mmv1beta.MattermostSpec{
 				Replicas: utils.NewInt32(-1),
 			},
 			want: &appsv1.Deployment{
@@ -298,7 +298,7 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 		},
 		{
 			name: "nil replicas",
-			spec: mattermostv1beta1.MattermostSpec{
+			spec: mmv1beta.MattermostSpec{
 				Replicas: nil,
 			},
 			want: &appsv1.Deployment{
@@ -309,7 +309,7 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 		},
 		{
 			name: "volumes",
-			spec: mattermostv1beta1.MattermostSpec{
+			spec: mmv1beta.MattermostSpec{
 				Volumes:      []corev1.Volume{fixVolume()},
 				VolumeMounts: []corev1.VolumeMount{fixVolumeMount()},
 			},
@@ -325,7 +325,7 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 		},
 		{
 			name: "volumes and licence",
-			spec: mattermostv1beta1.MattermostSpec{
+			spec: mmv1beta.MattermostSpec{
 				LicenseSecret: "license-secret",
 				Volumes:       []corev1.Volume{fixVolume()},
 				VolumeMounts:  []corev1.VolumeMount{fixVolumeMount()},
@@ -352,8 +352,8 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 		},
 		{
 			name: "elastic search",
-			spec: mattermostv1beta1.MattermostSpec{
-				ElasticSearch: mattermostv1beta1.ElasticSearch{
+			spec: mmv1beta.MattermostSpec{
+				ElasticSearch: mmv1beta.ElasticSearch{
 					Host:     "http://elastic",
 					UserName: "user",
 					Password: "password",
@@ -372,7 +372,7 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mattermost := &mattermostv1beta1.Mattermost{
+			mattermost := &mmv1beta.Mattermost{
 				Spec: tt.spec,
 			}
 			databaseConfig := tt.database
@@ -393,7 +393,7 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 			assert.Equal(t, tt.want.Spec.Template.Spec.Volumes, deployment.Spec.Template.Spec.Volumes)
 			assert.Equal(t, len(tt.want.Spec.Template.Spec.Volumes), len(deployment.Spec.Template.Spec.Containers[0].VolumeMounts))
 
-			mattermostAppContainer := mattermostv1beta1.GetMattermostAppContainerFromDeployment(deployment)
+			mattermostAppContainer := mmv1beta.GetMattermostAppContainerFromDeployment(deployment)
 			require.NotNil(t, mattermostAppContainer)
 
 			// Basic env var check to ensure the key exists.
@@ -445,7 +445,7 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 func TestGenerateRBACResources_V1Beta(t *testing.T) {
 	roleName := "role"
 	saName := "service-account"
-	mattermost := &mattermostv1beta1.Mattermost{
+	mattermost := &mmv1beta.Mattermost{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-mm",
 			Namespace: "test-namespace",

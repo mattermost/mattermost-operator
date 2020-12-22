@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
-	mattermostv1beta1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
+	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	"github.com/mattermost/mattermost-operator/pkg/mattermost/healthcheck"
 	"github.com/pkg/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -16,9 +16,9 @@ import (
 // NOTE: this is a vital health check. Every reconciliation loop should run this
 // check at the very end to ensure that everything in the installation is as it
 // should be. Over time, more types of checks should be added here as needed.
-func (r *MattermostReconciler) checkMattermostHealth(mattermost *mattermostv1beta1.Mattermost, logger logr.Logger) (mattermostv1beta1.MattermostStatus, error) {
-	status := mattermostv1beta1.MattermostStatus{
-		State:           mattermostv1beta1.Reconciling,
+func (r *MattermostReconciler) checkMattermostHealth(mattermost *mmv1beta.Mattermost, logger logr.Logger) (mmv1beta.MattermostStatus, error) {
+	status := mmv1beta.MattermostStatus{
+		State:           mmv1beta.Reconciling,
 		Replicas:        0,
 		UpdatedReplicas: 0,
 	}
@@ -79,7 +79,7 @@ func (r *MattermostReconciler) checkMattermostHealth(mattermost *mattermostv1bet
 	}
 
 	// Everything checks out. The installation is stable.
-	status.State = mattermostv1beta1.Stable
+	status.State = mmv1beta.Stable
 
 	return status, nil
 }

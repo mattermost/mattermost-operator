@@ -3,7 +3,7 @@ package mysql
 import (
 	"fmt"
 
-	mattermostv1beta1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
+	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	mattermostApp "github.com/mattermost/mattermost-operator/pkg/mattermost"
 
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1"
@@ -70,12 +70,12 @@ func Cluster(mattermost *mattermostv1alpha1.ClusterInstallation) *mysqlOperator.
 }
 
 // Cluster returns the MySQL cluster to deploy
-func ClusterV1Beta(mattermost *mattermostv1beta1.Mattermost) *mysqlOperator.MysqlCluster {
+func ClusterV1Beta(mattermost *mmv1beta.Mattermost) *mysqlOperator.MysqlCluster {
 	mysql := &mysqlOperator.MysqlCluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            componentUtils.HashWithPrefix("db", mattermost.Name),
 			Namespace:       mattermost.Namespace,
-			Labels:          mattermostv1beta1.MattermostResourceLabels(mattermost.Name),
+			Labels:          mmv1beta.MattermostResourceLabels(mattermost.Name),
 			OwnerReferences: mattermostApp.MattermostOwnerReference(mattermost),
 		},
 		Spec: mysqlOperator.MysqlClusterSpec{

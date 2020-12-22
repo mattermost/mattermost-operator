@@ -7,7 +7,7 @@ import (
 
 	"github.com/mattermost/mattermost-operator/pkg/resources"
 
-	mattermostv1beta1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
+	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	mattermostApp "github.com/mattermost/mattermost-operator/pkg/mattermost"
 
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -38,13 +38,13 @@ func TestCheckMattermost(t *testing.T) {
 	mmName := "foo"
 	mmNamespace := "default"
 	replicas := int32(4)
-	mm := &mattermostv1beta1.Mattermost{
+	mm := &mmv1beta.Mattermost{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      mmName,
 			Namespace: mmNamespace,
 			UID:       types.UID("test"),
 		},
-		Spec: mattermostv1beta1.MattermostSpec{
+		Spec: mmv1beta.MattermostSpec{
 			Replicas:    &replicas,
 			Image:       "mattermost/mattermost-enterprise-edition",
 			Version:     operatortest.LatestStableMattermostVersion,
@@ -67,7 +67,7 @@ func TestCheckMattermost(t *testing.T) {
 	require.NoError(t, err)
 
 	s := prepareSchema(t, scheme.Scheme)
-	s.AddKnownTypes(mattermostv1beta1.GroupVersion, mm)
+	s.AddKnownTypes(mmv1beta.GroupVersion, mm)
 	c := fake.NewFakeClient()
 	r := &MattermostReconciler{
 		Client:         c,
@@ -246,7 +246,7 @@ func TestCheckMattermost(t *testing.T) {
 			Spec: batchv1.JobSpec{Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
-						{Name: mattermostv1beta1.MattermostAppContainerName, Image: mm.GetImageName()},
+						{Name: mmv1beta.MattermostAppContainerName, Image: mm.GetImageName()},
 					},
 				},
 			}},
@@ -309,7 +309,7 @@ func TestCheckMattermost(t *testing.T) {
 			Spec: batchv1.JobSpec{Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
-						{Name: mattermostv1beta1.MattermostAppContainerName, Image: "invalid-image"},
+						{Name: mmv1beta.MattermostAppContainerName, Image: "invalid-image"},
 					},
 				},
 			}},
@@ -361,24 +361,24 @@ func TestCheckMattermostExternalDBAndFileStore(t *testing.T) {
 	mmNamespace := "default"
 	replicas := int32(4)
 	externalDBSecretName := "externalDB"
-	mm := &mattermostv1beta1.Mattermost{
+	mm := &mmv1beta.Mattermost{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      mmName,
 			Namespace: mmNamespace,
 			UID:       types.UID("test"),
 		},
-		Spec: mattermostv1beta1.MattermostSpec{
+		Spec: mmv1beta.MattermostSpec{
 			Replicas:    &replicas,
 			Image:       "mattermost/mattermost-enterprise-edition",
 			Version:     operatortest.LatestStableMattermostVersion,
 			IngressName: "foo.mattermost.dev",
-			Database: mattermostv1beta1.Database{
-				External: &mattermostv1beta1.ExternalDatabase{
+			Database: mmv1beta.Database{
+				External: &mmv1beta.ExternalDatabase{
 					Secret: externalDBSecretName,
 				},
 			},
-			FileStore: mattermostv1beta1.FileStore{
-				External: &mattermostv1beta1.ExternalFileStore{
+			FileStore: mmv1beta.FileStore{
+				External: &mmv1beta.ExternalFileStore{
 					URL:    "s3.amazon.com",
 					Bucket: "my-bucket",
 					Secret: "fileStoreSecret",
@@ -405,7 +405,7 @@ func TestCheckMattermostExternalDBAndFileStore(t *testing.T) {
 	require.NoError(t, err)
 
 	s := prepareSchema(t, scheme.Scheme)
-	s.AddKnownTypes(mattermostv1beta1.GroupVersion, mm)
+	s.AddKnownTypes(mmv1beta.GroupVersion, mm)
 	c := fake.NewFakeClient()
 	r := &MattermostReconciler{
 		Client:         c,
@@ -492,7 +492,7 @@ func TestCheckMattermostExternalDBAndFileStore(t *testing.T) {
 			Spec: batchv1.JobSpec{Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
-						{Name: mattermostv1beta1.MattermostAppContainerName, Image: mm.GetImageName()},
+						{Name: mmv1beta.MattermostAppContainerName, Image: mm.GetImageName()},
 					},
 				},
 			}},

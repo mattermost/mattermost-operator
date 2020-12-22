@@ -7,7 +7,7 @@ import (
 	"github.com/mattermost/mattermost-operator/pkg/resources"
 
 	"github.com/go-logr/logr"
-	mattermostv1beta1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
+	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	mattermostApp "github.com/mattermost/mattermost-operator/pkg/mattermost"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
@@ -22,7 +22,7 @@ import (
 )
 
 func (r *MattermostReconciler) checkMattermost(
-	mattermost *mattermostv1beta1.Mattermost,
+	mattermost *mmv1beta.Mattermost,
 	dbInfo mattermostApp.DatabaseConfig,
 	fileStoreInfo *mattermostApp.FileStoreInfo,
 	reqLogger logr.Logger) error {
@@ -58,14 +58,14 @@ func (r *MattermostReconciler) checkMattermost(
 	return nil
 }
 
-func (r *MattermostReconciler) checkLicence(mattermost *mattermostv1beta1.Mattermost) error {
+func (r *MattermostReconciler) checkLicence(mattermost *mmv1beta.Mattermost) error {
 	if mattermost.Spec.LicenseSecret == "" {
 		return nil
 	}
 	return r.assertSecretContains(mattermost.Spec.LicenseSecret, "license", mattermost.Namespace)
 }
 
-func (r *MattermostReconciler) checkMattermostService(mattermost *mattermostv1beta1.Mattermost, reqLogger logr.Logger) error {
+func (r *MattermostReconciler) checkMattermostService(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) error {
 	desired := mattermostApp.GenerateServiceV1Beta(mattermost)
 
 	err := r.Resources.CreateServiceIfNotExists(mattermost, desired, reqLogger)
@@ -82,7 +82,7 @@ func (r *MattermostReconciler) checkMattermostService(mattermost *mattermostv1be
 	return r.Resources.Update(current, desired, reqLogger)
 }
 
-func (r *MattermostReconciler) checkMattermostRBAC(mattermost *mattermostv1beta1.Mattermost, reqLogger logr.Logger) error {
+func (r *MattermostReconciler) checkMattermostRBAC(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) error {
 	err := r.checkMattermostSA(mattermost, reqLogger)
 	if err != nil {
 		return errors.Wrap(err, "failed to check mattermost ServiceAccount")
@@ -99,7 +99,7 @@ func (r *MattermostReconciler) checkMattermostRBAC(mattermost *mattermostv1beta1
 	return nil
 }
 
-func (r *MattermostReconciler) checkMattermostSA(mattermost *mattermostv1beta1.Mattermost, reqLogger logr.Logger) error {
+func (r *MattermostReconciler) checkMattermostSA(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) error {
 	desired := mattermostApp.GenerateServiceAccountV1Beta(mattermost, mattermost.Name)
 	err := r.Resources.CreateServiceAccountIfNotExists(mattermost, desired, reqLogger)
 	if err != nil {
@@ -115,7 +115,7 @@ func (r *MattermostReconciler) checkMattermostSA(mattermost *mattermostv1beta1.M
 	return r.Resources.Update(current, desired, reqLogger)
 }
 
-func (r *MattermostReconciler) checkMattermostRole(mattermost *mattermostv1beta1.Mattermost, reqLogger logr.Logger) error {
+func (r *MattermostReconciler) checkMattermostRole(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) error {
 	desired := mattermostApp.GenerateRoleV1Beta(mattermost, mattermost.Name)
 	err := r.Resources.CreateRoleIfNotExists(mattermost, desired, reqLogger)
 	if err != nil {
@@ -131,7 +131,7 @@ func (r *MattermostReconciler) checkMattermostRole(mattermost *mattermostv1beta1
 	return r.Resources.Update(current, desired, reqLogger)
 }
 
-func (r *MattermostReconciler) checkMattermostRoleBinding(mattermost *mattermostv1beta1.Mattermost, reqLogger logr.Logger) error {
+func (r *MattermostReconciler) checkMattermostRoleBinding(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) error {
 	desired := mattermostApp.GenerateRoleBindingV1Beta(mattermost, mattermost.Name, mattermost.Name)
 	err := r.Resources.CreateRoleBindingIfNotExists(mattermost, desired, reqLogger)
 	if err != nil {
@@ -147,7 +147,7 @@ func (r *MattermostReconciler) checkMattermostRoleBinding(mattermost *mattermost
 	return r.Resources.Update(current, desired, reqLogger)
 }
 
-func (r *MattermostReconciler) checkMattermostIngress(mattermost *mattermostv1beta1.Mattermost, reqLogger logr.Logger) error {
+func (r *MattermostReconciler) checkMattermostIngress(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) error {
 	ingressAnnotations := map[string]string{
 		"kubernetes.io/ingress.class":                 "nginx",
 		"nginx.ingress.kubernetes.io/proxy-body-size": "1000M",
@@ -174,7 +174,7 @@ func (r *MattermostReconciler) checkMattermostIngress(mattermost *mattermostv1be
 }
 
 func (r *MattermostReconciler) checkMattermostDeployment(
-	mattermost *mattermostv1beta1.Mattermost,
+	mattermost *mmv1beta.Mattermost,
 	dbConfig mattermostApp.DatabaseConfig,
 	fileStoreInfo *mattermostApp.FileStoreInfo,
 	reqLogger logr.Logger) error {
@@ -215,7 +215,7 @@ func (r *MattermostReconciler) checkMattermostDeployment(
 	return nil
 }
 
-func (r *MattermostReconciler) checkMattermostDBSetupJob(mattermost *mattermostv1beta1.Mattermost, deployment *appsv1.Deployment, reqLogger logr.Logger) error {
+func (r *MattermostReconciler) checkMattermostDBSetupJob(mattermost *mmv1beta.Mattermost, deployment *appsv1.Deployment, reqLogger logr.Logger) error {
 	desiredJob := resources.PrepareMattermostJobTemplate(mattermostApp.SetupJobName, mattermost.Namespace, deployment)
 	desiredJob.OwnerReferences = mattermostApp.MattermostOwnerReference(mattermost)
 
@@ -259,11 +259,11 @@ func (r *MattermostReconciler) isMainContainerImageSame(
 	b []corev1.Container,
 ) (bool, error) {
 	// Fetch containers to compare
-	containerA := mattermostv1beta1.GetMattermostAppContainer(a)
+	containerA := mmv1beta.GetMattermostAppContainer(a)
 	if containerA == nil {
 		return false, errors.Errorf("failed to find main container in a list while comparing images")
 	}
-	containerB := mattermostv1beta1.GetMattermostAppContainer(b)
+	containerB := mmv1beta.GetMattermostAppContainer(b)
 	if containerB == nil {
 		return false, errors.Errorf("failed to find main container in a list while comparing images")
 	}
@@ -275,7 +275,7 @@ func (r *MattermostReconciler) isMainContainerImageSame(
 // updateMattermostDeployment performs deployment update if necessary.
 // If a deployment update is necessary, an update job is launched to check new image.
 func (r *MattermostReconciler) updateMattermostDeployment(
-	mattermost *mattermostv1beta1.Mattermost,
+	mattermost *mmv1beta.Mattermost,
 	current *appsv1.Deployment,
 	desired *appsv1.Deployment,
 	reqLogger logr.Logger,
@@ -318,7 +318,7 @@ func (r *MattermostReconciler) checkUpdateJob(
 	baseDeployment *appsv1.Deployment,
 	reqLogger logr.Logger,
 ) (*batchv1.Job, error) {
-	reqLogger.Info(fmt.Sprintf("Running Mattermost update image job check for image %s", mattermostv1beta1.GetMattermostAppContainerFromDeployment(baseDeployment).Image))
+	reqLogger.Info(fmt.Sprintf("Running Mattermost update image job check for image %s", mmv1beta.GetMattermostAppContainerFromDeployment(baseDeployment).Image))
 	job, err := r.Resources.FetchMattermostUpdateJob(jobNamespace)
 	if err != nil {
 		if k8sErrors.IsNotFound(err) {
