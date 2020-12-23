@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	mattermostv1beta1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
+	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	"github.com/mattermost/mattermost-operator/pkg/components/utils"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -45,7 +45,7 @@ func NewMySQLDBConfig(secret corev1.Secret) (*MySQLDBConfig, error) {
 
 }
 
-func (m *MySQLDBConfig) EnvVars(mattermost *mattermostv1beta1.Mattermost) []corev1.EnvVar {
+func (m *MySQLDBConfig) EnvVars(mattermost *mmv1beta.Mattermost) []corev1.EnvVar {
 	mysqlName := utils.HashWithPrefix("db", mattermost.Name)
 
 	dbEnvVars := []corev1.EnvVar{
@@ -76,7 +76,7 @@ func (m *MySQLDBConfig) EnvVars(mattermost *mattermostv1beta1.Mattermost) []core
 	return dbEnvVars
 }
 
-func (m *MySQLDBConfig) InitContainers(mattermost *mattermostv1beta1.Mattermost) []corev1.Container {
+func (m *MySQLDBConfig) InitContainers(mattermost *mmv1beta.Mattermost) []corev1.Container {
 	mysqlName := utils.HashWithPrefix("db", mattermost.Name)
 
 	return []corev1.Container{

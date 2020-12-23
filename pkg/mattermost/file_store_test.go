@@ -3,7 +3,7 @@ package mattermost
 import (
 	"testing"
 
-	mattermostv1beta1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
+	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -11,17 +11,17 @@ import (
 )
 
 func TestFileStore(t *testing.T) {
-	mattermost := &mattermostv1beta1.Mattermost{
+	mattermost := &mmv1beta.Mattermost{
 		ObjectMeta: metav1.ObjectMeta{Name: "mm-test"},
-		Spec:       mattermostv1beta1.MattermostSpec{},
+		Spec:       mmv1beta.MattermostSpec{},
 	}
 
 	secret := "file-store-secret"
 	minioURL := "http://minio"
 
 	t.Run("operator managed Minio", func(t *testing.T) {
-		mattermost.Spec.FileStore = mattermostv1beta1.FileStore{
-			OperatorManaged: &mattermostv1beta1.OperatorManagedMinio{
+		mattermost.Spec.FileStore = mmv1beta.FileStore{
+			OperatorManaged: &mmv1beta.OperatorManagedMinio{
 				StorageSize: "10GB",
 				Replicas:    nil,
 				Resources:   corev1.ResourceRequirements{},
@@ -37,8 +37,8 @@ func TestFileStore(t *testing.T) {
 	})
 
 	t.Run("external file store", func(t *testing.T) {
-		mattermost.Spec.FileStore = mattermostv1beta1.FileStore{
-			External: &mattermostv1beta1.ExternalFileStore{
+		mattermost.Spec.FileStore = mmv1beta.FileStore{
+			External: &mmv1beta.ExternalFileStore{
 				URL:    minioURL,
 				Bucket: "test-bucket",
 				Secret: "external-file-store",

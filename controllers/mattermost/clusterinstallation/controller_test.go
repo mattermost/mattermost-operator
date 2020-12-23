@@ -5,13 +5,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mattermost/mattermost-operator/pkg/resources"
+
 	blubr "github.com/mattermost/blubr"
 	"github.com/mattermost/mattermost-operator/pkg/components/utils"
 	operatortest "github.com/mattermost/mattermost-operator/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"
-	"k8s.io/api/extensions/v1beta1"
+	"k8s.io/api/networking/v1beta1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -67,6 +69,7 @@ func TestReconcile(t *testing.T) {
 		Scheme:             s,
 		Log:                logger,
 		MaxReconciling:     5,
+		Resources:          resources.NewResourceHelper(c, s),
 	}
 
 	err := c.Create(context.TODO(), ci)
@@ -507,6 +510,7 @@ func TestReconcilingLimit(t *testing.T) {
 		Log:                 logger,
 		MaxReconciling:      2,
 		RequeueOnLimitDelay: requeueOnLimitDelay,
+		Resources:           resources.NewResourceHelper(c, s),
 	}
 
 	assertInstallationsCount := func(t *testing.T, expectedCIs, expectedReconciling int) {

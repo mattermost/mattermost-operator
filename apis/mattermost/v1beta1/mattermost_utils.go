@@ -35,7 +35,7 @@ const (
 
 	// ClusterResourceLabel is the label applied to a given Mattermost
 	// as well as all other resources created to support it.
-	ClusterResourceLabel = "v1beta1.installation.mattermost.com/resource"
+	ClusterResourceLabel = "v1alpha1.mattermost.com/resource"
 
 	// MattermostAppContainerName is the name of the container which runs the
 	// Mattermost application

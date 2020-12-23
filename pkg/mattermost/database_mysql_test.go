@@ -3,7 +3,7 @@ package mattermost
 import (
 	"testing"
 
-	mattermostv1beta1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
+	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -11,11 +11,11 @@ import (
 )
 
 func TestNewMySQLDB(t *testing.T) {
-	mattermost := &mattermostv1beta1.Mattermost{
+	mattermost := &mmv1beta.Mattermost{
 		ObjectMeta: metav1.ObjectMeta{Name: "mm-test"},
-		Spec: mattermostv1beta1.MattermostSpec{
-			Database: mattermostv1beta1.Database{
-				OperatorManaged: &mattermostv1beta1.OperatorManagedDatabase{},
+		Spec: mmv1beta.MattermostSpec{
+			Database: mmv1beta.Database{
+				OperatorManaged: &mmv1beta.OperatorManagedDatabase{},
 			},
 		},
 	}

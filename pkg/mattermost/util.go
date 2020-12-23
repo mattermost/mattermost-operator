@@ -12,3 +12,21 @@ func EnvSourceFromSecret(secretName, key string) *corev1.EnvVarSource {
 		},
 	}
 }
+
+func FindContainer(name string, containers []corev1.Container) (int, bool) {
+	for i, cont := range containers {
+		if cont.Name == name {
+			return i, true
+		}
+	}
+	return -1, false
+}
+
+func RemoveContainer(name string, containers []corev1.Container) []corev1.Container {
+	position, found := FindContainer(name, containers)
+	if found {
+		containers = append(containers[:position], containers[position+1:]...)
+	}
+
+	return containers
+}

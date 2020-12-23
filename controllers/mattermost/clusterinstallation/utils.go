@@ -5,18 +5,17 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/mattermost/mattermost-operator/pkg/mattermost/healthcheck"
+
 	"github.com/go-logr/logr"
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1"
 	"github.com/pkg/errors"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	v1beta1 "k8s.io/api/extensions/v1beta1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (r *ClusterInstallationReconciler) handleCheckClusterInstallation(mattermost *mattermostv1alpha1.ClusterInstallation) (mattermostv1alpha1.ClusterInstallationStatus, error) {
+func (r *ClusterInstallationReconciler) handleCheckClusterInstallation(mattermost *mattermostv1alpha1.ClusterInstallation, logger logr.Logger) (mattermostv1alpha1.ClusterInstallationStatus, error) {
 	if !mattermost.Spec.BlueGreen.Enable {
 		return r.checkClusterInstallation(
 			mattermost.GetNamespace(),
@@ -27,6 +26,7 @@ func (r *ClusterInstallationReconciler) handleCheckClusterInstallation(mattermos
 			mattermost.Spec.Replicas,
 			mattermost.Spec.UseServiceLoadBalancer,
 			mattermost.ClusterInstallationLabels(mattermost.Name),
+			logger,
 		)
 	}
 
@@ -41,6 +41,7 @@ func (r *ClusterInstallationReconciler) handleCheckClusterInstallation(mattermos
 		mattermost.Spec.Replicas,
 		mattermost.Spec.UseServiceLoadBalancer,
 		mattermost.ClusterInstallationLabels(mattermost.Spec.BlueGreen.Blue.Name),
+		logger,
 	)
 	greenStatus, greenErr := r.checkClusterInstallation(
 		mattermost.GetNamespace(),
@@ -51,6 +52,7 @@ func (r *ClusterInstallationReconciler) handleCheckClusterInstallation(mattermos
 		mattermost.Spec.Replicas,
 		mattermost.Spec.UseServiceLoadBalancer,
 		mattermost.ClusterInstallationLabels(mattermost.Spec.BlueGreen.Green.Name),
+		logger,
 	)
 
 	var status mattermostv1alpha1.ClusterInstallationStatus
@@ -79,7 +81,7 @@ func (r *ClusterInstallationReconciler) handleCheckClusterInstallation(mattermos
 // NOTE: this is a vital health check. Every reconciliation loop should run this
 // check at the very end to ensure that everything in the installation is as it
 // should be. Over time, more types of checks should be added here as needed.
-func (r *ClusterInstallationReconciler) checkClusterInstallation(namespace, name, imageName, image, version string, replicas int32, useServiceLoadBalancer bool, labels map[string]string) (mattermostv1alpha1.ClusterInstallationStatus, error) {
+func (r *ClusterInstallationReconciler) checkClusterInstallation(namespace, name, imageName, image, version string, replicas int32, useServiceLoadBalancer bool, labels map[string]string, logger logr.Logger) (mattermostv1alpha1.ClusterInstallationStatus, error) {
 	status := mattermostv1alpha1.ClusterInstallationStatus{
 		State:           mattermostv1alpha1.Reconciling,
 		Replicas:        0,
@@ -91,151 +93,58 @@ func (r *ClusterInstallationReconciler) checkClusterInstallation(namespace, name
 		client.MatchingLabels(labels),
 	}
 
-	err := r.checkRolloutStarted(name, namespace, listOptions)
+	healthChecker := healthcheck.NewHealthChecker(r.NonCachedAPIReader, listOptions, logger)
+
+	err := healthChecker.AssertDeploymentRolloutStarted(name, namespace)
 	if err != nil {
 		return status, errors.Wrap(err, "rollout not yet started")
 	}
 
-	pods := &corev1.PodList{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
-		},
-	}
-
-	// We use non-cached client to make sure we get the real state of pods instead of
-	// potentially outdated cached data.
-	err = r.NonCachedAPIReader.List(context.TODO(), pods, listOptions...)
+	podsStatus, err := healthChecker.CheckPodsRollOut(imageName)
 	if err != nil {
-		return status, errors.Wrap(err, "unable to get pod list")
+		return status, errors.Wrap(err, "failed to check pods status")
 	}
 
-	status.Replicas = int32(len(pods.Items))
-
-	for _, pod := range pods.Items {
-		if pod.Status.Phase != corev1.PodRunning || pod.DeletionTimestamp != nil {
-			return status, fmt.Errorf("mattermost pod %s is in state '%s'", pod.Name, pod.Status.Phase)
-		}
-		if len(pod.Spec.Containers) == 0 {
-			return status, fmt.Errorf("mattermost pod %s has no containers", pod.Name)
-		}
-		if pod.Spec.Containers[0].Image != imageName {
-			return status, fmt.Errorf("mattermost pod %s is running incorrect image", pod.Name)
-		}
-
-		podIsReady := false
-		for _, condition := range pod.Status.Conditions {
-			if condition.Type == corev1.PodReady {
-				if condition.Status == corev1.ConditionTrue {
-					podIsReady = true
-					break
-				} else {
-					return status, fmt.Errorf("mattermost pod %s is not ready", pod.Name)
-				}
-			}
-		}
-		if !podIsReady {
-			return status, fmt.Errorf("mattermost pod %s is not ready", pod.Name)
-		}
-
-		status.UpdatedReplicas++
-	}
+	status.UpdatedReplicas = podsStatus.UpdatedReplicas
+	status.Replicas = podsStatus.Replicas
 
 	if replicas < 0 {
 		replicas = 0
 	}
 
-	if int32(len(pods.Items)) != replicas {
-		return status, fmt.Errorf("found %d pods, but wanted %d", len(pods.Items), replicas)
+	if podsStatus.UpdatedReplicas != replicas {
+		return status, fmt.Errorf("found %d updated replicas, but wanted %d", podsStatus.UpdatedReplicas, replicas)
+	}
+	if podsStatus.Replicas != replicas {
+		return status, fmt.Errorf("found %d pods, but wanted %d", podsStatus.Replicas, replicas)
 	}
 
 	status.Image = image
 	status.Version = version
 
 	status.Endpoint = "not available"
+	var endpoint string
+
 	if useServiceLoadBalancer {
-		svc := &corev1.ServiceList{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "Service",
-				APIVersion: "v1",
-			},
-		}
-		err := r.Client.List(context.TODO(), svc, listOptions...)
+		endpoint, err = healthChecker.CheckServiceLoadBalancer()
 		if err != nil {
-			return status, errors.Wrap(err, "unable to get service list")
-		}
-		if len(svc.Items) != 1 {
-			return status, fmt.Errorf("should return just one service, but returned %d", len(svc.Items))
-		}
-		if svc.Items[0].Status.LoadBalancer.Ingress == nil {
-			return status, errors.New("waiting for the Load Balancer to be active")
-		}
-		lbIngress := svc.Items[0].Status.LoadBalancer.Ingress[0]
-		if lbIngress.Hostname != "" {
-			status.Endpoint = lbIngress.Hostname
-		} else if lbIngress.IP != "" {
-			status.Endpoint = lbIngress.IP
+			return status, errors.Wrap(err, "failed to check service load balancer")
 		}
 	} else {
-		ingress := &v1beta1.IngressList{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "Ingress",
-				APIVersion: "v1",
-			},
-		}
-		err := r.Client.List(context.TODO(), ingress, listOptions...)
+		endpoint, err = healthChecker.CheckIngressLoadBalancer()
 		if err != nil {
-			return status, errors.Wrap(err, "unable to get ingress list")
+			return status, errors.Wrap(err, "failed to check ingress load balancer")
 		}
-		if len(ingress.Items) != 1 {
-			return status, fmt.Errorf("should return just one ingress, but returned %d", len(ingress.Items))
-		}
-		status.Endpoint = ingress.Items[0].Spec.Rules[0].Host
+	}
+
+	if endpoint != "" {
+		status.Endpoint = endpoint
 	}
 
 	// Everything checks out. The installation is stable.
 	status.State = mattermostv1alpha1.Stable
 
 	return status, nil
-}
-
-func (r *ClusterInstallationReconciler) checkRolloutStarted(name, namespace string, listOpts []client.ListOption) error {
-	// To prevent race condition that new pods did not start rolling out and
-	// old ones are still ready, we need to check if Deployment was picked up by controller.
-	// We use non-cached client to make sure it won't return old Deployment where
-	// the generation and observedGeneration still match.
-	deployment := &appsv1.Deployment{}
-	deploymentKey := types.NamespacedName{Name: name, Namespace: namespace}
-	err := r.NonCachedAPIReader.Get(context.TODO(), deploymentKey, deployment)
-	if err != nil {
-		return errors.Wrap(err, "failed to get deployment")
-	}
-	if deployment.Generation != deployment.Status.ObservedGeneration {
-		return fmt.Errorf("mattermost deployment not yet picked up by the Deployment controller")
-	}
-
-	// We check if new ReplicaSet was created and it was observed by the controller
-	// to guarantee that new pods are created.
-	replicaSets := &appsv1.ReplicaSetList{}
-	err = r.Client.List(context.TODO(), replicaSets, listOpts...)
-	if err != nil {
-		return errors.Wrap(err, "failed to list replicaSets")
-	}
-
-	replicaSetReady := false
-	for _, rep := range replicaSets.Items {
-		if getRevision(rep.Annotations) == getRevision(deployment.Annotations) {
-			if rep.Status.ObservedGeneration > 0 {
-				replicaSetReady = true
-				break
-			}
-		}
-	}
-	if !replicaSetReady {
-		return fmt.Errorf("replicaSet did not start rolling pods")
-	}
-
-	return nil
 }
 
 func (r *ClusterInstallationReconciler) checkSecret(secretName, keyName, namespace string) error {
@@ -314,11 +223,4 @@ func ensureLabels(required, final map[string]string) map[string]string {
 	}
 
 	return final
-}
-
-func getRevision(annotations map[string]string) string {
-	if annotations == nil {
-		return ""
-	}
-	return annotations["deployment.kubernetes.io/revision"]
 }

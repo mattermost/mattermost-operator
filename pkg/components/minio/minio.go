@@ -3,7 +3,7 @@ package minio
 import (
 	"fmt"
 
-	mattermostv1beta1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
+	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1"
 	"github.com/mattermost/mattermost-operator/pkg/components/utils"
@@ -49,13 +49,13 @@ func Secret(mattermost *mattermostv1alpha1.ClusterInstallation) *corev1.Secret {
 }
 
 // Instance returns the Minio component to deploy
-func InstanceV1Beta(mattermost *mattermostv1beta1.Mattermost) *minioOperator.MinIOInstance {
+func InstanceV1Beta(mattermost *mmv1beta.Mattermost) *minioOperator.MinIOInstance {
 	minioName := fmt.Sprintf("%s-minio", mattermost.Name)
 
 	return newMinioInstance(
 		minioName,
 		mattermost.Namespace,
-		mattermostv1beta1.MattermostResourceLabels(mattermost.Name),
+		mmv1beta.MattermostResourceLabels(mattermost.Name),
 		mattermostApp.MattermostOwnerReference(mattermost),
 		*mattermost.Spec.FileStore.OperatorManaged.Replicas,
 		mattermost.Spec.FileStore.OperatorManaged.StorageSize,
@@ -63,7 +63,7 @@ func InstanceV1Beta(mattermost *mattermostv1beta1.Mattermost) *minioOperator.Min
 }
 
 // Secret returns the secret name created to use together with Minio deployment
-func SecretV1Beta(mattermost *mattermostv1beta1.Mattermost) *corev1.Secret {
+func SecretV1Beta(mattermost *mmv1beta.Mattermost) *corev1.Secret {
 	secretName := DefaultMinioSecretName(mattermost.Name)
 	data := minioSecretData()
 
