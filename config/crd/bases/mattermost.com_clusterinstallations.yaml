@@ -1071,6 +1071,12 @@ spec:
               mattermostLicenseSecret:
                 description: Secret that contains the mattermost license
                 type: string
+              migrate:
+                description: 'Migrate specifies that the ClusterInstallation CR should
+                  be migrated to the Mattermost CR. CAUTION: Some features like BlueGreen
+                  or Canary are not supported with a new Custom Resource therefore
+                  migration should be performed with extra caution.'
+                type: boolean
               minio:
                 description: Minio defines the configuration of Minio for a ClusterInstallation.
                 properties:
@@ -1329,6 +1335,14 @@ spec:
               image:
                 description: The image running on the pods in the Mattermost instance
                 type: string
+              migration:
+                description: The status of migration to Mattermost CR.
+                properties:
+                  error:
+                    type: string
+                  status:
+                    type: string
+                type: object
               replicas:
                 description: Total number of non-terminated pods targeted by this
                   Mattermost deployment

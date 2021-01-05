@@ -9,7 +9,7 @@ import (
 	"context"
 	time "time"
 
-	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
+	mattermostv1beta1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	versioned "github.com/mattermost/mattermost-operator/pkg/client/v1beta1/clientset/versioned"
 	internalinterfaces "github.com/mattermost/mattermost-operator/pkg/client/v1beta1/informers/externalversions/internalinterfaces"
 	v1beta1 "github.com/mattermost/mattermost-operator/pkg/client/v1beta1/listers/mattermost/v1beta1"
@@ -58,7 +58,7 @@ func NewFilteredMattermostInformer(client versioned.Interface, namespace string,
 				return client.MattermostV1beta1().Mattermosts(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&mmv1beta.Mattermost{},
+		&mattermostv1beta1.Mattermost{},
 		resyncPeriod,
 		indexers,
 	)
@@ -69,7 +69,7 @@ func (f *mattermostInformer) defaultInformer(client versioned.Interface, resyncP
 }
 
 func (f *mattermostInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&mmv1beta.Mattermost{}, f.defaultInformer)
+	return f.factory.InformerFor(&mattermostv1beta1.Mattermost{}, f.defaultInformer)
 }
 
 func (f *mattermostInformer) Lister() v1beta1.MattermostLister {

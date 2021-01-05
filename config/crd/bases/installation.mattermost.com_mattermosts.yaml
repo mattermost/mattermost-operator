@@ -224,6 +224,9 @@ spec:
               image:
                 description: Image defines the Mattermost Docker image.
                 type: string
+              imagePullPolicy:
+                description: Specify Mattermost deployment pull policy.
+                type: string
               ingressAnnotations:
                 additionalProperties:
                   type: string
