@@ -689,6 +689,7 @@ func TestMigration(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, ci.Status.Migration.Status, status)
 		assert.Empty(t, ci.Status.Migration.Error)
+		assert.Equal(t, mattermostv1alpha1.Reconciling, ci.Status.State)
 	}
 
 	t.Run("cannot perform migration with blue-green", func(t *testing.T) {

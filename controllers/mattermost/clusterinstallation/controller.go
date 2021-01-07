@@ -101,6 +101,11 @@ func (r *ClusterInstallationReconciler) Reconcile(request ctrl.Request) (ctrl.Re
 
 	// Check if the migration should be performed
 	if mattermost.Spec.Migrate {
+		err = r.setStateReconciling(mattermost, reqLogger)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+
 		return r.tryToMigrate(mattermost, reqLogger)
 	}
 
