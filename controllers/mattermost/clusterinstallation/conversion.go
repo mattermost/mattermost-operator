@@ -15,11 +15,11 @@ import (
 
 func (r *ClusterInstallationReconciler) IsConvertible(ci *mattermostv1alpha1.ClusterInstallation) error {
 	if ci.Spec.BlueGreen.Enable {
-		return errors.New("cluster installation with BlueGreen enabled cannot be converted to Mattermost")
+		return errors.New("ClusterInstallation resource with BlueGreen enabled cannot be converted to Mattermost resource. Disable BlueGreen to enable migration.")
 	}
 
 	if ci.Spec.Canary.Enable {
-		return errors.New("cluster installation with Canary enabled cannot be converted to Mattermost")
+		return errors.New("ClusterInstallation resource with Canary enabled cannot be converted to Mattermost resource. Disable Canary to enable migration.")
 	}
 
 	return nil
