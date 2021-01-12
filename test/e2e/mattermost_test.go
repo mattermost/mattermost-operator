@@ -3,8 +3,10 @@ package e2e
 import (
 	"context"
 	"fmt"
-	operator "github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1"
+
+	operator "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	"github.com/mattermost/mattermost-operator/pkg/components/utils"
+	ptrUtil "github.com/mattermost/mattermost-operator/pkg/utils"
 	operatortest "github.com/mattermost/mattermost-operator/test"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -15,9 +17,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"testing"
 	"time"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var (
@@ -62,44 +65,19 @@ func TestMattermost(t *testing.T) {
 
 func mattermostScaleTest(t *testing.T, k8sClient client.Client, k8sTypedClient kubernetes.Interface) {
 	// create ClusterInstallation custom resource
-	exampleMattermost := &operator.ClusterInstallation{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "ClusterInstallation",
-			APIVersion: "mattermost.com/v1alpha1",
-		},
+	exampleMattermost := &operator.Mattermost{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-mm",
 			Namespace: mmNamespace,
 		},
-		Spec: operator.ClusterInstallationSpec{
+		Spec: operator.MattermostSpec{
 			IngressName: "test-example.mattermost.dev",
-			Replicas:    1,
-			Resources: corev1.ResourceRequirements{
-				Requests: corev1.ResourceList{
-					corev1.ResourceCPU:    resource.MustParse("100m"),
-					corev1.ResourceMemory: resource.MustParse("100Mi"),
-				},
+			Replicas:    ptrUtil.NewInt32(1),
+			Scheduling: operator.Scheduling{
+				Resources: testMattermostResources(),
 			},
-			Minio: operator.Minio{
-				StorageSize: "1Gi",
-				Replicas:    1,
-				Resources: corev1.ResourceRequirements{
-					Requests: corev1.ResourceList{
-						corev1.ResourceCPU:    resource.MustParse("100m"),
-						corev1.ResourceMemory: resource.MustParse("100Mi"),
-					},
-				},
-			},
-			Database: operator.Database{
-				StorageSize: "1Gi",
-				Replicas:    1,
-				Resources: corev1.ResourceRequirements{
-					Requests: corev1.ResourceList{
-						corev1.ResourceCPU:    resource.MustParse("100m"),
-						corev1.ResourceMemory: resource.MustParse("100Mi"),
-					},
-				},
-			},
+			FileStore: testFileStoreConfig(1),
+			Database:  testDatabaseConfig(1),
 		},
 	}
 
@@ -119,7 +97,7 @@ func mattermostScaleTest(t *testing.T, k8sClient client.Client, k8sTypedClient k
 	err = k8sClient.Get(context.TODO(), types.NamespacedName{Name: "test-mm", Namespace: mmNamespace}, exampleMattermost)
 	require.NoError(t, err)
 
-	exampleMattermost.Spec.Replicas = 2
+	exampleMattermost.Spec.Replicas = ptrUtil.NewInt32(2)
 	err = k8sClient.Update(context.TODO(), exampleMattermost)
 	require.NoError(t, err)
 
@@ -134,7 +112,7 @@ func mattermostScaleTest(t *testing.T, k8sClient client.Client, k8sTypedClient k
 	err = k8sClient.Get(context.TODO(), types.NamespacedName{Name: "test-mm", Namespace: mmNamespace}, exampleMattermost)
 	require.NoError(t, err)
 
-	exampleMattermost.Spec.Replicas = 1
+	exampleMattermost.Spec.Replicas = ptrUtil.NewInt32(1)
 	err = k8sClient.Update(context.TODO(), exampleMattermost)
 	require.NoError(t, err)
 
@@ -152,47 +130,21 @@ func mattermostScaleTest(t *testing.T, k8sClient client.Client, k8sTypedClient k
 func mattermostUpgradeTest(t *testing.T, k8sClient client.Client, k8sTypedClient kubernetes.Interface) {
 	testName := "test-mm2"
 
-	// create ClusterInstallation custom resource
-	exampleMattermost := &operator.ClusterInstallation{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "ClusterInstallation",
-			APIVersion: "mattermost.com/v1alpha1",
-		},
+	exampleMattermost := &operator.Mattermost{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      testName,
 			Namespace: mmNamespace,
 		},
-		Spec: operator.ClusterInstallationSpec{
+		Spec: operator.MattermostSpec{
 			Image:       "mattermost/mattermost-enterprise-edition",
 			Version:     operatortest.PreviousStableMattermostVersion,
 			IngressName: "test-example2.mattermost.dev",
-			Replicas:    1,
-			Resources: corev1.ResourceRequirements{
-				Requests: corev1.ResourceList{
-					corev1.ResourceCPU:    resource.MustParse("100m"),
-					corev1.ResourceMemory: resource.MustParse("100Mi"),
-				},
+			Replicas:    ptrUtil.NewInt32(1),
+			Scheduling: operator.Scheduling{
+				Resources: testMattermostResources(),
 			},
-			Minio: operator.Minio{
-				StorageSize: "1Gi",
-				Replicas:    1,
-				Resources: corev1.ResourceRequirements{
-					Requests: corev1.ResourceList{
-						corev1.ResourceCPU:    resource.MustParse("100m"),
-						corev1.ResourceMemory: resource.MustParse("100Mi"),
-					},
-				},
-			},
-			Database: operator.Database{
-				StorageSize: "1Gi",
-				Replicas:    1,
-				Resources: corev1.ResourceRequirements{
-					Requests: corev1.ResourceList{
-						corev1.ResourceCPU:    resource.MustParse("100m"),
-						corev1.ResourceMemory: resource.MustParse("100Mi"),
-					},
-				},
-			},
+			FileStore: testFileStoreConfig(1),
+			Database:  testDatabaseConfig(1),
 		},
 	}
 
@@ -216,7 +168,7 @@ func mattermostUpgradeTest(t *testing.T, k8sClient client.Client, k8sTypedClient
 	pods := corev1.PodList{}
 	listOptions := []client.ListOption{
 		client.InNamespace(mmNamespace),
-		client.MatchingLabels(map[string]string{"app": "mattermost"}),
+		client.MatchingLabels(map[string]string{"app": "mattermost", operator.ClusterResourceLabel: testName}),
 	}
 
 	err = k8sClient.List(context.TODO(), &pods, listOptions...)
@@ -243,14 +195,14 @@ func mattermostUpgradeTest(t *testing.T, k8sClient client.Client, k8sTypedClient
 	err = waitForReconcilicationComplete(t, k8sClient, mmNamespace, testName, retryInterval, timeout)
 	require.NoError(t, err)
 
-	newMattermost := &operator.ClusterInstallation{}
-	err = k8sClient.Get(context.TODO(), types.NamespacedName{Name: testName, Namespace: mmNamespace}, newMattermost)
+	var updatedMattermost operator.Mattermost
+	err = k8sClient.Get(context.TODO(), types.NamespacedName{Name: testName, Namespace: mmNamespace}, &updatedMattermost)
 	require.NoError(t, err)
-	require.Equal(t, "mattermost/mattermost-enterprise-edition", newMattermost.Status.Image)
-	require.Equal(t, operatortest.LatestStableMattermostVersion, newMattermost.Status.Version)
+	require.Equal(t, "mattermost/mattermost-enterprise-edition", updatedMattermost.Status.Image)
+	require.Equal(t, operatortest.LatestStableMattermostVersion, updatedMattermost.Status.Version)
 
-	mmDeployment := &appsv1.Deployment{}
-	err = k8sClient.Get(context.TODO(), types.NamespacedName{Name: testName, Namespace: mmNamespace}, mmDeployment)
+	var mmDeployment appsv1.Deployment
+	err = k8sClient.Get(context.TODO(), types.NamespacedName{Name: testName, Namespace: mmNamespace}, &mmDeployment)
 	require.NoError(t, err)
 	require.Equal(t, "mattermost/mattermost-enterprise-edition:"+operatortest.LatestStableMattermostVersion, mmDeployment.Spec.Template.Spec.Containers[0].Image)
 
@@ -261,45 +213,19 @@ func mattermostUpgradeTest(t *testing.T, k8sClient client.Client, k8sTypedClient
 func mattermostWithMySQLReplicas(t *testing.T, client client.Client, typedClient kubernetes.Interface) {
 	testName := "test-mm3"
 
-	// create ClusterInstallation custom resource
-	exampleMattermost := &operator.ClusterInstallation{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "ClusterInstallation",
-			APIVersion: "mattermost.com/v1alpha1",
-		},
+	exampleMattermost := &operator.Mattermost{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      testName,
 			Namespace: mmNamespace,
 		},
-		Spec: operator.ClusterInstallationSpec{
+		Spec: operator.MattermostSpec{
 			IngressName: "test-example.mattermost.dev",
-			Replicas:    1,
-			Resources: corev1.ResourceRequirements{
-				Requests: corev1.ResourceList{
-					corev1.ResourceCPU:    resource.MustParse("100m"),
-					corev1.ResourceMemory: resource.MustParse("100Mi"),
-				},
+			Replicas:    ptrUtil.NewInt32(1),
+			Scheduling: operator.Scheduling{
+				Resources: testMattermostResources(),
 			},
-			Minio: operator.Minio{
-				StorageSize: "1Gi",
-				Replicas:    1,
-				Resources: corev1.ResourceRequirements{
-					Requests: corev1.ResourceList{
-						corev1.ResourceCPU:    resource.MustParse("100m"),
-						corev1.ResourceMemory: resource.MustParse("100Mi"),
-					},
-				},
-			},
-			Database: operator.Database{
-				StorageSize: "1Gi",
-				Replicas:    2,
-				Resources: corev1.ResourceRequirements{
-					Requests: corev1.ResourceList{
-						corev1.ResourceCPU:    resource.MustParse("100m"),
-						corev1.ResourceMemory: resource.MustParse("100Mi"),
-					},
-				},
-			},
+			FileStore: testFileStoreConfig(1),
+			Database:  testDatabaseConfig(2),
 		},
 	}
 
@@ -318,4 +244,43 @@ func mattermostWithMySQLReplicas(t *testing.T, client client.Client, typedClient
 
 	err = client.Delete(context.TODO(), exampleMattermost)
 	require.NoError(t, err)
+}
+
+func testMattermostResources() corev1.ResourceRequirements {
+	return corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("100m"),
+			corev1.ResourceMemory: resource.MustParse("100Mi"),
+		},
+	}
+}
+
+func testFileStoreConfig(replicas int32) operator.FileStore {
+	return operator.FileStore{
+		OperatorManaged: &operator.OperatorManagedMinio{
+			StorageSize: "1Gi",
+			Replicas:    ptrUtil.NewInt32(replicas),
+			Resources: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("100m"),
+					corev1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+			},
+		},
+	}
+}
+
+func testDatabaseConfig(replicas int32) operator.Database {
+	return operator.Database{
+		OperatorManaged: &operator.OperatorManagedDatabase{
+			StorageSize: "1Gi",
+			Replicas:    ptrUtil.NewInt32(replicas),
+			Resources: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("100m"),
+					corev1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+			},
+		},
+	}
 }
