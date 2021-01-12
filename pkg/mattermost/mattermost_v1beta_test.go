@@ -181,6 +181,13 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 			want: &appsv1.Deployment{},
 		},
 		{
+			name: "image pull policy",
+			spec: mmv1beta.MattermostSpec{
+				ImagePullPolicy: corev1.PullAlways,
+			},
+			want: &appsv1.Deployment{},
+		},
+		{
 			name: "node selector 1",
 			spec: mmv1beta.MattermostSpec{
 				Scheduling: mmv1beta.Scheduling{
@@ -395,6 +402,10 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 
 			mattermostAppContainer := mmv1beta.GetMattermostAppContainerFromDeployment(deployment)
 			require.NotNil(t, mattermostAppContainer)
+
+			if mattermost.Spec.ImagePullPolicy != "" {
+				assert.Equal(t, mattermost.Spec.ImagePullPolicy, mattermostAppContainer.ImagePullPolicy)
+			}
 
 			// Basic env var check to ensure the key exists.
 			assertEnvVarExists(t, "MM_CONFIG", mattermostAppContainer.Env)

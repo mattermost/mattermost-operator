@@ -2,6 +2,7 @@ package mattermost
 
 import (
 	"context"
+
 	mattermostMinio "github.com/mattermost/mattermost-operator/pkg/components/minio"
 	minioOperator "github.com/minio/minio-operator/pkg/apis/miniocontroller/v1beta1"
 

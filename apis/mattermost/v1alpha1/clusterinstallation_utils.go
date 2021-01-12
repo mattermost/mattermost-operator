@@ -24,12 +24,12 @@ const (
 	DefaultMinioStorageSize = "50Gi"
 	// DefaultStorageSize is the default Storage size for the Database
 	DefaultStorageSize = "50Gi"
-	// DefaultPullPolicy is ifNotPresetnt
+	// DefaultPullPolicy is ifNotPresent
 	DefaultPullPolicy = corev1.PullIfNotPresent
 
 	// ClusterLabel is the label applied across all compoments
 	ClusterLabel = "v1alpha1.mattermost.com/installation"
-	// ClusterResourceLabel is the label applied to a given ClusterInstallation
+	// ClusterResourceLabel is the label applied to a given Mattermost
 	// as well as all other resources created to support it.
 	ClusterResourceLabel = "v1alpha1.mattermost.com/resource"
 

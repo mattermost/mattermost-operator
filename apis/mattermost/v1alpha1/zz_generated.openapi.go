@@ -275,6 +275,13 @@ func schema_mattermost_operator_apis_mattermost_v1alpha1_ClusterInstallationSpec
 							Format:      "",
 						},
 					},
+					"migrate": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Migrate specifies that the ClusterInstallation CR should be migrated to the Mattermost CR. CAUTION: Some features like BlueGreen or Canary are not supported with a new Custom Resource therefore migration should be performed with extra caution.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 				},
 				Required: []string{"ingressName"},
 			},

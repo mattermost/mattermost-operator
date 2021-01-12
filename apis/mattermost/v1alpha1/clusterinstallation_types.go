@@ -95,6 +95,11 @@ type ClusterInstallationSpec struct {
 	// Specify deployment pull policy.
 	// +optional
 	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
+
+	// Migrate specifies that the ClusterInstallation CR should be migrated to the Mattermost CR.
+	// CAUTION: Some features like BlueGreen or Canary are not supported with a new Custom Resource
+	// therefore migration should be performed with extra caution.
+	Migrate bool `json:"migrate,omitempty"`
 }
 
 // Canary defines the configuration of Canary deployment for a ClusterInstallation
@@ -283,6 +288,15 @@ type ClusterInstallationStatus struct {
 	// The name of the green deployment in BlueGreen
 	// +optional
 	GreenName string `json:"greenName,omitempty"`
+
+	// The status of migration to Mattermost CR.
+	// +optional
+	Migration *MigrationStatus `json:"migration,omitempty"`
+}
+
+type MigrationStatus struct {
+	Status string `json:"status,omitempty"`
+	Error  string `json:"error,omitempty"`
 }
 
 // +genclient

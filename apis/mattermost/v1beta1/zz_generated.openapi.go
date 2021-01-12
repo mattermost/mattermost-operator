@@ -217,6 +217,13 @@ func schema_mattermost_operator_apis_mattermost_v1beta1_MattermostSpec(ref commo
 							},
 						},
 					},
+					"imagePullPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Specify Mattermost deployment pull policy.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 					"database": {
 						SchemaProps: spec.SchemaProps{
 							Description: "External Services",

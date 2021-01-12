@@ -69,6 +69,9 @@ type MattermostSpec struct {
 	// Defines additional volumeMounts to add to Mattermost application pods.
 	// +optional
 	VolumeMounts []v1.VolumeMount `json:"volumeMounts,omitempty"`
+	// Specify Mattermost deployment pull policy.
+	// +optional
+	ImagePullPolicy v1.PullPolicy `json:"imagePullPolicy,omitempty"`
 
 	// External Services
 	Database      Database      `json:"database,omitempty"`
