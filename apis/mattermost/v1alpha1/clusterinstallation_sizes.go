@@ -2,7 +2,6 @@ package v1alpha1
 
 import (
 	"github.com/pkg/errors"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
@@ -32,7 +31,7 @@ var size100 = ClusterInstallationSize{
 				corev1.ResourceMemory: resource.MustParse("256Mi"),
 			},
 			Limits: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("2"),
+				corev1.ResourceCPU:    resource.MustParse("2000m"),
 				corev1.ResourceMemory: resource.MustParse("4Gi"),
 			},
 		},
@@ -66,10 +65,10 @@ var cloudSize10 = ClusterInstallationSize{
 		Resources: corev1.ResourceRequirements{
 			Requests: corev1.ResourceList{
 				corev1.ResourceCPU:    resource.MustParse("10m"),
-				corev1.ResourceMemory: resource.MustParse("200Mi"),
+				corev1.ResourceMemory: resource.MustParse("150Mi"),
 			},
 			Limits: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("2"),
+				corev1.ResourceCPU:    resource.MustParse("2000m"),
 				corev1.ResourceMemory: resource.MustParse("4Gi"),
 			},
 		},
@@ -106,7 +105,7 @@ var cloudSize100 = ClusterInstallationSize{
 				corev1.ResourceMemory: resource.MustParse("256Mi"),
 			},
 			Limits: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("2"),
+				corev1.ResourceCPU:    resource.MustParse("2000m"),
 				corev1.ResourceMemory: resource.MustParse("4Gi"),
 			},
 		},
@@ -143,7 +142,7 @@ var size1000 = ClusterInstallationSize{
 				corev1.ResourceMemory: resource.MustParse("256Mi"),
 			},
 			Limits: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("2"),
+				corev1.ResourceCPU:    resource.MustParse("2000m"),
 				corev1.ResourceMemory: resource.MustParse("4Gi"),
 			},
 		},
@@ -180,7 +179,7 @@ var size5000 = ClusterInstallationSize{
 				corev1.ResourceMemory: resource.MustParse("500Mi"),
 			},
 			Limits: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("4"),
+				corev1.ResourceCPU:    resource.MustParse("4000m"),
 				corev1.ResourceMemory: resource.MustParse("8Gi"),
 			},
 		},
@@ -217,7 +216,7 @@ var size10000 = ClusterInstallationSize{
 				corev1.ResourceMemory: resource.MustParse("500Mi"),
 			},
 			Limits: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("4"),
+				corev1.ResourceCPU:    resource.MustParse("4000m"),
 				corev1.ResourceMemory: resource.MustParse("8Gi"),
 			},
 		},
@@ -254,7 +253,7 @@ var size25000 = ClusterInstallationSize{
 				corev1.ResourceMemory: resource.MustParse("500Mi"),
 			},
 			Limits: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("4"),
+				corev1.ResourceCPU:    resource.MustParse("4000m"),
 				corev1.ResourceMemory: resource.MustParse("8Gi"),
 			},
 		},
@@ -293,7 +292,7 @@ var sizeMiniSingleton = ClusterInstallationSize{
 				corev1.ResourceMemory: resource.MustParse("256Mi"),
 			},
 			Limits: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("2"),
+				corev1.ResourceCPU:    resource.MustParse("2000m"),
 				corev1.ResourceMemory: resource.MustParse("4Gi"),
 			},
 		},
@@ -330,7 +329,7 @@ var sizeMiniHA = ClusterInstallationSize{
 				corev1.ResourceMemory: resource.MustParse("512Mi"),
 			},
 			Limits: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("2"),
+				corev1.ResourceCPU:    resource.MustParse("2000m"),
 				corev1.ResourceMemory: resource.MustParse("4Gi"),
 			},
 		},
