@@ -1,7 +1,6 @@
 apiVersion: installation.mattermost.com/v1beta1
 kind: Mattermost
 metadata:
-  name: mattermost-sample
+  name: example-mattermost
 spec:
-  # Add fields here
-  foo: bar
+  ingressName: example.mattermost-example.dev
