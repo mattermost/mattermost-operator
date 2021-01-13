@@ -2,5 +2,5 @@
 resources:
 - mattermost.com_v1alpha1_mattermostrestoredb.yaml
 - mattermost.com_v1alpha1_clusterinstallation.yaml
-- mattermost_v1beta1_mattermost.yaml
+- installation.mattermost.com_v1beta1_mattermost.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples
