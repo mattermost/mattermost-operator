@@ -34,6 +34,7 @@ func TestFileStore(t *testing.T) {
 		assert.Equal(t, secret, fileStore.secretName)
 		assert.Equal(t, minioURL, fileStore.url)
 		assert.Equal(t, "mm-test", fileStore.bucketName)
+		assert.Equal(t, false, fileStore.useS3SSL)
 	})
 
 	t.Run("external file store", func(t *testing.T) {
@@ -60,5 +61,6 @@ func TestFileStore(t *testing.T) {
 		assert.Equal(t, "external-file-store", fileStore.secretName)
 		assert.Equal(t, minioURL, fileStore.url)
 		assert.Equal(t, "test-bucket", fileStore.bucketName)
+		assert.Equal(t, true, fileStore.useS3SSL)
 	})
 }

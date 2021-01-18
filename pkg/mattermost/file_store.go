@@ -17,6 +17,7 @@ type FileStoreInfo struct {
 	secretName string
 	bucketName string
 	url        string
+	useS3SSL   bool
 	config     FileStoreConfig
 }
 
@@ -94,6 +95,7 @@ func NewExternalFileStoreInfo(mattermost *mmv1beta.Mattermost, secret corev1.Sec
 		secretName: secret.Name,
 		bucketName: bucket,
 		url:        url,
+		useS3SSL:   true,
 		config:     &ExternalFileStore{},
 	}, nil
 }
@@ -103,6 +105,7 @@ func NewOperatorManagedFileStoreInfo(mattermost *mmv1beta.Mattermost, secret, mi
 		secretName: secret,
 		bucketName: mattermost.Name,
 		url:        minioURL,
+		useS3SSL:   false,
 		config:     &OperatorManagedMinioConfig{minioURL: minioURL, secretName: secret},
 	}
 }
