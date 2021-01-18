@@ -197,6 +197,23 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 			requiredEnvVals: map[string]string{"MM_FILESETTINGS_AMAZONS3SSL": "false"},
 		},
 		{
+			name: "override envs set by default with ones in MM spec",
+			spec: mmv1beta.MattermostSpec{
+				MattermostEnv: []corev1.EnvVar{
+					{Name: "MM_FILESETTINGS_AMAZONS3SSL", Value: "false"},
+				},
+			},
+			fileStore: &FileStoreInfo{
+				secretName: "file-store-secret",
+				bucketName: "file-store-bucket",
+				url:        "s3.amazon.com",
+				useS3SSL:   true,
+				config:     &ExternalFileStore{},
+			},
+			want:            &appsv1.Deployment{},
+			requiredEnvVals: map[string]string{"MM_FILESETTINGS_AMAZONS3SSL": "false"},
+		},
+		{
 			name: "image pull policy",
 			spec: mmv1beta.MattermostSpec{
 				ImagePullPolicy: corev1.PullAlways,
