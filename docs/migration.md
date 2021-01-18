@@ -7,7 +7,10 @@ Besides the name change, some new functionality is introduced while other is rem
 Behavior similar to `BlueGreen` could be mimicked by using multiple Mattermost resources and with some extra ingresses and services.
 
 ## Automatic migration
-It is possible for the Operator to migrate `ClusterInstallation` to `Mattermost` as long as none of the unsupported features are enabled (like `BlueGreen` or `Canary`).
+It is possible for the Operator to migrate `ClusterInstallation` to `Mattermost` as long as none of the unsupported features are enabled (like `BlueGreen` or `Canary`). 
+During the migration, old Pods are deleted only after the new `Mattermost` resource reaches the `stable` state, 
+therefore **the Mattermost instance should not experience any downtime.**
+
 For migration to be possible, the Mattermost Operator needs to be version `v1.12.x`.
 
 > **NOTE:** Make sure that Mattermost Operator is in version `v1.12.x` before starting the migration.
