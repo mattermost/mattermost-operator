@@ -1,14 +1,14 @@
 # Migrating ClusterInstallation to Mattermost
 
-As of the new release, the Custom Resource managed by the Mattermsot Operator changes from `ClusterInstallation` to `Mattermost`.
+As of the new release, the Custom Resource managed by the Mattermost Operator changes from `ClusterInstallation` to `Mattermost`.
 Besides the name change, some new functionality is introduced while other is removed.
 
 `BlueGreen` and `Canary` deployments were not widely used and introduced a lot of complexity, so those features were dropped. In most cases, the multi-replica Mattermost cluster proved to be enough for save updates between versions.
-Behavior similar to `BlueGreen` could be mimicked by using multiple Mattermost Instances.
+Behavior similar to `BlueGreen` could be mimicked by using multiple Mattermost resources and with some extra ingresses and services.
 
 ## Automatic migration
-It is possible for the Operator to migrate `ClusterInstallation` to `Mattermost` as long as it does not contain any of the unsupported features (like `BlueGreen` or `Canary`).
-For migration to be possible, the Mattermost Operator needs to be in version `v1.12.x`.
+It is possible for the Operator to migrate `ClusterInstallation` to `Mattermost` as long as none of the unsupported features are enabled (like `BlueGreen` or `Canary`).
+For migration to be possible, the Mattermost Operator needs to be version `v1.12.x`.
 
 > **NOTE:** Make sure that Mattermost Operator is in version `v1.12.x` before starting the migration.
 > To do that, inspect the Operator image tag. To get full image name and tag, run:

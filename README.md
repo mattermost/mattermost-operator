@@ -16,7 +16,7 @@ See the install instructions at https://docs.mattermost.com/install/install-kube
 ## 2 Migrate to Mattermost Custom Resource
 
 In version `v2.0.0` of the Mattermost Operator, several breaking changes will be introduced. Some of the more significant ones are: 
-- The name of the Custom Resource changed form `ClusterInstallation` to `Mattermost`.
+- The name of the Custom Resource changed from `ClusterInstallation` to `Mattermost`.
 - Support for `BlueGreen` and `Canary` deployments was dropped.
 - Layout of some fields changed.
 
