@@ -123,7 +123,7 @@ We have a script that changes some files, commit those changes and then tag the 
 To run you can issue the following command:
 
 ```console
-./scripts --tag=<DESIRED_TAG>
+./scripts/release.sh --tag=<DESIRED_TAG>
 ````
 
 where:
