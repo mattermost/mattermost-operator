@@ -2,13 +2,14 @@ package e2e
 
 import (
 	"context"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/kubernetes"
 	"testing"
 	"time"
 
-	operator "github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
+
+	operator "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 
 	mysqlOperator "github.com/presslabs/mysql-operator/pkg/apis/mysql/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -40,7 +41,7 @@ func waitForMySQLStatusReady(t *testing.T, dynclient client.Client, namespace, n
 }
 
 func waitForReconcilicationComplete(t *testing.T, dynclient client.Client, namespace, name string, retryInterval, timeout time.Duration) error {
-	newMattermost := &operator.ClusterInstallation{}
+	newMattermost := &operator.Mattermost{}
 	err := wait.Poll(retryInterval, timeout, func() (done bool, err error) {
 		errClient := dynclient.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, newMattermost)
 		if errClient != nil {

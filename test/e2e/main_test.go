@@ -1,18 +1,19 @@
 package e2e
 
 import (
-	mattermostcomv1alpha1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1"
+	"os"
+	"path/filepath"
+	"testing"
+
+	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	v1beta1Minio "github.com/minio/minio-operator/pkg/apis/miniocontroller/v1beta1"
 	v1alpha1MySQL "github.com/presslabs/mysql-operator/pkg/apis/mysql/v1alpha1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	"os"
-	"path/filepath"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-	"testing"
 )
 
 var cfg *rest.Config
@@ -56,7 +57,7 @@ func SetupTest() error {
 		return err
 	}
 
-	err = mattermostcomv1alpha1.AddToScheme(scheme.Scheme)
+	err = mmv1beta.AddToScheme(scheme.Scheme)
 	if err != nil {
 		return err
 	}
