@@ -22,7 +22,7 @@ For migration to be possible, the Mattermost Operator needs to be version `v1.12
 
 To run the migration, follow the steps:
 
-1. Prepare the namespace and name of the `ClusterInstallation` and export those as environment variables:
+1. Record the namespace and name of the `ClusterInstallation` and export those as environment variables on the device from which you are triggering the migration:
     ```
     export CI_NAMESPACE=[YOUR_NAMESPACE]
     export CI_NAME=[NAME_OF_YOUR_INSTALLATION]
