@@ -1,7 +1,7 @@
 # Migrating ClusterInstallation to Mattermost
 
 As of the new release, the Custom Resource managed by the Mattermost Operator changes from `ClusterInstallation` to `Mattermost`.
-Besides the name change, some new functionality is introduced while other is removed.
+Besides the name change, some new functionality is introduced while other functionality is changed or removed.
 
 `BlueGreen` and `Canary` deployments were not widely used and introduced a lot of complexity, so those features were dropped. In most cases, the multi-replica Mattermost cluster proved to be enough for save updates between versions.
 Behavior similar to `BlueGreen` could be mimicked by using multiple Mattermost resources and with some extra ingresses and services.

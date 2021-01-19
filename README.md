@@ -21,7 +21,7 @@ In version `v2.0.0` of the Mattermost Operator, several breaking changes will be
 - Layout of some fields changed.
 
 To prepare for the new release all `ClusterInstallation` Custom Resources need to be migrated to `Mattermost`.
-Mattermost Operator in version `v1.12.0` provides mechanism to make the migration easier.
+Mattermost Operator in version `v1.12.0` provides a mechanism to make the migration easier.
 To run the migration see [the automatic migration guide](./docs/migration.md).
 
 
