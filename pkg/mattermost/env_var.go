@@ -1,6 +1,10 @@
 package mattermost
 
-import corev1 "k8s.io/api/core/v1"
+import (
+	"strconv"
+
+	corev1 "k8s.io/api/core/v1"
+)
 
 func generalMattermostEnvVars(siteURL string) []corev1.EnvVar {
 	return []corev1.EnvVar{
@@ -62,7 +66,7 @@ func fileStoreEnvVars(fileStore *FileStoreInfo) []corev1.EnvVar {
 		},
 		{
 			Name:  "MM_FILESETTINGS_AMAZONS3SSL",
-			Value: "false",
+			Value: strconv.FormatBool(fileStore.useS3SSL),
 		},
 	}
 }

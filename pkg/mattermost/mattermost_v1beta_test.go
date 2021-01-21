@@ -104,12 +104,13 @@ func TestGenerateIngress_V1Beta(t *testing.T) {
 
 func TestGenerateDeployment_V1Beta(t *testing.T) {
 	tests := []struct {
-		name        string
-		spec        mmv1beta.MattermostSpec
-		database    DatabaseConfig
-		fileStore   *FileStoreInfo
-		want        *appsv1.Deployment
-		requiredEnv []string
+		name            string
+		spec            mmv1beta.MattermostSpec
+		database        DatabaseConfig
+		fileStore       *FileStoreInfo
+		want            *appsv1.Deployment
+		requiredEnv     []string
+		requiredEnvVals map[string]string
 	}{
 		{
 			name: "has license",
@@ -134,7 +135,7 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 					},
 				},
 			},
-			requiredEnv: []string{"MM_SERVICESETTINGS_LICENSEFILELOCATION"},
+			requiredEnvVals: map[string]string{"MM_SERVICESETTINGS_LICENSEFILELOCATION": "/mattermost-license/license"},
 		},
 		{
 			name:     "external database",
@@ -176,9 +177,41 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 				secretName: "file-store-secret",
 				bucketName: "file-store-bucket",
 				url:        "s3.amazon.com",
+				useS3SSL:   true,
 				config:     &ExternalFileStore{},
 			},
-			want: &appsv1.Deployment{},
+			want:            &appsv1.Deployment{},
+			requiredEnvVals: map[string]string{"MM_FILESETTINGS_AMAZONS3SSL": "true"},
+		},
+		{
+			name: "operator managed file store",
+			spec: mmv1beta.MattermostSpec{},
+			fileStore: &FileStoreInfo{
+				secretName: "file-store-secret",
+				bucketName: "file-store-bucket",
+				url:        "minio.local.com",
+				useS3SSL:   false,
+				config:     &OperatorManagedMinioConfig{},
+			},
+			want:            &appsv1.Deployment{},
+			requiredEnvVals: map[string]string{"MM_FILESETTINGS_AMAZONS3SSL": "false"},
+		},
+		{
+			name: "override envs set by default with ones in MM spec",
+			spec: mmv1beta.MattermostSpec{
+				MattermostEnv: []corev1.EnvVar{
+					{Name: "MM_FILESETTINGS_AMAZONS3SSL", Value: "false"},
+				},
+			},
+			fileStore: &FileStoreInfo{
+				secretName: "file-store-secret",
+				bucketName: "file-store-bucket",
+				url:        "s3.amazon.com",
+				useS3SSL:   true,
+				config:     &ExternalFileStore{},
+			},
+			want:            &appsv1.Deployment{},
+			requiredEnvVals: map[string]string{"MM_FILESETTINGS_AMAZONS3SSL": "false"},
 		},
 		{
 			name: "image pull policy",
@@ -367,12 +400,12 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 				},
 			},
 			want: &appsv1.Deployment{},
-			requiredEnv: []string{
-				"MM_ELASTICSEARCHSETTINGS_ENABLEINDEXING",
-				"MM_ELASTICSEARCHSETTINGS_ENABLESEARCHING",
-				"MM_ELASTICSEARCHSETTINGS_CONNECTIONURL",
-				"MM_ELASTICSEARCHSETTINGS_USERNAME",
-				"MM_ELASTICSEARCHSETTINGS_PASSWORD",
+			requiredEnvVals: map[string]string{
+				"MM_ELASTICSEARCHSETTINGS_ENABLEINDEXING":  "true",
+				"MM_ELASTICSEARCHSETTINGS_ENABLESEARCHING": "true",
+				"MM_ELASTICSEARCHSETTINGS_CONNECTIONURL":   "http://elastic",
+				"MM_ELASTICSEARCHSETTINGS_USERNAME":        "user",
+				"MM_ELASTICSEARCHSETTINGS_PASSWORD":        "password",
 			},
 		},
 	}
@@ -422,6 +455,10 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 				assertEnvVarExists(t, env, mattermostAppContainer.Env)
 			}
 
+			for env, val := range tt.requiredEnvVals {
+				assertEnvVarEqual(t, env, val, mattermostAppContainer.Env)
+			}
+
 			// External db check.
 			expectedInitContainers := 0 // Due to disabling DB setup job we start with 0 init containers
 
@@ -432,16 +469,13 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 						expectedInitContainers++
 					}
 				}
-				if externalDB.hasReaderEndpoints {
-					assertEnvVarExists(t, "MM_SQLSETTINGS_DATASOURCEREPLICAS", mattermostAppContainer.Env)
-				}
 			} else {
 				expectedInitContainers++
 				assertEnvVarExists(t, "MYSQL_USERNAME", mattermostAppContainer.Env)
 				assertEnvVarExists(t, "MYSQL_PASSWORD", mattermostAppContainer.Env)
 			}
 
-			if tt.fileStore == nil {
+			if _, ok := fileStoreInfo.config.(*OperatorManagedMinioConfig); ok {
 				expectedInitContainers += 2
 			}
 
@@ -499,4 +533,15 @@ func fixVolumeMount() corev1.VolumeMount {
 		Name:      "test-volume",
 		MountPath: "/etc/test",
 	}
+}
+
+func assertEnvVarEqual(t *testing.T, name, val string, env []corev1.EnvVar) {
+	for _, e := range env {
+		if e.Name == name {
+			assert.Equal(t, e.Value, val)
+			return
+		}
+	}
+
+	assert.Fail(t, fmt.Sprintf("failed to find env var %s", name))
 }
