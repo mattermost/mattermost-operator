@@ -8,7 +8,7 @@ metadata:
 spec:
   ingressName: example.mattermost-example.com
   database:
-    operatorManaged:                            # Operator managed database allows configuration of replicas, storage size and resource requirements, but if the `size` is specified, it will override those values.
+    operatorManaged:                            # Operator managed database allows configuration of replicas, storage size and resource requirements. If the `size` is specified, it will override those values.
       replicas: 2
       resources:
         requests:
@@ -17,7 +17,7 @@ spec:
       storageSize: 50Gi
       type: mysql
   fileStore:
-    operatorManaged:                            # Operator managed file store allows configuration of replicas, storage size and resource requirements, but if the `size` is specified, it will override those values.
+    operatorManaged:                            # Operator managed file store allows configuration of replicas, storage size and resource requirements. If the `size` is specified, it will override those values.
       replicas: 4
       resources:
         requests:
