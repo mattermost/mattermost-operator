@@ -1,0 +1,6 @@
+apiVersion: installation.mattermost.com/v1beta1
+kind: Mattermost
+metadata:
+  name: mm-example-anywhere
+spec:
+  ingressName: mattermost.example.com

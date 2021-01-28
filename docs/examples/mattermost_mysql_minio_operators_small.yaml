@@ -1,0 +1,27 @@
+# This file contains example of Mattermost Custom Resource  configured to
+# run with in cluster database and file storage (not recommended for production scenario).
+
+apiVersion: installation.mattermost.com/v1beta1
+kind: Mattermost
+metadata:
+  name: mm-example-operators
+spec:
+  ingressName: example.mattermost-example.com
+  database:
+    operatorManaged:                            # Operator managed database allows configuration of replicas, storage size and resource requirements, but if the `size` is specified, it will override those values.
+      replicas: 2
+      resources:
+        requests:
+          cpu: 250m
+          memory: 512Mi
+      storageSize: 50Gi
+      type: mysql
+  fileStore:
+    operatorManaged:                            # Operator managed file store allows configuration of replicas, storage size and resource requirements, but if the `size` is specified, it will override those values.
+      replicas: 4
+      resources:
+        requests:
+          cpu: 150m
+          memory: 512Mi
+      storageSize: 50Gi
+---
