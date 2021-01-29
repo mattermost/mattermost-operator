@@ -1,0 +1,7 @@
+apiVersion: installation.mattermost.com/v1beta1
+kind: Mattermost
+metadata:
+  name: mm-example-aws-azure
+spec:
+  ingressName: example.dev.cloud.mattermost.com
+  useServiceLoadBalancer: true
