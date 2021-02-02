@@ -148,16 +148,7 @@ func (r *MattermostReconciler) checkMattermostRoleBinding(mattermost *mmv1beta.M
 }
 
 func (r *MattermostReconciler) checkMattermostIngress(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) error {
-	ingressAnnotations := map[string]string{
-		"kubernetes.io/ingress.class":                 "nginx",
-		"nginx.ingress.kubernetes.io/proxy-body-size": "1000M",
-	}
-	ingressHost := mattermost.Spec.IngressName
-	for k, v := range mattermost.Spec.IngressAnnotations {
-		ingressAnnotations[k] = v
-	}
-
-	desired := mattermostApp.GenerateIngressV1Beta(mattermost, mattermost.Name, ingressHost, ingressAnnotations)
+	desired := mattermostApp.GenerateIngressV1Beta(mattermost)
 
 	err := r.Resources.CreateIngressIfNotExists(mattermost, desired, reqLogger)
 	if err != nil {
