@@ -85,27 +85,35 @@ func configureMattermostService(service *corev1.Service) *corev1.Service {
 	return service
 }
 
-// GenerateIngress returns the ingress for the Mattermost app.
-func GenerateIngressV1Beta(mattermost *mmv1beta.Mattermost, name, ingressName string, ingressAnnotations map[string]string) *v1beta1.Ingress {
+// GenerateIngressV1Beta returns the ingress for the Mattermost app.
+func GenerateIngressV1Beta(mattermost *mmv1beta.Mattermost) *v1beta1.Ingress {
+	ingressAnnotations := map[string]string{
+		"kubernetes.io/ingress.class":                 "nginx",
+		"nginx.ingress.kubernetes.io/proxy-body-size": "1000M",
+	}
+	for k, v := range mattermost.Spec.IngressAnnotations {
+		ingressAnnotations[k] = v
+	}
+
 	ingress := &v1beta1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            name,
+			Name:            mattermost.Name,
 			Namespace:       mattermost.Namespace,
-			Labels:          mattermost.MattermostLabels(name),
+			Labels:          mattermost.MattermostLabels(mattermost.Name),
 			OwnerReferences: MattermostOwnerReference(mattermost),
 			Annotations:     ingressAnnotations,
 		},
 		Spec: v1beta1.IngressSpec{
 			Rules: []v1beta1.IngressRule{
 				{
-					Host: ingressName,
+					Host: mattermost.Spec.IngressName,
 					IngressRuleValue: v1beta1.IngressRuleValue{
 						HTTP: &v1beta1.HTTPIngressRuleValue{
 							Paths: []v1beta1.HTTPIngressPath{
 								{
 									Path: "/",
 									Backend: v1beta1.IngressBackend{
-										ServiceName: name,
+										ServiceName: mattermost.Name,
 										ServicePort: intstr.FromInt(8065),
 									},
 								},
@@ -120,8 +128,8 @@ func GenerateIngressV1Beta(mattermost *mmv1beta.Mattermost, name, ingressName st
 	if mattermost.Spec.UseIngressTLS {
 		ingress.Spec.TLS = []v1beta1.IngressTLS{
 			{
-				Hosts:      []string{ingressName},
-				SecretName: strings.ReplaceAll(ingressName, ".", "-") + "-tls-cert",
+				Hosts:      []string{mattermost.Spec.IngressName},
+				SecretName: strings.ReplaceAll(mattermost.Spec.IngressName, ".", "-") + "-tls-cert",
 			},
 		}
 	}
@@ -129,7 +137,7 @@ func GenerateIngressV1Beta(mattermost *mmv1beta.Mattermost, name, ingressName st
 	return ingress
 }
 
-// GenerateDeployment returns the deployment for Mattermost app.
+// GenerateDeploymentV1Beta returns the deployment for Mattermost app.
 func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig, fileStore *FileStoreInfo, deploymentName, ingressName, serviceAccountName, containerImage string) *appsv1.Deployment {
 	// DB
 	envVarDB := db.EnvVars(mattermost)
@@ -258,7 +266,7 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 	}
 }
 
-// GenerateSecret returns the secret for Mattermost
+// GenerateSecretV1Beta returns the secret for Mattermost
 func GenerateSecretV1Beta(mattermost *mmv1beta.Mattermost, secretName string, labels map[string]string, values map[string][]byte) *corev1.Secret {
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -271,7 +279,7 @@ func GenerateSecretV1Beta(mattermost *mmv1beta.Mattermost, secretName string, la
 	}
 }
 
-// GenerateServiceAccount returns the Service Account for Mattermost
+// GenerateServiceAccountV1Beta returns the Service Account for Mattermost
 func GenerateServiceAccountV1Beta(mattermost *mmv1beta.Mattermost, saName string) *corev1.ServiceAccount {
 	return &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
@@ -282,7 +290,7 @@ func GenerateServiceAccountV1Beta(mattermost *mmv1beta.Mattermost, saName string
 	}
 }
 
-// GenerateRole returns the Role for Mattermost
+// GenerateRoleV1Beta returns the Role for Mattermost
 func GenerateRoleV1Beta(mattermost *mmv1beta.Mattermost, roleName string) *rbacv1.Role {
 	return &rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
@@ -305,7 +313,7 @@ func mattermostRolePermissions() []rbacv1.PolicyRule {
 	}
 }
 
-// GenerateRoleBinding returns the RoleBinding for Mattermost
+// GenerateRoleBindingV1Beta returns the RoleBinding for Mattermost
 func GenerateRoleBindingV1Beta(mattermost *mmv1beta.Mattermost, roleName, saName string) *rbacv1.RoleBinding {
 	return &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{

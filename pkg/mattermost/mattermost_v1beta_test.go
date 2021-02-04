@@ -90,7 +90,7 @@ func TestGenerateIngress_V1Beta(t *testing.T) {
 				Spec: tt.spec,
 			}
 
-			ingress := GenerateIngressV1Beta(mattermost, "", "", nil)
+			ingress := GenerateIngressV1Beta(mattermost)
 			require.NotNil(t, ingress)
 
 			if mattermost.Spec.UseIngressTLS {
