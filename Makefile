@@ -149,7 +149,7 @@ uninstall: manifests kustomize ## Uninstall CRDs from a cluster
 	$(KUSTOMIZE) build config/crd | kubectl delete -f -
 
 deploy: manifests kustomize ## Deploy controller in the configured Kubernetes cluster in ~/.kube/config
-	kubectl create ns mattermost-operator --dry-run=client -oyaml | kubectl apply -f -
+	kubectl create ns mattermost-operator --dry-run -oyaml | kubectl apply -f -
 	cd config/manager && $(KUSTOMIZE) edit set image mattermost-operator="mattermost/mattermost-operator:test"
 	$(KUSTOMIZE) build config/default | kubectl apply -n mattermost-operator -f -
 
