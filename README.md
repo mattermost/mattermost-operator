@@ -9,11 +9,11 @@ Learn more about Mattermost at https://mattermost.com.
 
 The Mattermost server source code is available at https://github.com/mattermost/mattermost-server.
 
-## 1 Install
+## Install
 
-See the install instructions at https://docs.mattermost.com/install/install-kubernetes.html.
+See the installation instructions at https://docs.mattermost.com/install/install-kubernetes.html.
 
-## 2 Migrate to Mattermost Custom Resource
+## Migrate to Mattermost Custom Resource
 
 In version `v2.0.0` of the Mattermost Operator, several breaking changes will be introduced. Some of the more significant ones are: 
 - The name of the Custom Resource changed from `ClusterInstallation` to `Mattermost`.
@@ -25,7 +25,7 @@ Mattermost Operator in version `v1.12.0` provides a mechanism to make the migrat
 To run the migration see [the automatic migration guide](./docs/migration.md).
 
 
-## 3 Restore an existing Mattermost MySQL Database
+## Restore an existing Mattermost MySQL Database
 To restore an existing Mattermost MySQL Database into a new Mattermost installation using the Mattermost Operator you will need to follow these steps:
 
 Use Case: An existing AWS RDS Database
@@ -75,54 +75,72 @@ Use Case: An existing AWS RDS Database
 
 If you have an machine running MySQL you just need to perform the `Percona XtraBackup` step
 
-## 3 Developer Flow
+## Developer Flow
 To test the operator locally. We recommend [Kind](https://kind.sigs.k8s.io/), however, you can use Minikube or Minishift as well.
 
-### 3.1 Prerequisites
+### Prerequisites
 To develop locally you will need the [Operator SDK](https://github.com/operator-framework/operator-sdk).
 
 First, checkout and install the operator-sdk CLI:
 
 ```bash
-$ mkdir -p $GOPATH/src/github.com/operator-framework
-$ cd $GOPATH/src/github.com/operator-framework
-$ git clone https://github.com/operator-framework/operator-sdk
-$ cd operator-sdk
-$ git checkout master
-$ make install
+mkdir -p $GOPATH/src/github.com/operator-framework
+cd $GOPATH/src/github.com/operator-framework
+git clone https://github.com/operator-framework/operator-sdk
+cd operator-sdk
+git checkout master
+make install
 ```
 
-### 3.2 Building mattermost-operator
+### Building mattermost-operator
 To start contributing to mattermost-operator you need to clone this repo to your local workspace.
 
 ```bash
-$ mkdir -p $GOPATH/src/github.com/mattermost
-$ cd $GOPATH/src/github.com/mattermost
-$ git clone https://github.com/mattermost/mattermost-operator
-$ cd mattermost-operator
-$ git checkout master
-$ make build
+mkdir -p $GOPATH/src/github.com/mattermost
+cd $GOPATH/src/github.com/mattermost
+git clone https://github.com/mattermost/mattermost-operator
+cd mattermost-operator
+git checkout master
+make build
 ```
 
-### 3.3 Testing locally
-Developing and testing local changes to Mattermost operator is fairly simple. For that you can deploy Kind and then apply the manifests to deploy the dependencies and the Mattermost operator as well.
+### Testing locally with Kind
+Developing and testing local changes to Mattermost Operator is fairly simple. For that you can deploy Kind cluster.
 
-You don't need to push the mattermost-operator image to DockerHub or any other registry if testing with kind. You can load the image, built with `make build-image`, directly to the Kind cluster by running the following:
+> **NOTE:**
+> You don't need to push the mattermost-operator image to DockerHub or any other registry if testing with kind. You can load the image, built with `make build-image`, directly to the Kind cluster by running the following:
+> ```bash
+> kind load docker-image mattermost/mattermost-operator:test
+> ``` 
 
+To spin up an appropriate Kind cluster and deploy dependencies, run:
 ```bash
-$ kind load docker-image mattermost/mattermost-operator:test
+make kind-start mysql-minio-operators
 ```
 
-## 4 Notes
+After Kind cluster is up and running, build Mattermost Operator image, load it to Kind cluster and deploy it. For that, run:
+```bash
+make build-image kind-load-image deploy
+```
 
-### 4.1 Installation Size
+### Accessing Mattermost Installation on Kind
+
+After you create Mattermost installation using Mattermost Operator on Kind cluster, 
+port-forward the service to access it:
+```bash
+kubectl port-forward svc/[MATTERMOST_NAME] 8065:8065
+```
+
+## Notes
+
+### Installation Size
 
 The `spec.Size` field was modified to be treated as a write-only field.
 After adjusting values according to the size, the value of `spec.Size` is erased.
 
 Replicas and resource requests/limits values can be overridden manually but setting new Size will override those values again regardless if set by the previous Size or adjusted manually.
 
-## 5 Release
+## Release
 
 To release a new version of Mattermost Operator you need to:
 
@@ -134,7 +152,7 @@ We have a script that changes some files, commit those changes and then tag the 
 
 To run you can issue the following command:
 
-```console
+```bash
 ./scripts/release.sh --tag=<DESIRED_TAG>
 ````
 

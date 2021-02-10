@@ -44,6 +44,8 @@ TEST_PACKAGES=$(shell go list ./...| grep -v test/e2e)
 INSTALL_YAML=docs/mattermost-operator/mattermost-operator.yaml
 GO_INSTALL = ./scripts/go_install.sh
 
+KIND_CLUSTER ?= "kind"
+
 # Binaries.
 TOOLS_BIN_DIR := $(abspath bin)
 
@@ -147,8 +149,12 @@ uninstall: manifests kustomize ## Uninstall CRDs from a cluster
 	$(KUSTOMIZE) build config/crd | kubectl delete -f -
 
 deploy: manifests kustomize ## Deploy controller in the configured Kubernetes cluster in ~/.kube/config
+	kubectl create ns mattermost-operator --dry-run=client -oyaml | kubectl apply -f -
 	cd config/manager && $(KUSTOMIZE) edit set image mattermost-operator="mattermost/mattermost-operator:test"
-	$(KUSTOMIZE) build config/default | kubectl apply -f -
+	$(KUSTOMIZE) build config/default | kubectl apply -n mattermost-operator -f -
+
+mysql-minio-operators: ## Deploys MinIO and MySQL Operators to the active cluster
+	./scripts/install-mysql-minio.sh
 
 manifests: controller-gen ## Runs CRD generator
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) paths="./..." output:crd:artifacts:config=config/crd/bases
@@ -180,6 +186,15 @@ generate: $(OPENAPI_GEN) controller-gen ## Runs the kubernetes code-generators a
 
 docker-push: ## Push the docker image
 	docker push ${OPERATOR_IMAGE}
+
+kind-start: ## Setup Kind cluster capable of running Mattermost Operator
+	KIND_CLUSTER="${KIND_CLUSTER}" ./scripts/setup_kind.sh
+
+kind-load-image: ## Loads Mattermost Operator image to Kind cluster
+	kind load --name "${KIND_CLUSTER}" docker-image $(OPERATOR_IMAGE)
+
+kind-destroy: ## Destroy Kind cluster
+	kind delete cluster --name "${KIND_CLUSTER}"
 
 controller-gen: ## Find or download controller-gen
 ifeq (, $(shell which controller-gen))

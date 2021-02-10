@@ -9,13 +9,12 @@ set -Eeuxo pipefail
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
+export KIND_CLUSTER="kind"
+
 CLUSTER_NAME=${CLUSTER_NAME:-kind}
 
 echo "Creating Kind cluster"
-kind create cluster --config "${DIR}"/kind-config.yaml --name "${CLUSTER_NAME}"
-
-# Use Kind cluster kubeconfig
-kind export kubeconfig --name "${CLUSTER_NAME}"
+make kind-start
 
 # shellcheck source=test/setup_test.sh
 source "${DIR}"/setup_test.sh
