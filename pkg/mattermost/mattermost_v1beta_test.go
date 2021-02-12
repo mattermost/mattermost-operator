@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"testing"
 
+	"k8s.io/api/networking/v1beta1"
+
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	"github.com/mattermost/mattermost-operator/pkg/database"
 	"github.com/mattermost/mattermost-operator/pkg/utils"
@@ -92,6 +94,8 @@ func TestGenerateIngress_V1Beta(t *testing.T) {
 
 			ingress := GenerateIngressV1Beta(mattermost)
 			require.NotNil(t, ingress)
+
+			assert.Equal(t, v1beta1.PathTypeImplementationSpecific, *ingress.Spec.Rules[0].HTTP.Paths[0].PathType)
 
 			if mattermost.Spec.UseIngressTLS {
 				assert.NotNil(t, ingress.Spec.TLS)

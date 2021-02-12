@@ -25,6 +25,8 @@ const (
 	WaitForDBSetupContainerName = "init-wait-for-db-setup"
 )
 
+var defaultIngressPathType = v1beta1.PathTypeImplementationSpecific
+
 // GenerateService returns the service for the Mattermost app.
 func GenerateService(mattermost *mattermostv1alpha1.ClusterInstallation, serviceName, selectorName string) *corev1.Service {
 	baseAnnotations := map[string]string{
@@ -76,6 +78,7 @@ func GenerateIngress(mattermost *mattermostv1alpha1.ClusterInstallation, name, i
 										ServiceName: name,
 										ServicePort: intstr.FromInt(8065),
 									},
+									PathType: &defaultIngressPathType,
 								},
 							},
 						},

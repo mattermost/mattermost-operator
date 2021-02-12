@@ -116,6 +116,7 @@ func GenerateIngressV1Beta(mattermost *mmv1beta.Mattermost) *v1beta1.Ingress {
 										ServiceName: mattermost.Name,
 										ServicePort: intstr.FromInt(8065),
 									},
+									PathType: &defaultIngressPathType,
 								},
 							},
 						},
