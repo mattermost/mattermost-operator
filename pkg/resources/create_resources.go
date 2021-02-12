@@ -44,7 +44,7 @@ func NewResourceHelper(client client.Client, scheme *runtime.Scheme) *ResourceHe
 	}
 }
 
-// create creates the provided resource and sets the owner
+// Create creates the provided resource and sets the owner
 func (r *ResourceHelper) Create(owner v1.Object, desired Object, reqLogger logr.Logger) error {
 	// adding the last applied annotation to use the object matcher later
 	// see: https://github.com/banzaicloud/k8s-objectmatcher
@@ -70,7 +70,7 @@ func (r *ResourceHelper) Update(current, desired Object, reqLogger logr.Logger) 
 			return errors.Wrap(err, "failed to apply annotation to the resource")
 		}
 
-		reqLogger.Info("updating resource", "name", desired.GetName(), "namespace", desired.GetNamespace(), "patch", string(patchResult.Patch))
+		reqLogger.Info("Updating resource", "name", desired.GetName(), "kind", desired.GetObjectKind(), "namespace", desired.GetNamespace(), "patch", string(patchResult.Patch))
 
 		// Resource version is required for the update, but need to be set after
 		// the last applied annotation to avoid unnecessary diffs

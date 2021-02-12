@@ -13,13 +13,14 @@ require (
 	github.com/pborman/uuid v1.2.1
 	github.com/pkg/errors v0.9.1
 	github.com/presslabs/mysql-operator v0.4.0
-	github.com/stretchr/testify v1.6.1
+	github.com/stretchr/testify v1.7.0
 	github.com/vrischmann/envconfig v1.3.0
 	golang.org/x/net v0.0.0-20200625001655-4c5254603344
-	k8s.io/api v0.18.8
-	k8s.io/apimachinery v0.18.8
-	k8s.io/client-go v0.18.8
-	k8s.io/code-generator v0.18.8
+	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
+	k8s.io/api v0.18.15
+	k8s.io/apimachinery v0.18.15
+	k8s.io/client-go v0.18.15
+	k8s.io/code-generator v0.18.15
 	k8s.io/kube-openapi v0.0.0-20200410145947-61e04a5be9a6
-	sigs.k8s.io/controller-runtime v0.6.2
+	sigs.k8s.io/controller-runtime v0.6.5
 )
