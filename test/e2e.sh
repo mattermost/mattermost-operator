@@ -4,6 +4,8 @@ set -Eeuxo pipefail
 
 readonly REPO_ROOT="${REPO_ROOT:-$(git rev-parse --show-toplevel)}"
 
+export KIND_CLUSTER="kind"
+
 run_ct_container() {
     echo 'Running testing container...'
     docker run --rm --interactive --detach --network host --name test-cont \
@@ -36,8 +38,7 @@ run_kind() {
     echo
 
     echo "Create Kubernetes cluster with kind..."
-    kind create cluster --config test/kind-config.yaml --wait 5m
-    echo
+    make kind-start
 
     echo 'Copying kubeconfig to container...'
     kind get kubeconfig
