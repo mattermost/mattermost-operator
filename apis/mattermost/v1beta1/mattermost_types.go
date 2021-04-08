@@ -72,6 +72,9 @@ type MattermostSpec struct {
 	// Specify Mattermost deployment pull policy.
 	// +optional
 	ImagePullPolicy v1.PullPolicy `json:"imagePullPolicy,omitempty"`
+	// Specify Mattermost image pull secrets.
+	// +optional
+	ImagePullSecrets []v1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 
 	// External Services
 	Database      Database      `json:"database,omitempty"`

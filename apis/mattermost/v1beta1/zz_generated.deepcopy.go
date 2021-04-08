@@ -216,6 +216,11 @@ func (in *MattermostSpec) DeepCopyInto(out *MattermostSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.ImagePullSecrets != nil {
+		in, out := &in.ImagePullSecrets, &out.ImagePullSecrets
+		*out = make([]v1.LocalObjectReference, len(*in))
+		copy(*out, *in)
+	}
 	in.Database.DeepCopyInto(&out.Database)
 	in.FileStore.DeepCopyInto(&out.FileStore)
 	out.ElasticSearch = in.ElasticSearch
