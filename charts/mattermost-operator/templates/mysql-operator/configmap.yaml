@@ -1,0 +1,22 @@
+{{- if and .Values.mysqlOperator.enabled }}
+{{- $conf := .Values.mysqlOperator.orchestrator.config }}
+{{- $_ := set $conf "RaftAdvertise" "{{ .Env.HOSTNAME }}-svc" }}
+{{- $_ := set $conf "RaftBind" "{{ .Env.HOSTNAME }}" }}
+{{- $_ := set $conf "RaftDataDir" "/var/lib/orchestrator" }}
+{{- $_ := set $conf "RaftEnabled" true }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.mysqlOperator.appName }}-operator-orc
+  namespace: {{ .Values.mysqlOperator.appName }}-operator
+  labels:
+    app: {{ .Values.mysqlOperator.appName }}-operator
+    release: {{ .Values.mysqlOperator.appName }}-operator
+data:
+  orchestrator.conf.json: {{ toPrettyJson $conf | quote }}
+  orc-topology.cnf: |
+    [client]
+    user = {{ printf "{{ .Env.ORC_TOPOLOGY_USER }}" }}
+    password = {{ printf "{{ .Env.ORC_TOPOLOGY_PASSWORD }}" }}
+{{- end }}
+

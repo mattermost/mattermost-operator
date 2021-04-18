@@ -1,0 +1,43 @@
+{{- if .Values.mysqlOperator.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.mysqlOperator.appName }}-operator-0-svc
+  namespace: {{ .Values.mysqlOperator.appName }}-operator
+  labels:
+    app: {{ .Values.mysqlOperator.appName }}-operator
+    release: {{ .Values.mysqlOperator.appName }}-operator
+{{- if .Values.mysqlOperator.service.annotations }}
+  annotations:
+{{ toYaml .Values.mysqlOperator.service.annotations | indent 4 }}
+{{- end }}
+spec:
+  type: ClusterIP
+  ports:
+  - name: web
+    port: 80
+    targetPort: 3000
+  - name: raft
+    port: 10008
+    targetPort: 10008
+  selector:
+    statefulset.kubernetes.io/pod-name: {{ .Values.mysqlOperator.appName }}-operator-0
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.mysqlOperator.appName }}-operator
+  namespace: {{ .Values.mysqlOperator.appName }}-operator
+  labels:
+    app: {{ .Values.mysqlOperator.appName }}-operator
+    release: {{ .Values.mysqlOperator.appName }}-operator
+spec:
+  type: ClusterIP
+  selector:
+    app: {{ .Values.mysqlOperator.appName }}-operator
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: 3000
+{{- end }}

@@ -1,0 +1,22 @@
+{{- if .Values.minioOperator.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.minioOperator.appName }}-operator
+  namespace: {{ .Values.minioOperator.appName }}-operator
+spec:
+  replicas: {{ .Values.minioOperator.replicas }}
+  selector:
+    matchLabels:
+      name: {{ .Values.minioOperator.appName }}-operator
+  template:
+    metadata:
+      labels:
+        name: {{ .Values.minioOperator.appName }}-operator
+    spec:
+      serviceAccountName: {{ .Values.minioOperator.appName }}-operator-sa
+      containers:
+        - name: {{ .Values.minioOperator.appName }}-operator
+          image: "{{ .Values.minioOperator.image.repository }}:{{ .Values.minioOperator.image.tag }}"
+          imagePullPolicy: "{{ .Values.minioOperator.image.pullPolicy }}"
+{{- end }}
