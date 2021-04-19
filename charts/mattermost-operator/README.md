@@ -55,7 +55,7 @@ To upgrade an existing release, modify the `config.yaml` with your desired chang
 helm upgrade -f config.yaml <your-release-name> . -n mattermost-operator
 ```
 
-## 3.1 Uninstalling Mattermost Push Proxy Helm Chart
+## 3.1 Uninstalling Mattermost Operator Helm Chart
 
 If you are done with your deployment and want to delete it, use `helm delete <your-release-name>`. If you don't know the name of your release, use `helm ls` to find it.
 
