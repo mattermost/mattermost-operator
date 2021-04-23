@@ -3,6 +3,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ template "mattermost-operator.name" . }}
+  namespace: {{ template "mattermost-operator.namespace" . }}
 spec:
   replicas: {{ .Values.mattermostOperator.replicas }}
   selector:
@@ -15,7 +16,9 @@ spec:
     spec:
       containers:
       - args:
-        - --enable-leader-election
+        {{- if .Values.mattermostOperator.args }}
+{{ toYaml .Values.mattermostOperator.args | indent 10 }}
+        {{- end }}
         command:
         - /mattermost-operator
         env:
@@ -26,5 +29,5 @@ spec:
         image: "{{ .Values.mattermostOperator.image.repository }}:{{ .Values.mattermostOperator.image.tag }}"
         imagePullPolicy: "{{ .Values.mattermostOperator.image.pullPolicy }}"
         name: {{ template "mattermost-operator.name" . }}
-      serviceAccountName: {{ template "mattermost-operator.fullname" . }}
+      serviceAccountName: {{ template "mattermost-operator.name" . }}
 {{- end }}

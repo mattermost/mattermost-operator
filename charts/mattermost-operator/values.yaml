@@ -16,11 +16,14 @@ mattermostOperator:
     repository: mattermost/mattermost-operator
     tag: v1.13.0
     pullPolicy: IfNotPresent
+  args:
+    - --enable-leader-election
 
 minioOperator:
   enabled: true
   replicas: 1
   appName: minio
+  namespace: minio-operator
   rbac:
     create: true
   serviceAccount:
@@ -34,6 +37,7 @@ mysqlOperator:
   enabled: true
   replicas: 1
   appName: mysql
+  namespace: mysql-operator
   rbac:
     create: true
   serviceAccount:
@@ -42,6 +46,14 @@ mysqlOperator:
     repository: quay.io/presslabs/mysql-operator
     tag: 0.4.0
     pullPolicy: IfNotPresent
+
+  ## Configuration for Mysql operator fs group
+  ##
+  fsGroup: 777
+
+  ## Configuration for Mysql operator extra args
+  ##
+  extraArgs: []
 
   ## Configuration for Mysql operator service
   ##
@@ -62,6 +74,15 @@ mysqlOperator:
     image:
       repository: quay.io/presslabs/mysql-operator-sidecar
       tag: 0.4.0
+
+
+  ## Configuration for Probes
+  ##
+  readinessProbeTimeout: 10
+  readinessProbeInitialDelay: 0
+
+  livenessProbeTimeout: 10
+  livenessProbeInitialDelay: 200
 
   ## Configuration for Mysql operator orchestrator
   ##

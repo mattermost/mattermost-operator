@@ -2,21 +2,21 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Values.minioOperator.appName }}-operator
-  namespace: {{ .Values.minioOperator.appName }}-operator
+  name: {{ template "minio-operator.name" . }}
+  namespace: {{ template "minio-operator.namespace" . }}
 spec:
   replicas: {{ .Values.minioOperator.replicas }}
   selector:
     matchLabels:
-      name: {{ .Values.minioOperator.appName }}-operator
+      name: {{ template "minio-operator.name" . }}
   template:
     metadata:
       labels:
-        name: {{ .Values.minioOperator.appName }}-operator
+        name: {{ template "minio-operator.name" . }}
     spec:
-      serviceAccountName: {{ .Values.minioOperator.appName }}-operator-sa
+      serviceAccountName: {{ template "minio-operator.name" . }}-sa
       containers:
-        - name: {{ .Values.minioOperator.appName }}-operator
+        - name: {{ template "minio-operator.name" . }}
           image: "{{ .Values.minioOperator.image.repository }}:{{ .Values.minioOperator.image.tag }}"
           imagePullPolicy: "{{ .Values.minioOperator.image.pullPolicy }}"
 {{- end }}

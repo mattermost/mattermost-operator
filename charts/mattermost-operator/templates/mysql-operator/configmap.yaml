@@ -7,11 +7,11 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ .Values.mysqlOperator.appName }}-operator-orc
-  namespace: {{ .Values.mysqlOperator.appName }}-operator
+  name: {{ template "mysql-operator.name" . }}-orc
+  namespace: {{ .Values.mysqlOperator.namespace }}
   labels:
-    app: {{ .Values.mysqlOperator.appName }}-operator
-    release: {{ .Values.mysqlOperator.appName }}-operator
+    app: {{ template "mysql-operator.name" . }}
+    release: {{ template "mysql-operator.name" . }}
 data:
   orchestrator.conf.json: {{ toPrettyJson $conf | quote }}
   orc-topology.cnf: |

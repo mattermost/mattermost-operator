@@ -2,11 +2,11 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ .Values.mysqlOperator.appName }}-operator-0-svc
-  namespace: {{ .Values.mysqlOperator.appName }}-operator
+  name: {{ template "mysql-operator.name" . }}-0-svc
+  namespace: {{ template "mysql-operator.namespace" . }}
   labels:
-    app: {{ .Values.mysqlOperator.appName }}-operator
-    release: {{ .Values.mysqlOperator.appName }}-operator
+    app: {{ template "mysql-operator.name" . }}
+    release: {{ template "mysql-operator.name" . }}
 {{- if .Values.mysqlOperator.service.annotations }}
   annotations:
 {{ toYaml .Values.mysqlOperator.service.annotations | indent 4 }}
@@ -21,20 +21,20 @@ spec:
     port: 10008
     targetPort: 10008
   selector:
-    statefulset.kubernetes.io/pod-name: {{ .Values.mysqlOperator.appName }}-operator-0
+    statefulset.kubernetes.io/pod-name: {{ template "mysql-operator.name" . }}-0
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ .Values.mysqlOperator.appName }}-operator
-  namespace: {{ .Values.mysqlOperator.appName }}-operator
+  name: {{ template "mysql-operator.name" . }}
+  namespace: {{ template "mysql-operator.namespace" . }}
   labels:
-    app: {{ .Values.mysqlOperator.appName }}-operator
-    release: {{ .Values.mysqlOperator.appName }}-operator
+    app: {{ template "mysql-operator.name" . }}
+    release: {{ template "mysql-operator.name" . }}
 spec:
   type: ClusterIP
   selector:
-    app: {{ .Values.mysqlOperator.appName }}-operator
+    app: {{ template "mysql-operator.name" . }}
   ports:
   - name: http
     port: 80

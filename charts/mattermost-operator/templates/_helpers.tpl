@@ -33,3 +33,29 @@ Allow the release namespace to be overridden for multi-namespace deployments in 
     {{- .Release.Namespace -}}
   {{- end -}}
 {{- end -}}
+
+
+{{- define "mysql-operator.name" -}}
+{{ .Values.mysqlOperator.appName }}-operator
+{{- end }}
+
+{{- define "mysql-operator.namespace" -}}
+  {{- if .Values.mysqlOperator.namespace -}}
+    {{- .Values.mysqlOperator.namespace -}}
+  {{- else -}}
+    {{- printf "mysql-operator" -}}
+  {{- end -}}
+{{- end -}}
+
+
+{{- define "minio-operator.name" -}}
+{{ .Values.minioOperator.appName }}-operator
+{{- end }}
+
+{{- define "minio-operator.namespace" -}}
+  {{- if .Values.minioOperator.namespace -}}
+    {{- .Values.minioOperator.namespace -}}
+  {{- else -}}
+    {{- printf "minio-operator" -}}
+  {{- end -}}
+{{- end -}}

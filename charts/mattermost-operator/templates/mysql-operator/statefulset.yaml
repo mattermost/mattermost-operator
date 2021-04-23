@@ -1,30 +1,31 @@
+{{- if and .Values.mysqlOperator.enabled }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ .Values.mysqlOperator.appName }}-operator
-  namespace: {{ .Values.mysqlOperator.appName }}-operator
+  name: {{ template "mysql-operator.name" . }}
+  namespace: {{ template "mysql-operator.namespace" . }}
   labels:
-    app: {{ .Values.mysqlOperator.appName }}-operator
-    release: {{ .Values.mysqlOperator.appName }}-operator
+    app: {{ template "mysql-operator.name" . }}
+    release: {{ template "mysql-operator.name" . }}
 spec:
   replicas: {{ .Values.mysqlOperator.replicas }}
-  serviceName: {{ .Values.mysqlOperator.appName }}-operator-orc
+  serviceName: {{ template "mysql-operator.name" . }}-orc
   podManagementPolicy: Parallel
   selector:
     matchLabels:
-      app: {{ .Values.mysqlOperator.appName }}-operator
-      release: {{ .Values.mysqlOperator.appName }}-operator
+      app: {{ template "mysql-operator.name" . }}
+      release: {{ template "mysql-operator.name" . }}
   template:
     metadata:
       labels:
-        app: {{ .Values.mysqlOperator.appName }}-operator
-        release: {{ .Values.mysqlOperator.appName }}-operator
+        app: {{ template "mysql-operator.name" . }}
+        release: {{ template "mysql-operator.name" . }}
 {{- if .Values.mysqlOperator.statefulSet.annotations }}
       annotations:
         {{- toYaml .Values.mysqlOperator.statefulSet.annotations | nindent 8 }}
 {{- end }}
     spec:
-      serviceAccountName: {{ .Values.mysqlOperator.appName }}-operator
+      serviceAccountName: {{ template "mysql-operator.name" . }}
       containers:
         - name: operator
           image: "{{ .Values.mysqlOperator.image.repository }}:{{ .Values.mysqlOperator.image.tag }}"
@@ -33,18 +34,21 @@ spec:
             - name: ORC_TOPOLOGY_USER
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.mysqlOperator.appName }}-operator-orc
+                  name: {{ template "mysql-operator.name" . }}-orc
                   key: TOPOLOGY_USER
             - name: ORC_TOPOLOGY_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.mysqlOperator.appName }}-operator-orc
+                  name: {{ template "mysql-operator.name" . }}-orc
                   key: TOPOLOGY_PASSWORD
           args:
-            - --leader-election-namespace={{ .Values.mysqlOperator.appName }}-operator
+            - --leader-election-namespace={{ template "mysql-operator.namespace" . }}
             # connect to orchestrator on localhost
             - --orchestrator-uri=http://127.0.0.1:3000/api
             - --sidecar-image={{ .Values.mysqlOperator.sidecar.image.repository }}:{{ .Values.mysqlOperator.sidecar.image.tag }}
+            {{- if .Values.mysqlOperator.extraArgs }}
+{{ toYaml .Values.mysqlOperator.extraArgs | indent 12 }}
+            {{- end }}
         - name: orchestrator
           image: "{{ .Values.mysqlOperator.orchestrator.image.repository }}:{{ .Values.mysqlOperator.orchestrator.image.tag }}"
           imagePullPolicy: "{{ .Values.mysqlOperator.orchestrator.image.pullPolicy }}"
@@ -63,31 +67,32 @@ spec:
           envFrom:
             - prefix: ORC_
               secretRef:
-                name: {{ .Values.mysqlOperator.appName }}-operator-orc
+                name: {{ template "mysql-operator.name" . }}-orc
           volumeMounts:
             - name: data
               mountPath: /var/lib/orchestrator/
             - name: config
               mountPath: /templates/
           livenessProbe:
-            timeoutSeconds: 10
-            initialDelaySeconds: 200
+            timeoutSeconds: {{ .Values.mysqlOperator.livenessProbeTimeout }}
+            initialDelaySeconds: {{ .Values.mysqlOperator.livenessProbeInitialDelay }}
             httpGet:
               path: /api/lb-check
               port: 3000
           # https://github.com/github/orchestrator/blob/master/docs/raft.md#proxy-healthy-raft-nodes
           readinessProbe:
-            timeoutSeconds: 10
+            timeoutSeconds: {{ .Values.mysqlOperator.readinessProbeTimeout }}
+            initialDelaySeconds: {{ .Values.mysqlOperator.readinessProbeInitialDelay }}
             httpGet:
               path: /api/raft-health
               port: 3000
       volumes:
         - name: config
           configMap:
-            name: {{ .Values.mysqlOperator.appName }}-operator-orc
+            name: {{ template "mysql-operator.name" . }}-orc
       # security context to mount corectly the volume for orc
       securityContext:
-        fsGroup: 777
+        fsGroup: {{ .Values.mysqlOperator.fsGroup }}
   volumeClaimTemplates:
     - metadata:
         name: data
@@ -97,3 +102,4 @@ spec:
         resources:
           requests:
             storage: {{ .Values.mysqlOperator.persistentVolume.size }}
+{{- end }}
