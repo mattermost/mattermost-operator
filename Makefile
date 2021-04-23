@@ -53,7 +53,7 @@ SHADOW_BIN := shadow
 SHADOW_VER := master
 SHADOW_GEN := $(TOOLS_BIN_DIR)/$(SHADOW_BIN)
 
-OPENAPI_VER := master
+OPENAPI_VER := release-1.18
 OPENAPI_BIN := openapi-gen
 OPENAPI_GEN := $(TOOLS_BIN_DIR)/$(OPENAPI_BIN)
 
