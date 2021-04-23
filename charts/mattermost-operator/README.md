@@ -1,4 +1,4 @@
-Mattermost Operatop Helm Chart
+Mattermost Operator Helm Chart
 ====================================================
 
 This is the Helm chart for the Mattermost Operator. To learn more about Helm charts, [see the Helm docs](https://helm.sh/docs/). You can find more information about Mattermost Operator [here](https://github.com/mattermost/mattermost-operator/blob/master/README.md).
