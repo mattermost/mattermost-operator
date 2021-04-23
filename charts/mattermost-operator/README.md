@@ -26,7 +26,7 @@ To start, copy [mattermost-operator/charts/mattermost-operator/values.yaml](http
 
 ## 2.1 Prerequisites
 
-Before you install the Mattermost Operator Helm chart the respectice k8s namespaces need to be created. To create all required namespaces you should run:
+Before you install the Mattermost Operator Helm chart the respective k8s namespaces need to be created. To create all required namespaces you should run:
 
 ```
 kubectl create namespace mattermost-operator
