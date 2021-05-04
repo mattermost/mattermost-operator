@@ -289,7 +289,6 @@ func (r *ClusterInstallationReconciler) deleteMattermostResource(mattermost *mat
 		return err
 	}
 
-
 	err = r.Client.Delete(context.TODO(), resource)
 	if err != nil {
 		reqLogger.Error(err, "Failed to delete mattermost resource")
