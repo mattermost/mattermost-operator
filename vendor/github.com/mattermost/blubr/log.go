@@ -9,11 +9,6 @@ import (
 )
 
 type logrusLogger struct {
-	l *log.Entry
-	infoLogger
-}
-
-type infoLogger struct {
 	l    *log.Entry
 	name string
 }
@@ -22,16 +17,13 @@ type infoLogger struct {
 func InitLogger() logr.Logger {
 	logger := log.NewEntry(log.New())
 	return &logrusLogger{
-		l: logger,
-		infoLogger: infoLogger{
-			l:    logger,
-			name: "",
-		},
+		l:    logger,
+		name: "",
 	}
 }
 
-func (l *infoLogger) Enabled() bool { return true }
-func (l *infoLogger) Info(msg string, keysAndVals ...interface{}) {
+func (l *logrusLogger) Enabled() bool { return true }
+func (l *logrusLogger) Info(msg string, keysAndVals ...interface{}) {
 	fields := parseFields(l.l, l.name, keysAndVals)
 	l.l.WithFields(fields).Info(prependName(l.name, msg))
 }
@@ -45,7 +37,7 @@ func (l *logrusLogger) Error(err error, msg string, keysAndVals ...interface{}) 
 // The commented code below works, but in practice the operator logging quickly
 // gets set to 'fatal' and stops logging normally. This requires further
 // investigation. For now, the logging levels are not changed.
-func (l *logrusLogger) V(level int) logr.InfoLogger {
+func (l *logrusLogger) V(level int) logr.Logger {
 	// Compare the given int to the list of all logrus levels. If the given value
 	// is below or above the range of logrus levels then we take the lowest or
 	// highest value respectively.
@@ -63,17 +55,13 @@ func (l *logrusLogger) V(level int) logr.InfoLogger {
 	// 	name: l.name,
 	// }
 
-	return &infoLogger{
-		l:    l.l,
-		name: l.name,
-	}
+	return l
 }
 
 func (l *logrusLogger) WithValues(keysAndValues ...interface{}) logr.Logger {
 	newFieldLogger := l.l.WithFields(parseFields(l.l, l.name, keysAndValues))
 	newLogger := newLogger(l)
 	newLogger.l = newFieldLogger
-	newLogger.infoLogger.l = newFieldLogger
 
 	return newLogger
 }
@@ -91,11 +79,8 @@ func (l *logrusLogger) WithName(name string) logr.Logger {
 
 func newLogger(l *logrusLogger) *logrusLogger {
 	return &logrusLogger{
-		l: l.l,
-		infoLogger: infoLogger{
-			l:    l.l,
-			name: l.name,
-		},
+		l:    l.l,
+		name: l.name,
 	}
 }
 

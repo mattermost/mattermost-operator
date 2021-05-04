@@ -16,7 +16,6 @@ import (
 	"k8s.io/api/networking/v1beta1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	k8sClient "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -281,7 +280,7 @@ func (r *ClusterInstallationReconciler) deleteMattermostIngress(mattermost *matt
 	return r.deleteMattermostResource(mattermost, resourceName, &v1beta1.Ingress{}, reqLogger)
 }
 
-func (r *ClusterInstallationReconciler) deleteMattermostResource(mattermost *mattermostv1alpha1.ClusterInstallation, resourceName string, resource runtime.Object, reqLogger logr.Logger) error {
+func (r *ClusterInstallationReconciler) deleteMattermostResource(mattermost *mattermostv1alpha1.ClusterInstallation, resourceName string, resource k8sClient.Object, reqLogger logr.Logger) error {
 	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: resourceName, Namespace: mattermost.GetNamespace()}, resource)
 	if err != nil && k8sErrors.IsNotFound(err) {
 		return nil
@@ -289,6 +288,7 @@ func (r *ClusterInstallationReconciler) deleteMattermostResource(mattermost *mat
 		reqLogger.Error(err, "Failed to check if mattermost resource exists")
 		return err
 	}
+
 
 	err = r.Client.Delete(context.TODO(), resource)
 	if err != nil {

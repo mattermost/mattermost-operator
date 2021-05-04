@@ -67,13 +67,13 @@ func (r *MattermostReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // The Controller will requeue the Request to be processed again if the returned
 // error is non-nil or Result. Requeue is true, otherwise upon completion it will
 // remove the work from the queue.
-func (r *MattermostReconciler) Reconcile(request ctrl.Request) (ctrl.Result, error) {
+func (r *MattermostReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
 	reqLogger := r.Log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	reqLogger.Info("Reconciling Mattermost")
 
 	// Fetch the Mattermost.
 	mattermost := &mmv1beta.Mattermost{}
-	err := r.Client.Get(context.TODO(), request.NamespacedName, mattermost)
+	err := r.Client.Get(ctx, request.NamespacedName, mattermost)
 	if err != nil && k8sErrors.IsNotFound(err) {
 		// Request object not found, could have been deleted after reconcile
 		// request. Owned objects are automatically garbage collected.
@@ -84,7 +84,7 @@ func (r *MattermostReconciler) Reconcile(request ctrl.Request) (ctrl.Result, err
 
 	if mattermost.Status.State != mmv1beta.Reconciling {
 		var mmListInstallations mmv1beta.MattermostList
-		err = r.Client.List(context.TODO(), &mmListInstallations)
+		err = r.Client.List(ctx, &mmListInstallations)
 		if err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "failed to list Mattermosts")
 		}
@@ -119,7 +119,7 @@ func (r *MattermostReconciler) Reconcile(request ctrl.Request) (ctrl.Result, err
 	}
 
 	if !reflect.DeepEqual(originalMattermost.Spec, mattermost.Spec) {
-		err = r.updateSpec(reqLogger, originalMattermost, mattermost)
+		err = r.updateSpec(ctx, reqLogger, originalMattermost, mattermost)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
@@ -162,12 +162,12 @@ func (r *MattermostReconciler) Reconcile(request ctrl.Request) (ctrl.Result, err
 	return reconcile.Result{}, nil
 }
 
-func (r *MattermostReconciler) updateSpec(reqLogger logr.Logger, originalMattermost *mmv1beta.Mattermost, updated *mmv1beta.Mattermost) error {
+func (r *MattermostReconciler) updateSpec(ctx context.Context, reqLogger logr.Logger, originalMattermost *mmv1beta.Mattermost, updated *mmv1beta.Mattermost) error {
 	reqLogger.Info(fmt.Sprintf("Updating spec"),
 		"Old", fmt.Sprintf("%+v", originalMattermost.Spec),
 		"New", fmt.Sprintf("%+v", updated.Spec),
 	)
-	err := r.Client.Update(context.TODO(), updated)
+	err := r.Client.Update(ctx, updated)
 	if err != nil {
 		reqLogger.Error(err, "failed to update the Mattermost spec")
 		r.setStateReconcilingAndLogError(updated, reqLogger)

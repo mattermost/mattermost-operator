@@ -6,7 +6,6 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 
 	operator "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
@@ -113,17 +112,14 @@ func waitForDeployment(t *testing.T, kubeclient kubernetes.Interface, namespace,
 	return nil
 }
 
-func waitForDeletion(t *testing.T, dynclient client.Client, obj runtime.Object, retryInterval,
+func waitForDeletion(t *testing.T, dynclient client.Client, obj client.Object, retryInterval,
 	timeout time.Duration) error {
-	key, err := client.ObjectKeyFromObject(obj)
-	if err != nil {
-		return err
-	}
+	key := client.ObjectKeyFromObject(obj)
 
 	kind := obj.GetObjectKind().GroupVersionKind().Kind
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	err = wait.Poll(retryInterval, timeout, func() (done bool, err error) {
+	err := wait.Poll(retryInterval, timeout, func() (done bool, err error) {
 		err = dynclient.Get(ctx, key, obj)
 		if apierrors.IsNotFound(err) {
 			return true, nil

@@ -27,7 +27,7 @@ endif
 
 SDK_VERSION = v1.0.1
 MACHINE = $(shell uname -m)
-BUILD_IMAGE = golang:1.14.6
+BUILD_IMAGE = golang:1.16.3
 BASE_IMAGE = gcr.io/distroless/static:nonroot
 GOROOT ?= $(shell go env GOROOT)
 GOPATH ?= $(shell go env GOPATH)
@@ -53,7 +53,7 @@ SHADOW_BIN := shadow
 SHADOW_VER := master
 SHADOW_GEN := $(TOOLS_BIN_DIR)/$(SHADOW_BIN)
 
-OPENAPI_VER := master
+OPENAPI_VER := release-1.19
 OPENAPI_BIN := openapi-gen
 OPENAPI_GEN := $(TOOLS_BIN_DIR)/$(OPENAPI_BIN)
 
@@ -173,6 +173,9 @@ generate: $(OPENAPI_GEN) controller-gen ## Runs the kubernetes code-generators a
 
 	GOROOT=$(GOROOT) $(OPENAPI_GEN) --logtostderr=true -o "" -i ./apis/mattermost/v1alpha1 -O zz_generated.openapi -p ./apis/mattermost/v1alpha1 -h ./hack/boilerplate.go.txt -r "-"
 
+	## Grant permissions to execute generation script
+	chmod +x vendor/k8s.io/code-generator/generate-groups.sh
+
 	## Do not generate deepcopy as it is handled by controller-gen
 	vendor/k8s.io/code-generator/generate-groups.sh client github.com/mattermost/mattermost-operator/pkg/client github.com/mattermost/mattermost-operator/apis "mattermost:v1alpha1" -h ./hack/boilerplate.go.txt
 	vendor/k8s.io/code-generator/generate-groups.sh lister github.com/mattermost/mattermost-operator/pkg/client github.com/mattermost/mattermost-operator/apis "mattermost:v1alpha1" -h ./hack/boilerplate.go.txt
@@ -203,7 +206,7 @@ ifeq (, $(shell which controller-gen))
 	CONTROLLER_GEN_TMP_DIR=$$(mktemp -d) ;\
 	cd $$CONTROLLER_GEN_TMP_DIR ;\
 	go mod init tmp ;\
-	go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.4.0 ;\
+	go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.5.0 ;\
 	rm -rf $$CONTROLLER_GEN_TMP_DIR ;\
 	}
 CONTROLLER_GEN=$(GOBIN)/controller-gen

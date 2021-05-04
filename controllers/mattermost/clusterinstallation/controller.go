@@ -60,13 +60,13 @@ func (r *ClusterInstallationReconciler) SetupWithManager(mgr ctrl.Manager) error
 // The Controller will requeue the Request to be processed again if the returned
 // error is non-nil or Result.Requeue is true, otherwise upon completion it will
 // remove the work from the queue.
-func (r *ClusterInstallationReconciler) Reconcile(request ctrl.Request) (ctrl.Result, error) {
+func (r *ClusterInstallationReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
 	reqLogger := r.Log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	reqLogger.Info("Reconciling ClusterInstallation")
 
 	// Fetch the ClusterInstallation.
 	mattermost := &mattermostv1alpha1.ClusterInstallation{}
-	err := r.Client.Get(context.TODO(), request.NamespacedName, mattermost)
+	err := r.Client.Get(ctx, request.NamespacedName, mattermost)
 	if err != nil && k8sErrors.IsNotFound(err) {
 		// Request object not found, could have been deleted after reconcile
 		// request. Owned objects are automatically garbage collected. For
@@ -79,7 +79,7 @@ func (r *ClusterInstallationReconciler) Reconcile(request ctrl.Request) (ctrl.Re
 
 	if mattermost.Status.State != mattermostv1alpha1.Reconciling {
 		var clusterInstallations mattermostv1alpha1.ClusterInstallationList
-		err = r.Client.List(context.TODO(), &clusterInstallations)
+		err = r.Client.List(ctx, &clusterInstallations)
 		if err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "failed to list ClusterInstallations")
 		}
@@ -128,7 +128,7 @@ func (r *ClusterInstallationReconciler) Reconcile(request ctrl.Request) (ctrl.Re
 			"Old", fmt.Sprintf("%+v", originalMattermost.Spec),
 			"New", fmt.Sprintf("%+v", mattermost.Spec),
 		)
-		err = r.Client.Update(context.TODO(), mattermost)
+		err = r.Client.Update(ctx, mattermost)
 		if err != nil {
 			reqLogger.Error(err, "failed to update the clusterinstallation spec")
 			r.setStateReconcilingAndLogError(mattermost, reqLogger)
@@ -136,7 +136,7 @@ func (r *ClusterInstallationReconciler) Reconcile(request ctrl.Request) (ctrl.Re
 		}
 	}
 
-	err = r.checkDatabase(mattermost, reqLogger)
+	err = r.checkDatabase(ctx, mattermost, reqLogger)
 	if err != nil {
 		r.setStateReconcilingAndLogError(mattermost, reqLogger)
 		return reconcile.Result{}, err
@@ -185,12 +185,12 @@ func (r *ClusterInstallationReconciler) Reconcile(request ctrl.Request) (ctrl.Re
 	return reconcile.Result{}, nil
 }
 
-func (r *ClusterInstallationReconciler) checkDatabase(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
+func (r *ClusterInstallationReconciler) checkDatabase(ctx context.Context, mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
 	// Check for an existing secret and determine which type it is (User-Managed
 	// or Operator-Manged). See the Database spec to learn more on this.
 	if mattermost.Spec.Database.Secret != "" {
 		databaseSecret := &corev1.Secret{}
-		err := r.Client.Get(context.TODO(), types.NamespacedName{Name: mattermost.Spec.Database.Secret, Namespace: mattermost.Namespace}, databaseSecret)
+		err := r.Client.Get(ctx, types.NamespacedName{Name: mattermost.Spec.Database.Secret, Namespace: mattermost.Namespace}, databaseSecret)
 		if err != nil {
 			return errors.Wrap(err, "failed to get database secret")
 		}

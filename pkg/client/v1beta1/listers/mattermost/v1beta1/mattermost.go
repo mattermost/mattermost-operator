@@ -13,8 +13,10 @@ import (
 )
 
 // MattermostLister helps list Mattermosts.
+// All objects returned here must be treated as read-only.
 type MattermostLister interface {
 	// List lists all Mattermosts in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1beta1.Mattermost, err error)
 	// Mattermosts returns an object that can list and get Mattermosts.
 	Mattermosts(namespace string) MattermostNamespaceLister
@@ -45,10 +47,13 @@ func (s *mattermostLister) Mattermosts(namespace string) MattermostNamespaceList
 }
 
 // MattermostNamespaceLister helps list and get Mattermosts.
+// All objects returned here must be treated as read-only.
 type MattermostNamespaceLister interface {
 	// List lists all Mattermosts in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1beta1.Mattermost, err error)
 	// Get retrieves the Mattermost from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1beta1.Mattermost, error)
 	MattermostNamespaceListerExpansion
 }
