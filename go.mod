@@ -6,7 +6,7 @@ require (
 	github.com/banzaicloud/k8s-objectmatcher v1.4.1
 	github.com/go-logr/logr v0.4.0
 	github.com/go-openapi/jsonreference v0.19.4 // indirect
-	github.com/mattermost/blubr v0.0.0-20210504150210-38452bff1bd1
+	github.com/mattermost/blubr v0.0.0-20210505124256-5b36c16ffa07
 	github.com/mattn/goveralls v0.0.7
 	github.com/mikefarah/yq/v3 v3.0.0-20200916054308-65cb4726048d
 	github.com/minio/minio-operator v0.0.0-20200214142425-158e343f1f19

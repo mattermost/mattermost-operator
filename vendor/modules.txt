@@ -83,7 +83,7 @@ github.com/kylelemons/godebug/diff
 github.com/mailru/easyjson/buffer
 github.com/mailru/easyjson/jlexer
 github.com/mailru/easyjson/jwriter
-# github.com/mattermost/blubr v0.0.0-20210504150210-38452bff1bd1
+# github.com/mattermost/blubr v0.0.0-20210505124256-5b36c16ffa07
 ## explicit
 github.com/mattermost/blubr
 # github.com/mattn/go-colorable v0.1.8
