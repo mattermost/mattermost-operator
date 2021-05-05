@@ -53,7 +53,7 @@ SHADOW_BIN := shadow
 SHADOW_VER := master
 SHADOW_GEN := $(TOOLS_BIN_DIR)/$(SHADOW_BIN)
 
-OPENAPI_VER := master
+OPENAPI_VER := release-1.19
 OPENAPI_BIN := openapi-gen
 OPENAPI_GEN := $(TOOLS_BIN_DIR)/$(OPENAPI_BIN)
 
@@ -171,10 +171,10 @@ vet: ## Run go vet against against all packages.
 generate: $(OPENAPI_GEN) controller-gen ## Runs the kubernetes code-generators and openapi
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
-	GOROOT=$(GOROOT) $(OPENAPI_GEN) --logtostderr=true -o "" -i ./apis/mattermost/v1alpha1 -O zz_generated.openapi -p ./apis/mattermost/v1alpha1 -h ./hack/boilerplate.go.txt -r "-"
-
 	## Grant permissions to execute generation script
 	chmod +x vendor/k8s.io/code-generator/generate-groups.sh
+
+	GOROOT=$(GOROOT) $(OPENAPI_GEN) --logtostderr=true -o "" -i ./apis/mattermost/v1alpha1 -O zz_generated.openapi -p ./apis/mattermost/v1alpha1 -h ./hack/boilerplate.go.txt -r "-"
 
 	## Do not generate deepcopy as it is handled by controller-gen
 	vendor/k8s.io/code-generator/generate-groups.sh client github.com/mattermost/mattermost-operator/pkg/client github.com/mattermost/mattermost-operator/apis "mattermost:v1alpha1" -h ./hack/boilerplate.go.txt
