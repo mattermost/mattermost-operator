@@ -1,4 +1,4 @@
-// Copyright 2015 go-swagger maintainers
+// Copyright 2020 Google LLC. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,13 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package spec
+package openapi_v2
 
-// ExternalDocumentation allows referencing an external resource for
-// extended documentation.
-//
-// For more information: http://goo.gl/8us55a#externalDocumentationObject
-type ExternalDocumentation struct {
-	Description string `json:"description,omitempty"`
-	URL         string `json:"url,omitempty"`
+import "github.com/googleapis/gnostic/compiler"
+
+// ParseDocument reads an OpenAPI v2 description from a YAML/JSON representation.
+func ParseDocument(b []byte) (*Document, error) {
+	info, err := compiler.ReadInfoFromBytes("", b)
+	if err != nil {
+		return nil, err
+	}
+	return NewDocument(info.Content[0], compiler.NewContextWithExtensions("$root", nil, nil))
 }
