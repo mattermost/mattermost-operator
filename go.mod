@@ -25,3 +25,7 @@ require (
 	k8s.io/kube-openapi v0.0.0-20201113171705-d219536bb9fd // release-1.19
 	sigs.k8s.io/controller-runtime v0.8.3
 )
+
+replace (
+	github.com/googleapis/gnostic v0.5.1 => github.com/googleapis/gnostic v0.4.1
+)
