@@ -92,6 +92,16 @@ git checkout master
 make install
 ```
 
+If you made changes to any structs representing Custom Resources make sure to regenerate code and manifests:
+```
+make generate manifests
+```
+
+If generation produced any unexpected changes, clean old binaries and rerun the generation:
+```
+make clean generate manifests
+```
+
 ### Building mattermost-operator
 To start contributing to mattermost-operator you need to clone this repo to your local workspace.
 
