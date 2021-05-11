@@ -52,7 +52,7 @@ func (r *MattermostRestoreDBReconciler) setFailed() {
 	r.state = mattermostv1alpha1.Failed
 }
 
-func (r *MattermostRestoreDBReconciler) Reconcile(request ctrl.Request) (ctrl.Result, error) {
+func (r *MattermostRestoreDBReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
 	reqLogger := r.Log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	reqLogger.Info("Reconciling MattermostRestoreDB")
 	// Fetch the MattermostRestoreDB instance

@@ -27,7 +27,7 @@ endif
 
 SDK_VERSION = v1.0.1
 MACHINE = $(shell uname -m)
-BUILD_IMAGE = golang:1.14.6
+BUILD_IMAGE = golang:1.16.3
 BASE_IMAGE = gcr.io/distroless/static:nonroot
 GOROOT ?= $(shell go env GOROOT)
 GOPATH ?= $(shell go env GOPATH)
@@ -68,6 +68,10 @@ OUTDATED_GEN := $(TOOLS_BIN_DIR)/$(OUTDATED_BIN)
 YQ_VER := master
 YQ_BIN := yq
 YQ_GEN := $(TOOLS_BIN_DIR)/$(YQ_BIN)
+
+CONTROLLER_GEN_VER := v0.5.0
+CONTROLLER_GEN_BIN := controller-gen
+CONTROLLER_GEN := $(TOOLS_BIN_DIR)/$(CONTROLLER_GEN_BIN)
 
 ## --------------------------------------
 ## Rules
@@ -156,7 +160,7 @@ deploy: manifests kustomize ## Deploy controller in the configured Kubernetes cl
 mysql-minio-operators: ## Deploys MinIO and MySQL Operators to the active cluster
 	./scripts/install-mysql-minio.sh
 
-manifests: controller-gen ## Runs CRD generator
+manifests: $(CONTROLLER_GEN) ## Runs CRD generator
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) paths="./..." output:crd:artifacts:config=config/crd/bases
 
 fmt: ## Run go fmt against code
@@ -168,8 +172,11 @@ vet: ## Run go vet against against all packages.
 	$(GO) vet $(GOFLAGS) -vettool=$(SHADOW_GEN) $(PACKAGES)
 	@echo "govet success";
 
-generate: $(OPENAPI_GEN) controller-gen ## Runs the kubernetes code-generators and openapi
+generate: $(OPENAPI_GEN) $(CONTROLLER_GEN) ## Runs the kubernetes code-generators and openapi
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+
+	## Grant permissions to execute generation script
+	chmod +x vendor/k8s.io/code-generator/generate-groups.sh
 
 	GOROOT=$(GOROOT) $(OPENAPI_GEN) --logtostderr=true -o "" -i ./apis/mattermost/v1alpha1 -O zz_generated.openapi -p ./apis/mattermost/v1alpha1 -h ./hack/boilerplate.go.txt -r "-"
 
@@ -195,21 +202,6 @@ kind-load-image: ## Loads Mattermost Operator image to Kind cluster
 
 kind-destroy: ## Destroy Kind cluster
 	kind delete cluster --name "${KIND_CLUSTER}"
-
-controller-gen: ## Find or download controller-gen
-ifeq (, $(shell which controller-gen))
-	@{ \
-	set -e ;\
-	CONTROLLER_GEN_TMP_DIR=$$(mktemp -d) ;\
-	cd $$CONTROLLER_GEN_TMP_DIR ;\
-	go mod init tmp ;\
-	go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.4.0 ;\
-	rm -rf $$CONTROLLER_GEN_TMP_DIR ;\
-	}
-CONTROLLER_GEN=$(GOBIN)/controller-gen
-else
-CONTROLLER_GEN=$(shell which controller-gen)
-endif
 
 kustomize:
 ifeq (, $(shell which kustomize))
@@ -256,6 +248,9 @@ $(OUTDATED_GEN): ## Build go-mod-outdated
 
 $(YQ_GEN): ## Build yq
 	GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) github.com/mikefarah/yq $(YQ_BIN) $(YQ_VER)
+
+$(CONTROLLER_GEN): ## Build controller-gen
+	GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) sigs.k8s.io/controller-tools/cmd/controller-gen $(CONTROLLER_GEN_BIN) $(CONTROLLER_GEN_VER)
 
 .PHONY: check-modules
 check-modules: $(OUTDATED_GEN) ## Check outdated modules

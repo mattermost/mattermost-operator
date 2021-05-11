@@ -122,13 +122,22 @@ type MysqlClusterSpec struct {
 	// +optional
 	QueryLimits *QueryLimits `json:"queryLimits,omitempty"`
 
-	// Makes the cluster READ ONLY. Set the master to writable or ReadOnly
+	// Makes the cluster READ ONLY. This has not a strong guarantee, in case of a failover the cluster will be writable
+	// for at least a few seconds.
 	// +optional
 	ReadOnly bool `json:"readOnly,omitempty"`
 
 	// Set a custom offset for Server IDs.  ServerID for each node will be the index of the statefulset, plus offset
 	// +optional
 	ServerIDOffset *int `json:"serverIDOffset,omitempty"`
+
+	// BackupCompressCommand is a command to use for compressing the backup.
+	// +optional
+	BackupCompressCommand []string `json:"backupCompressCommand,omitempty"`
+
+	// BackupDecompressCommand is a command to use for decompressing the backup.
+	// +optional
+	BackupDecompressCommand []string `json:"backupDecompressCommand,omitempty"`
 
 	// MetricsExporterExtraArgs is a list of extra command line arguments to pass to MySQL metrics exporter.
 	// See https://github.com/prometheus/mysqld_exporter for the list of available flags.
@@ -174,10 +183,16 @@ type PodSpec struct {
 	Annotations        map[string]string         `json:"annotations,omitempty"`
 	Resources          core.ResourceRequirements `json:"resources,omitempty"`
 	Affinity           *core.Affinity            `json:"affinity,omitempty"`
+	MysqlLifecycle     *core.Lifecycle           `json:"mysqlLifecycle,omitempty"`
 	NodeSelector       map[string]string         `json:"nodeSelector,omitempty"`
 	PriorityClassName  string                    `json:"priorityClassName,omitempty"`
 	Tolerations        []core.Toleration         `json:"tolerations,omitempty"`
 	ServiceAccountName string                    `json:"serviceAccountName,omitempty"`
+
+	BackupAffinity          *core.Affinity    `json:"backupAffinity,omitempty"`
+	BackupNodeSelector      map[string]string `json:"backupNodeSelector,omitempty"`
+	BackupPriorityClassName string            `json:"backupPriorityClassName,omitempty"`
+	BackupTolerations       []core.Toleration `json:"backupTolerations,omitempty"`
 
 	// Volumes allows adding extra volumes to the statefulset
 	// +optional
@@ -340,17 +355,15 @@ type MysqlClusterStatus struct {
 	Nodes []NodeStatus `json:"nodes,omitempty"`
 }
 
-// +genclient
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // MysqlCluster is the Schema for the mysqlclusters API
-// +k8s:openapi-gen=true
+// +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:subresource:scale:specpath=.spec.replicas,statuspath=.status.readyNodes
-// +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.conditions[?(@.type == "Ready")].status",description="The cluster status"
+// +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.conditions[?(@.type == 'Ready')].status",description="The cluster status"
 // +kubebuilder:printcolumn:name="Replicas",type="integer",JSONPath=".spec.replicas",description="The number of desired nodes"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:resource:shortName=mysql
+//
 type MysqlCluster struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -359,9 +372,9 @@ type MysqlCluster struct {
 	Status MysqlClusterStatus `json:"status,omitempty"`
 }
 
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // MysqlClusterList contains a list of MysqlCluster
+// +kubebuilder:object:root=true
+//
 type MysqlClusterList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

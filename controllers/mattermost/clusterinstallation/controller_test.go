@@ -88,7 +88,7 @@ func TestReconcile(t *testing.T) {
 	// Run Reconcile
 	// We expect an error on the first reconciliation due to the deployment pods
 	// not running yet.
-	res, err := r.Reconcile(req)
+	res, err := r.Reconcile(context.Background(), req)
 	require.NoError(t, err)
 	require.Equal(t, res, reconcile.Result{RequeueAfter: 6 * time.Second})
 
@@ -136,7 +136,7 @@ func TestReconcile(t *testing.T) {
 	t.Run("final check", func(t *testing.T) {
 
 		t.Run("replica set does not exist", func(t *testing.T) {
-			res, err = r.Reconcile(req)
+			res, err = r.Reconcile(context.Background(), req)
 			require.NoError(t, err)
 			require.Equal(t, res, reconcile.Result{RequeueAfter: 6 * time.Second})
 		})
@@ -153,7 +153,7 @@ func TestReconcile(t *testing.T) {
 		require.NoError(t, err)
 
 		t.Run("replica set not observed", func(t *testing.T) {
-			res, err = r.Reconcile(req)
+			res, err = r.Reconcile(context.Background(), req)
 			require.NoError(t, err)
 			require.Equal(t, res, reconcile.Result{RequeueAfter: 6 * time.Second})
 		})
@@ -191,7 +191,7 @@ func TestReconcile(t *testing.T) {
 		}
 
 		t.Run("pods not ready", func(t *testing.T) {
-			res, err = r.Reconcile(req)
+			res, err = r.Reconcile(context.Background(), req)
 			require.NoError(t, err)
 			require.Equal(t, res, reconcile.Result{RequeueAfter: 6 * time.Second})
 		})
@@ -217,7 +217,7 @@ func TestReconcile(t *testing.T) {
 		}
 
 		t.Run("no reconcile errors", func(t *testing.T) {
-			res, err = r.Reconcile(req)
+			res, err = r.Reconcile(context.Background(), req)
 			require.NoError(t, err)
 			require.Equal(t, res, reconcile.Result{})
 		})
@@ -238,7 +238,7 @@ func TestReconcile(t *testing.T) {
 		}
 
 		t.Run("pods not running", func(t *testing.T) {
-			res, err = r.Reconcile(req)
+			res, err = r.Reconcile(context.Background(), req)
 			require.NoError(t, err)
 			require.Equal(t, res, reconcile.Result{RequeueAfter: 6 * time.Second})
 		})
@@ -259,7 +259,7 @@ func TestReconcile(t *testing.T) {
 		}
 
 		t.Run("no reconcile errors", func(t *testing.T) {
-			res, err = r.Reconcile(req)
+			res, err = r.Reconcile(context.Background(), req)
 			require.NoError(t, err)
 			require.Equal(t, res, reconcile.Result{})
 		})
@@ -361,7 +361,7 @@ func TestReconcile(t *testing.T) {
 
 		t.Run("blue", func(t *testing.T) {
 			t.Run("no reconcile errors", func(t *testing.T) {
-				res, err = r.Reconcile(req)
+				res, err = r.Reconcile(context.Background(), req)
 				require.NoError(t, err)
 				require.Equal(t, res, reconcile.Result{})
 			})
@@ -401,7 +401,7 @@ func TestReconcile(t *testing.T) {
 			require.NoError(t, err)
 
 			t.Run("no reconcile errors", func(t *testing.T) {
-				res, err = r.Reconcile(req)
+				res, err = r.Reconcile(context.Background(), req)
 				require.NoError(t, err)
 				require.Equal(t, res, reconcile.Result{})
 			})
@@ -435,7 +435,7 @@ func TestReconcile(t *testing.T) {
 			require.NoError(t, err)
 
 			t.Run("no reconcile errors", func(t *testing.T) {
-				res, err = r.Reconcile(req)
+				res, err = r.Reconcile(context.Background(), req)
 				require.NoError(t, err)
 				require.Equal(t, res, reconcile.Result{})
 			})
@@ -544,54 +544,54 @@ func TestReconcilingLimit(t *testing.T) {
 	require.NoError(t, err)
 
 	req1 := requestForCI(ci1)
-	_, err = r.Reconcile(req1)
+	_, err = r.Reconcile(context.Background(), req1)
 	require.Error(t, err)
 	assertInstallationsCount(t, 5, 3)
 
 	req2 := requestForCI(ci2)
-	_, err = r.Reconcile(req2)
+	_, err = r.Reconcile(context.Background(), req2)
 	require.Error(t, err)
 
 	t.Run("should pick up Installation in Reconciling state even if limit reached", func(t *testing.T) {
 		req3 := requestForCI(ci3)
-		_, err = r.Reconcile(req3)
+		_, err = r.Reconcile(context.Background(), req3)
 		require.Error(t, err)
 	})
 
 	var result reconcile.Result
 	t.Run("should not pick up Installation without state if limit reached", func(t *testing.T) {
 		req4 := requestForCI(ci4)
-		result, err = r.Reconcile(req4)
+		result, err = r.Reconcile(context.Background(), req4)
 		require.NoError(t, err)
 		assert.Equal(t, requeueOnLimitDelay, result.RequeueAfter)
 
-		result, err = r.Reconcile(req4)
+		result, err = r.Reconcile(context.Background(), req4)
 		require.NoError(t, err)
 		assert.Equal(t, requeueOnLimitDelay, result.RequeueAfter)
 	})
 
 	t.Run("should not pick up Installation in Stable state if limit reached", func(t *testing.T) {
 		req5 := requestForCI(ci5)
-		result, err = r.Reconcile(req5)
+		result, err = r.Reconcile(context.Background(), req5)
 		require.NoError(t, err)
 		assert.Equal(t, requeueOnLimitDelay, result.RequeueAfter)
 	})
 
 	err = c.Delete(context.TODO(), ci1)
 	require.NoError(t, err)
-	_, err = r.Reconcile(req1)
+	_, err = r.Reconcile(context.Background(), req1)
 	require.NoError(t, err)
 	assertInstallationsCount(t, 4, 2)
 
 	err = c.Delete(context.TODO(), ci2)
 	require.NoError(t, err)
-	_, err = r.Reconcile(req2)
+	_, err = r.Reconcile(context.Background(), req2)
 	require.NoError(t, err)
 	assertInstallationsCount(t, 3, 1)
 
 	t.Run("should pick up Installation without state when cache freed", func(t *testing.T) {
 		req4 := requestForCI(ci4)
-		_, err = r.Reconcile(req4)
+		_, err = r.Reconcile(context.Background(), req4)
 		require.Error(t, err)
 		assertInstallationsCount(t, 3, 2)
 	})
@@ -599,13 +599,13 @@ func TestReconcilingLimit(t *testing.T) {
 	err = c.Delete(context.TODO(), ci4)
 	require.NoError(t, err)
 	req4 := requestForCI(ci4)
-	_, err = r.Reconcile(req4)
+	_, err = r.Reconcile(context.Background(), req4)
 	require.NoError(t, err)
 	assertInstallationsCount(t, 2, 1)
 
 	t.Run("should pick up Installation in Stable state when cache freed", func(t *testing.T) {
 		req5 := requestForCI(ci5)
-		_, err = r.Reconcile(req5)
+		_, err = r.Reconcile(context.Background(), req5)
 		require.Error(t, err)
 		assertInstallationsCount(t, 2, 2)
 	})
@@ -613,7 +613,7 @@ func TestReconcilingLimit(t *testing.T) {
 	err = c.Delete(context.TODO(), ci5)
 	require.NoError(t, err)
 	req5 := requestForCI(ci5)
-	_, err = r.Reconcile(req5)
+	_, err = r.Reconcile(context.Background(), req5)
 	require.NoError(t, err)
 	assertInstallationsCount(t, 1, 1)
 
@@ -623,7 +623,7 @@ func TestReconcilingLimit(t *testing.T) {
 		err = c.Create(context.TODO(), ci6)
 		require.NoError(t, err)
 		req6 := requestForCI(ci6)
-		_, err = r.Reconcile(req6)
+		_, err = r.Reconcile(context.Background(), req6)
 		require.Error(t, err)
 		assertInstallationsCount(t, 2, 2)
 
@@ -632,7 +632,7 @@ func TestReconcilingLimit(t *testing.T) {
 		err = c.Create(context.TODO(), ci7)
 		require.NoError(t, err)
 		req7 := requestForCI(ci7)
-		result, err = r.Reconcile(req7)
+		result, err = r.Reconcile(context.Background(), req7)
 		require.NoError(t, err)
 		assert.Equal(t, requeueOnLimitDelay, result.RequeueAfter)
 		assertInstallationsCount(t, 3, 2)
@@ -700,7 +700,7 @@ func TestMigration(t *testing.T) {
 		err := c.Create(context.Background(), ci)
 		require.NoError(t, err)
 
-		res, err = r.Reconcile(requestForCI(ci))
+		res, err = r.Reconcile(context.Background(), requestForCI(ci))
 		require.NoError(t, err)
 		assert.Equal(t, time.Duration(0), res.RequeueAfter)
 
@@ -721,7 +721,7 @@ func TestMigration(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("start deployment migration", func(t *testing.T) {
-		res, err = r.Reconcile(requestForCI(ci1))
+		res, err = r.Reconcile(context.Background(), requestForCI(ci1))
 		require.NoError(t, err)
 		assert.Equal(t, 10*time.Second, res.RequeueAfter)
 		assertMigrationStatus(ci1.Name, "Migration to Mattermost is in progress - recreating deployment")
@@ -761,7 +761,7 @@ func TestMigration(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("create Mattermost and delete CI", func(t *testing.T) {
-		res, err = r.Reconcile(requestForCI(ci1))
+		res, err = r.Reconcile(context.Background(), requestForCI(ci1))
 		require.NoError(t, err)
 		assert.Equal(t, 10*time.Second, res.RequeueAfter)
 		assertMigrationStatus(ci1.Name, "Migration to Mattermost is in progress - waiting for Mattermost to be ready")
@@ -774,7 +774,7 @@ func TestMigration(t *testing.T) {
 		err = c.Update(context.Background(), &mm)
 		require.NoError(t, err)
 
-		res, err = r.Reconcile(requestForCI(ci1))
+		res, err = r.Reconcile(context.Background(), requestForCI(ci1))
 		require.NoError(t, err)
 		assert.Equal(t, 0*time.Second, res.RequeueAfter)
 

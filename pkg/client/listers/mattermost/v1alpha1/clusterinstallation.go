@@ -13,8 +13,10 @@ import (
 )
 
 // ClusterInstallationLister helps list ClusterInstallations.
+// All objects returned here must be treated as read-only.
 type ClusterInstallationLister interface {
 	// List lists all ClusterInstallations in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1alpha1.ClusterInstallation, err error)
 	// ClusterInstallations returns an object that can list and get ClusterInstallations.
 	ClusterInstallations(namespace string) ClusterInstallationNamespaceLister
@@ -45,10 +47,13 @@ func (s *clusterInstallationLister) ClusterInstallations(namespace string) Clust
 }
 
 // ClusterInstallationNamespaceLister helps list and get ClusterInstallations.
+// All objects returned here must be treated as read-only.
 type ClusterInstallationNamespaceLister interface {
 	// List lists all ClusterInstallations in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1alpha1.ClusterInstallation, err error)
 	// Get retrieves the ClusterInstallation from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1alpha1.ClusterInstallation, error)
 	ClusterInstallationNamespaceListerExpansion
 }
