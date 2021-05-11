@@ -44,17 +44,20 @@ func schema_mattermost_operator_apis_mattermost_v1beta1_Mattermost(ref common.Re
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+							Default: map[string]interface{}{},
+							Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.MattermostSpec"),
+							Default: map[string]interface{}{},
+							Ref:     ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.MattermostSpec"),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.MattermostStatus"),
+							Default: map[string]interface{}{},
+							Ref:     ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.MattermostStatus"),
 						},
 					},
 				},
@@ -107,7 +110,8 @@ func schema_mattermost_operator_apis_mattermost_v1beta1_MattermostSpec(ref commo
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref("k8s.io/api/core/v1.EnvVar"),
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/core/v1.EnvVar"),
 									},
 								},
 							},
@@ -123,6 +127,7 @@ func schema_mattermost_operator_apis_mattermost_v1beta1_MattermostSpec(ref commo
 					"ingressName": {
 						SchemaProps: spec.SchemaProps{
 							Description: "IngressName defines the name to be used when creating the ingress rules",
+							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -134,8 +139,9 @@ func schema_mattermost_operator_apis_mattermost_v1beta1_MattermostSpec(ref commo
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Type:   []string{"string"},
-										Format: "",
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
 									},
 								},
 							},
@@ -160,8 +166,9 @@ func schema_mattermost_operator_apis_mattermost_v1beta1_MattermostSpec(ref commo
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Type:   []string{"string"},
-										Format: "",
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
 									},
 								},
 							},
@@ -174,8 +181,9 @@ func schema_mattermost_operator_apis_mattermost_v1beta1_MattermostSpec(ref commo
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Type:   []string{"string"},
-										Format: "",
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
 									},
 								},
 							},
@@ -188,7 +196,8 @@ func schema_mattermost_operator_apis_mattermost_v1beta1_MattermostSpec(ref commo
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref("k8s.io/api/core/v1.Volume"),
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/core/v1.Volume"),
 									},
 								},
 							},
@@ -201,7 +210,8 @@ func schema_mattermost_operator_apis_mattermost_v1beta1_MattermostSpec(ref commo
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref("k8s.io/api/core/v1.VolumeMount"),
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/core/v1.VolumeMount"),
 									},
 								},
 							},
@@ -221,7 +231,8 @@ func schema_mattermost_operator_apis_mattermost_v1beta1_MattermostSpec(ref commo
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref("k8s.io/api/core/v1.LocalObjectReference"),
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/core/v1.LocalObjectReference"),
 									},
 								},
 							},
@@ -230,28 +241,33 @@ func schema_mattermost_operator_apis_mattermost_v1beta1_MattermostSpec(ref commo
 					"database": {
 						SchemaProps: spec.SchemaProps{
 							Description: "External Services",
+							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.Database"),
 						},
 					},
 					"fileStore": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.FileStore"),
+							Default: map[string]interface{}{},
+							Ref:     ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.FileStore"),
 						},
 					},
 					"elasticSearch": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.ElasticSearch"),
+							Default: map[string]interface{}{},
+							Ref:     ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.ElasticSearch"),
 						},
 					},
 					"scheduling": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Scheduling defines the configuration related to scheduling of the Mattermost pods as well as resource constraints. These settings generally don't need to be changed.",
+							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.Scheduling"),
 						},
 					},
 					"probes": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Probes defines configuration of liveness and readiness probe for Mattermost pods. These settings generally don't need to be changed.",
+							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.Probes"),
 						},
 					},
