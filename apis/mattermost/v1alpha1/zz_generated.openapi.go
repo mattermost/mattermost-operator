@@ -10,8 +10,8 @@
 package v1alpha1
 
 import (
+	spec "github.com/go-openapi/spec"
 	common "k8s.io/kube-openapi/pkg/common"
-	spec "k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
@@ -47,21 +47,18 @@ func schema_mattermost_operator_apis_mattermost_v1alpha1_ClusterInstallation(ref
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Default: map[string]interface{}{},
-							Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+							Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Specification of the desired behavior of the Mattermost cluster. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status",
-							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1.ClusterInstallationSpec"),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Most recent observed status of the Mattermost cluster. Read-only. Not included when requesting from the apiserver, only from the Mattermost Operator API itself. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status",
-							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1.ClusterInstallationStatus"),
 						},
 					},
@@ -112,14 +109,12 @@ func schema_mattermost_operator_apis_mattermost_v1alpha1_ClusterInstallationSpec
 					"resources": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Defines the resource requests and limits for the Mattermost app server pods.",
-							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/api/core/v1.ResourceRequirements"),
 						},
 					},
 					"ingressName": {
 						SchemaProps: spec.SchemaProps{
 							Description: "IngressName defines the name to be used when creating the ingress rules",
-							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -139,9 +134,8 @@ func schema_mattermost_operator_apis_mattermost_v1alpha1_ClusterInstallationSpec
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -155,32 +149,27 @@ func schema_mattermost_operator_apis_mattermost_v1alpha1_ClusterInstallationSpec
 					},
 					"minio": {
 						SchemaProps: spec.SchemaProps{
-							Default: map[string]interface{}{},
-							Ref:     ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1.Minio"),
+							Ref: ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1.Minio"),
 						},
 					},
 					"database": {
 						SchemaProps: spec.SchemaProps{
-							Default: map[string]interface{}{},
-							Ref:     ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1.Database"),
+							Ref: ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1.Database"),
 						},
 					},
 					"blueGreen": {
 						SchemaProps: spec.SchemaProps{
-							Default: map[string]interface{}{},
-							Ref:     ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1.BlueGreen"),
+							Ref: ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1.BlueGreen"),
 						},
 					},
 					"canary": {
 						SchemaProps: spec.SchemaProps{
-							Default: map[string]interface{}{},
-							Ref:     ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1.Canary"),
+							Ref: ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1.Canary"),
 						},
 					},
 					"elasticSearch": {
 						SchemaProps: spec.SchemaProps{
-							Default: map[string]interface{}{},
-							Ref:     ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1.ElasticSearch"),
+							Ref: ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1.ElasticSearch"),
 						},
 					},
 					"useServiceLoadBalancer": {
@@ -196,9 +185,8 @@ func schema_mattermost_operator_apis_mattermost_v1alpha1_ClusterInstallationSpec
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -217,9 +205,8 @@ func schema_mattermost_operator_apis_mattermost_v1alpha1_ClusterInstallationSpec
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -232,9 +219,8 @@ func schema_mattermost_operator_apis_mattermost_v1alpha1_ClusterInstallationSpec
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -247,8 +233,7 @@ func schema_mattermost_operator_apis_mattermost_v1alpha1_ClusterInstallationSpec
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/core/v1.EnvVar"),
+										Ref: ref("k8s.io/api/core/v1.EnvVar"),
 									},
 								},
 							},
@@ -257,14 +242,12 @@ func schema_mattermost_operator_apis_mattermost_v1alpha1_ClusterInstallationSpec
 					"livenessProbe": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Defines the probe to check if the application is up and running.",
-							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/api/core/v1.Probe"),
 						},
 					},
 					"readinessProbe": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Defines the probe to check if the application is ready to accept traffic.",
-							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/api/core/v1.Probe"),
 						},
 					},
@@ -314,20 +297,17 @@ func schema_mattermost_operator_apis_mattermost_v1alpha1_MattermostRestoreDB(ref
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Default: map[string]interface{}{},
-							Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+							Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Default: map[string]interface{}{},
-							Ref:     ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1.MattermostRestoreDBSpec"),
+							Ref: ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1.MattermostRestoreDBSpec"),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Default: map[string]interface{}{},
-							Ref:     ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1.MattermostRestoreDBStatus"),
+							Ref: ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1.MattermostRestoreDBStatus"),
 						},
 					},
 				},
