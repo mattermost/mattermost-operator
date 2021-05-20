@@ -6,6 +6,7 @@ require (
 	github.com/banzaicloud/k8s-objectmatcher v1.4.1
 	github.com/go-logr/logr v0.4.0
 	github.com/go-openapi/jsonreference v0.19.4 // indirect
+	github.com/go-openapi/spec v0.19.3
 	github.com/mattermost/blubr v0.0.0-20210505124256-5b36c16ffa07
 	github.com/mattn/goveralls v0.0.7
 	github.com/mikefarah/yq/v3 v3.0.0-20200916054308-65cb4726048d
@@ -21,6 +22,6 @@ require (
 	k8s.io/apimachinery v0.20.6
 	k8s.io/client-go v0.20.6
 	k8s.io/code-generator v0.20.6
-	k8s.io/kube-openapi v0.0.0-20210421082810-95288971da7e
+	k8s.io/kube-openapi v0.0.0-20201113171705-d219536bb9fd
 	sigs.k8s.io/controller-runtime v0.8.3
 )

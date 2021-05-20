@@ -17,6 +17,7 @@ package spec
 import (
 	"encoding/json"
 
+	"github.com/go-openapi/jsonpointer"
 	"github.com/go-openapi/swag"
 )
 
@@ -35,6 +36,18 @@ type Response struct {
 	Refable
 	ResponseProps
 	VendorExtensible
+}
+
+// JSONLookup look up a value by the json property name
+func (r Response) JSONLookup(token string) (interface{}, error) {
+	if ex, ok := r.Extensions[token]; ok {
+		return &ex, nil
+	}
+	if token == "$ref" {
+		return &r.Ref, nil
+	}
+	ptr, _, err := jsonpointer.GetForToken(r.ResponseProps, token)
+	return ptr, err
 }
 
 // UnmarshalJSON hydrates this items instance with the data from JSON
@@ -75,4 +88,44 @@ func ResponseRef(url string) *Response {
 	resp := NewResponse()
 	resp.Ref = MustCreateRef(url)
 	return resp
+}
+
+// WithDescription sets the description on this response, allows for chaining
+func (r *Response) WithDescription(description string) *Response {
+	r.Description = description
+	return r
+}
+
+// WithSchema sets the schema on this response, allows for chaining.
+// Passing a nil argument removes the schema from this response
+func (r *Response) WithSchema(schema *Schema) *Response {
+	r.Schema = schema
+	return r
+}
+
+// AddHeader adds a header to this response
+func (r *Response) AddHeader(name string, header *Header) *Response {
+	if header == nil {
+		return r.RemoveHeader(name)
+	}
+	if r.Headers == nil {
+		r.Headers = make(map[string]Header)
+	}
+	r.Headers[name] = *header
+	return r
+}
+
+// RemoveHeader removes a header from this response
+func (r *Response) RemoveHeader(name string) *Response {
+	delete(r.Headers, name)
+	return r
+}
+
+// AddExample adds an example to this response
+func (r *Response) AddExample(mediaType string, example interface{}) *Response {
+	if r.Examples == nil {
+		r.Examples = make(map[string]interface{})
+	}
+	r.Examples[mediaType] = example
+	return r
 }

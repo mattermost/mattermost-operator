@@ -16,6 +16,7 @@ package spec
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/go-openapi/swag"
@@ -30,6 +31,17 @@ import (
 type Paths struct {
 	VendorExtensible
 	Paths map[string]PathItem `json:"-"` // custom serializer to flatten this, each entry must start with "/"
+}
+
+// JSONLookup look up a value by the json property name
+func (p Paths) JSONLookup(token string) (interface{}, error) {
+	if pi, ok := p.Paths[token]; ok {
+		return &pi, nil
+	}
+	if ex, ok := p.Extensions[token]; ok {
+		return &ex, nil
+	}
+	return nil, fmt.Errorf("object has no field %q", token)
 }
 
 // UnmarshalJSON hydrates this items instance with the data from JSON

@@ -10,8 +10,8 @@
 package v1alpha1
 
 import (
+	spec "github.com/go-openapi/spec"
 	common "k8s.io/kube-openapi/pkg/common"
-	spec "k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
@@ -75,7 +75,7 @@ func schema_mattermost_operator_apis_mattermost_v1alpha1_ClusterInstallationSpec
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "ClusterInstallationSpec defines the desired state of ClusterInstallation",
+				Description: "ClusterInstallationSpec defines the desired state of ClusterInstallation. Deprecated: use v1beta1.Mattermost instead.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"image": {

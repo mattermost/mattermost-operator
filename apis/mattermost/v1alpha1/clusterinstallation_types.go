@@ -12,13 +12,17 @@ func init() {
 ////////////////////////////////////////////////////////////////////////////////
 //                                 IMPORTANT!                                 //
 ////////////////////////////////////////////////////////////////////////////////
+// ClusterInstallation CR is deprecated and will be removed                   //
+// in next major release. Use v1beta1.Mattermost instead.                     //
+////////////////////////////////////////////////////////////////////////////////
 // Run "make generate manifests" in the root of this repository to regenerate //
 // code after modifying this file.                                            //
 // Add custom validation using kubebuilder tags:                              //
 // https://book.kubebuilder.io/reference/generating-crd.html                  //
 ////////////////////////////////////////////////////////////////////////////////
 
-// ClusterInstallationSpec defines the desired state of ClusterInstallation
+// ClusterInstallationSpec defines the desired state of ClusterInstallation.
+// Deprecated: use v1beta1.Mattermost instead.
 // +k8s:openapi-gen=true
 type ClusterInstallationSpec struct {
 	// Image defines the ClusterInstallation Docker image.

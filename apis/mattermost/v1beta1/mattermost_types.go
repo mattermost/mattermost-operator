@@ -11,9 +11,6 @@ import (
 ////////////////////////////////////////////////////////////////////////////////
 //                                 IMPORTANT!                                 //
 ////////////////////////////////////////////////////////////////////////////////
-// This is a work in progress and should not be used in production. Use the   //
-// v1alpha1 specification instead.                                            //
-////////////////////////////////////////////////////////////////////////////////
 // Run "make generate manifests" in the root of this repository to regenerate //
 // code after modifying this file.                                            //
 // Add custom validation using kubebuilder tags:                              //
