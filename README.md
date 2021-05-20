@@ -158,6 +158,11 @@ To release a new version of Mattermost Operator you need to:
 - Have the remote upstream configured
 - Have a clean repo, not pending commits and changes
 
+As a first step of release process generate deployment manifests:
+```
+make yaml
+```
+
 We have a script that changes some files, commit those changes and then tag the main branch.
 
 To run you can issue the following command:
