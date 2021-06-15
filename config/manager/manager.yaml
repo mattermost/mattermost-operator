@@ -24,11 +24,35 @@ spec:
         - /mattermost-operator
         args:
         - --enable-leader-election
+        - --metrics-addr=0.0.0.0:8383
         image: mattermost-operator
         imagePullPolicy: IfNotPresent
         name: mattermost-operator
+        ports:
+          - containerPort: 8383
+            name: metrics
         env:
           - name: "MAX_RECONCILING_INSTALLATIONS"
             value: "20"
           - name: "REQUEUE_ON_LIMIT_DELAY"
             value: "20s"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  labels:
+    app: mattermost-operator
+    name: mattermost-operator
+  name: mattermost-operator
+spec:
+  ports:
+    - name: metrics
+      port: 8383
+      protocol: TCP
+      targetPort: metrics
+  selector:
+    name: mattermost-operator
+  type: ClusterIP
+status:
+  loadBalancer: {}
