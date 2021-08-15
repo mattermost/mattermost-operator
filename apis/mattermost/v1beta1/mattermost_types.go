@@ -260,6 +260,9 @@ type MattermostStatus struct {
 	// that are running with the desired image.
 	// +optional
 	UpdatedReplicas int32 `json:"updatedReplicas,omitempty"`
+	// The last observed Generation of the Mattermost resource that was acted on.
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
 // +genclient
