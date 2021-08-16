@@ -141,6 +141,19 @@ port-forward the service to access it:
 kubectl port-forward svc/[MATTERMOST_NAME] 8065:8065
 ```
 
+### Running Operator locally against K8s cluster
+
+Mattermost Operator can be run on local machine against remote a Kubernetes cluster to rapidly test changes during the development.
+
+To run Operator locally:
+- Make sure you are connected to a Kubernetes cluster.
+- Install Custom Resources by running: `kubectl apply -f ./config/crd/bases`.
+- Install MinIO and MySQL operators: `make mysql-minio-operators`.
+- Make sure Mattermost Operator **is not** running in the cluster or scale it down to 0 replicas to avoid unexpected behaviour.
+- Run Operator binary: `go run .`
+
+Be aware that running Operator locally does not verify Kubernetes manifests, RBAC rules, leader election etc.
+
 ## Notes
 
 ### Installation Size
