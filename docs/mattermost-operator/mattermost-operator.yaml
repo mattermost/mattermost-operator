@@ -4235,6 +4235,11 @@ spec:
               image:
                 description: The image running on the pods in the Mattermost instance
                 type: string
+              observedGeneration:
+                description: The last observed Generation of the Mattermost resource
+                  that was acted on.
+                format: int64
+                type: integer
               replicas:
                 description: Total number of non-terminated pods targeted by this
                   Mattermost deployment
@@ -4279,20 +4284,7 @@ rules:
   - ""
   resources:
   - pods
-  verbs:
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - pods
   - services
-  - endpoints
-  - persistentvolumeclaims
-  - events
   - configmaps
   - secrets
   - serviceaccounts
@@ -4314,11 +4306,34 @@ rules:
   - apps
   resources:
   - deployments
-  - daemonsets
-  - replicasets
-  - statefulsets
   verbs:
   - '*'
+- apiGroups:
+  - apps
+  resourceNames:
+  - mattermost-operator
+  resources:
+  - deployments/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - apps
+  resources:
+  - replicasets
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - get
+  - create
+  - list
+  - delete
+  - watch
+  - update
 - apiGroups:
   - networking.k8s.io
   resources:
@@ -4338,26 +4353,9 @@ rules:
   - watch
   - update
 - apiGroups:
-  - monitoring.coreos.com
-  resources:
-  - servicemonitors
-  verbs:
-  - get
-  - create
-- apiGroups:
-  - apps
-  resourceNames:
-  - mattermost-operator
-  resources:
-  - deployments/finalizers
-  verbs:
-  - update
-- apiGroups:
   - mattermost.com
   resources:
   - '*'
-  - clusterinstallations
-  - mattermostrestoredbs
   verbs:
   - '*'
 - apiGroups:
@@ -4370,17 +4368,6 @@ rules:
   - mysql.presslabs.org
   resources:
   - mysqlbackups
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - mysql.presslabs.org
-  resources:
   - mysqlclusters
   - mysqlclusters/status
   verbs:
@@ -4394,36 +4381,16 @@ rules:
 - apiGroups:
   - miniocontroller.min.io
   resources:
-  - '*'
-  verbs:
-  - '*'
-- apiGroups:
-  - minio.io
-  resources:
-  - '*'
-  verbs:
-  - '*'
-- apiGroups:
-  - batch
-  resources:
-  - jobs
+  - minioinstances
+  - minioinstances/status
   verbs:
   - get
-  - create
   - list
-  - delete
   - watch
-  - update
-- apiGroups:
-  - certificates.k8s.io
-  resources:
-  - certificatesigningrequests
-  - certificatesigningrequests/approval
-  - certificatesigningrequests/status
-  verbs:
-  - update
   - create
-  - get
+  - update
+  - patch
+  - delete
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -4437,6 +4404,26 @@ subjects:
 - kind: ServiceAccount
   name: mattermost-operator
   namespace: mattermost-operator
+---
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  labels:
+    app: mattermost-operator
+    name: mattermost-operator
+  name: mattermost-operator
+spec:
+  ports:
+  - name: metrics
+    port: 8383
+    protocol: TCP
+    targetPort: metrics
+  selector:
+    name: mattermost-operator
+  type: ClusterIP
+status:
+  loadBalancer: {}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -4455,6 +4442,7 @@ spec:
       containers:
       - args:
         - --enable-leader-election
+        - --metrics-addr=0.0.0.0:8383
         command:
         - /mattermost-operator
         env:
@@ -4462,8 +4450,11 @@ spec:
           value: "20"
         - name: REQUEUE_ON_LIMIT_DELAY
           value: 20s
-        image: mattermost/mattermost-operator:v1.14.0
+        image: mattermost/mattermost-operator:latest
         imagePullPolicy: IfNotPresent
         name: mattermost-operator
+        ports:
+        - containerPort: 8383
+          name: metrics
       serviceAccountName: mattermost-operator
 ---
