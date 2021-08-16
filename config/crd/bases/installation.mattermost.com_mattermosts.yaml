@@ -1795,6 +1795,10 @@ spec:
               image:
                 description: The image running on the pods in the Mattermost instance
                 type: string
+              observedGeneration:
+                description: The last observed Generation of the Mattermost resource that was acted on.
+                format: int64
+                type: integer
               replicas:
                 description: Total number of non-terminated pods targeted by this Mattermost deployment
                 format: int32

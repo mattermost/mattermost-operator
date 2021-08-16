@@ -18,9 +18,10 @@ import (
 // should be. Over time, more types of checks should be added here as needed.
 func (r *MattermostReconciler) checkMattermostHealth(mattermost *mmv1beta.Mattermost, logger logr.Logger) (mmv1beta.MattermostStatus, error) {
 	status := mmv1beta.MattermostStatus{
-		State:           mmv1beta.Reconciling,
-		Replicas:        0,
-		UpdatedReplicas: 0,
+		State:              mmv1beta.Reconciling,
+		ObservedGeneration: mattermost.Generation,
+		Replicas:           0,
+		UpdatedReplicas:    0,
 	}
 
 	labels := mattermost.MattermostLabels(mattermost.Name)

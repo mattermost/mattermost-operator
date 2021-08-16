@@ -96,6 +96,9 @@ func (r *MattermostReconciler) Reconcile(ctx context.Context, request ctrl.Reque
 		}
 	}
 
+	// Indicate that the newest generation of the resource has been observed.
+	mattermost.Status.ObservedGeneration = mattermost.Generation
+
 	// Set a new Mattermost's state to reconciling.
 	if len(mattermost.Status.State) == 0 {
 		err = r.setStateReconciling(mattermost, reqLogger)
