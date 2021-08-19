@@ -125,6 +125,17 @@ type Database struct {
 	// Defines the configuration of database managed by Kubernetes operator.
 	// +optional
 	OperatorManaged *OperatorManagedDatabase `json:"operatorManaged,omitempty"`
+	// Defines checks used by Mattermost pods to determine whether the database is ready.
+	// If provided it will override default checks configured by the Operator.
+	// +optional
+	ReadinessCheck *CheckExtensions `json:"readinessCheck,omitempty"`
+}
+
+// CheckExtensions defines extensions for various checks.
+type CheckExtensions struct {
+	// Additional InitContainers injected to pods.
+	// Empty slice is considered a valid value. To skip the field use `nil`.
+	InitContainers []v1.Container `json:"initContainers,omitempty"`
 }
 
 // ExternalDatabase defines the configuration of the external database that should be used by Mattermost.

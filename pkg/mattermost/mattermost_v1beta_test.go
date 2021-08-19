@@ -489,6 +489,90 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 			assert.Equal(t, 1, len(deployment.Spec.Template.Spec.Containers))
 		})
 	}
+
+	t.Run("custom DB check init containers", func(t *testing.T) {
+		customInitContainers := []corev1.Container{
+			{Image: "my-check-image", Name: "custom-check"},
+			{Image: "my-other-check-image", Name: "other-custom-check"},
+		}
+		defaultExternalPostgresInitContainers := []corev1.Container{
+			{
+				Name:            "init-check-database",
+				Image:           "postgres:13",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Command:         []string{"sh", "-c", "until pg_isready --dbname=\"$DB_CONNECTION_CHECK_URL\"; do echo waiting for database; sleep 5; done;"},
+				Env:             []corev1.EnvVar{{Name: "DB_CONNECTION_CHECK_URL", Value: "", ValueFrom: EnvSourceFromSecret("secret", "DB_CONNECTION_CHECK_URL")}},
+			},
+		}
+
+		for _, testCase := range []struct {
+			description            string
+			dbSpec                 mmv1beta.Database
+			dbConfig               DatabaseConfig
+			expectedInitContainers []corev1.Container
+		}{
+			{
+				description: "custom init container external DB",
+				dbSpec: mmv1beta.Database{
+					External: &mmv1beta.ExternalDatabase{},
+					ReadinessCheck: &mmv1beta.CheckExtensions{
+						InitContainers: customInitContainers,
+					},
+				},
+				dbConfig:               &ExternalDBConfig{dbType: database.PostgreSQLDatabase, hasDBCheckURL: true},
+				expectedInitContainers: customInitContainers,
+			},
+			{
+				description: "custom init container operator managed DB",
+				dbSpec: mmv1beta.Database{
+					OperatorManaged: &mmv1beta.OperatorManagedDatabase{},
+					ReadinessCheck: &mmv1beta.CheckExtensions{
+						InitContainers: customInitContainers,
+					},
+				},
+				dbConfig:               &MySQLDBConfig{},
+				expectedInitContainers: customInitContainers,
+			},
+			{
+				description: "empty init containers slice",
+				dbSpec: mmv1beta.Database{
+					External: &mmv1beta.ExternalDatabase{},
+					ReadinessCheck: &mmv1beta.CheckExtensions{
+						InitContainers: []corev1.Container{},
+					},
+				},
+				dbConfig:               &ExternalDBConfig{dbType: database.PostgreSQLDatabase, hasDBCheckURL: true},
+				expectedInitContainers: []corev1.Container{},
+			},
+			{
+				description: "nil init containers slice",
+				dbSpec: mmv1beta.Database{
+					External:       &mmv1beta.ExternalDatabase{},
+					ReadinessCheck: &mmv1beta.CheckExtensions{},
+				},
+				dbConfig:               &ExternalDBConfig{dbType: database.PostgreSQLDatabase, hasDBCheckURL: true, secretName: "secret"},
+				expectedInitContainers: defaultExternalPostgresInitContainers,
+			},
+			{
+				description: "nil readiness check",
+				dbSpec: mmv1beta.Database{
+					External: &mmv1beta.ExternalDatabase{},
+				},
+				dbConfig:               &ExternalDBConfig{dbType: database.PostgreSQLDatabase, hasDBCheckURL: true, secretName: "secret"},
+				expectedInitContainers: defaultExternalPostgresInitContainers,
+			},
+		} {
+			t.Run(testCase.description, func(t *testing.T) {
+				mattermost := &mmv1beta.Mattermost{
+					Spec: mmv1beta.MattermostSpec{
+						Database: testCase.dbSpec,
+					},
+				}
+				deployment := GenerateDeploymentV1Beta(mattermost, testCase.dbConfig, &FileStoreInfo{config: &ExternalFileStore{}}, "", "", "", "image")
+				assert.Equal(t, testCase.expectedInitContainers, deployment.Spec.Template.Spec.InitContainers)
+			})
+		}
+	})
 }
 
 func TestGenerateRBACResources_V1Beta(t *testing.T) {

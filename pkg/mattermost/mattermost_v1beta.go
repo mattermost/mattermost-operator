@@ -29,7 +29,7 @@ type FileStoreConfig interface {
 	InitContainers(mattermost *mmv1beta.Mattermost) []corev1.Container
 }
 
-// GenerateService returns the service for the Mattermost app.
+// GenerateServiceV1Beta returns the service for the Mattermost app.
 func GenerateServiceV1Beta(mattermost *mmv1beta.Mattermost) *corev1.Service {
 	baseAnnotations := map[string]string{
 		"service.alpha.kubernetes.io/tolerate-unready-endpoints": "true",
@@ -143,6 +143,9 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 	// DB
 	envVarDB := db.EnvVars(mattermost)
 	initContainers := db.InitContainers(mattermost)
+	if mattermost.Spec.Database.ReadinessCheck != nil && mattermost.Spec.Database.ReadinessCheck.InitContainers != nil {
+		initContainers = mattermost.Spec.Database.ReadinessCheck.InitContainers
+	}
 
 	// File Store
 	envVarFileStore := fileStoreEnvVars(fileStore)
