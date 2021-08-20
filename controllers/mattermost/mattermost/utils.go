@@ -28,36 +28,20 @@ func (r *MattermostReconciler) assertSecretContains(secretName, keyName, namespa
 	return fmt.Errorf("secret %s is missing data key: %s", secretName, keyName)
 }
 
-// setStateReconciling sets the Mattermost state to reconciling.
-func (r *MattermostReconciler) setStateReconciling(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) error {
-	return r.setState(mattermost, mmv1beta.Reconciling, reqLogger)
+// updateStatusReconciling sets the Mattermost state to reconciling.
+func (r *MattermostReconciler) updateStatusReconciling(mattermost *mmv1beta.Mattermost, status mmv1beta.MattermostStatus, reqLogger logr.Logger) error {
+	status.State = mmv1beta.Reconciling
+	return r.updateStatus(mattermost, status, reqLogger)
 }
 
-// setStateReconcilingAndLogError attempts to set the Mattermost state
-// to reconciling. Any errors attempting this are logged, but not returned. This
-// should only be used when the outcome of setting the state can be ignored.
-func (r *MattermostReconciler) setStateReconcilingAndLogError(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) {
-	err := r.setStateReconciling(mattermost, reqLogger)
+// updateStatusReconcilingAndLogError attempts to set the Mattermost state to reconciling
+// and updates the status. Any errors attempting this are logged, but not returned.
+// This should only be used when the outcome of setting the state can be ignored.
+func (r *MattermostReconciler) updateStatusReconcilingAndLogError(mattermost *mmv1beta.Mattermost, status mmv1beta.MattermostStatus, reqLogger logr.Logger) {
+	err := r.updateStatusReconciling(mattermost, status, reqLogger)
 	if err != nil {
 		reqLogger.Error(err, "Failed to set state to reconciling")
 	}
-}
-
-// setState sets the provided Mattermost to the provided state if that
-// is different from the current state.
-func (r *MattermostReconciler) setState(mattermost *mmv1beta.Mattermost, desired mmv1beta.RunningState, reqLogger logr.Logger) error {
-	if mattermost.Status.State == desired {
-		return nil
-	}
-
-	status := mattermost.Status
-	status.State = desired
-	err := r.updateStatus(mattermost, status, reqLogger)
-	if err != nil {
-		return errors.Wrapf(err, "failed to set state to %s", desired)
-	}
-
-	return nil
 }
 
 func (r *MattermostReconciler) updateStatus(mattermost *mmv1beta.Mattermost, status mmv1beta.MattermostStatus, reqLogger logr.Logger) error {

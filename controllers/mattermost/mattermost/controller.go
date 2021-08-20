@@ -96,12 +96,14 @@ func (r *MattermostReconciler) Reconcile(ctx context.Context, request ctrl.Reque
 		}
 	}
 
+	// We copy status to not to refetch the resource
+	status := mattermost.Status
 	// Indicate that the newest generation of the resource has been observed.
-	mattermost.Status.ObservedGeneration = mattermost.Generation
+	status.ObservedGeneration = mattermost.Generation
 
 	// Set a new Mattermost's state to reconciling.
 	if len(mattermost.Status.State) == 0 {
-		err = r.setStateReconciling(mattermost, reqLogger)
+		err = r.updateStatusReconciling(mattermost, status, reqLogger)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
@@ -112,7 +114,7 @@ func (r *MattermostReconciler) Reconcile(ctx context.Context, request ctrl.Reque
 	originalMattermost := mattermost.DeepCopy()
 	err = mattermost.SetDefaults()
 	if err != nil {
-		r.setStateReconcilingAndLogError(mattermost, reqLogger)
+		r.updateStatusReconcilingAndLogError(mattermost, status, reqLogger)
 		return reconcile.Result{}, err
 	}
 
@@ -122,31 +124,33 @@ func (r *MattermostReconciler) Reconcile(ctx context.Context, request ctrl.Reque
 	}
 
 	if !reflect.DeepEqual(originalMattermost.Spec, mattermost.Spec) {
+		mattermost.Status = status
 		err = r.updateSpec(ctx, reqLogger, originalMattermost, mattermost)
 		if err != nil {
+			r.updateStatusReconcilingAndLogError(originalMattermost, status, reqLogger)
 			return reconcile.Result{}, err
 		}
 	}
 
 	dbConfig, err := r.checkDatabase(mattermost, reqLogger)
 	if err != nil {
-		r.setStateReconcilingAndLogError(mattermost, reqLogger)
+		r.updateStatusReconcilingAndLogError(mattermost, status, reqLogger)
 		return reconcile.Result{}, err
 	}
 
 	fileStoreConfig, err := r.checkFileStore(mattermost, reqLogger)
 	if err != nil {
-		r.setStateReconcilingAndLogError(mattermost, reqLogger)
+		r.updateStatusReconcilingAndLogError(mattermost, status, reqLogger)
 		return reconcile.Result{}, err
 	}
 
 	err = r.checkMattermost(mattermost, dbConfig, fileStoreConfig, reqLogger)
 	if err != nil {
-		r.setStateReconcilingAndLogError(mattermost, reqLogger)
+		r.updateStatusReconcilingAndLogError(mattermost, status, reqLogger)
 		return reconcile.Result{}, err
 	}
 
-	status, err := r.checkMattermostHealth(mattermost, reqLogger)
+	status, err = r.checkMattermostHealth(mattermost, reqLogger)
 	if err != nil {
 		statusErr := r.updateStatus(mattermost, status, reqLogger)
 		if statusErr != nil {
@@ -158,7 +162,7 @@ func (r *MattermostReconciler) Reconcile(ctx context.Context, request ctrl.Reque
 
 	err = r.updateStatus(mattermost, status, reqLogger)
 	if err != nil {
-		r.setStateReconcilingAndLogError(mattermost, reqLogger)
+		r.updateStatusReconcilingAndLogError(mattermost, status, reqLogger)
 		return reconcile.Result{}, err
 	}
 
@@ -170,13 +174,7 @@ func (r *MattermostReconciler) updateSpec(ctx context.Context, reqLogger logr.Lo
 		"Old", fmt.Sprintf("%+v", originalMattermost.Spec),
 		"New", fmt.Sprintf("%+v", updated.Spec),
 	)
-	err := r.Client.Update(ctx, updated)
-	if err != nil {
-		reqLogger.Error(err, "failed to update the Mattermost spec")
-		r.setStateReconcilingAndLogError(updated, reqLogger)
-		return err
-	}
-	return nil
+	return r.Client.Update(ctx, updated)
 }
 
 func countReconciling(mattermosts []mmv1beta.Mattermost) int {

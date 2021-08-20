@@ -44,9 +44,10 @@ func TestReconcile(t *testing.T) {
 	replicas := int32(4)
 	mm := &mmv1beta.Mattermost{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      mmName,
-			Namespace: mmNamespace,
-			UID:       types.UID("test"),
+			Name:       mmName,
+			Namespace:  mmNamespace,
+			UID:        types.UID("test"),
+			Generation: 1,
 		},
 		Spec: mmv1beta.MattermostSpec{
 			Replicas:    &replicas,
@@ -95,6 +96,13 @@ func TestReconcile(t *testing.T) {
 	mmKey := types.NamespacedName{Name: mmName, Namespace: mmNamespace}
 	mmMysqlKey := types.NamespacedName{Name: utils.HashWithPrefix("db", mmName), Namespace: mmNamespace}
 	mmMinioKey := types.NamespacedName{Name: mmName + "-minio", Namespace: mmNamespace}
+
+	t.Run("observed generation updated", func(t *testing.T) {
+		var fetchedMM mmv1beta.Mattermost
+		err = c.Get(context.Background(), mmKey, &fetchedMM)
+		require.NoError(t, err)
+		assert.Equal(t, int64(1), fetchedMM.Status.ObservedGeneration)
+	})
 
 	t.Run("mysql", func(t *testing.T) {
 		t.Run("cluster", func(t *testing.T) {
