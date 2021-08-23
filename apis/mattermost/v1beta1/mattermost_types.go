@@ -140,6 +140,8 @@ type Database struct {
 	OperatorManaged *OperatorManagedDatabase `json:"operatorManaged,omitempty"`
 
 	// DisableReadinessCheck instructs Operator to not add init container responsible for checking DB access.
+	// Can be used to define custom init containers specified in `spec.PodExtensions.InitContainers`.
+	// +optional
 	DisableReadinessCheck bool `json:"disableReadinessCheck,omitempty"`
 }
 
