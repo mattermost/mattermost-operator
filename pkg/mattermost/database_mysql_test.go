@@ -46,6 +46,15 @@ func TestNewMySQLDB(t *testing.T) {
 		assert.Equal(t, 1, len(initContainers))
 	})
 
+	t.Run("with disabled DB readiness check", func(t *testing.T) {
+		mattermost.Spec.Database.DisableReadinessCheck = true
+		config, err := NewMySQLDBConfig(secret)
+		require.NoError(t, err)
+
+		initContainers := config.InitContainers(mattermost)
+		assert.Equal(t, 0, len(initContainers))
+	})
+
 	t.Run("should fail if missing key", func(t *testing.T) {
 		for _, testCase := range []struct {
 			description string

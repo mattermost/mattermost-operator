@@ -143,13 +143,15 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 	// DB
 	envVarDB := db.EnvVars(mattermost)
 	initContainers := db.InitContainers(mattermost)
-	if mattermost.Spec.Database.ReadinessCheck != nil && mattermost.Spec.Database.ReadinessCheck.InitContainers != nil {
-		initContainers = mattermost.Spec.Database.ReadinessCheck.InitContainers
-	}
 
 	// File Store
 	envVarFileStore := fileStoreEnvVars(fileStore)
 	initContainers = append(initContainers, fileStore.config.InitContainers(mattermost)...)
+
+	// Extensions
+	if mattermost.Spec.PodExtensions.InitContainers != nil {
+		initContainers = append(initContainers, mattermost.Spec.PodExtensions.InitContainers...)
+	}
 
 	// TODO: DB setup job is temporarily disabled as `mattermost version` command
 	// does not account for the custom configuration
