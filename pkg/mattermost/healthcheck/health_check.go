@@ -8,7 +8,7 @@ import (
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/api/networking/v1beta1"
+	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -145,7 +145,7 @@ func (hc *HealthChecker) CheckServiceLoadBalancer() (string, error) {
 }
 
 func (hc *HealthChecker) CheckIngressLoadBalancer() (string, error) {
-	ingress := &v1beta1.IngressList{
+	ingress := &networkingv1.IngressList{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Ingress",
 			APIVersion: "v1",

@@ -13,7 +13,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	v1beta1 "k8s.io/api/networking/v1beta1"
+	networkingv1 "k8s.io/api/networking/v1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -25,7 +25,7 @@ const (
 	WaitForDBSetupContainerName = "init-wait-for-db-setup"
 )
 
-var defaultIngressPathType = v1beta1.PathTypeImplementationSpecific
+var defaultIngressPathType = networkingv1.PathTypeImplementationSpecific
 
 // GenerateService returns the service for the Mattermost app.
 func GenerateService(mattermost *mattermostv1alpha1.ClusterInstallation, serviceName, selectorName string) *corev1.Service {
@@ -50,8 +50,8 @@ func GenerateService(mattermost *mattermostv1alpha1.ClusterInstallation, service
 }
 
 // GenerateIngress returns the ingress for the Mattermost app.
-func GenerateIngress(mattermost *mattermostv1alpha1.ClusterInstallation, name, ingressName string, ingressAnnotations map[string]string) *v1beta1.Ingress {
-	ingress := &v1beta1.Ingress{
+func GenerateIngress(mattermost *mattermostv1alpha1.ClusterInstallation, name, ingressName string, ingressAnnotations map[string]string) *networkingv1.Ingress {
+	ingress := &networkingv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: mattermost.Namespace,
@@ -65,18 +65,22 @@ func GenerateIngress(mattermost *mattermostv1alpha1.ClusterInstallation, name, i
 			},
 			Annotations: ingressAnnotations,
 		},
-		Spec: v1beta1.IngressSpec{
-			Rules: []v1beta1.IngressRule{
+		Spec: networkingv1.IngressSpec{
+			Rules: []networkingv1.IngressRule{
 				{
 					Host: ingressName,
-					IngressRuleValue: v1beta1.IngressRuleValue{
-						HTTP: &v1beta1.HTTPIngressRuleValue{
-							Paths: []v1beta1.HTTPIngressPath{
+					IngressRuleValue: networkingv1.IngressRuleValue{
+						HTTP: &networkingv1.HTTPIngressRuleValue{
+							Paths: []networkingv1.HTTPIngressPath{
 								{
 									Path: "/",
-									Backend: v1beta1.IngressBackend{
-										ServiceName: name,
-										ServicePort: intstr.FromInt(8065),
+									Backend: networkingv1.IngressBackend{
+										Service: &networkingv1.IngressServiceBackend{
+											Name: mattermost.Name,
+											Port: networkingv1.ServiceBackendPort{
+												Number: 8065,
+											},
+										},
 									},
 									PathType: &defaultIngressPathType,
 								},
@@ -89,7 +93,7 @@ func GenerateIngress(mattermost *mattermostv1alpha1.ClusterInstallation, name, i
 	}
 
 	if mattermost.Spec.UseIngressTLS {
-		ingress.Spec.TLS = []v1beta1.IngressTLS{
+		ingress.Spec.TLS = []networkingv1.IngressTLS{
 			{
 				Hosts:      []string{ingressName},
 				SecretName: strings.ReplaceAll(ingressName, ".", "-") + "-tls-cert",

@@ -13,7 +13,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/api/networking/v1beta1"
+	networkingv1 "k8s.io/api/networking/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -154,7 +154,7 @@ func (r *ClusterInstallationReconciler) checkMattermostIngress(mattermost *matte
 		return err
 	}
 
-	current := &v1beta1.Ingress{}
+	current := &networkingv1.Ingress{}
 	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: desired.Name, Namespace: desired.Namespace}, current)
 	if err != nil {
 		return err
@@ -277,7 +277,7 @@ func (r *ClusterInstallationReconciler) deleteMattermostService(mattermost *matt
 }
 
 func (r *ClusterInstallationReconciler) deleteMattermostIngress(mattermost *mattermostv1alpha1.ClusterInstallation, resourceName string, reqLogger logr.Logger) error {
-	return r.deleteMattermostResource(mattermost, resourceName, &v1beta1.Ingress{}, reqLogger)
+	return r.deleteMattermostResource(mattermost, resourceName, &networkingv1.Ingress{}, reqLogger)
 }
 
 func (r *ClusterInstallationReconciler) deleteMattermostResource(mattermost *mattermostv1alpha1.ClusterInstallation, resourceName string, resource k8sClient.Object, reqLogger logr.Logger) error {

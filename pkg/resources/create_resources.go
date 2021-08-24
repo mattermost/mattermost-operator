@@ -13,7 +13,7 @@ import (
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/api/networking/v1beta1"
+	networkingv1 "k8s.io/api/networking/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -121,8 +121,8 @@ func (r *ResourceHelper) CreateServiceIfNotExists(owner v1.Object, service *core
 	return nil
 }
 
-func (r *ResourceHelper) CreateIngressIfNotExists(owner v1.Object, ingress *v1beta1.Ingress, reqLogger logr.Logger) error {
-	foundIngress := &v1beta1.Ingress{}
+func (r *ResourceHelper) CreateIngressIfNotExists(owner v1.Object, ingress *networkingv1.Ingress, reqLogger logr.Logger) error {
+	foundIngress := &networkingv1.Ingress{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: ingress.Name, Namespace: ingress.Namespace}, foundIngress)
 	if err != nil && k8sErrors.IsNotFound(err) {
 		reqLogger.Info("Creating ingress", "name", ingress.Name)
