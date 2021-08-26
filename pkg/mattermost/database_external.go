@@ -64,7 +64,11 @@ func (e *ExternalDBConfig) EnvVars(_ *mmv1beta.Mattermost) []corev1.EnvVar {
 	return dbEnvVars
 }
 
-func (e *ExternalDBConfig) InitContainers(_ *mmv1beta.Mattermost) []corev1.Container {
+func (e *ExternalDBConfig) InitContainers(mattermost *mmv1beta.Mattermost) []corev1.Container {
+	if mattermost.Spec.Database.DisableReadinessCheck {
+		return nil
+	}
+
 	var initContainers []corev1.Container
 	if e.hasDBCheckURL {
 		container := getDBCheckInitContainer(e.secretName, e.dbType)

@@ -89,6 +89,12 @@ type MattermostSpec struct {
 	// These settings generally don't need to be changed.
 	// +optional
 	Probes Probes `json:"probes,omitempty"`
+
+	// PodExtensions specify custom extensions for Mattermost pods.
+	// This can be used for custom readiness checks etc.
+	// These settings generally don't need to be changed.
+	// +optional
+	PodExtensions PodExtensions `json:"podExtensions,omitempty"`
 }
 
 // Scheduling defines the configuration related to scheduling of the Mattermost pods
@@ -117,6 +123,13 @@ type Probes struct {
 	ReadinessProbe v1.Probe `json:"readinessProbe,omitempty"`
 }
 
+// PodExtensions specify customized extensions for a pod.
+type PodExtensions struct {
+	// Additional InitContainers injected to pods.
+	// The setting does not override InitContainers defined by the Operator.
+	InitContainers []v1.Container `json:"initContainers,omitempty"`
+}
+
 // Database defines the database configuration for Mattermost.
 type Database struct {
 	// Defines the configuration of and external database.
@@ -125,6 +138,11 @@ type Database struct {
 	// Defines the configuration of database managed by Kubernetes operator.
 	// +optional
 	OperatorManaged *OperatorManagedDatabase `json:"operatorManaged,omitempty"`
+
+	// DisableReadinessCheck instructs Operator to not add init container responsible for checking DB access.
+	// Can be used to define custom init containers specified in `spec.PodExtensions.InitContainers`.
+	// +optional
+	DisableReadinessCheck bool `json:"disableReadinessCheck,omitempty"`
 }
 
 // ExternalDatabase defines the configuration of the external database that should be used by Mattermost.
@@ -135,6 +153,7 @@ type ExternalDatabase struct {
 	// It can also contain optional fields, such as:
 	//   - Key: MM_SQLSETTINGS_DATASOURCEREPLICAS | Value: Connection string to read replicas of the database.
 	//   - Key: DB_CONNECTION_CHECK_URL | Value: The URL used for checking that the database is accessible.
+	//     Omitting this value in the secret will cause Operator to skip adding init container for database check.
 	Secret string `json:"secret,omitempty"`
 }
 

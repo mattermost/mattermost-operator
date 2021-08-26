@@ -29,7 +29,7 @@ type FileStoreConfig interface {
 	InitContainers(mattermost *mmv1beta.Mattermost) []corev1.Container
 }
 
-// GenerateService returns the service for the Mattermost app.
+// GenerateServiceV1Beta returns the service for the Mattermost app.
 func GenerateServiceV1Beta(mattermost *mmv1beta.Mattermost) *corev1.Service {
 	baseAnnotations := map[string]string{
 		"service.alpha.kubernetes.io/tolerate-unready-endpoints": "true",
@@ -147,6 +147,11 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 	// File Store
 	envVarFileStore := fileStoreEnvVars(fileStore)
 	initContainers = append(initContainers, fileStore.config.InitContainers(mattermost)...)
+
+	// Extensions
+	if mattermost.Spec.PodExtensions.InitContainers != nil {
+		initContainers = append(initContainers, mattermost.Spec.PodExtensions.InitContainers...)
+	}
 
 	// TODO: DB setup job is temporarily disabled as `mattermost version` command
 	// does not account for the custom configuration

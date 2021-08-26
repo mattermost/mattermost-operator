@@ -77,6 +77,10 @@ func (m *MySQLDBConfig) EnvVars(mattermost *mmv1beta.Mattermost) []corev1.EnvVar
 }
 
 func (m *MySQLDBConfig) InitContainers(mattermost *mmv1beta.Mattermost) []corev1.Container {
+	if mattermost.Spec.Database.DisableReadinessCheck {
+		return nil
+	}
+
 	mysqlName := utils.HashWithPrefix("db", mattermost.Name)
 
 	return []corev1.Container{

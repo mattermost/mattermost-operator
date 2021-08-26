@@ -61,6 +61,15 @@ func TestNewExternalDBInfo(t *testing.T) {
 		assert.Equal(t, "postgres:13", initContainers[0].Image)
 	})
 
+	t.Run("with disabled DB readiness check", func(t *testing.T) {
+		mattermost.Spec.Database.DisableReadinessCheck = true
+		config, err := NewExternalDBConfig(mattermost, secret)
+		require.NoError(t, err)
+
+		initContainers := config.InitContainers(mattermost)
+		assert.Equal(t, 0, len(initContainers))
+	})
+
 	secret.Data["DB_CONNECTION_STRING"] = []byte{}
 	t.Run("fail if connection string is empty", func(t *testing.T) {
 		_, err := NewExternalDBConfig(mattermost, secret)

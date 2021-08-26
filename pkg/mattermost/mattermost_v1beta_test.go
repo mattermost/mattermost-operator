@@ -489,6 +489,108 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 			assert.Equal(t, 1, len(deployment.Spec.Template.Spec.Containers))
 		})
 	}
+
+	t.Run("custom pod extensions and DB check", func(t *testing.T) {
+		customInitContainers := []corev1.Container{
+			{Image: "my-check-image", Name: "custom-check"},
+			{Image: "my-other-check-image", Name: "other-custom-check"},
+		}
+		defaultExternalPostgresInitContainers := []corev1.Container{
+			{
+				Name:            "init-check-database",
+				Image:           "postgres:13",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Command:         []string{"sh", "-c", "until pg_isready --dbname=\"$DB_CONNECTION_CHECK_URL\"; do echo waiting for database; sleep 5; done;"},
+				Env:             []corev1.EnvVar{{Name: "DB_CONNECTION_CHECK_URL", Value: "", ValueFrom: EnvSourceFromSecret("secret", "DB_CONNECTION_CHECK_URL")}},
+			},
+		}
+
+		for _, testCase := range []struct {
+			description            string
+			mmSpec                 mmv1beta.MattermostSpec
+			dbConfig               DatabaseConfig
+			fileStoreConfig        FileStoreConfig
+			expectedInitContainers []corev1.Container
+		}{
+			{
+				description: "custom init container with DB check disabled",
+				mmSpec: mmv1beta.MattermostSpec{
+					Database: mmv1beta.Database{
+						External:              &mmv1beta.ExternalDatabase{},
+						DisableReadinessCheck: true,
+					},
+					PodExtensions: mmv1beta.PodExtensions{
+						InitContainers: customInitContainers,
+					},
+				},
+				dbConfig:               &ExternalDBConfig{dbType: database.PostgreSQLDatabase, hasDBCheckURL: true},
+				expectedInitContainers: customInitContainers,
+			},
+			{
+				description: "custom init container with DB check enabled",
+				mmSpec: mmv1beta.MattermostSpec{
+					Database: mmv1beta.Database{
+						External:              &mmv1beta.ExternalDatabase{},
+						DisableReadinessCheck: false,
+					},
+					PodExtensions: mmv1beta.PodExtensions{
+						InitContainers: customInitContainers,
+					},
+				},
+				dbConfig:               &ExternalDBConfig{dbType: database.PostgreSQLDatabase, secretName: "secret", hasDBCheckURL: true},
+				expectedInitContainers: append(defaultExternalPostgresInitContainers, customInitContainers...),
+			},
+			{
+				description: "empty init containers slice",
+				mmSpec: mmv1beta.MattermostSpec{
+					Database: mmv1beta.Database{
+						External:              &mmv1beta.ExternalDatabase{},
+						DisableReadinessCheck: true,
+					},
+					PodExtensions: mmv1beta.PodExtensions{
+						InitContainers: []corev1.Container{},
+					},
+				},
+				dbConfig:               &ExternalDBConfig{dbType: database.PostgreSQLDatabase, hasDBCheckURL: true},
+				expectedInitContainers: nil,
+			},
+			{
+				description: "empty init containers slice with DB check",
+				mmSpec: mmv1beta.MattermostSpec{
+					Database: mmv1beta.Database{
+						External:              &mmv1beta.ExternalDatabase{},
+						DisableReadinessCheck: false,
+					},
+					PodExtensions: mmv1beta.PodExtensions{
+						InitContainers: []corev1.Container{},
+					},
+				},
+				dbConfig:               &ExternalDBConfig{dbType: database.PostgreSQLDatabase, secretName: "secret", hasDBCheckURL: true},
+				expectedInitContainers: defaultExternalPostgresInitContainers,
+			},
+			{
+				description: "nil init containers slice",
+				mmSpec: mmv1beta.MattermostSpec{
+					Database: mmv1beta.Database{
+						External: &mmv1beta.ExternalDatabase{},
+					},
+					PodExtensions: mmv1beta.PodExtensions{
+						InitContainers: nil,
+					},
+				},
+				dbConfig:               &ExternalDBConfig{dbType: database.PostgreSQLDatabase, hasDBCheckURL: false},
+				expectedInitContainers: nil,
+			},
+		} {
+			t.Run(testCase.description, func(t *testing.T) {
+				mattermost := &mmv1beta.Mattermost{
+					Spec: testCase.mmSpec,
+				}
+				deployment := GenerateDeploymentV1Beta(mattermost, testCase.dbConfig, &FileStoreInfo{config: &ExternalFileStore{}}, "", "", "", "image")
+				assert.Equal(t, testCase.expectedInitContainers, deployment.Spec.Template.Spec.InitContainers)
+			})
+		}
+	})
 }
 
 func TestGenerateRBACResources_V1Beta(t *testing.T) {
