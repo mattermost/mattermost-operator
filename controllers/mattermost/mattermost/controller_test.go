@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"
-	"k8s.io/api/networking/v1beta1"
+	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -85,7 +85,7 @@ func TestReconcile(t *testing.T) {
 	// watched resource .
 	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: mmName, Namespace: mmNamespace}}
 	// Run Reconcile
-	// We expect an error on the first reconciliation due to the deployment pods
+	// We expect health check delay on the first reconciliation due to the deployment pods
 	// not running yet.
 	res, err := r.Reconcile(context.Background(), req)
 	require.NoError(t, err)
@@ -127,7 +127,7 @@ func TestReconcile(t *testing.T) {
 			require.NoError(t, err)
 		})
 		t.Run("ingress", func(t *testing.T) {
-			ingress := &v1beta1.Ingress{}
+			ingress := &networkingv1.Ingress{}
 			err = c.Get(context.TODO(), mmKey, ingress)
 			require.NoError(t, err)
 		})

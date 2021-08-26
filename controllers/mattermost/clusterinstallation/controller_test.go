@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"
-	"k8s.io/api/networking/v1beta1"
+	networkingv1 "k8s.io/api/networking/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -121,7 +121,7 @@ func TestReconcile(t *testing.T) {
 			require.NoError(t, err)
 		})
 		t.Run("ingress", func(t *testing.T) {
-			ingress := &v1beta1.Ingress{}
+			ingress := &networkingv1.Ingress{}
 			err = c.Get(context.TODO(), ciKey, ingress)
 			require.NoError(t, err)
 		})
@@ -458,8 +458,8 @@ func TestReconcile(t *testing.T) {
 				assert.True(t, k8sErrors.IsNotFound(err))
 			})
 			t.Run("ingress", func(t *testing.T) {
-				blueIngress := &v1beta1.Ingress{}
-				greenIngress := &v1beta1.Ingress{}
+				blueIngress := &networkingv1.Ingress{}
+				greenIngress := &networkingv1.Ingress{}
 				err = c.Get(context.TODO(), blueKey, blueIngress)
 				require.Error(t, err)
 				assert.True(t, k8sErrors.IsNotFound(err))
