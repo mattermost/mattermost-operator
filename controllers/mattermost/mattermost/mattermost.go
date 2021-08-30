@@ -79,6 +79,8 @@ func (r *MattermostReconciler) checkMattermostService(mattermost *mmv1beta.Matte
 		return err
 	}
 
+	resources.CopyServiceEmptyAutoAssignedFields(desired, current)
+
 	return r.Resources.Update(current, desired, reqLogger)
 }
 

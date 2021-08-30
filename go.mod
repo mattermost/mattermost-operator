@@ -3,7 +3,7 @@ module github.com/mattermost/mattermost-operator
 go 1.14
 
 require (
-	github.com/banzaicloud/k8s-objectmatcher v1.4.1
+	github.com/banzaicloud/k8s-objectmatcher v1.5.2
 	github.com/go-logr/logr v0.4.0
 	github.com/go-openapi/jsonreference v0.19.4 // indirect
 	github.com/go-openapi/spec v0.19.3

@@ -126,9 +126,7 @@ func (mm *Mattermost) MattermostLabels(name string) map[string]string {
 	l[ClusterLabel] = name
 	l["app"] = MattermostAppContainerName
 
-	labels := mm.Spec.ResourceLabels
-
-	for k, v := range labels {
+	for k, v := range mm.Spec.ResourceLabels {
 		l[k] = v
 	}
 	return l

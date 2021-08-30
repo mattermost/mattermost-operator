@@ -547,3 +547,59 @@ func TestCheckMattermostExternalDBAndFileStore(t *testing.T) {
 		})
 	})
 }
+
+func TestSpecialCases(t *testing.T) {
+	// Setup logging for the reconciler so we can see what happened on failure.
+	logger := blubr.InitLogger()
+	logger = logger.WithName("test.opr")
+	logf.SetLogger(logger)
+
+	mmName := "foo"
+	mmNamespace := "default"
+	mm := &mmv1beta.Mattermost{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      mmName,
+			Namespace: mmNamespace,
+			UID:       types.UID("test"),
+		},
+		Spec: mmv1beta.MattermostSpec{
+			UseServiceLoadBalancer: true,
+		},
+	}
+
+	s := prepareSchema(t, scheme.Scheme)
+	s.AddKnownTypes(mmv1beta.GroupVersion, mm)
+	c := fake.NewFakeClient()
+	r := &MattermostReconciler{
+		Client:         c,
+		Scheme:         s,
+		Log:            logger,
+		MaxReconciling: 5,
+		Resources:      resources.NewResourceHelper(c, s),
+	}
+
+	t.Run("service - copy ClusterIP for LoadBalancer service", func(t *testing.T) {
+		// Create the service
+		err := r.checkMattermostService(mm, logger)
+		require.NoError(t, err)
+
+		service := &corev1.Service{}
+		err = r.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, service)
+		require.NoError(t, err)
+
+		service.Spec.ClusterIPs = []string{"10.10.10.10", "10.10.10.11"}
+		service.Spec.ClusterIP = "10.10.10.10"
+		err = r.Client.Update(context.TODO(), service)
+		require.NoError(t, err)
+
+		mm.Spec.ResourceLabels = map[string]string{"myLabel": "test"}
+		err = r.checkMattermostService(mm, logger)
+		require.NoError(t, err)
+
+		modified := &corev1.Service{}
+		err = r.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, modified)
+		require.NoError(t, err)
+		assert.Equal(t, service.Spec.ClusterIPs, modified.Spec.ClusterIPs)
+		assert.Equal(t, service.Spec.ClusterIP, modified.Spec.ClusterIP)
+	})
+}
