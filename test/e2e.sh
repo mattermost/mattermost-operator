@@ -22,7 +22,7 @@ docker_exec() {
 
 
 run_kind() {
-    KIND_VERSION="v0.9.0"
+    KIND_VERSION="${KIND_VERSION:=v0.9.0}"
     echo "Download kind binary..."
     curl -sSLo kind https://github.com/kubernetes-sigs/kind/releases/download/"${KIND_VERSION}"/kind-linux-amd64
     chmod +x kind
