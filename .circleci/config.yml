@@ -78,6 +78,7 @@ jobs:
       - IMAGE_TAG=test
       - KIND_VERSION=v0.11.1
       - SDK_VERSION=v1.0.1
+      - KIND_CONFIG_FILE=kind-config-1.22.yaml
     machine: true
     resource_class: 2xlarge
     working_directory: /home/circleci/.go_workspace/src/github.com/mattermost/mattermost-operator
