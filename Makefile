@@ -196,7 +196,7 @@ docker-push: ## Push the docker image
 	docker push ${OPERATOR_IMAGE}
 
 kind-start: ## Setup Kind cluster capable of running Mattermost Operator
-	KIND_CLUSTER="${KIND_CLUSTER}" ./scripts/setup_kind.sh
+	KIND_CLUSTER="${KIND_CLUSTER}" KIND_CONFIG_FILE=${KIND_CONFIG_FILE} ./scripts/setup_kind.sh
 
 kind-load-image: ## Loads Mattermost Operator image to Kind cluster
 	kind load --name "${KIND_CLUSTER}" docker-image $(OPERATOR_IMAGE)
