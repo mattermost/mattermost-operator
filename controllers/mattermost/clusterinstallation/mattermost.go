@@ -78,6 +78,8 @@ func (r *ClusterInstallationReconciler) checkMattermostService(mattermost *matte
 		return err
 	}
 
+	resources.CopyServiceEmptyAutoAssignedFields(desired, current)
+
 	return r.Resources.Update(current, desired, reqLogger)
 }
 
