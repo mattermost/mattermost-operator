@@ -71,6 +71,24 @@ jobs:
           command: ./test/e2e.sh
           no_output_timeout: 1h
 
+  e2e_removed_apis:
+    environment:
+      - K8S_VERSION=v1.22.0
+      - IMAGE_NAME=mattermost/mattermost-operator
+      - IMAGE_TAG=test
+      - KIND_VERSION=v0.11.1
+      - SDK_VERSION=v1.0.1
+      - KIND_CONFIG_FILE=kind-config-1.22.yaml
+    machine: true
+    resource_class: 2xlarge
+    working_directory: /home/circleci/.go_workspace/src/github.com/mattermost/mattermost-operator
+    steps:
+      - checkout
+      - run:
+          name: Kind
+          command: ./test/e2e.sh
+          no_output_timeout: 1h
+
   push-docker-pr:
     executor:
       name: default
@@ -146,6 +164,15 @@ workflows:
                 - master
                 - /^v.*/
       - e2e:
+          requires:
+            - lint
+            - unittest
+          filters:
+            branches:
+              ignore:
+                - master
+                - /^v.*/
+      - e2e_removed_apis:
           requires:
             - lint
             - unittest
