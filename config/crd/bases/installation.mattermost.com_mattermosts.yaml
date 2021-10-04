@@ -197,12 +197,33 @@ spec:
                       type: string
                   type: object
                 type: array
+              ingress:
+                description: Ingress defines configuration for Ingress resource created by the Operator.
+                properties:
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    description: Annotations defines annotations passed to the Ingress associated with Mattermost.
+                    type: object
+                  enabled:
+                    description: Enabled determines whether the Operator should create Ingress resource or not. Disabling ingress on existing installation will cause Operator to remove it.
+                    type: boolean
+                  host:
+                    description: Host defines the Ingress host to be used when creating the ingress rules.
+                    type: string
+                  tlsSecret:
+                    description: TLSSecret specifies secret used for configuring TLS for Ingress. If empty TLS will not be configured.
+                    type: string
+                required:
+                - enabled
+                type: object
               ingressAnnotations:
                 additionalProperties:
                   type: string
+                description: 'IngressAnnotations defines annotations passed to the Ingress associated with Mattermost. Deprecated: Use Spec.Ingress.Annotations.'
                 type: object
               ingressName:
-                description: IngressName defines the name to be used when creating the ingress rules
+                description: 'IngressName defines the host to be used when creating the ingress rules. Deprecated: Use Spec.Ingress.Host instead.'
                 type: string
               licenseSecret:
                 description: LicenseSecret is the name of the secret containing a Mattermost license.
@@ -1579,6 +1600,7 @@ spec:
                 description: 'Size defines the size of the Mattermost. This is typically specified in number of users. This will override replica and resource requests/limits appropriately for the provided number of users. This is a write-only field - its value is erased after setting appropriate values of resources. Accepted values are: 100users, 1000users, 5000users, 10000users, and 250000users. If replicas and resource requests/limits are not specified, and Size is not provided the configuration for 5000users will be applied. Setting ''Replicas'', ''Scheduling.Resources'', ''FileStore.Replicas'', ''FileStore.Resource'', ''Database.Replicas'', or ''Database.Resources'' will override the values set by Size. Setting new Size will override previous values regardless if set by Size or manually.'
                 type: string
               useIngressTLS:
+                description: 'UseIngressTLS specifies whether TLS secret should be configured for Ingress. Deprecated: Use Spec.Ingress.TLSSecret.'
                 type: boolean
               useServiceLoadBalancer:
                 type: boolean
@@ -2516,8 +2538,6 @@ spec:
                   - name
                   type: object
                 type: array
-            required:
-            - ingressName
             type: object
           status:
             description: MattermostStatus defines the observed state of Mattermost

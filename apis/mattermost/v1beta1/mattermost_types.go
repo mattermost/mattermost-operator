@@ -47,10 +47,16 @@ type MattermostSpec struct {
 	// LicenseSecret is the name of the secret containing a Mattermost license.
 	// +optional
 	LicenseSecret string `json:"licenseSecret,omitempty"`
-	// IngressName defines the name to be used when creating the ingress rules
+	// IngressName defines the host to be used when creating the ingress rules.
+	// Deprecated: Use Spec.Ingress.Host instead.
+	// +optional
 	IngressName string `json:"ingressName"`
+	// IngressAnnotations defines annotations passed to the Ingress associated with Mattermost.
+	// Deprecated: Use Spec.Ingress.Annotations.
 	// +optional
 	IngressAnnotations map[string]string `json:"ingressAnnotations,omitempty"`
+	// UseIngressTLS specifies whether TLS secret should be configured for Ingress.
+	// Deprecated: Use Spec.Ingress.TLSSecret.
 	// +optional
 	UseIngressTLS bool `json:"useIngressTLS,omitempty"`
 	// +optional
@@ -59,6 +65,16 @@ type MattermostSpec struct {
 	ServiceAnnotations map[string]string `json:"serviceAnnotations,omitempty"`
 	// +optional
 	ResourceLabels map[string]string `json:"resourceLabels,omitempty"`
+
+	// TODO: Before adding Ingress section Operator would always create the Ingress.
+	// Therefore to preserve it as a default behavior this field needs to be optional
+	// otherwise Ingress.Enabled will default to false.
+	// After we drop old Ingress fields in new CR version this no longer needs to be a pointer
+	// and we can default to not creating Ingress. We can also then remove the accessor methods.
+
+	// Ingress defines configuration for Ingress resource created by the Operator.
+	// +optional
+	Ingress *Ingress `json:"ingress,omitempty"`
 	// Volumes allows for mounting volumes from various sources into the
 	// Mattermost application pods.
 	// +optional
@@ -95,6 +111,23 @@ type MattermostSpec struct {
 	// These settings generally don't need to be changed.
 	// +optional
 	PodExtensions PodExtensions `json:"podExtensions,omitempty"`
+}
+
+// Ingress defines configuration for Ingress resource created by the Operator.
+type Ingress struct {
+	// Enabled determines whether the Operator should create Ingress resource or not.
+	// Disabling ingress on existing installation will cause Operator to remove it.
+	Enabled bool `json:"enabled"`
+	// Host defines the Ingress host to be used when creating the ingress rules.
+	// +optional
+	Host string `json:"host,omitempty"`
+	// Annotations defines annotations passed to the Ingress associated with Mattermost.
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+	// TLSSecret specifies secret used for configuring TLS for Ingress.
+	// If empty TLS will not be configured.
+	// +optional
+	TLSSecret string `json:"tlsSecret,omitempty"`
 }
 
 // Scheduling defines the configuration related to scheduling of the Mattermost pods

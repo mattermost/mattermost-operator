@@ -159,3 +159,20 @@ func (r *ResourceHelper) CreateRoleIfNotExists(owner v1.Object, role *rbacv1.Rol
 
 	return nil
 }
+
+func (r *ResourceHelper) DeleteIngress(key types.NamespacedName, reqLogger logr.Logger) error {
+	foundIngress := &networkingv1.Ingress{}
+	err := r.client.Get(context.TODO(), key, foundIngress)
+	if err != nil && k8sErrors.IsNotFound(err) {
+		return nil
+	} else if err != nil {
+		return errors.Wrap(err, "failed to check if ingress exists")
+	}
+
+	reqLogger.Info("Deleting ingress", "name", foundIngress.Name)
+	err = r.client.Delete(context.TODO(), foundIngress)
+	if err != nil {
+		return errors.Wrap(err, "failed to delete ingress")
+	}
+	return nil
+}

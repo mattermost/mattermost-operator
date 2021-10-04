@@ -4,9 +4,10 @@
 package v1beta1
 
 import (
-	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/pkg/errors"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -44,8 +45,8 @@ const (
 
 // SetDefaults set the missing values in the manifest to the default ones
 func (mm *Mattermost) SetDefaults() error {
-	if mm.Spec.IngressName == "" {
-		return errors.New("IngressName required, but not set")
+	if mm.IngressEnabled() && mm.GetIngressHost() == "" {
+		return errors.New("ingress.host required, but not set")
 	}
 	if mm.Spec.Image == "" {
 		mm.Spec.Image = DefaultMattermostImage
@@ -61,6 +62,45 @@ func (mm *Mattermost) SetDefaults() error {
 	mm.Spec.Database.SetDefaults()
 
 	return nil
+}
+
+// IngressEnabled determines whether Mattermost Ingress should be created.
+func (mm *Mattermost) IngressEnabled() bool {
+	if mm.Spec.Ingress != nil {
+		return mm.Spec.Ingress.Enabled
+	}
+	return true
+}
+
+// GetIngressHost returns Mattermost Ingress host.
+func (mm *Mattermost) GetIngressHost() string {
+	if mm.Spec.Ingress == nil {
+		return mm.Spec.IngressName
+	}
+	return mm.Spec.Ingress.Host
+}
+
+// GetIngresAnnotations returns Mattermost Ingress annotations.
+func (mm *Mattermost) GetIngresAnnotations() map[string]string {
+	if mm.Spec.Ingress == nil {
+		return mm.Spec.IngressAnnotations
+	}
+	return mm.Spec.Ingress.Annotations
+}
+
+// GetIngressTLSSecret returns Mattermost Ingress TLS secret.
+func (mm *Mattermost) GetIngressTLSSecret() string {
+	if mm.Spec.Ingress != nil {
+		return mm.Spec.Ingress.TLSSecret
+	}
+	if mm.Spec.UseIngressTLS {
+		return defaultTLSSecret(mm)
+	}
+	return ""
+}
+
+func defaultTLSSecret(mm *Mattermost) string {
+	return strings.ReplaceAll(mm.GetIngressHost(), ".", "-") + "-tls-cert"
 }
 
 // GetMattermostAppContainerFromDeployment gets container from Deployment which runs Mattermost application
