@@ -5,4 +5,4 @@ kind: Kustomization
 images:
 - name: mattermost-operator
   newName: mattermost/mattermost-operator
-  newTag: latest
+  newTag: test

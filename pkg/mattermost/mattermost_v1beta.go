@@ -271,6 +271,7 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 					Volumes:          volumes,
 					Affinity:         mattermost.Spec.Scheduling.Affinity,
 					NodeSelector:     mattermost.Spec.Scheduling.NodeSelector,
+					Tolerations:      mattermost.Spec.Scheduling.Tolerations,
 				},
 			},
 		},
