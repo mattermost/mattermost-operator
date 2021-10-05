@@ -113,7 +113,7 @@ type Scheduling struct {
 	Affinity *v1.Affinity `json:"affinity,omitempty"`
 	// Defines tolerations for the Mattermost app server pods
 	// More info: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
-    // +optional
+	// +optional
 	Tolerations []v1.Toleration `json:"tolerations,omitempty"`
 }
 
