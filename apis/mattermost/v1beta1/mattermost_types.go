@@ -111,6 +111,10 @@ type Scheduling struct {
 	// If specified, affinity will define the pod's scheduling constraints
 	// +optional
 	Affinity *v1.Affinity `json:"affinity,omitempty"`
+	// Defines tolerations for the Mattermost app server pods
+	// More info: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
+	// +optional
+	Tolerations []v1.Toleration `json:"tolerations,omitempty"`
 }
 
 // Probes defines configuration of liveness and readiness probe for Mattermost pods.
