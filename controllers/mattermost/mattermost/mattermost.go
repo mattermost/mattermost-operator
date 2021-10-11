@@ -152,6 +152,14 @@ func (r *MattermostReconciler) checkMattermostRoleBinding(mattermost *mmv1beta.M
 func (r *MattermostReconciler) checkMattermostIngress(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) error {
 	desired := mattermostApp.GenerateIngressV1Beta(mattermost)
 
+	if !mattermost.IngressEnabled() {
+		err := r.Resources.DeleteIngress(types.NamespacedName{Namespace: desired.Namespace, Name: desired.Name}, reqLogger)
+		if err != nil {
+			return errors.Wrap(err, "failed to delete disabled ingress")
+		}
+		return nil
+	}
+
 	err := r.Resources.CreateIngressIfNotExists(mattermost, desired, reqLogger)
 	if err != nil {
 		return err
@@ -177,7 +185,7 @@ func (r *MattermostReconciler) checkMattermostDeployment(
 		dbConfig,
 		fileStoreInfo,
 		mattermost.Name,
-		mattermost.Spec.IngressName,
+		mattermost.GetIngressHost(),
 		mattermost.Name,
 		mattermost.GetImageName(),
 	)

@@ -122,14 +122,15 @@ func schema_mattermost_operator_apis_mattermost_v1beta1_MattermostSpec(ref commo
 					},
 					"ingressName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "IngressName defines the name to be used when creating the ingress rules",
+							Description: "IngressName defines the host to be used when creating the ingress rules. Deprecated: Use Spec.Ingress.Host instead.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"ingressAnnotations": {
 						SchemaProps: spec.SchemaProps{
-							Type: []string{"object"},
+							Description: "IngressAnnotations defines annotations passed to the Ingress associated with Mattermost. Deprecated: Use Spec.Ingress.Annotations.",
+							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
 								Schema: &spec.Schema{
@@ -143,8 +144,9 @@ func schema_mattermost_operator_apis_mattermost_v1beta1_MattermostSpec(ref commo
 					},
 					"useIngressTLS": {
 						SchemaProps: spec.SchemaProps{
-							Type:   []string{"boolean"},
-							Format: "",
+							Description: "UseIngressTLS specifies whether TLS secret should be configured for Ingress. Deprecated: Use Spec.Ingress.TLSSecret.",
+							Type:        []string{"boolean"},
+							Format:      "",
 						},
 					},
 					"useServiceLoadBalancer": {
@@ -179,6 +181,12 @@ func schema_mattermost_operator_apis_mattermost_v1beta1_MattermostSpec(ref commo
 									},
 								},
 							},
+						},
+					},
+					"ingress": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Ingress defines configuration for Ingress resource created by the Operator.",
+							Ref:         ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.Ingress"),
 						},
 					},
 					"volumes": {
@@ -262,10 +270,9 @@ func schema_mattermost_operator_apis_mattermost_v1beta1_MattermostSpec(ref commo
 						},
 					},
 				},
-				Required: []string{"ingressName"},
 			},
 		},
 		Dependencies: []string{
-			"github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.Database", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.ElasticSearch", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.FileStore", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.PodExtensions", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.Probes", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.Scheduling", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.LocalObjectReference", "k8s.io/api/core/v1.Volume", "k8s.io/api/core/v1.VolumeMount"},
+			"github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.Database", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.ElasticSearch", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.FileStore", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.Ingress", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.PodExtensions", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.Probes", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.Scheduling", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.LocalObjectReference", "k8s.io/api/core/v1.Volume", "k8s.io/api/core/v1.VolumeMount"},
 	}
 }

@@ -3,7 +3,6 @@ package mattermost
 import (
 	"fmt"
 	"strconv"
-	"strings"
 
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	pkgUtils "github.com/mattermost/mattermost-operator/pkg/utils"
@@ -91,7 +90,7 @@ func GenerateIngressV1Beta(mattermost *mmv1beta.Mattermost) *networkingv1.Ingres
 		"kubernetes.io/ingress.class":                 "nginx",
 		"nginx.ingress.kubernetes.io/proxy-body-size": "1000M",
 	}
-	for k, v := range mattermost.Spec.IngressAnnotations {
+	for k, v := range mattermost.GetIngresAnnotations() {
 		ingressAnnotations[k] = v
 	}
 
@@ -106,7 +105,7 @@ func GenerateIngressV1Beta(mattermost *mmv1beta.Mattermost) *networkingv1.Ingres
 		Spec: networkingv1.IngressSpec{
 			Rules: []networkingv1.IngressRule{
 				{
-					Host: mattermost.Spec.IngressName,
+					Host: mattermost.GetIngressHost(),
 					IngressRuleValue: networkingv1.IngressRuleValue{
 						HTTP: &networkingv1.HTTPIngressRuleValue{
 							Paths: []networkingv1.HTTPIngressPath{
@@ -130,11 +129,11 @@ func GenerateIngressV1Beta(mattermost *mmv1beta.Mattermost) *networkingv1.Ingres
 		},
 	}
 
-	if mattermost.Spec.UseIngressTLS {
+	if mattermost.GetIngressTLSSecret() != "" {
 		ingress.Spec.TLS = []networkingv1.IngressTLS{
 			{
-				Hosts:      []string{mattermost.Spec.IngressName},
-				SecretName: strings.ReplaceAll(mattermost.Spec.IngressName, ".", "-") + "-tls-cert",
+				Hosts:      []string{mattermost.GetIngressHost()},
+				SecretName: mattermost.GetIngressTLSSecret(),
 			},
 		}
 	}
@@ -179,7 +178,7 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 	// Determine max file size
 	bodySize := strconv.Itoa(defaultMaxFileSize * sizeMB)
 	if !mattermost.Spec.UseServiceLoadBalancer {
-		bodySize = determineMaxBodySize(mattermost.Spec.IngressAnnotations, bodySize)
+		bodySize = determineMaxBodySize(mattermost.GetIngresAnnotations(), bodySize)
 	}
 	envVarGeneral = append(envVarGeneral, corev1.EnvVar{
 		Name:  "MM_FILESETTINGS_MAXFILESIZE",

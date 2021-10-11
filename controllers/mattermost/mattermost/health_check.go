@@ -68,7 +68,7 @@ func (r *MattermostReconciler) checkMattermostHealth(mattermost *mmv1beta.Matter
 		if err != nil {
 			return status, errors.Wrap(err, "failed to check service load balancer")
 		}
-	} else {
+	} else if mattermost.IngressEnabled() {
 		endpoint, err = healthChecker.CheckIngressLoadBalancer()
 		if err != nil {
 			return status, errors.Wrap(err, "failed to check ingress load balancer")

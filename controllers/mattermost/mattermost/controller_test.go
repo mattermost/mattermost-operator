@@ -276,7 +276,7 @@ func TestReconcile(t *testing.T) {
 			assert.Equal(t, mm.Status.Replicas, *mm.Spec.Replicas)
 			assert.Equal(t, mm.Status.Version, mm.Spec.Version)
 			assert.Equal(t, mm.Status.Image, mm.Spec.Image)
-			assert.Equal(t, mm.Status.Endpoint, mm.Spec.IngressName)
+			assert.Equal(t, mm.Status.Endpoint, mm.GetIngressHost())
 		})
 	})
 }

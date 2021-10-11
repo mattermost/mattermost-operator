@@ -3,6 +3,7 @@ package mattermost
 import (
 	"context"
 	"fmt"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"testing"
 
 	"github.com/mattermost/mattermost-operator/pkg/resources"
@@ -211,7 +212,7 @@ func TestCheckMattermost(t *testing.T) {
 		found := &v1beta1.Ingress{}
 		err = r.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
 		require.NoError(t, err)
-		require.NotNil(t, found)
+		require.NotEmpty(t, found)
 		require.NotNil(t, found.Spec.TLS)
 		require.NotNil(t, found.Annotations)
 		assert.Contains(t, found.Annotations, "kubernetes.io/ingress.class")
@@ -233,6 +234,25 @@ func TestCheckMattermost(t *testing.T) {
 		assert.Equal(t, original.GetNamespace(), found.GetNamespace())
 		assert.Equal(t, original.Spec.Rules, found.Spec.Rules)
 		assert.Equal(t, original.Spec.TLS, original.Spec.TLS)
+	})
+
+	t.Run("ingress disabled", func(t *testing.T) {
+		err = r.checkMattermostIngress(mm, logger)
+		assert.NoError(t, err)
+
+		found := &v1beta1.Ingress{}
+		err = r.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
+		require.NoError(t, err)
+		require.NotEmpty(t, found)
+
+		mm.Spec.Ingress = &mmv1beta.Ingress{Enabled: false}
+
+		err = r.checkMattermostIngress(mm, logger)
+		require.NoError(t, err)
+
+		err = r.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
+		require.Error(t, err)
+		assert.True(t, k8sErrors.IsNotFound(err))
 	})
 
 	t.Run("deployment", func(t *testing.T) {
