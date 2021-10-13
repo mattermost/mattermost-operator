@@ -114,7 +114,7 @@ func (r *MattermostReconciler) Reconcile(ctx context.Context, request ctrl.Reque
 	originalMattermost := mattermost.DeepCopy()
 	err = mattermost.SetDefaults()
 	if err != nil {
-		r.updateStatusReconcilingAndLogError(mattermost, status, reqLogger)
+		r.updateStatusReconcilingAndLogError(mattermost, status, reqLogger, err)
 		return reconcile.Result{}, err
 	}
 
@@ -127,26 +127,26 @@ func (r *MattermostReconciler) Reconcile(ctx context.Context, request ctrl.Reque
 		mattermost.Status = status
 		err = r.updateSpec(ctx, reqLogger, originalMattermost, mattermost)
 		if err != nil {
-			r.updateStatusReconcilingAndLogError(originalMattermost, status, reqLogger)
+			r.updateStatusReconcilingAndLogError(originalMattermost, status, reqLogger, err)
 			return reconcile.Result{}, err
 		}
 	}
 
 	dbConfig, err := r.checkDatabase(mattermost, reqLogger)
 	if err != nil {
-		r.updateStatusReconcilingAndLogError(mattermost, status, reqLogger)
+		r.updateStatusReconcilingAndLogError(mattermost, status, reqLogger, err)
 		return reconcile.Result{}, err
 	}
 
 	fileStoreConfig, err := r.checkFileStore(mattermost, reqLogger)
 	if err != nil {
-		r.updateStatusReconcilingAndLogError(mattermost, status, reqLogger)
+		r.updateStatusReconcilingAndLogError(mattermost, status, reqLogger, err)
 		return reconcile.Result{}, err
 	}
 
 	err = r.checkMattermost(mattermost, dbConfig, fileStoreConfig, reqLogger)
 	if err != nil {
-		r.updateStatusReconcilingAndLogError(mattermost, status, reqLogger)
+		r.updateStatusReconcilingAndLogError(mattermost, status, reqLogger, err)
 		return reconcile.Result{}, err
 	}
 
@@ -162,7 +162,7 @@ func (r *MattermostReconciler) Reconcile(ctx context.Context, request ctrl.Reque
 
 	err = r.updateStatus(mattermost, status, reqLogger)
 	if err != nil {
-		r.updateStatusReconcilingAndLogError(mattermost, status, reqLogger)
+		r.updateStatusReconcilingAndLogError(mattermost, status, reqLogger, err)
 		return reconcile.Result{}, err
 	}
 

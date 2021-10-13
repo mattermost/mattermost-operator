@@ -2525,6 +2525,9 @@ spec:
               endpoint:
                 description: The endpoint to access the Mattermost instance
                 type: string
+              error:
+                description: The last observed error in the deployment of this Mattermost instance
+                type: string
               image:
                 description: The image running on the pods in the Mattermost instance
                 type: string
