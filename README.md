@@ -4,7 +4,7 @@
 
 
 ## Summary
-[Mattermost](https://mattermost.com) is an open source platform for secure collaboration across the entire software development lifecycle. It's is written in Golang and React and runs as a single Linux binary with MySQL or PostgreSQL.
+[Mattermost](https://mattermost.com) is an open source platform for secure collaboration across the entire software development lifecycle. It's written in Golang and React and runs as a single Linux binary with MySQL or PostgreSQL.
 
 This repo contains a Kubernetes Operator for Mattermost to simplify deploying and managing your Mattermost instance.
 
