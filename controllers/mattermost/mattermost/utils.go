@@ -38,7 +38,9 @@ func (r *MattermostReconciler) updateStatusReconciling(mattermost *mmv1beta.Matt
 // and updates the status. Any errors attempting this are logged, but not returned.
 // This should only be used when the outcome of setting the state can be ignored.
 func (r *MattermostReconciler) updateStatusReconcilingAndLogError(mattermost *mmv1beta.Mattermost, status mmv1beta.MattermostStatus, reqLogger logr.Logger, statusErr error) {
-	status.Error = statusErr.Error()
+	if statusErr != nil {
+		status.Error = statusErr.Error()
+	}
 	err := r.updateStatusReconciling(mattermost, status, reqLogger)
 	if err != nil {
 		reqLogger.Error(err, "Failed to set state to reconciling")
