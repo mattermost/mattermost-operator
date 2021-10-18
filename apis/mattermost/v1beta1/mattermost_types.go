@@ -128,6 +128,9 @@ type Ingress struct {
 	// If empty TLS will not be configured.
 	// +optional
 	TLSSecret string `json:"tlsSecret,omitempty"`
+	// IngressClass will be set on Ingress resource to associate it with specified IngressClass resource.
+	// +optional
+	IngressClass *string `json:"ingressClass,omitempty"`
 }
 
 // Scheduling defines the configuration related to scheduling of the Mattermost pods

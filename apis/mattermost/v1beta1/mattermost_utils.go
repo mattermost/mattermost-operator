@@ -99,6 +99,14 @@ func (mm *Mattermost) GetIngressTLSSecret() string {
 	return ""
 }
 
+// GetIngressClass returns IngressClass for Mattermost Ingress.
+func (mm *Mattermost) GetIngressClass() *string {
+	if mm.Spec.Ingress == nil {
+		return nil
+	}
+	return mm.Spec.Ingress.IngressClass
+}
+
 func defaultTLSSecret(mm *Mattermost) string {
 	return strings.ReplaceAll(mm.GetIngressHost(), ".", "-") + "-tls-cert"
 }
