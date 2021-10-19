@@ -211,6 +211,9 @@ spec:
                   host:
                     description: Host defines the Ingress host to be used when creating the ingress rules.
                     type: string
+                  ingressClass:
+                    description: IngressClass will be set on Ingress resource to associate it with specified IngressClass resource.
+                    type: string
                   tlsSecret:
                     description: TLSSecret specifies secret used for configuring TLS for Ingress. If empty TLS will not be configured.
                     type: string

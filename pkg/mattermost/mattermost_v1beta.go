@@ -19,6 +19,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
+const (
+	ingressClassAnnotation = "kubernetes.io/ingress.class"
+)
+
 type DatabaseConfig interface {
 	EnvVars(mattermost *mmv1beta.Mattermost) []corev1.EnvVar
 	InitContainers(mattermost *mmv1beta.Mattermost) []corev1.Container
@@ -87,9 +91,19 @@ func configureMattermostService(service *corev1.Service) *corev1.Service {
 // GenerateIngressV1Beta returns the ingress for the Mattermost app.
 func GenerateIngressV1Beta(mattermost *mmv1beta.Mattermost) *networkingv1.Ingress {
 	ingressAnnotations := map[string]string{
-		"kubernetes.io/ingress.class":                 "nginx",
 		"nginx.ingress.kubernetes.io/proxy-body-size": "1000M",
 	}
+	// This is somewhat tricky as you cannot set both ingress.class annotation
+	// and spec.IngressClassName when creating Ingress.
+	// At the same time older Nginx do not recognize spec.IngressClassName,
+	// so we cannot transition to using only new field.
+	// Both can exist if one is added on update therefore we leave the option of
+	// specifying ingress.class annotation in IngressAnnotations.
+	if mattermost.GetIngressClass() == nil {
+		// TODO: for Operator v2 we should change the default behavior to do not to set this annotation.
+		ingressAnnotations[ingressClassAnnotation] = "nginx"
+	}
+
 	for k, v := range mattermost.GetIngresAnnotations() {
 		ingressAnnotations[k] = v
 	}
@@ -103,6 +117,7 @@ func GenerateIngressV1Beta(mattermost *mmv1beta.Mattermost) *networkingv1.Ingres
 			Annotations:     ingressAnnotations,
 		},
 		Spec: networkingv1.IngressSpec{
+			IngressClassName: mattermost.GetIngressClass(),
 			Rules: []networkingv1.IngressRule{
 				{
 					Host: mattermost.GetIngressHost(),

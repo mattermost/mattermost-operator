@@ -71,18 +71,44 @@ func TestGenerateService_V1Beta(t *testing.T) {
 
 func TestGenerateIngress_V1Beta(t *testing.T) {
 	tests := []struct {
-		name string
-		spec mmv1beta.MattermostSpec
+		name                   string
+		spec                   mmv1beta.MattermostSpec
+		tlsSecret              string
+		ingressClass           *string
+		ingressClassAnnotation string
 	}{
 		{
-			name: "no tls",
-			spec: mmv1beta.MattermostSpec{},
+			name:                   "no tls, no ingress class",
+			spec:                   mmv1beta.MattermostSpec{Ingress: &mmv1beta.Ingress{Enabled: true}},
+			ingressClass:           nil,
+			ingressClassAnnotation: "nginx",
+			tlsSecret:              "",
 		},
 		{
-			name: "use tls",
+			name:                   "custom tls secret, custom ingress class",
+			spec:                   mmv1beta.MattermostSpec{Ingress: &mmv1beta.Ingress{IngressClass: utils.NewString("custom-nginx"), TLSSecret: "my-secret"}},
+			ingressClass:           utils.NewString("custom-nginx"),
+			ingressClassAnnotation: "",
+			tlsSecret:              "my-secret",
+		},
+		{
+			name: "default tls secret, no ingress spec",
 			spec: mmv1beta.MattermostSpec{
+				IngressName:   "test",
 				UseIngressTLS: true,
 			},
+			ingressClass:           nil,
+			ingressClassAnnotation: "nginx",
+			tlsSecret:              "test-tls-cert",
+		},
+		{
+			name: "custom ingress class annotation",
+			spec: mmv1beta.MattermostSpec{
+				IngressName:        "test",
+				IngressAnnotations: map[string]string{ingressClassAnnotation: "custom-nginx"},
+			},
+			ingressClass:           nil,
+			ingressClassAnnotation: "custom-nginx",
 		},
 	}
 
@@ -96,9 +122,12 @@ func TestGenerateIngress_V1Beta(t *testing.T) {
 			require.NotNil(t, ingress)
 
 			assert.Equal(t, networkingv1.PathTypeImplementationSpecific, *ingress.Spec.Rules[0].HTTP.Paths[0].PathType)
+			assert.Equal(t, tt.ingressClass, ingress.Spec.IngressClassName)
+			assert.Equal(t, tt.ingressClassAnnotation, ingress.Annotations[ingressClassAnnotation])
 
-			if mattermost.Spec.UseIngressTLS {
+			if tt.tlsSecret != "" {
 				assert.NotNil(t, ingress.Spec.TLS)
+				assert.Equal(t, tt.tlsSecret, ingress.Spec.TLS[0].SecretName)
 			} else {
 				assert.Nil(t, ingress.Spec.TLS)
 			}

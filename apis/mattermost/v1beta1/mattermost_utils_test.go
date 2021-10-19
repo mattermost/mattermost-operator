@@ -3,6 +3,8 @@ package v1beta1
 import (
 	"testing"
 
+	pkgUtils "github.com/mattermost/mattermost-operator/pkg/utils"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -26,12 +28,13 @@ func TestMattermost_SetDefaults(t *testing.T) {
 func TestMattermost_IngressAccessors(t *testing.T) {
 
 	for _, testCase := range []struct {
-		description string
-		mmSpec      MattermostSpec
-		enabled     bool
-		host        string
-		annotations map[string]string
-		tlsSecret   string
+		description  string
+		mmSpec       MattermostSpec
+		enabled      bool
+		host         string
+		annotations  map[string]string
+		tlsSecret    string
+		ingressClass *string
 	}{
 		{
 			description: "respect only old values",
@@ -40,25 +43,28 @@ func TestMattermost_IngressAccessors(t *testing.T) {
 				IngressAnnotations: map[string]string{"test": "val"},
 				UseIngressTLS:      true,
 			},
-			enabled:     true,
-			host:        "test-mm.com",
-			annotations: map[string]string{"test": "val"},
-			tlsSecret:   "test-mm-com-tls-cert",
+			enabled:      true,
+			host:         "test-mm.com",
+			annotations:  map[string]string{"test": "val"},
+			tlsSecret:    "test-mm-com-tls-cert",
+			ingressClass: nil,
 		},
 		{
 			description: "respect only new values - enabled",
 			mmSpec: MattermostSpec{
 				Ingress: &Ingress{
-					Enabled:     true,
-					Host:        "test-mm.com",
-					Annotations: map[string]string{"test2": "val2"},
-					TLSSecret:   "my-tls-secret",
+					Enabled:      true,
+					Host:         "test-mm.com",
+					Annotations:  map[string]string{"test2": "val2"},
+					TLSSecret:    "my-tls-secret",
+					IngressClass: pkgUtils.NewString("custom-nginx"),
 				},
 			},
-			enabled:     true,
-			host:        "test-mm.com",
-			annotations: map[string]string{"test2": "val2"},
-			tlsSecret:   "my-tls-secret",
+			enabled:      true,
+			host:         "test-mm.com",
+			annotations:  map[string]string{"test2": "val2"},
+			tlsSecret:    "my-tls-secret",
+			ingressClass: pkgUtils.NewString("custom-nginx"),
 		},
 		{
 			description: "respect only new values - disabled",
@@ -67,9 +73,10 @@ func TestMattermost_IngressAccessors(t *testing.T) {
 					Enabled: false,
 				},
 			},
-			enabled:   false,
-			host:      "",
-			tlsSecret: "",
+			enabled:      false,
+			host:         "",
+			tlsSecret:    "",
+			ingressClass: nil,
 		},
 		{
 			description: "prefer new values over old",
@@ -84,19 +91,23 @@ func TestMattermost_IngressAccessors(t *testing.T) {
 					TLSSecret:   "",
 				},
 			},
-			enabled:     true,
-			host:        "test-mm.com",
-			annotations: map[string]string{"test2": "val2"},
-			tlsSecret:   "",
+			enabled:      true,
+			host:         "test-mm.com",
+			annotations:  map[string]string{"test2": "val2"},
+			tlsSecret:    "",
+			ingressClass: nil,
 		},
 	} {
 		t.Run(testCase.description, func(t *testing.T) {
 			mm := &Mattermost{Spec: testCase.mmSpec}
+			err := mm.SetDefaults()
+			require.NoError(t, err)
 
 			assert.Equal(t, testCase.enabled, mm.IngressEnabled())
 			assert.Equal(t, testCase.host, mm.GetIngressHost())
 			assert.Equal(t, testCase.annotations, mm.GetIngresAnnotations())
 			assert.Equal(t, testCase.tlsSecret, mm.GetIngressTLSSecret())
+			assert.Equal(t, testCase.ingressClass, mm.GetIngressClass())
 		})
 	}
 }
