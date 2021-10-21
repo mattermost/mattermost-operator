@@ -322,6 +322,9 @@ type MattermostStatus struct {
 	// The last observed Generation of the Mattermost resource that was acted on.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+	// The last observed error in the deployment of this Mattermost instance
+	// +optional
+	Error string `json:"error,omitempty"`
 }
 
 // +genclient

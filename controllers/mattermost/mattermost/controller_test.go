@@ -269,6 +269,7 @@ func TestReconcile(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, res, reconcile.Result{})
 		})
+
 		t.Run("correct status", func(t *testing.T) {
 			err = c.Get(context.TODO(), mmKey, mm)
 			require.NoError(t, err)
@@ -278,6 +279,30 @@ func TestReconcile(t *testing.T) {
 			assert.Equal(t, mm.Status.Image, mm.Spec.Image)
 			assert.Equal(t, mm.Status.Endpoint, mm.GetIngressHost())
 		})
+	})
+
+	t.Run("check error set in status", func(t *testing.T) {
+		mm := &mmv1beta.Mattermost{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mm-invalid",
+				Namespace: "default",
+			},
+			Spec: mmv1beta.MattermostSpec{
+				IngressName: "",
+			},
+		}
+		mmKey := types.NamespacedName{Name: mm.Name, Namespace: mm.Namespace}
+
+		err = c.Create(context.TODO(), mm)
+		require.NoError(t, err)
+
+		req := reconcile.Request{NamespacedName: mmKey}
+		_, err = r.Reconcile(context.Background(), req)
+		require.Error(t, err)
+
+		err = c.Get(context.Background(), mmKey, mm)
+		require.NoError(t, err)
+		assert.NotEmpty(t, mm.Status.Error)
 	})
 }
 
