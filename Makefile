@@ -117,14 +117,10 @@ gofmt: ## Validates gofmt against all packages.
 	done
 	@echo "gofmt success"; \
 
-yaml: $(YQ_GEN) kustomize manifests ## Generate the YAML file for easy operator installation
+yaml: kustomize manifests ## Generate the YAML file for easy operator installation
 	cd config/manager && $(KUSTOMIZE) edit set image mattermost-operator="mattermost/mattermost-operator:latest"
 
 	$(KUSTOMIZE) build config/default > $(INSTALL_YAML)
-
-	## Remove "metadata.namespace" keys to allow configuration
-	$(YQ_GEN) d -d'*' --inplace $(INSTALL_YAML) metadata.namespace
-	echo --- >> $(INSTALL_YAML)
 
 operator-sdk: ## Download sdk only if it's not available. Used when creating bundle.
 	build/get-operator-sdk.sh $(SDK_VERSION)
