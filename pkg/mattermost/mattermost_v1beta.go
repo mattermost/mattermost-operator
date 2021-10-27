@@ -274,6 +274,11 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 									ContainerPort: 8067,
 									Name:          "metrics",
 								},
+								{
+									ContainerPort: 8443,
+									Name:          "calls",
+									Protocol:      corev1.ProtocolUDP,
+								},
 							},
 							ReadinessProbe: readiness,
 							LivenessProbe:  liveness,
