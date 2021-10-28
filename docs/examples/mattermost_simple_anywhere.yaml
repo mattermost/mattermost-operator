@@ -3,4 +3,6 @@ kind: Mattermost
 metadata:
   name: mm-example-anywhere
 spec:
-  ingressName: mattermost.example.com
+  ingress:
+    enabled: true
+    host: mattermost.example.com

@@ -3,5 +3,6 @@ kind: Mattermost
 metadata:
   name: mm-example-aws-azure
 spec:
-  ingressName: example.dev.cloud.mattermost.com
+  ingress:
+    enabled: false
   useServiceLoadBalancer: true
