@@ -1,7 +1,6 @@
 package mattermost
 
 import (
-	"fmt"
 	"strconv"
 
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
@@ -157,7 +156,7 @@ func GenerateIngressV1Beta(mattermost *mmv1beta.Mattermost) *networkingv1.Ingres
 }
 
 // GenerateDeploymentV1Beta returns the deployment for Mattermost app.
-func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig, fileStore *FileStoreInfo, deploymentName, ingressName, serviceAccountName, containerImage string) *appsv1.Deployment {
+func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig, fileStore *FileStoreInfo, deploymentName, ingressHost, serviceAccountName, containerImage string) *appsv1.Deployment {
 	// DB
 	envVarDB := db.EnvVars(mattermost)
 	initContainers := db.InitContainers(mattermost)
@@ -187,8 +186,7 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 	}
 
 	// General settings
-	siteURL := fmt.Sprintf("https://%s", ingressName)
-	envVarGeneral := generalMattermostEnvVars(siteURL)
+	envVarGeneral := generalMattermostEnvVars(siteURLFromHost(ingressHost))
 
 	// Determine max file size
 	bodySize := strconv.Itoa(defaultMaxFileSize * sizeMB)

@@ -307,8 +307,7 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbIn
 		)
 	}
 
-	siteURL := fmt.Sprintf("https://%s", ingressName)
-	envVarGeneral := generalMattermostEnvVars(siteURL)
+	envVarGeneral := generalMattermostEnvVars(siteURLFromHost(ingressName))
 
 	valueSize := strconv.Itoa(defaultMaxFileSize * sizeMB)
 	if !mattermost.Spec.UseServiceLoadBalancer {

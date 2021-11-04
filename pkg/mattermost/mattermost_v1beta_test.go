@@ -475,7 +475,6 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 
 			// Basic env var check to ensure the key exists.
 			assertEnvVarExists(t, "MM_CONFIG", mattermostAppContainer.Env)
-			assertEnvVarExists(t, "MM_SERVICESETTINGS_SITEURL", mattermostAppContainer.Env)
 			assertEnvVarExists(t, "MM_METRICSSETTINGS_LISTENADDRESS", mattermostAppContainer.Env)
 			assertEnvVarExists(t, "MM_METRICSSETTINGS_ENABLE", mattermostAppContainer.Env)
 			assertEnvVarExists(t, "MM_PLUGINSETTINGS_ENABLEUPLOADS", mattermostAppContainer.Env)
@@ -483,6 +482,9 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 			assertEnvVarExists(t, "MM_CLUSTERSETTINGS_CLUSTERNAME", mattermostAppContainer.Env)
 			assertEnvVarExists(t, "MM_FILESETTINGS_MAXFILESIZE", mattermostAppContainer.Env)
 			assertEnvVarExists(t, "MM_INSTALL_TYPE", mattermostAppContainer.Env)
+
+			// Passed ingress name is empty -- SiteURL should not be set.
+			assertEnvVarNotExist(t, "MM_SERVICESETTINGS_SITEURL", mattermostAppContainer.Env)
 
 			for _, env := range tt.requiredEnv {
 				assertEnvVarExists(t, env, mattermostAppContainer.Env)
@@ -619,6 +621,19 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 				assert.Equal(t, testCase.expectedInitContainers, deployment.Spec.Template.Spec.InitContainers)
 			})
 		}
+	})
+
+	t.Run("should set SiteURL env if ingress host provided", func(t *testing.T) {
+		mattermost := &mmv1beta.Mattermost{
+			Spec: mmv1beta.MattermostSpec{},
+		}
+		dbCfg := &ExternalDBConfig{dbType: database.PostgreSQLDatabase, hasDBCheckURL: true}
+		fileStoreCfg := &FileStoreInfo{config: &ExternalFileStore{}}
+
+		deployment := GenerateDeploymentV1Beta(mattermost, dbCfg, fileStoreCfg, "", "my-mattermost.com", "", "")
+		mattermostAppContainer := mmv1beta.GetMattermostAppContainer(deployment.Spec.Template.Spec.Containers)
+
+		assertEnvVarEqual(t, "MM_SERVICESETTINGS_SITEURL", "https://my-mattermost.com", mattermostAppContainer.Env)
 	})
 }
 
