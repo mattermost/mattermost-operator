@@ -13,8 +13,11 @@ spec:
   size: 5000users                                 # Size of the Mattermost installation, typically based on the number of users. This a is write-only field - its value is erased after setting appropriate values of resources. Automatically sets the replica and resource limits for Minio, databases and app servers based on the number provided here. Accepts 100users, 1000users, 5000users, 10000users, or 25000users. Manually setting replicas or resources will override the values set by 'size'.
   useServiceLoadBalancer: true                    # Set to true to use AWS or Azure load balancers instead of an NGINX controller.
   serviceAnnotations: {}                          # Service annotations to use with AWS or Azure load balancers.
-  ingressAnnotations: {}                          # Custom annotations propagated to Ingress resource.
-  ingressName: example.mattermost-example.com     # Hostname used for Ingress, e.g. example.mattermost-example.com. Required when using an Ingress controller. Ignored if useServiceLoadBalancer is true.
+  ingress:
+    enabled: true                                 # If disabled Ingress will not be created by Mattermost Operator.
+    host: example.mattermost-example.com          # Hostname used for Ingress, e.g. example.mattermost-example.com. Required when Ingress is enabled.
+    annotations: {}                               # Custom annotations propagated to Ingress resource.
+    tlsSecret: "my-tls"                           # Name of a Secret that contains TLS certificates for the ingress. If empty TLS will not be configured.
   mattermostEnv:                                  # Custom environment variables that Mattermost installation should use.
     - name: MM_FILESETTINGS_AMAZONS3SSE
       value: "true"

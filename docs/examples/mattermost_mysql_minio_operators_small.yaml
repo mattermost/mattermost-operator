@@ -6,7 +6,9 @@ kind: Mattermost
 metadata:
   name: mm-example-operators
 spec:
-  ingressName: example.mattermost-example.com
+  ingress:
+    enabled: true
+    host: example.mattermost-example.com
   database:
     operatorManaged:                            # Operator managed database allows configuration of replicas, storage size and resource requirements. If the `size` is specified, it will override those values.
       replicas: 2
