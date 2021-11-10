@@ -292,7 +292,6 @@ func TestGenerateDeployment(t *testing.T) {
 
 			// Basic env var check to ensure the key exists.
 			assertEnvVarExists(t, "MM_CONFIG", mattermostAppContainer.Env)
-			assertEnvVarExists(t, "MM_SERVICESETTINGS_SITEURL", mattermostAppContainer.Env)
 			assertEnvVarExists(t, "MM_METRICSSETTINGS_LISTENADDRESS", mattermostAppContainer.Env)
 			assertEnvVarExists(t, "MM_METRICSSETTINGS_ENABLE", mattermostAppContainer.Env)
 			assertEnvVarExists(t, "MM_PLUGINSETTINGS_ENABLEUPLOADS", mattermostAppContainer.Env)
@@ -300,6 +299,9 @@ func TestGenerateDeployment(t *testing.T) {
 			assertEnvVarExists(t, "MM_CLUSTERSETTINGS_CLUSTERNAME", mattermostAppContainer.Env)
 			assertEnvVarExists(t, "MM_FILESETTINGS_MAXFILESIZE", mattermostAppContainer.Env)
 			assertEnvVarExists(t, "MM_INSTALL_TYPE", mattermostAppContainer.Env)
+
+			// Passed ingress name is empty -- SiteURL should not be set.
+			assertEnvVarNotExist(t, "MM_SERVICESETTINGS_SITEURL", mattermostAppContainer.Env)
 
 			if databaseInfo.HasReaderEndpoints() {
 				assertEnvVarExists(t, "MM_SQLSETTINGS_DATASOURCEREPLICAS", mattermostAppContainer.Env)
@@ -329,6 +331,18 @@ func TestGenerateDeployment(t *testing.T) {
 			assert.Equal(t, 1, len(deployment.Spec.Template.Spec.Containers))
 		})
 	}
+
+	t.Run("should set SiteURL env if ingress name provided", func(t *testing.T) {
+		mattermost := &mattermostv1alpha1.ClusterInstallation{
+			Spec: mattermostv1alpha1.ClusterInstallationSpec{},
+		}
+		dbInfo := &database.Info{}
+
+		deployment := GenerateDeployment(mattermost, dbInfo, "", "my-mattermost.com", "", "", "")
+		mattermostAppContainer := mattermost.GetMattermostAppContainerFromDeployment(deployment)
+
+		assertEnvVarEqual(t, "MM_SERVICESETTINGS_SITEURL", "https://my-mattermost.com", mattermostAppContainer.Env)
+	})
 }
 
 func TestGenerateRBACResources(t *testing.T) {
@@ -369,4 +383,13 @@ func assertEnvVarExists(t *testing.T, name string, env []corev1.EnvVar) {
 	}
 
 	assert.Fail(t, fmt.Sprintf("failed to find env var %s", name))
+}
+
+func assertEnvVarNotExist(t *testing.T, name string, env []corev1.EnvVar) {
+	for _, e := range env {
+		if e.Name == name {
+			assert.Fail(t, fmt.Sprintf("found env var that should not exist: %s", name))
+		}
+	}
+	return
 }

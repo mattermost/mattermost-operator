@@ -1,6 +1,7 @@
 package mattermost
 
 import (
+	"fmt"
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
@@ -131,4 +132,11 @@ func setProbes(customLiveness, customReadiness corev1.Probe) (*corev1.Probe, *co
 	}
 
 	return liveness, readiness
+}
+
+func siteURLFromHost(ingressHost string) string {
+	if ingressHost != "" {
+		return fmt.Sprintf("https://%s", ingressHost)
+	}
+	return ""
 }

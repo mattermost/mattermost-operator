@@ -7,11 +7,7 @@ import (
 )
 
 func generalMattermostEnvVars(siteURL string) []corev1.EnvVar {
-	return []corev1.EnvVar{
-		{
-			Name:  "MM_SERVICESETTINGS_SITEURL",
-			Value: siteURL,
-		},
+	envs := []corev1.EnvVar{
 		{
 			Name:  "MM_PLUGINSETTINGS_ENABLEUPLOADS",
 			Value: "true",
@@ -37,6 +33,15 @@ func generalMattermostEnvVars(siteURL string) []corev1.EnvVar {
 			Value: "kubernetes-operator",
 		},
 	}
+
+	if siteURL != "" {
+		envs = append(envs, corev1.EnvVar{
+			Name:  "MM_SERVICESETTINGS_SITEURL",
+			Value: siteURL,
+		})
+	}
+
+	return envs
 }
 
 func fileStoreEnvVars(fileStore *FileStoreInfo) []corev1.EnvVar {
