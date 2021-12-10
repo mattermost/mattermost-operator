@@ -285,6 +285,8 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 					},
 					ImagePullSecrets: mattermost.Spec.ImagePullSecrets,
 					Volumes:          volumes,
+					DNSConfig:        mattermost.Spec.DNSConfig,
+					DNSPolicy:        mattermost.Spec.DNSPolicy,
 					Affinity:         mattermost.Spec.Scheduling.Affinity,
 					NodeSelector:     mattermost.Spec.Scheduling.NodeSelector,
 					Tolerations:      mattermost.Spec.Scheduling.Tolerations,
