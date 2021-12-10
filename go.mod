@@ -4,6 +4,7 @@ go 1.14
 
 require (
 	github.com/banzaicloud/k8s-objectmatcher v1.5.2
+	github.com/evanphx/json-patch v4.9.0+incompatible
 	github.com/go-logr/logr v0.4.0
 	github.com/go-openapi/jsonreference v0.19.4 // indirect
 	github.com/go-openapi/spec v0.19.3

@@ -3,7 +3,6 @@ package mattermost
 import (
 	"context"
 	"fmt"
-
 	"github.com/mattermost/mattermost-operator/pkg/resources"
 
 	"github.com/go-logr/logr"
@@ -25,6 +24,7 @@ func (r *MattermostReconciler) checkMattermost(
 	mattermost *mmv1beta.Mattermost,
 	dbInfo mattermostApp.DatabaseConfig,
 	fileStoreInfo *mattermostApp.FileStoreInfo,
+	status *mmv1beta.MattermostStatus,
 	reqLogger logr.Logger) error {
 	reqLogger = reqLogger.WithValues("Reconcile", "mattermost")
 
@@ -33,7 +33,7 @@ func (r *MattermostReconciler) checkMattermost(
 		return errors.Wrap(err, "failed to check mattermost license secret.")
 	}
 
-	err = r.checkMattermostService(mattermost, reqLogger)
+	err = r.checkMattermostService(mattermost, status, reqLogger)
 	if err != nil {
 		return err
 	}
@@ -50,7 +50,7 @@ func (r *MattermostReconciler) checkMattermost(
 		}
 	}
 
-	err = r.checkMattermostDeployment(mattermost, dbInfo, fileStoreInfo, reqLogger)
+	err = r.checkMattermostDeployment(mattermost, dbInfo, fileStoreInfo, status, reqLogger)
 	if err != nil {
 		return err
 	}
@@ -65,10 +65,25 @@ func (r *MattermostReconciler) checkLicence(mattermost *mmv1beta.Mattermost) err
 	return r.assertSecretContains(mattermost.Spec.LicenseSecret, "license", mattermost.Namespace)
 }
 
-func (r *MattermostReconciler) checkMattermostService(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) error {
+func (r *MattermostReconciler) checkMattermostService(
+	mattermost *mmv1beta.Mattermost,
+	status *mmv1beta.MattermostStatus,
+	reqLogger logr.Logger) error {
 	desired := mattermostApp.GenerateServiceV1Beta(mattermost)
 
-	err := r.Resources.CreateServiceIfNotExists(mattermost, desired, reqLogger)
+	patchedObj, applied, err := mattermost.Spec.ResourcePatch.ApplyToService(desired)
+	if err != nil {
+		reqLogger.Error(err, "Failed to patch service")
+		status.SetServicePatchStatus(false, errors.Wrap(err, "failed to apply patch to Service"))
+	} else if applied {
+		reqLogger.Info("Applied patch to service")
+		desired = patchedObj
+		status.SetServicePatchStatus(true, nil)
+	} else {
+		status.ClearServicePatchStatus()
+	}
+
+	err = r.Resources.CreateServiceIfNotExists(mattermost, desired, reqLogger)
 	if err != nil {
 		return err
 	}
@@ -178,7 +193,8 @@ func (r *MattermostReconciler) checkMattermostDeployment(
 	mattermost *mmv1beta.Mattermost,
 	dbConfig mattermostApp.DatabaseConfig,
 	fileStoreInfo *mattermostApp.FileStoreInfo,
-	reqLogger logr.Logger) error {
+	status *mmv1beta.MattermostStatus,
+reqLogger logr.Logger) error {
 
 	desired := mattermostApp.GenerateDeploymentV1Beta(
 		mattermost,
@@ -190,6 +206,19 @@ func (r *MattermostReconciler) checkMattermostDeployment(
 		mattermost.GetImageName(),
 	)
 
+	patchedObj, applied, err := mattermost.Spec.ResourcePatch.ApplyToDeployment(desired)
+	if err != nil {
+		reqLogger.Error(err, "Failed to patch deployment")
+		status.SetDeploymentPatchStatus(false, errors.Wrap(err, "failed to apply patch to Deployment"))
+		fmt.Println(mattermost.Status.ResourcePatch)
+	} else if applied {
+		reqLogger.Info("Applied patch to deployment")
+		desired = patchedObj
+		status.SetDeploymentPatchStatus(true, nil)
+	} else {
+		status.ClearDeploymentPatchStatus()
+	}
+
 	// TODO: DB setup job is temporarily disabled as `mattermost version` command
 	// does not account for the custom configuration
 	//err = r.checkMattermostDBSetupJob(mattermost, desired, reqLogger)
@@ -197,7 +226,7 @@ func (r *MattermostReconciler) checkMattermostDeployment(
 	//	return errors.Wrap(err, "failed to check mattermost DB setup job")
 	//}
 
-	err := r.Resources.CreateDeploymentIfNotExists(mattermost, desired, reqLogger)
+	err = r.Resources.CreateDeploymentIfNotExists(mattermost, desired, reqLogger)
 	if err != nil {
 		return errors.Wrap(err, "failed to create mattermost deployment")
 	}

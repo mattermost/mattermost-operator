@@ -1,0 +1,7 @@
+[
+    {
+        "op":"add",
+        "path":"/spec/template/spec/containers/0/ports/-",
+        "value":{"containerPort":8443, "name":"calls", "protocol":"UDP"}
+    }
+]

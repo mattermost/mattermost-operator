@@ -111,6 +111,25 @@ type MattermostSpec struct {
 	// These settings generally don't need to be changed.
 	// +optional
 	PodExtensions PodExtensions `json:"podExtensions,omitempty"`
+
+	// ResourcePatch specifies JSON patches that can be applied to resources created by Mattermost Operator.
+	//
+	// WARNING: ResourcePatch is highly experimental and subject to change.
+	// Some patches may be impossible to perform or may impact the stability of Mattermost server.
+	//
+	// Use at your own risk when no other options are available.
+	ResourcePatch *ResourcePatch `json:"resourcePatch,omitempty"`
+}
+
+// ResourcePatch allows defined custom  patches to resources.
+type ResourcePatch struct {
+	Service    *Patch `json:"service,omitempty"`
+	Deployment *Patch `json:"deployment,omitempty"`
+}
+
+type Patch struct {
+	Disable bool `json:"disable,omitempty"`
+	Patch string `json:"patch,omitempty"`
 }
 
 // Ingress defines configuration for Ingress resource created by the Operator.
@@ -325,6 +344,20 @@ type MattermostStatus struct {
 	// The last observed error in the deployment of this Mattermost instance
 	// +optional
 	Error string `json:"error,omitempty"`
+	// Status of specified resource patches.
+	ResourcePatch *ResourcePatchStatus `json:"resourcePatch,omitempty"`
+}
+
+// ResourcePatchStatus defines status of ResourcePatch
+type ResourcePatchStatus struct {
+	ServicePatch    *PatchStatus `json:"servicePatch,omitempty"`
+	DeploymentPatch *PatchStatus `json:"deploymentPatch,omitempty"`
+}
+
+// PatchStatus represents status of particular patch.
+type PatchStatus struct {
+	Applied bool   `json:"applied,omitempty"`
+	Error   string `json:"error,omitempty"`
 }
 
 // +genclient

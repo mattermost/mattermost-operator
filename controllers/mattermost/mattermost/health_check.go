@@ -16,12 +16,15 @@ import (
 // NOTE: this is a vital health check. Every reconciliation loop should run this
 // check at the very end to ensure that everything in the installation is as it
 // should be. Over time, more types of checks should be added here as needed.
-func (r *MattermostReconciler) checkMattermostHealth(mattermost *mmv1beta.Mattermost, logger logr.Logger) (mmv1beta.MattermostStatus, error) {
+func (r *MattermostReconciler) checkMattermostHealth(mattermost *mmv1beta.Mattermost, currentStatus mmv1beta.MattermostStatus, logger logr.Logger) (mmv1beta.MattermostStatus, error) {
 	status := mmv1beta.MattermostStatus{
 		State:              mmv1beta.Reconciling,
 		ObservedGeneration: mattermost.Generation,
 		Replicas:           0,
 		UpdatedReplicas:    0,
+		// Rewrite Resource Patch status to not lose it.
+		// It is cleared when appropriate by resource patch logic.
+		ResourcePatch: currentStatus.ResourcePatch,
 	}
 
 	labels := mattermost.MattermostLabels(mattermost.Name)
