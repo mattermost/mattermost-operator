@@ -194,7 +194,7 @@ func (r *MattermostReconciler) checkMattermostDeployment(
 	dbConfig mattermostApp.DatabaseConfig,
 	fileStoreInfo *mattermostApp.FileStoreInfo,
 	status *mmv1beta.MattermostStatus,
-reqLogger logr.Logger) error {
+	reqLogger logr.Logger) error {
 
 	desired := mattermostApp.GenerateDeploymentV1Beta(
 		mattermost,

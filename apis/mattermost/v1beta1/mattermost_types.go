@@ -128,8 +128,8 @@ type ResourcePatch struct {
 }
 
 type Patch struct {
-	Disable bool `json:"disable,omitempty"`
-	Patch string `json:"patch,omitempty"`
+	Disable bool   `json:"disable,omitempty"`
+	Patch   string `json:"patch,omitempty"`
 }
 
 // Ingress defines configuration for Ingress resource created by the Operator.

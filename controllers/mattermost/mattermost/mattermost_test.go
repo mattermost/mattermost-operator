@@ -74,7 +74,7 @@ func TestCheckMattermost(t *testing.T) {
 
 		err = reconciler.Client.Update(context.TODO(), modified)
 		require.NoError(t, err)
-		err = reconciler.checkMattermostService(mm,currentMMStatus, logger)
+		err = reconciler.checkMattermostService(mm, currentMMStatus, logger)
 		require.NoError(t, err)
 		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
 		require.NoError(t, err)
@@ -257,7 +257,7 @@ func TestCheckMattermost(t *testing.T) {
 		err = reconciler.Client.Create(context.TODO(), job)
 		require.NoError(t, err)
 
-		err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo,currentMMStatus, logger)
+		err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
 		assert.NoError(t, err)
 
 		//dbSetupJob := &batchv1.Job{}
@@ -283,7 +283,7 @@ func TestCheckMattermost(t *testing.T) {
 
 		err = reconciler.Client.Update(context.TODO(), modified)
 		require.NoError(t, err)
-		err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo,currentMMStatus, logger)
+		err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
 		require.NoError(t, err)
 		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
 		require.NoError(t, err)
@@ -294,7 +294,7 @@ func TestCheckMattermost(t *testing.T) {
 
 	t.Run("restart update job", func(t *testing.T) {
 		// create deployment
-		err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo,currentMMStatus, logger)
+		err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
 		assert.NoError(t, err)
 
 		// create update job with invalid image
@@ -324,7 +324,7 @@ func TestCheckMattermost(t *testing.T) {
 		newImage := "mattermost/new-image"
 		mm.Spec.Image = newImage
 
-		err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo,currentMMStatus, logger)
+		err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "Restarted update image job")
 
@@ -345,7 +345,7 @@ func TestCheckMattermost(t *testing.T) {
 		require.NoError(t, err)
 
 		// should succeed now
-		err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo,currentMMStatus, logger)
+		err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
 		assert.NoError(t, err)
 	})
 }
@@ -414,7 +414,7 @@ func TestCheckMattermostExternalDBAndFileStore(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("service", func(t *testing.T) {
-		err = reconciler.checkMattermostService(mm, currentMMStatus,logger)
+		err = reconciler.checkMattermostService(mm, currentMMStatus, logger)
 		assert.NoError(t, err)
 
 		found := &corev1.Service{}
@@ -430,7 +430,7 @@ func TestCheckMattermostExternalDBAndFileStore(t *testing.T) {
 
 		err = reconciler.Client.Update(context.TODO(), modified)
 		require.NoError(t, err)
-		err = reconciler.checkMattermostService(mm,currentMMStatus, logger)
+		err = reconciler.checkMattermostService(mm, currentMMStatus, logger)
 		require.NoError(t, err)
 		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
 		require.NoError(t, err)
@@ -490,7 +490,7 @@ func TestCheckMattermostExternalDBAndFileStore(t *testing.T) {
 		err := reconciler.Client.Create(context.TODO(), job)
 		require.NoError(t, err)
 
-		err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo,currentMMStatus, logger)
+		err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
 		assert.NoError(t, err)
 
 		// TODO: uncomment when enabling back the db setup job
@@ -516,7 +516,7 @@ func TestCheckMattermostExternalDBAndFileStore(t *testing.T) {
 
 		err = reconciler.Client.Update(context.TODO(), modified)
 		require.NoError(t, err)
-		err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo,currentMMStatus, logger)
+		err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
 		require.NoError(t, err)
 		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
 		require.NoError(t, err)
@@ -553,7 +553,7 @@ func TestSpecialCases(t *testing.T) {
 
 	t.Run("service - copy ClusterIP for LoadBalancer service", func(t *testing.T) {
 		// Create the service
-		err := reconciler.checkMattermostService(mm, currentMMStatus,logger)
+		err := reconciler.checkMattermostService(mm, currentMMStatus, logger)
 		require.NoError(t, err)
 
 		service := &corev1.Service{}
@@ -566,7 +566,7 @@ func TestSpecialCases(t *testing.T) {
 		require.NoError(t, err)
 
 		mm.Spec.ResourceLabels = map[string]string{"myLabel": "test"}
-		err = reconciler.checkMattermostService(mm,currentMMStatus, logger)
+		err = reconciler.checkMattermostService(mm, currentMMStatus, logger)
 		require.NoError(t, err)
 
 		modified := &corev1.Service{}
