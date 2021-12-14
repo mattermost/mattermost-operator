@@ -54,14 +54,16 @@ func GenerateServiceV1Beta(mattermost *mmv1beta.Mattermost) *corev1.Service {
 func configureMattermostLoadBalancerService(service *corev1.Service) *corev1.Service {
 	service.Spec.Ports = []corev1.ServicePort{
 		{
-			Name:       "http",
-			Port:       80,
-			TargetPort: intstr.FromString("app"),
+			Name:        "http",
+			Port:        80,
+			AppProtocol: pkgUtils.NewString("http"),
+			TargetPort:  intstr.FromString("app"),
 		},
 		{
-			Name:       "https",
-			Port:       443,
-			TargetPort: intstr.FromString("app"),
+			Name:        "https",
+			Port:        443,
+			AppProtocol: pkgUtils.NewString("https"),
+			TargetPort:  intstr.FromString("app"),
 		},
 	}
 	service.Spec.Type = corev1.ServiceTypeLoadBalancer
@@ -72,14 +74,16 @@ func configureMattermostLoadBalancerService(service *corev1.Service) *corev1.Ser
 func configureMattermostService(service *corev1.Service) *corev1.Service {
 	service.Spec.Ports = []corev1.ServicePort{
 		{
-			Port:       8065,
-			Name:       "http-app",
-			TargetPort: intstr.FromString("app"),
+			Port:        8065,
+			Name:        "app",
+			AppProtocol: pkgUtils.NewString("http"),
+			TargetPort:  intstr.FromString("app"),
 		},
 		{
-			Port:       8067,
-			Name:       "http-metrics",
-			TargetPort: intstr.FromString("metrics"),
+			Port:        8067,
+			Name:        "metrics",
+			AppProtocol: pkgUtils.NewString("http"),
+			TargetPort:  intstr.FromString("metrics"),
 		},
 	}
 	service.Spec.ClusterIP = corev1.ClusterIPNone
