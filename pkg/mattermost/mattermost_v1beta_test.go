@@ -45,7 +45,7 @@ func TestGenerateService_V1Beta(t *testing.T) {
 				if *port.AppProtocol == *appProtocol {
 					return
 				}
-				assert.Fail(t, fmt.Sprintf("failed to find correct appProtocol %s on service, service had %s", *appProtocol, *port.AppProtocol))
+				assert.Fail(t, fmt.Sprintf("failed to find appProtocol %s on port %d", *appProtocol, portNumber))
 			}
 		}
 		assert.Fail(t, fmt.Sprintf("failed to find port %d on service", portNumber))
