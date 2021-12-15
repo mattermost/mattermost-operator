@@ -38,11 +38,14 @@ func TestGenerateService_V1Beta(t *testing.T) {
 		},
 	}
 
-	expectPort := func(t *testing.T, service *corev1.Service, portNumber int32) {
+	expectPort := func(t *testing.T, service *corev1.Service, portNumber int32, appProtocol *string) {
 		t.Helper()
 		for _, port := range service.Spec.Ports {
 			if port.Port == portNumber {
-				return
+				if *port.AppProtocol == *appProtocol {
+					return
+				}
+				assert.Fail(t, fmt.Sprintf("failed to find correct appProtocol %s on service, service had %s", *appProtocol, *port.AppProtocol))
 			}
 		}
 		assert.Fail(t, fmt.Sprintf("failed to find port %d on service", portNumber))
@@ -59,11 +62,11 @@ func TestGenerateService_V1Beta(t *testing.T) {
 
 			if mattermost.Spec.UseServiceLoadBalancer {
 				assert.Equal(t, service.Spec.Type, corev1.ServiceTypeLoadBalancer)
-				expectPort(t, service, 80)
-				expectPort(t, service, 443)
+				expectPort(t, service, 80, utils.NewString("http"))
+				expectPort(t, service, 443, utils.NewString("https"))
 			} else {
-				expectPort(t, service, 8065)
-				expectPort(t, service, 8067)
+				expectPort(t, service, 8065, utils.NewString("http"))
+				expectPort(t, service, 8067, utils.NewString("http"))
 			}
 		})
 	}
