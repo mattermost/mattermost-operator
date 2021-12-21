@@ -54,6 +54,11 @@ func TestReconcile(t *testing.T) {
 			Image:       "mattermost/mattermost-enterprise-edition",
 			Version:     operatortest.LatestStableMattermostVersion,
 			IngressName: "foo.mattermost.dev",
+			ResourcePatch: &mmv1beta.ResourcePatch{
+				Deployment: &mmv1beta.Patch{
+					Patch: exposePortPatch,
+				},
+			},
 		},
 	}
 
@@ -136,6 +141,14 @@ func TestReconcile(t *testing.T) {
 			err = c.Get(context.TODO(), mmKey, deployment)
 			require.NoError(t, err)
 			require.Equal(t, deployment.Spec.Replicas, mm.Spec.Replicas)
+
+			// Check resource patch logic
+			assert.Equal(t, 3, len(deployment.Spec.Template.Spec.Containers[0].Ports))
+
+			err = c.Get(context.TODO(), mmKey, mm)
+			require.NoError(t, err)
+			assert.True(t, mm.Status.ResourcePatch.DeploymentPatch.Applied)
+			assert.Empty(t, mm.Status.ResourcePatch.DeploymentPatch.Error)
 		})
 	})
 
@@ -278,6 +291,10 @@ func TestReconcile(t *testing.T) {
 			assert.Equal(t, mm.Status.Version, mm.Spec.Version)
 			assert.Equal(t, mm.Status.Image, mm.Spec.Image)
 			assert.Equal(t, mm.Status.Endpoint, mm.GetIngressHost())
+
+			// Patch status preserved
+			assert.True(t, mm.Status.ResourcePatch.DeploymentPatch.Applied)
+			assert.Empty(t, mm.Status.ResourcePatch.DeploymentPatch.Error)
 		})
 	})
 

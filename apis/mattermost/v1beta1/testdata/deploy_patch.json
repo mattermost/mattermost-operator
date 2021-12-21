@@ -1,0 +1,11 @@
+[
+    {"op":"add","path":"/metadata/labels/addedKey","value":"newVal"},
+    {"op":"remove","path":"/metadata/labels/oldKey"},
+    {"op":"replace","path":"/spec/template/spec/serviceAccountName","value":"newSA"},
+    {"op":"replace","path":"/spec/template/metadata/labels/podKey1","value":"podModifiedVal"},
+    {
+        "op":"replace",
+        "path":"/spec/template/spec/containers/0",
+        "value":{"name":"modified-container-1","image":"modified-image-1","args":[]}
+    }
+]
