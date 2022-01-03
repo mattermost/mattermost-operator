@@ -1,11 +1,12 @@
 # Mattermost Operator for Kubernetes ![CircleCI branch](https://img.shields.io/circleci/project/github/mattermost/mattermost-operator/master.svg) [![Community Server](https://img.shields.io/badge/Mattermost_Community-cloud_channel-blue.svg)](https://community.mattermost.com/core/channels/cloud)
 
+[![Mattermost](https://user-images.githubusercontent.com/7205829/137170381-fe86eef0-bccc-4fdd-8e92-b258884ebdd7.png)](https://mattermost.com)
+
+
 ## Summary
-Mattermost is a scalable, open source collaboration tool. It's written in Golang and React.
+[Mattermost](https://mattermost.com) is an open source platform for secure collaboration across the entire software development lifecycle. It's written in Golang and React and runs as a single Linux binary with MySQL or PostgreSQL.
 
-This project offers a Kubernetes Operator for Mattermost to simplify deploying and managing your Mattermost instance.
-
-Learn more about Mattermost at https://mattermost.com.
+This repo contains a Kubernetes Operator for Mattermost to simplify deploying and managing your Mattermost instance.
 
 The Mattermost server source code is available at https://github.com/mattermost/mattermost-server.
 
