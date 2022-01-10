@@ -89,6 +89,13 @@ type MattermostSpec struct {
 	// +optional
 	ImagePullSecrets []v1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 
+	// Custom DNS configuration to use for the Mattermost Installation pods.
+	// +optional
+	DNSConfig *v1.PodDNSConfig `json:"dnsConfig,omitempty"`
+	// Custom DNS policy to use for the Mattermost Installation pods.
+	// +optional
+	DNSPolicy v1.DNSPolicy `json:"dnsPolicy,omitempty"`
+
 	// External Services
 	Database      Database      `json:"database,omitempty"`
 	FileStore     FileStore     `json:"fileStore,omitempty"`
