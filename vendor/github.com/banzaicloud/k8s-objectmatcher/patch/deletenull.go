@@ -41,6 +41,22 @@ func IgnoreStatusFields() CalculateOption {
 	}
 }
 
+func IgnoreField(field string) CalculateOption {
+	return func(current, modified []byte) ([]byte, []byte, error) {
+		current, err := deleteDataField(current, field)
+		if err != nil {
+			return []byte{}, []byte{}, errors.Wrap(err, "could not delete the field from current byte sequence")
+		}
+
+		modified, err = deleteDataField(modified, field)
+		if err != nil {
+			return []byte{}, []byte{}, errors.Wrap(err, "could not delete the field from modified byte sequence")
+		}
+
+		return current, modified, nil
+	}
+}
+
 func IgnoreVolumeClaimTemplateTypeMetaAndStatus() CalculateOption {
 	return func(current, modified []byte) ([]byte, []byte, error) {
 		current, err := deleteVolumeClaimTemplateFields(current)
@@ -173,6 +189,21 @@ func deleteNullInSlice(m []interface{}) ([]interface{}, error) {
 	return filteredSlice, nil
 }
 
+func deleteDataField(obj []byte, fieldName string) ([]byte, error) {
+	var objectMap map[string]interface{}
+	err := json.Unmarshal(obj, &objectMap)
+	if err != nil {
+		return []byte{}, errors.Wrap(err, "could not unmarshal byte sequence")
+	}
+	delete(objectMap, fieldName)
+	obj, err = json.ConfigCompatibleWithStandardLibrary.Marshal(objectMap)
+	if err != nil {
+		return []byte{}, errors.Wrap(err, "could not marshal byte sequence")
+	}
+
+	return obj, nil
+}
+
 func deleteStatusField(obj []byte) ([]byte, error) {
 	var objectMap map[string]interface{}
 	err := json.Unmarshal(obj, &objectMap)
@@ -226,7 +257,7 @@ func isZero(v reflect.Value) bool {
 	default:
 		z := reflect.Zero(v.Type())
 		return v.Interface() == z.Interface()
-	case reflect.Float64, reflect.Int64:
+	case reflect.Float64, reflect.Int64, reflect.Bool:
 		return false
 	case reflect.Func, reflect.Map, reflect.Slice:
 		return v.IsNil()

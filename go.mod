@@ -3,11 +3,9 @@ module github.com/mattermost/mattermost-operator
 go 1.14
 
 require (
-	github.com/banzaicloud/k8s-objectmatcher v1.5.2
-	github.com/evanphx/json-patch v4.9.0+incompatible
+	github.com/banzaicloud/k8s-objectmatcher v1.7.0
+	github.com/evanphx/json-patch v4.12.0+incompatible
 	github.com/go-logr/logr v0.4.0
-	github.com/go-openapi/jsonreference v0.19.4 // indirect
-	github.com/go-openapi/spec v0.19.3
 	github.com/mattermost/blubr v0.0.0-20210505124256-5b36c16ffa07
 	github.com/mattn/goveralls v0.0.7
 	github.com/mikefarah/yq/v3 v3.0.0-20200916054308-65cb4726048d
@@ -17,12 +15,11 @@ require (
 	github.com/presslabs/mysql-operator v0.5.0-rc.2
 	github.com/stretchr/testify v1.7.0
 	github.com/vrischmann/envconfig v1.3.0
-	golang.org/x/net v0.0.0-20201202161906-c7110b5ffcbb
-	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
-	k8s.io/api v0.20.6
-	k8s.io/apimachinery v0.20.6
-	k8s.io/client-go v0.20.6
-	k8s.io/code-generator v0.20.6
-	k8s.io/kube-openapi v0.0.0-20201113171705-d219536bb9fd
-	sigs.k8s.io/controller-runtime v0.8.3
+	golang.org/x/net v0.0.0-20210825183410-e898025ed96a
+	k8s.io/api v0.22.2
+	k8s.io/apimachinery v0.22.2
+	k8s.io/client-go v0.22.2
+	k8s.io/code-generator v0.22.2
+	k8s.io/kube-openapi v0.0.0-20211115234752-e816edb12b65
+	sigs.k8s.io/controller-runtime v0.10.3
 )
