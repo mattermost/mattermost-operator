@@ -11,7 +11,7 @@ run_ct_container() {
     docker run --rm --interactive --detach --network host --name test-cont \
         --volume "$(pwd):/go/src/github.com/mattermost/mattermost-operator" \
         --workdir "/go/src/github.com/mattermost/mattermost-operator" \
-        "golang:1.13" \
+        "golang:1.17" \
         cat
     echo
 }
