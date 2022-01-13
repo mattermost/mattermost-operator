@@ -61,7 +61,10 @@ func (c *Clientset) Tracker() testing.ObjectTracker {
 	return c.tracker
 }
 
-var _ clientset.Interface = &Clientset{}
+var (
+	_ clientset.Interface = &Clientset{}
+	_ testing.FakeClient  = &Clientset{}
+)
 
 // MattermostV1beta1 retrieves the MattermostV1beta1Client
 func (c *Clientset) MattermostV1beta1() mattermostv1beta1.MattermostV1beta1Interface {

@@ -7,12 +7,11 @@ import (
 	"runtime"
 	"time"
 
+	blubr "github.com/mattermost/blubr"
 	"github.com/mattermost/mattermost-operator/controllers/mattermost/clusterinstallation"
 	"github.com/mattermost/mattermost-operator/controllers/mattermost/mattermost"
 	"github.com/mattermost/mattermost-operator/controllers/mattermost/mattermostrestoredb"
 	"github.com/mattermost/mattermost-operator/pkg/resources"
-
-	blubr "github.com/mattermost/blubr"
 	v1beta1Minio "github.com/minio/minio-operator/pkg/apis/miniocontroller/v1beta1"
 	v1alpha1MySQL "github.com/presslabs/mysql-operator/pkg/apis/mysql/v1alpha1"
 	"github.com/vrischmann/envconfig"

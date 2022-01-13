@@ -15,8 +15,7 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 
 # Image URL to use all building/pushing image targets
 OPERATOR_IMAGE ?= mattermost/mattermost-operator:test
-# Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
-CRD_OPTIONS ?= "crd:trivialVersions=true"
+CRD_OPTIONS ?= "crd"
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -27,7 +26,7 @@ endif
 
 SDK_VERSION = v1.0.1
 MACHINE = $(shell uname -m)
-BUILD_IMAGE = golang:1.16.3
+BUILD_IMAGE = golang:1.17
 BASE_IMAGE = gcr.io/distroless/static:nonroot
 GOROOT ?= $(shell go env GOROOT)
 GOPATH ?= $(shell go env GOPATH)
@@ -54,7 +53,7 @@ SHADOW_BIN := shadow
 SHADOW_VER := master
 SHADOW_GEN := $(TOOLS_BIN_DIR)/$(SHADOW_BIN)
 
-OPENAPI_VER := release-1.19
+OPENAPI_VER := release-1.22
 OPENAPI_BIN := openapi-gen
 OPENAPI_GEN := $(TOOLS_BIN_DIR)/$(OPENAPI_BIN)
 
@@ -70,7 +69,7 @@ YQ_VER := master
 YQ_BIN := yq
 YQ_GEN := $(TOOLS_BIN_DIR)/$(YQ_BIN)
 
-CONTROLLER_GEN_VER := v0.5.0
+CONTROLLER_GEN_VER := v0.7.0
 CONTROLLER_GEN_BIN := controller-gen
 CONTROLLER_GEN := $(TOOLS_BIN_DIR)/$(CONTROLLER_GEN_BIN)
 

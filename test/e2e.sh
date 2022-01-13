@@ -11,7 +11,7 @@ run_ct_container() {
     docker run --rm --interactive --detach --network host --name test-cont \
         --volume "$(pwd):/go/src/github.com/mattermost/mattermost-operator" \
         --workdir "/go/src/github.com/mattermost/mattermost-operator" \
-        "golang:1.13" \
+        "golang:1.17" \
         cat
     echo
 }
@@ -22,7 +22,7 @@ docker_exec() {
 
 
 run_kind() {
-    KIND_VERSION="${KIND_VERSION:=v0.9.0}"
+    KIND_VERSION="${KIND_VERSION:=v0.11.1}"
     echo "Download kind binary..."
     curl -sSLo kind https://github.com/kubernetes-sigs/kind/releases/download/"${KIND_VERSION}"/kind-linux-amd64
     chmod +x kind
