@@ -124,10 +124,7 @@ func (r *ClusterInstallationReconciler) Reconcile(ctx context.Context, request c
 	}
 
 	if !reflect.DeepEqual(originalMattermost.Spec, mattermost.Spec) {
-		reqLogger.Info(fmt.Sprintf("Updating spec"),
-			"Old", fmt.Sprintf("%+v", originalMattermost.Spec),
-			"New", fmt.Sprintf("%+v", mattermost.Spec),
-		)
+		reqLogger.Info("Updating spec")
 		err = r.Client.Update(ctx, mattermost)
 		if err != nil {
 			reqLogger.Error(err, "failed to update the clusterinstallation spec")

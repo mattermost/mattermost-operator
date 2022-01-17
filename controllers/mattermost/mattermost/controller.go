@@ -125,7 +125,7 @@ func (r *MattermostReconciler) Reconcile(ctx context.Context, request ctrl.Reque
 
 	if !reflect.DeepEqual(originalMattermost.Spec, mattermost.Spec) {
 		mattermost.Status = status
-		err = r.updateSpec(ctx, reqLogger, originalMattermost, mattermost)
+		err = r.updateSpec(ctx, reqLogger, mattermost)
 		if err != nil {
 			r.updateStatusReconcilingAndLogError(originalMattermost, status, reqLogger, err)
 			return reconcile.Result{}, err
@@ -169,11 +169,8 @@ func (r *MattermostReconciler) Reconcile(ctx context.Context, request ctrl.Reque
 	return reconcile.Result{}, nil
 }
 
-func (r *MattermostReconciler) updateSpec(ctx context.Context, reqLogger logr.Logger, originalMattermost *mmv1beta.Mattermost, updated *mmv1beta.Mattermost) error {
-	reqLogger.Info(fmt.Sprintf("Updating spec"),
-		"Old", fmt.Sprintf("%+v", originalMattermost.Spec),
-		"New", fmt.Sprintf("%+v", updated.Spec),
-	)
+func (r *MattermostReconciler) updateSpec(ctx context.Context, reqLogger logr.Logger, updated *mmv1beta.Mattermost) error {
+	reqLogger.Info("Updating Mattermost spec")
 	return r.Client.Update(ctx, updated)
 }
 
