@@ -80,6 +80,7 @@ func mattermostScaleTest(t *testing.T, k8sClient client.Client, k8sTypedClient k
 			Database:  testDatabaseConfig(1),
 		},
 	}
+	mmNamespaceName := types.NamespacedName{Namespace: exampleMattermost.Namespace, Name: exampleMattermost.Name}
 
 	err := k8sClient.Create(context.TODO(), exampleMattermost)
 	require.NoError(t, err)
@@ -105,7 +106,7 @@ func mattermostScaleTest(t *testing.T, k8sClient client.Client, k8sTypedClient k
 	err = waitForDeployment(t, k8sTypedClient, mmNamespace, "test-mm", 2, retryInterval, timeout)
 	require.NoError(t, err)
 
-	err = waitForReconcilicationComplete(t, k8sClient, mmNamespace, "test-mm", retryInterval, timeout)
+	err = WaitForMattermostStable(t, k8sClient, mmNamespaceName, timeout)
 	require.NoError(t, err)
 
 	// scale down again
@@ -120,7 +121,7 @@ func mattermostScaleTest(t *testing.T, k8sClient client.Client, k8sTypedClient k
 	err = waitForDeployment(t, k8sTypedClient, mmNamespace, "test-mm", 1, retryInterval, timeout)
 	require.NoError(t, err)
 
-	err = waitForReconcilicationComplete(t, k8sClient, mmNamespace, "test-mm", retryInterval, timeout)
+	err = WaitForMattermostStable(t, k8sClient, mmNamespaceName, timeout)
 	require.NoError(t, err)
 
 	err = k8sClient.Delete(context.TODO(), exampleMattermost)
@@ -147,6 +148,7 @@ func mattermostUpgradeTest(t *testing.T, k8sClient client.Client, k8sTypedClient
 			Database:  testDatabaseConfig(1),
 		},
 	}
+	mmNamespaceName := types.NamespacedName{Namespace: exampleMattermost.Namespace, Name: exampleMattermost.Name}
 
 	err := k8sClient.Create(context.TODO(), exampleMattermost)
 	require.NoError(t, err)
@@ -192,7 +194,7 @@ func mattermostUpgradeTest(t *testing.T, k8sClient client.Client, k8sTypedClient
 	err = waitForDeployment(t, k8sTypedClient, mmNamespace, testName, 1, retryInterval, timeout)
 	require.NoError(t, err)
 
-	err = waitForReconcilicationComplete(t, k8sClient, mmNamespace, testName, retryInterval, timeout)
+	err = WaitForMattermostStable(t, k8sClient, mmNamespaceName, timeout)
 	require.NoError(t, err)
 
 	var updatedMattermost operator.Mattermost

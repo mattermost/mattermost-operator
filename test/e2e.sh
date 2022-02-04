@@ -85,6 +85,9 @@ main() {
     echo "Starting Operator Testing..."
     docker_exec go test ./test/e2e -timeout 50m -v
 
+    echo "Starting External DB and File Store tests..."
+    docker_exec go test ./test/e2e-external -timeout 20m -v
+
     echo "Done Testing!"
 }
 
