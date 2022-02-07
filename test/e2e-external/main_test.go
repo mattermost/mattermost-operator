@@ -4,14 +4,13 @@ import (
 	"os"
 	"testing"
 
-	"k8s.io/client-go/rest"
+	"github.com/mattermost/mattermost-operator/test/e2e"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
-var cfg *rest.Config
 var k8sClient client.Client
 var testEnv *envtest.Environment
 
@@ -38,12 +37,11 @@ func TestMain(m *testing.M) {
 }
 
 func setup() error {
-	env, err := SetupTest()
+	env, err := e2e.SetupTest()
 	if err != nil {
 		return err
 	}
 
-	cfg = env.Cfg
 	k8sClient = env.K8sClient
 	testEnv = env.TestEnv
 

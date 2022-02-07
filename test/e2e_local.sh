@@ -2,7 +2,7 @@
 
 ## Run e2e tests on local machine
 ## Requirement:
-## - kind 0.9.0
+## - kind 0.11.0
 ## - kustomize
 
 set -Eeuxo pipefail
@@ -22,4 +22,8 @@ source "${DIR}"/setup_test.sh
 # Deploy Mattermost Operator
 make deploy
 
+echo "Running operators e2e..."
 go test ./test/e2e --timeout 45m -v
+
+echo "Running external DB and File Store e2e..."
+go test ./test/e2e-extenal --timeout 15m -v

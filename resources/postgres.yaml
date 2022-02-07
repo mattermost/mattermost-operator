@@ -1,0 +1,86 @@
+# This file contains Postgres manifest than can be applied locally in the cluster and
+# treated as an external database for Mattermost instance.
+# This manifest is prepared for development and testing purposes and should not be used in production environment.
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgresql
+  labels:
+    app: postgres
+    tier: postgreSQL
+spec:
+  ports:
+    - port: 5432
+  selector:
+    app: postgres
+    tier: postgreSQL
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-claim
+  labels:
+    app: postgres
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgresql
+  labels:
+    app: postgres
+spec:
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: postgres
+      tier: postgreSQL
+  template:
+    metadata:
+      labels:
+        app: postgres
+        tier: postgreSQL
+    spec:
+      containers:
+        - image: postgres:12-alpine
+          name: postgresql
+          env:
+            - name: POSTGRES_USER
+              value: postgres
+            - name: POSTGRES_DB
+              value: postgres
+            - name: POSTGRES_PASSWORD
+              value: password
+          ports:
+            - containerPort: 5432
+              name: postgresql
+          volumeMounts:
+            - name: postgresql
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: postgresql
+          emptyDir: {}
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: local-volume-1
+  labels:
+    type: local
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: /tmp/data/pv-1
+  persistentVolumeReclaimPolicy: Recycle

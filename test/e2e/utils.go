@@ -39,15 +39,15 @@ func waitForMySQLStatusReady(t *testing.T, dynclient client.Client, namespace, n
 	return nil
 }
 
-func waitForReconcilicationComplete(t *testing.T, dynclient client.Client, namespace, name string, retryInterval, timeout time.Duration) error {
+func WaitForMattermostStable(t *testing.T, k8sClient client.Client, mmKey types.NamespacedName, timeout time.Duration) error {
 	newMattermost := &operator.Mattermost{}
-	err := wait.Poll(retryInterval, timeout, func() (done bool, err error) {
-		errClient := dynclient.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, newMattermost)
+	err := wait.Poll(3*time.Second, timeout, func() (done bool, err error) {
+		errClient := k8sClient.Get(context.TODO(), mmKey, newMattermost)
 		if errClient != nil {
 			return false, errClient
 		}
 
-		if newMattermost.Status.State == "stable" {
+		if newMattermost.Status.State == operator.Stable {
 			return true, nil
 		}
 		t.Logf("Waiting for Reconcilication finish (Status:%s)\n", newMattermost.Status.State)
