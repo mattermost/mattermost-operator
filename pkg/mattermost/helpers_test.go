@@ -184,7 +184,7 @@ func TestSetProbes(t *testing.T) {
 			customLiveness:  corev1.Probe{},
 			customReadiness: corev1.Probe{},
 			wantLiveness: &corev1.Probe{
-				Handler: corev1.Handler{
+				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{
 						Path: "/api/v4/system/ping",
 						Port: intstr.FromInt(8065),
@@ -195,7 +195,7 @@ func TestSetProbes(t *testing.T) {
 				FailureThreshold:    3,
 			},
 			wantReadiness: &corev1.Probe{
-				Handler: corev1.Handler{
+				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{
 						Path: "/api/v4/system/ping",
 						Port: intstr.FromInt(8065),
@@ -215,7 +215,7 @@ func TestSetProbes(t *testing.T) {
 				InitialDelaySeconds: 90,
 			},
 			wantLiveness: &corev1.Probe{
-				Handler: corev1.Handler{
+				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{
 						Path: "/api/v4/system/ping",
 						Port: intstr.FromInt(8065),
@@ -226,7 +226,7 @@ func TestSetProbes(t *testing.T) {
 				FailureThreshold:    3,
 			},
 			wantReadiness: &corev1.Probe{
-				Handler: corev1.Handler{
+				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{
 						Path: "/api/v4/system/ping",
 						Port: intstr.FromInt(8065),
@@ -248,7 +248,7 @@ func TestSetProbes(t *testing.T) {
 				FailureThreshold:    10,
 			},
 			wantLiveness: &corev1.Probe{
-				Handler: corev1.Handler{
+				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{
 						Path: "/api/v4/system/ping",
 						Port: intstr.FromInt(8065),
@@ -259,7 +259,7 @@ func TestSetProbes(t *testing.T) {
 				FailureThreshold:    3,
 			},
 			wantReadiness: &corev1.Probe{
-				Handler: corev1.Handler{
+				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{
 						Path: "/api/v4/system/ping",
 						Port: intstr.FromInt(8065),
@@ -271,9 +271,9 @@ func TestSetProbes(t *testing.T) {
 			},
 		},
 		{
-			name: "Handler changed",
+			name: "ProbeHandler changed",
 			customLiveness: corev1.Probe{
-				Handler: corev1.Handler{
+				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{
 						Path: "/api/v4/system/pong",
 						Port: intstr.FromInt(8080),
@@ -282,7 +282,7 @@ func TestSetProbes(t *testing.T) {
 				InitialDelaySeconds: 120,
 			},
 			customReadiness: corev1.Probe{
-				Handler: corev1.Handler{
+				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{
 						Path: "/api/v4/system/pingpong",
 						Port: intstr.FromInt(1234),
@@ -290,7 +290,7 @@ func TestSetProbes(t *testing.T) {
 				},
 			},
 			wantLiveness: &corev1.Probe{
-				Handler: corev1.Handler{
+				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{
 						Path: "/api/v4/system/pong",
 						Port: intstr.FromInt(8080),
@@ -301,7 +301,7 @@ func TestSetProbes(t *testing.T) {
 				FailureThreshold:    3,
 			},
 			wantReadiness: &corev1.Probe{
-				Handler: corev1.Handler{
+				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{
 						Path: "/api/v4/system/pingpong",
 						Port: intstr.FromInt(1234),

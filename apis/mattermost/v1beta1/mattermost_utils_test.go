@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	pkgUtils "github.com/mattermost/mattermost-operator/pkg/utils"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -108,6 +107,68 @@ func TestMattermost_IngressAccessors(t *testing.T) {
 			assert.Equal(t, testCase.annotations, mm.GetIngresAnnotations())
 			assert.Equal(t, testCase.tlsSecret, mm.GetIngressTLSSecret())
 			assert.Equal(t, testCase.ingressClass, mm.GetIngressClass())
+		})
+	}
+}
+
+func TestMattermost_GetIngressHostNames(t *testing.T) {
+
+	for _, testCase := range []struct {
+		description   string
+		mmSpec        MattermostSpec
+		expectedHosts []string
+	}{
+		{
+			description: "deprecated host",
+			mmSpec: MattermostSpec{
+				IngressName: "primary-host",
+			},
+			expectedHosts: []string{"primary-host"},
+		},
+		{
+			description: "ingress disabled",
+			mmSpec: MattermostSpec{
+				Ingress: &Ingress{
+					Enabled: false,
+				},
+			},
+			expectedHosts: []string{},
+		},
+		{
+			description: "only primary host",
+			mmSpec: MattermostSpec{
+				Ingress: &Ingress{
+					Enabled: true,
+					Host:    "primary-host",
+				},
+			},
+			expectedHosts: []string{"primary-host"},
+		},
+		{
+			description: "multiple hosts, skip duplicates",
+			mmSpec: MattermostSpec{
+				Ingress: &Ingress{
+					Enabled: true,
+					Host:    "primary-host",
+					Hosts: []IngressHost{
+						{HostName: "test-1"},
+						{HostName: "test-1"},
+						{HostName: "test-2"},
+						{HostName: "test-2"},
+						{HostName: "test-3"},
+						{HostName: "test-3"},
+					},
+				},
+			},
+			expectedHosts: []string{"primary-host", "test-1", "test-2", "test-3"},
+		},
+	} {
+		t.Run(testCase.description, func(t *testing.T) {
+			mm := &Mattermost{
+				Spec: testCase.mmSpec,
+			}
+
+			assert.Equal(t, testCase.expectedHosts, mm.GetIngressHostNames())
 		})
 	}
 }

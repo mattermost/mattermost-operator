@@ -9,64 +9,49 @@ import (
 )
 
 type logrusLogger struct {
-	l    *log.Entry
-	name string
+	logger       *log.Entry
+	defaultLevel log.Level
+	name         string
 }
 
-// InitLogger returns a logrus-based logger wrapped in a logr.Logger interface.
-func InitLogger() logr.Logger {
-	logger := log.NewEntry(log.New())
+// InitLogger returns a logrus-based logger wrapped in a logr.LogSink interface.
+func InitLogger(logger *log.Entry) logr.LogSink {
+
 	return &logrusLogger{
-		l:    logger,
-		name: "",
+		logger:       logger,
+		defaultLevel: logger.Logger.Level,
+		name:         "",
 	}
 }
 
-func (l *logrusLogger) Enabled() bool { return true }
-func (l *logrusLogger) Info(msg string, keysAndVals ...interface{}) {
-	fields := parseFields(l.l, l.name, keysAndVals)
-	l.l.WithFields(fields).Info(prependName(l.name, msg))
+func (l *logrusLogger) Init(info logr.RuntimeInfo) {
+	// We initialize logger with constructor as we do not support CallDepth.
+}
+
+// Enabled tests whether logging is enabled on specified of higher defaultLevel.
+func (l *logrusLogger) Enabled(level int) bool {
+	return int(l.logger.Logger.Level) >= level
+}
+
+func (l *logrusLogger) Info(level int, msg string, keysAndVals ...interface{}) {
+	fields := parseFields(l.logger, l.name, keysAndVals)
+	l.logger.WithFields(fields).Log(l.toLogrusLevel(level), prependName(l.name, msg))
 }
 
 func (l *logrusLogger) Error(err error, msg string, keysAndVals ...interface{}) {
-	fields := parseFields(l.l, l.name, keysAndVals)
-	l.l.WithFields(fields).WithError(err).Error(prependName(l.name, msg))
+	fields := parseFields(l.logger, l.name, keysAndVals)
+	l.logger.WithFields(fields).WithError(err).Error(prependName(l.name, msg))
 }
 
-// TODO
-// The commented code below works, but in practice the operator logging quickly
-// gets set to 'fatal' and stops logging normally. This requires further
-// investigation. For now, the logging levels are not changed.
-func (l *logrusLogger) V(level int) logr.Logger {
-	// Compare the given int to the list of all logrus levels. If the given value
-	// is below or above the range of logrus levels then we take the lowest or
-	// highest value respectively.
-	// logLevel := log.AllLevels[0]
-	// if level > 0 && level < (len(log.AllLevels)-1) {
-	// 	logLevel = log.AllLevels[level]
-	// } else if level > (len(log.AllLevels) - 1) {
-	// 	logLevel = log.AllLevels[(len(log.AllLevels) - 1)]
-	// }
-
-	// newLogger := newLogger(l)
-	// newLogger.l.Logger.SetLevel(logLevel)
-	// return &infoLogger{
-	// 	l:    newLogger.l,
-	// 	name: l.name,
-	// }
-
-	return l
-}
-
-func (l *logrusLogger) WithValues(keysAndValues ...interface{}) logr.Logger {
-	newFieldLogger := l.l.WithFields(parseFields(l.l, l.name, keysAndValues))
+func (l *logrusLogger) WithValues(keysAndValues ...interface{}) logr.LogSink {
+	newFieldLogger := l.logger.WithFields(parseFields(l.logger, l.name, keysAndValues))
 	newLogger := newLogger(l)
-	newLogger.l = newFieldLogger
+	newLogger.logger = newFieldLogger
 
 	return newLogger
 }
 
-func (l *logrusLogger) WithName(name string) logr.Logger {
+func (l *logrusLogger) WithName(name string) logr.LogSink {
 	newLogger := newLogger(l)
 	if l.name == "" {
 		newLogger.name = name
@@ -77,10 +62,22 @@ func (l *logrusLogger) WithName(name string) logr.Logger {
 	return newLogger
 }
 
+func (l *logrusLogger) toLogrusLevel(level int) log.Level {
+	lvl := log.Level(level)
+	if lvl <= 0 {
+		return l.defaultLevel
+	}
+	if lvl > log.TraceLevel {
+		return log.TraceLevel
+	}
+	return lvl
+}
+
 func newLogger(l *logrusLogger) *logrusLogger {
 	return &logrusLogger{
-		l:    l.l,
-		name: l.name,
+		logger:       l.logger,
+		defaultLevel: l.defaultLevel,
+		name:         l.name,
 	}
 }
 

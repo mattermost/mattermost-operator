@@ -72,12 +72,43 @@ func (mm *Mattermost) IngressEnabled() bool {
 	return true
 }
 
-// GetIngressHost returns Mattermost Ingress host.
+// GetIngressHost returns Mattermost primary Ingress host.
 func (mm *Mattermost) GetIngressHost() string {
 	if mm.Spec.Ingress == nil {
 		return mm.Spec.IngressName
 	}
 	return mm.Spec.Ingress.Host
+}
+
+// GetIngressHostNames returns all Ingress host names configured for Mattermost.
+// It skips duplicated entries.
+func (mm *Mattermost) GetIngressHostNames() []string {
+	initialHost := mm.GetIngressHost()
+	// TODO: If we decide to deprecates Host in favor of Hosts
+	// we might need to adjust this part.
+	if initialHost == "" {
+		return []string{}
+	}
+
+	// Create set of hosts to avoid duplicates
+	hostsSet := map[string]struct{}{
+		initialHost: {},
+	}
+	// We do it this way to retain the order of hosts specified in CR
+	// while still eliminating duplicates.
+	// We do it to avoid unnecessary Ingress updates.
+	hosts := []string{initialHost}
+
+	if mm.Spec.Ingress != nil {
+		for _, host := range mm.Spec.Ingress.Hosts {
+			if _, found := hostsSet[host.HostName]; !found {
+				hosts = append(hosts, host.HostName)
+				hostsSet[host.HostName] = struct{}{}
+			}
+		}
+	}
+
+	return hosts
 }
 
 // GetIngresAnnotations returns Mattermost Ingress annotations.

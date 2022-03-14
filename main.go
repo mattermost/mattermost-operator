@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/go-logr/logr"
 	blubr "github.com/mattermost/blubr"
 	"github.com/mattermost/mattermost-operator/controllers/mattermost/clusterinstallation"
 	"github.com/mattermost/mattermost-operator/controllers/mattermost/mattermost"
@@ -14,6 +15,7 @@ import (
 	"github.com/mattermost/mattermost-operator/pkg/resources"
 	v1beta1Minio "github.com/minio/minio-operator/pkg/apis/miniocontroller/v1beta1"
 	v1alpha1MySQL "github.com/presslabs/mysql-operator/pkg/apis/mysql/v1alpha1"
+	"github.com/sirupsen/logrus"
 	"github.com/vrischmann/envconfig"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -68,8 +70,11 @@ func main() {
 	// Setup logging.
 	// This logger wraps logrus in a 'logr.Logger' interface. This is required
 	// for the deferred logging required by the various operator packages.
-	logger := blubr.InitLogger()
-	logger = logger.WithName("opr")
+	logSink := blubr.InitLogger(logrus.NewEntry(logrus.New()))
+	logSink = logSink.WithName("opr")
+
+	logger := logr.New(logSink)
+
 	logf.SetLogger(logger)
 	ctrl.SetLogger(logger)
 

@@ -3,10 +3,12 @@ package mattermost
 import (
 	"context"
 	"fmt"
+	"testing"
+
 	"github.com/go-logr/logr"
+	"github.com/sirupsen/logrus"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"testing"
 
 	"github.com/mattermost/mattermost-operator/pkg/resources"
 
@@ -762,8 +764,9 @@ func Test_Patches(t *testing.T) {
 
 func setupTestDeps(t *testing.T) (logr.Logger, client.Client, *MattermostReconciler) {
 	// Setup logging for the reconciler, so we can see what happened on failure.
-	logger := blubr.InitLogger()
-	logger = logger.WithName("test.opr")
+	logSink := blubr.InitLogger(logrus.NewEntry(logrus.New()))
+	logSink = logSink.WithName("test.opr")
+	logger := logr.New(logSink)
 	logf.SetLogger(logger)
 
 	s := prepareSchema(t, scheme.Scheme)

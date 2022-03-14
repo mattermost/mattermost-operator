@@ -104,7 +104,7 @@ func (c *FakeMattermosts) UpdateStatus(ctx context.Context, mattermost *v1beta1.
 // Delete takes name of the mattermost and deletes it. Returns an error if one occurs.
 func (c *FakeMattermosts) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(mattermostsResource, c.ns, name), &v1beta1.Mattermost{})
+		Invokes(testing.NewDeleteActionWithOptions(mattermostsResource, c.ns, name, opts), &v1beta1.Mattermost{})
 
 	return err
 }
