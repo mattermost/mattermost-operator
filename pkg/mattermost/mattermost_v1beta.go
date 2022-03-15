@@ -132,7 +132,7 @@ func GenerateIngressV1Beta(mattermost *mmv1beta.Mattermost) *networkingv1.Ingres
 			{
 				// TODO: for now we use the same secret for all hosts.
 				// We can easily extend this in the future by adding another filed to IngressHost.
-				Hosts: hosts,
+				Hosts:      hosts,
 				SecretName: mattermost.GetIngressTLSSecret(),
 			},
 		}
