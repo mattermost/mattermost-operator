@@ -5,7 +5,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-logr/logr"
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
+	"github.com/sirupsen/logrus"
 
 	"github.com/mattermost/mattermost-operator/pkg/resources"
 
@@ -37,8 +39,9 @@ import (
 
 func TestReconcile(t *testing.T) {
 	// Setup logging for the reconciler so we can see what happened on failure.
-	logger := blubr.InitLogger()
-	logger = logger.WithName("test.opr")
+	logSink := blubr.InitLogger(logrus.NewEntry(logrus.New()))
+	logSink = logSink.WithName("test.opr")
+	logger := logr.New(logSink)
 	logf.SetLogger(logger)
 
 	ciName := "foo"
@@ -473,8 +476,9 @@ func TestReconcile(t *testing.T) {
 
 func TestReconcilingLimit(t *testing.T) {
 	// Setup logging for the reconciler so we can see what happened on failure.
-	logger := blubr.InitLogger()
-	logger = logger.WithName("test.opr")
+	logSink := blubr.InitLogger(logrus.NewEntry(logrus.New()))
+	logSink = logSink.WithName("test.opr")
+	logger := logr.New(logSink)
 	logf.SetLogger(logger)
 
 	ciNamespace := "default"
@@ -641,8 +645,9 @@ func TestReconcilingLimit(t *testing.T) {
 
 func TestMigration(t *testing.T) {
 	// Setup logging for the reconciler so we can see what happened on failure.
-	logger := blubr.InitLogger()
-	logger = logger.WithName("test.opr")
+	logSink := blubr.InitLogger(logrus.NewEntry(logrus.New()))
+	logSink = logSink.WithName("test.opr")
+	logger := logr.New(logSink)
 	logf.SetLogger(logger)
 
 	var res reconcile.Result

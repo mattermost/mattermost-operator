@@ -111,6 +111,8 @@ func GenerateIngressV1Beta(mattermost *mmv1beta.Mattermost) *networkingv1.Ingres
 		ingressAnnotations[k] = v
 	}
 
+	hosts := mattermost.GetIngressHostNames()
+
 	ingress := &networkingv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            mattermost.Name,
@@ -121,42 +123,52 @@ func GenerateIngressV1Beta(mattermost *mmv1beta.Mattermost) *networkingv1.Ingres
 		},
 		Spec: networkingv1.IngressSpec{
 			IngressClassName: mattermost.GetIngressClass(),
-			Rules: []networkingv1.IngressRule{
-				{
-					Host: mattermost.GetIngressHost(),
-					IngressRuleValue: networkingv1.IngressRuleValue{
-						HTTP: &networkingv1.HTTPIngressRuleValue{
-							Paths: []networkingv1.HTTPIngressPath{
-								{
-									Path: "/",
-									Backend: networkingv1.IngressBackend{
-										Service: &networkingv1.IngressServiceBackend{
-											Name: mattermost.Name,
-											Port: networkingv1.ServiceBackendPort{
-												Number: 8065,
-											},
-										},
-									},
-									PathType: &defaultIngressPathType,
-								},
-							},
-						},
-					},
-				},
-			},
+			Rules:            makeIngressRules(hosts, mattermost),
 		},
 	}
 
 	if mattermost.GetIngressTLSSecret() != "" {
 		ingress.Spec.TLS = []networkingv1.IngressTLS{
 			{
-				Hosts:      []string{mattermost.GetIngressHost()},
+				// TODO: for now we use the same secret for all hosts.
+				// We can easily extend this in the future by adding another filed to IngressHost.
+				Hosts:      hosts,
 				SecretName: mattermost.GetIngressTLSSecret(),
 			},
 		}
 	}
 
 	return ingress
+}
+
+func makeIngressRules(hosts []string, mattermost *mmv1beta.Mattermost) []networkingv1.IngressRule {
+	rules := make([]networkingv1.IngressRule, 0, len(hosts))
+	for _, host := range hosts {
+		rule := networkingv1.IngressRule{
+			Host: host,
+			IngressRuleValue: networkingv1.IngressRuleValue{
+				HTTP: &networkingv1.HTTPIngressRuleValue{
+					Paths: []networkingv1.HTTPIngressPath{
+						{
+							Path: "/",
+							Backend: networkingv1.IngressBackend{
+								Service: &networkingv1.IngressServiceBackend{
+									Name: mattermost.Name,
+									Port: networkingv1.ServiceBackendPort{
+										Number: 8065,
+									},
+								},
+							},
+							PathType: &defaultIngressPathType,
+						},
+					},
+				},
+			},
+		}
+		rules = append(rules, rule)
+	}
+
+	return rules
 }
 
 // GenerateDeploymentV1Beta returns the deployment for Mattermost app.

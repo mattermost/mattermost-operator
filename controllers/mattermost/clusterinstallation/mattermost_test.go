@@ -4,7 +4,9 @@ import (
 	"context"
 	"testing"
 
+	"github.com/go-logr/logr"
 	"github.com/mattermost/mattermost-operator/pkg/resources"
+	"github.com/sirupsen/logrus"
 
 	rbacv1 "k8s.io/api/rbac/v1"
 
@@ -29,8 +31,9 @@ import (
 
 func TestCheckMattermost(t *testing.T) {
 	// Setup logging for the reconciler so we can see what happened on failure.
-	logger := blubr.InitLogger()
-	logger = logger.WithName("test.opr")
+	logSink := blubr.InitLogger(logrus.NewEntry(logrus.New()))
+	logSink = logSink.WithName("test.opr")
+	logger := logr.New(logSink)
 	logf.SetLogger(logger)
 
 	ciName := "foo"
@@ -350,8 +353,9 @@ func TestCheckMattermost(t *testing.T) {
 
 func TestCheckMattermostExternalDB(t *testing.T) {
 	// Setup logging for the reconciler so we can see what happened on failure.
-	logger := blubr.InitLogger()
-	logger = logger.WithName("test.opr")
+	logSink := blubr.InitLogger(logrus.NewEntry(logrus.New()))
+	logSink = logSink.WithName("test.opr")
+	logger := logr.New(logSink)
 	logf.SetLogger(logger)
 
 	ciName := "foo"

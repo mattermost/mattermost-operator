@@ -68,7 +68,7 @@ func determineMaxBodySize(ingressAnnotations map[string]string, defaultSize stri
 
 func setProbes(customLiveness, customReadiness corev1.Probe) (*corev1.Probe, *corev1.Probe) {
 	liveness := &corev1.Probe{
-		Handler: corev1.Handler{
+		ProbeHandler: corev1.ProbeHandler{
 			HTTPGet: &corev1.HTTPGetAction{
 				Path: "/api/v4/system/ping",
 				Port: intstr.FromInt(8065),
@@ -79,8 +79,8 @@ func setProbes(customLiveness, customReadiness corev1.Probe) (*corev1.Probe, *co
 		FailureThreshold:    3,
 	}
 
-	if customLiveness.Handler != (corev1.Handler{}) {
-		liveness.Handler = customLiveness.Handler
+	if customLiveness.ProbeHandler != (corev1.ProbeHandler{}) {
+		liveness.ProbeHandler = customLiveness.ProbeHandler
 	}
 
 	if customLiveness.InitialDelaySeconds != 0 {
@@ -100,7 +100,7 @@ func setProbes(customLiveness, customReadiness corev1.Probe) (*corev1.Probe, *co
 	}
 
 	readiness := &corev1.Probe{
-		Handler: corev1.Handler{
+		ProbeHandler: corev1.ProbeHandler{
 			HTTPGet: &corev1.HTTPGetAction{
 				Path: "/api/v4/system/ping",
 				Port: intstr.FromInt(8065),
@@ -111,8 +111,8 @@ func setProbes(customLiveness, customReadiness corev1.Probe) (*corev1.Probe, *co
 		FailureThreshold:    6,
 	}
 
-	if customReadiness.Handler != (corev1.Handler{}) {
-		readiness.Handler = customReadiness.Handler
+	if customReadiness.ProbeHandler != (corev1.ProbeHandler{}) {
+		readiness.ProbeHandler = customReadiness.ProbeHandler
 	}
 
 	if customReadiness.InitialDelaySeconds != 0 {

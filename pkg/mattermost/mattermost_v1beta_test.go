@@ -4,12 +4,11 @@ import (
 	"fmt"
 	"testing"
 
-	networkingv1 "k8s.io/api/networking/v1"
-
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	"github.com/mattermost/mattermost-operator/pkg/database"
 	"github.com/mattermost/mattermost-operator/pkg/utils"
 	appsv1 "k8s.io/api/apps/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/stretchr/testify/assert"
@@ -73,26 +72,94 @@ func TestGenerateService_V1Beta(t *testing.T) {
 }
 
 func TestGenerateIngress_V1Beta(t *testing.T) {
+	mmName := "my-mm"
+
+	expectedMMIngressRule := networkingv1.IngressRuleValue{
+		HTTP: &networkingv1.HTTPIngressRuleValue{
+			Paths: []networkingv1.HTTPIngressPath{
+				{
+					Path: "/",
+					Backend: networkingv1.IngressBackend{
+						Service: &networkingv1.IngressServiceBackend{
+							Name: mmName,
+							Port: networkingv1.ServiceBackendPort{
+								Number: 8065,
+							},
+						},
+					},
+					PathType: &defaultIngressPathType,
+				},
+			},
+		},
+	}
+
+	expectedIngresMeta := func(extraAnnotations map[string]string) metav1.ObjectMeta {
+		annotations := map[string]string{"nginx.ingress.kubernetes.io/proxy-body-size": "1000M"}
+		for k, v := range extraAnnotations {
+			annotations[k] = v
+		}
+
+		return metav1.ObjectMeta{
+			Name: mmName,
+			Labels: map[string]string{
+				"app": "mattermost",
+				"installation.mattermost.com/installation": mmName,
+				"installation.mattermost.com/resource":     mmName,
+			},
+			Annotations: annotations,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         "installation.mattermost.com/v1beta1",
+					Kind:               "Mattermost",
+					Name:               mmName,
+					BlockOwnerDeletion: utils.NewBool(true),
+					Controller:         utils.NewBool(true),
+				},
+			},
+		}
+	}
+
 	tests := []struct {
-		name                   string
-		spec                   mmv1beta.MattermostSpec
-		tlsSecret              string
-		ingressClass           *string
-		ingressClassAnnotation string
+		name            string
+		spec            mmv1beta.MattermostSpec
+		expectedIngress *networkingv1.Ingress
 	}{
 		{
-			name:                   "no tls, no ingress class",
-			spec:                   mmv1beta.MattermostSpec{Ingress: &mmv1beta.Ingress{Enabled: true}},
-			ingressClass:           nil,
-			ingressClassAnnotation: "nginx",
-			tlsSecret:              "",
+			name: "no tls, no ingress class",
+			spec: mmv1beta.MattermostSpec{Ingress: &mmv1beta.Ingress{Enabled: true, Host: "test"}},
+			expectedIngress: &networkingv1.Ingress{
+				ObjectMeta: expectedIngresMeta(map[string]string{ingressClassAnnotation: "nginx"}),
+				Spec: networkingv1.IngressSpec{
+					Rules: []networkingv1.IngressRule{
+						{
+							Host:             "test",
+							IngressRuleValue: expectedMMIngressRule,
+						},
+					},
+				},
+			},
 		},
 		{
-			name:                   "custom tls secret, custom ingress class",
-			spec:                   mmv1beta.MattermostSpec{Ingress: &mmv1beta.Ingress{IngressClass: utils.NewString("custom-nginx"), TLSSecret: "my-secret"}},
-			ingressClass:           utils.NewString("custom-nginx"),
-			ingressClassAnnotation: "",
-			tlsSecret:              "my-secret",
+			name: "custom tls secret, custom ingress class",
+			spec: mmv1beta.MattermostSpec{Ingress: &mmv1beta.Ingress{Host: "test", IngressClass: utils.NewString("custom-nginx"), TLSSecret: "my-secret"}},
+			expectedIngress: &networkingv1.Ingress{
+				ObjectMeta: expectedIngresMeta(nil),
+				Spec: networkingv1.IngressSpec{
+					IngressClassName: utils.NewString("custom-nginx"),
+					Rules: []networkingv1.IngressRule{
+						{
+							Host:             "test",
+							IngressRuleValue: expectedMMIngressRule,
+						},
+					},
+					TLS: []networkingv1.IngressTLS{
+						{
+							Hosts:      []string{"test"},
+							SecretName: "my-secret",
+						},
+					},
+				},
+			},
 		},
 		{
 			name: "default tls secret, no ingress spec",
@@ -100,9 +167,23 @@ func TestGenerateIngress_V1Beta(t *testing.T) {
 				IngressName:   "test",
 				UseIngressTLS: true,
 			},
-			ingressClass:           nil,
-			ingressClassAnnotation: "nginx",
-			tlsSecret:              "test-tls-cert",
+			expectedIngress: &networkingv1.Ingress{
+				ObjectMeta: expectedIngresMeta(map[string]string{ingressClassAnnotation: "nginx"}),
+				Spec: networkingv1.IngressSpec{
+					Rules: []networkingv1.IngressRule{
+						{
+							Host:             "test",
+							IngressRuleValue: expectedMMIngressRule,
+						},
+					},
+					TLS: []networkingv1.IngressTLS{
+						{
+							Hosts:      []string{"test"},
+							SecretName: "test-tls-cert",
+						},
+					},
+				},
+			},
 		},
 		{
 			name: "custom ingress class annotation",
@@ -110,30 +191,68 @@ func TestGenerateIngress_V1Beta(t *testing.T) {
 				IngressName:        "test",
 				IngressAnnotations: map[string]string{ingressClassAnnotation: "custom-nginx"},
 			},
-			ingressClass:           nil,
-			ingressClassAnnotation: "custom-nginx",
+			expectedIngress: &networkingv1.Ingress{
+				ObjectMeta: expectedIngresMeta(map[string]string{ingressClassAnnotation: "custom-nginx"}),
+				Spec: networkingv1.IngressSpec{
+					Rules: []networkingv1.IngressRule{
+						{
+							Host:             "test",
+							IngressRuleValue: expectedMMIngressRule,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "support multiple hosts and ignore duplicates",
+			spec: mmv1beta.MattermostSpec{
+				Ingress: &mmv1beta.Ingress{
+					Enabled: true,
+					Host:    "test",
+					Hosts: []mmv1beta.IngressHost{
+						{HostName: "test"},
+						{HostName: "test-2"},
+						{HostName: "test-2"},
+						{HostName: "test-3"},
+					},
+					IngressClass: utils.NewString("nginx"),
+				},
+			},
+			expectedIngress: &networkingv1.Ingress{
+				ObjectMeta: expectedIngresMeta(nil),
+				Spec: networkingv1.IngressSpec{
+					IngressClassName: utils.NewString("nginx"),
+					Rules: []networkingv1.IngressRule{
+						{
+							Host:             "test",
+							IngressRuleValue: expectedMMIngressRule,
+						},
+						{
+							Host:             "test-2",
+							IngressRuleValue: expectedMMIngressRule,
+						},
+						{
+							Host:             "test-3",
+							IngressRuleValue: expectedMMIngressRule,
+						},
+					},
+				},
+				Status: networkingv1.IngressStatus{},
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mattermost := &mmv1beta.Mattermost{
-				Spec: tt.spec,
+				ObjectMeta: metav1.ObjectMeta{Name: mmName},
+				Spec:       tt.spec,
 			}
 
 			ingress := GenerateIngressV1Beta(mattermost)
 			require.NotNil(t, ingress)
-
+			assert.Equal(t, tt.expectedIngress, ingress)
 			assert.Equal(t, networkingv1.PathTypeImplementationSpecific, *ingress.Spec.Rules[0].HTTP.Paths[0].PathType)
-			assert.Equal(t, tt.ingressClass, ingress.Spec.IngressClassName)
-			assert.Equal(t, tt.ingressClassAnnotation, ingress.Annotations[ingressClassAnnotation])
-
-			if tt.tlsSecret != "" {
-				assert.NotNil(t, ingress.Spec.TLS)
-				assert.Equal(t, tt.tlsSecret, ingress.Spec.TLS[0].SecretName)
-			} else {
-				assert.Nil(t, ingress.Spec.TLS)
-			}
 		})
 	}
 }

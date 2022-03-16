@@ -5,7 +5,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/mattermost/mattermost-operator/pkg/resources"
+	"github.com/sirupsen/logrus"
 
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 
@@ -35,8 +37,9 @@ import (
 
 func TestReconcile(t *testing.T) {
 	// Setup logging for the reconciler so we can see what happened on failure.
-	logger := blubr.InitLogger()
-	logger = logger.WithName("test.opr")
+	logSink := blubr.InitLogger(logrus.NewEntry(logrus.New()))
+	logSink = logSink.WithName("test.opr")
+	logger := logr.New(logSink)
 	logf.SetLogger(logger)
 
 	mmName := "foo"
@@ -325,8 +328,9 @@ func TestReconcile(t *testing.T) {
 
 func TestReconcilingLimit(t *testing.T) {
 	// Setup logging for the reconciler so we can see what happened on failure.
-	logger := blubr.InitLogger()
-	logger = logger.WithName("test.opr")
+	logSink := blubr.InitLogger(logrus.NewEntry(logrus.New()))
+	logSink = logSink.WithName("test.opr")
+	logger := logr.New(logSink)
 	logf.SetLogger(logger)
 
 	mmNamespace := "default"

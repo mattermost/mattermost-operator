@@ -139,6 +139,11 @@ type Patch struct {
 	Patch   string `json:"patch,omitempty"`
 }
 
+// TODO:
+// For future extendability we are creating new struct for additional hosts instead of using simple []string.
+// Moving forward we might want to drop `Host` field and support only `Hosts` but we cannot break
+// compatibility for now.
+
 // Ingress defines configuration for Ingress resource created by the Operator.
 type Ingress struct {
 	// Enabled determines whether the Operator should create Ingress resource or not.
@@ -147,6 +152,11 @@ type Ingress struct {
 	// Host defines the Ingress host to be used when creating the ingress rules.
 	// +optional
 	Host string `json:"host,omitempty"`
+
+	// Hosts allows specifying additional domain names for Mattermost to use.
+	// +optional
+	Hosts []IngressHost `json:"hosts,omitempty"`
+
 	// Annotations defines annotations passed to the Ingress associated with Mattermost.
 	// +optional
 	Annotations map[string]string `json:"annotations,omitempty"`
@@ -157,6 +167,11 @@ type Ingress struct {
 	// IngressClass will be set on Ingress resource to associate it with specified IngressClass resource.
 	// +optional
 	IngressClass *string `json:"ingressClass,omitempty"`
+}
+
+// IngressHost specifies additional hosts configuration.
+type IngressHost struct {
+	HostName string `json:"hostName,omitempty"`
 }
 
 // Scheduling defines the configuration related to scheduling of the Mattermost pods
