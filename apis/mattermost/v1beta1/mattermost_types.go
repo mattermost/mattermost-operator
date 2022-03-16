@@ -155,7 +155,7 @@ type Ingress struct {
 
 	// Hosts allows specifying additional domain names for Mattermost to use.
 	// +optional
-	Hosts []IngressHost `json:"rules,omitempty"`
+	Hosts []IngressHost `json:"hosts,omitempty"`
 
 	// Annotations defines annotations passed to the Ingress associated with Mattermost.
 	// +optional
