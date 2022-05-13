@@ -66,13 +66,16 @@ func (hc *HealthChecker) CheckPodsRollOut(desiredImage string) (PodRolloutStatus
 			hc.logger.Info(fmt.Sprintf("mattermost pod %s has no containers", pod.Name))
 			continue
 		}
+		var mattermostContainer corev1.Container
 		for _, container := range pod.Spec.Containers {
 			if container.Name == mattermostv1alpha1.MattermostAppContainerName {
-				if container.Image != desiredImage {
-					hc.logger.Info(fmt.Sprintf("mattermost pod %s is running incorrect image", pod.Name))
-					continue
-				}
+				mattermostContainer = container
+				continue
 			}
+		}
+		if mattermostContainer.Image != desiredImage {
+			hc.logger.Info(fmt.Sprintf("mattermost pod %s is running incorrect image", pod.Name))
+			continue
 		}
 		if !isPodReady(pod) {
 			hc.logger.Info(fmt.Sprintf("mattermost pod %s is not ready", pod.Name))
