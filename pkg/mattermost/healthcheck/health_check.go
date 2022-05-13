@@ -68,9 +68,9 @@ func (hc *HealthChecker) CheckPodsRollOut(desiredImage string) (PodRolloutStatus
 		}
 		var mattermostContainer corev1.Container
 		for _, container := range pod.Spec.Containers {
-			if container.Name == mattermostv1alpha1.MattermostAppContainerName {
+			if container.Name == mattermostv1alpha1.MattermostAppContainerName || container.Name == "" {
 				mattermostContainer = container
-				continue
+				break
 			}
 		}
 		if mattermostContainer.Image != desiredImage {
