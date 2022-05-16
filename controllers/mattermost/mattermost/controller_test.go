@@ -192,6 +192,7 @@ func TestReconcile(t *testing.T) {
 			Spec: corev1.PodSpec{
 				Containers: []corev1.Container{
 					{
+						Name:  mmv1beta.MattermostAppContainerName,
 						Image: mm.GetImageName(),
 					},
 				},

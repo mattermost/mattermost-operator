@@ -173,6 +173,7 @@ func TestReconcile(t *testing.T) {
 			Spec: corev1.PodSpec{
 				Containers: []corev1.Container{
 					{
+						Name:  mmv1beta.MattermostAppContainerName,
 						Image: ci.GetImageName(),
 					},
 				},
@@ -326,6 +327,7 @@ func TestReconcile(t *testing.T) {
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
+							Name:  mmv1beta.MattermostAppContainerName,
 							Image: deployment.GetDeploymentImageName(),
 						},
 					},
@@ -747,6 +749,7 @@ func TestMigration(t *testing.T) {
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
 				{
+					Name:  mmv1beta.MattermostAppContainerName,
 					Image: ci1.GetImageName(),
 				},
 			},
