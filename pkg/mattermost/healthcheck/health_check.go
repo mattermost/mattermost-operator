@@ -68,8 +68,8 @@ func (hc *HealthChecker) CheckPodsRollOut(desiredImage string) (PodRolloutStatus
 		}
 		mmContainer := v1beta.GetMattermostAppContainer(pod.Spec.Containers)
 		if mmContainer == nil {
-				hc.logger.Info(fmt.Sprintf("mattermost container not found in the pod %s", pod.Name))
-				continue
+			hc.logger.Info(fmt.Sprintf("mattermost container not found in the pod %s", pod.Name))
+			continue
 		}
 		if mmContainer.Image != desiredImage {
 			hc.logger.Info(fmt.Sprintf("mattermost pod %s is running incorrect image", pod.Name))
