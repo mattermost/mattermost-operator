@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
+	v1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -65,7 +66,12 @@ func (hc *HealthChecker) CheckPodsRollOut(desiredImage string) (PodRolloutStatus
 			hc.logger.Info(fmt.Sprintf("mattermost pod %s has no containers", pod.Name))
 			continue
 		}
-		if pod.Spec.Containers[0].Image != desiredImage {
+		mmContainer := v1beta.GetMattermostAppContainer(pod.Spec.Containers)
+		if mmContainer == nil {
+			hc.logger.Info(fmt.Sprintf("mattermost container not found in the pod %s", pod.Name))
+			continue
+		}
+		if mmContainer.Image != desiredImage {
 			hc.logger.Info(fmt.Sprintf("mattermost pod %s is running incorrect image", pod.Name))
 			continue
 		}
