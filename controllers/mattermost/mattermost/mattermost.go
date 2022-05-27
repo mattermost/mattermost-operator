@@ -3,9 +3,11 @@ package mattermost
 import (
 	"context"
 	"fmt"
+
 	"github.com/mattermost/mattermost-operator/pkg/resources"
 
 	"github.com/go-logr/logr"
+	"github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	mattermostApp "github.com/mattermost/mattermost-operator/pkg/mattermost"
 	"github.com/pkg/errors"
@@ -305,6 +307,7 @@ func (r *MattermostReconciler) isMainContainerImageSame(
 // updateMattermostDeployment performs deployment update if necessary.
 // If a deployment update is necessary, an update job is launched to check new image.
 func (r *MattermostReconciler) updateMattermostDeployment(
+	owner *v1beta1.Mattermost,
 	mattermost *mmv1beta.Mattermost,
 	current *appsv1.Deployment,
 	desired *appsv1.Deployment,
@@ -328,7 +331,7 @@ func (r *MattermostReconciler) updateMattermostDeployment(
 
 	reqLogger.Info("Current image is not the same as the requested, will upgrade the Mattermost installation")
 
-	job, err := r.checkUpdateJob(mattermost.Namespace, desired, reqLogger)
+	job, err := r.checkUpdateJob(owner, mattermost.Namespace, desired, reqLogger)
 	if job != nil {
 		// Job is done, need to cleanup
 		defer r.cleanupUpdateJob(job, reqLogger)
@@ -344,6 +347,7 @@ func (r *MattermostReconciler) updateMattermostDeployment(
 
 // checkUpdateJob checks whether update job status. In case job is not running it is launched
 func (r *MattermostReconciler) checkUpdateJob(
+	owner *v1beta1.Mattermost,
 	jobNamespace string,
 	baseDeployment *appsv1.Deployment,
 	reqLogger logr.Logger,
@@ -353,7 +357,7 @@ func (r *MattermostReconciler) checkUpdateJob(
 	if err != nil {
 		if k8sErrors.IsNotFound(err) {
 			reqLogger.Info("Launching update image job")
-			if err = r.Resources.LaunchMattermostUpdateJob(jobNamespace, baseDeployment); err != nil {
+			if err = r.Resources.LaunchMattermostUpdateJob(owner, jobNamespace, baseDeployment, reqLogger); err != nil {
 				return nil, errors.Wrap(err, "Launching update image job failed")
 			}
 			return nil, errors.New("Began update image job")

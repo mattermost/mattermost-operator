@@ -3,6 +3,8 @@ package resources
 import (
 	"context"
 
+	"github.com/go-logr/logr"
+	"github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	mattermostApp "github.com/mattermost/mattermost-operator/pkg/mattermost"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
@@ -17,12 +19,14 @@ import (
 const UpdateJobName = "mattermost-update-check"
 
 func (r *ResourceHelper) LaunchMattermostUpdateJob(
+	owner *v1beta1.Mattermost,
 	jobNamespace string,
 	baseDeployment *appsv1.Deployment,
+	reqLogger logr.Logger,
 ) error {
 	job := PrepareMattermostJobTemplate(UpdateJobName, jobNamespace, baseDeployment)
 
-	err := r.client.Create(context.TODO(), job)
+	err := r.Create(owner, job, reqLogger)
 	if err != nil && !k8sErrors.IsAlreadyExists(err) {
 		return err
 	}

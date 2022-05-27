@@ -20,6 +20,7 @@ import (
 	k8sClient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1"
+	"github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	"github.com/mattermost/mattermost-operator/pkg/database"
 	mattermostApp "github.com/mattermost/mattermost-operator/pkg/mattermost"
 )
@@ -346,6 +347,7 @@ func (r *ClusterInstallationReconciler) isMainContainerImageSame(
 // updateMattermostDeployment performs deployment update if necessary.
 // If a deployment update is necessary, an update job is launched to check new image.
 func (r *ClusterInstallationReconciler) updateMattermostDeployment(
+	owner *v1beta1.Mattermost,
 	mattermost *mattermostv1alpha1.ClusterInstallation,
 	current *appsv1.Deployment,
 	desired *appsv1.Deployment,
@@ -370,7 +372,7 @@ func (r *ClusterInstallationReconciler) updateMattermostDeployment(
 
 	reqLogger.Info("Current image is not the same as the requested, will upgrade the Mattermost installation")
 
-	job, err := r.checkUpdateJob(mattermost, desired, reqLogger)
+	job, err := r.checkUpdateJob(owner, mattermost, desired, reqLogger)
 	if job != nil {
 		// Job is done, need to cleanup
 		defer r.cleanupUpdateJob(job, reqLogger)
@@ -386,6 +388,7 @@ func (r *ClusterInstallationReconciler) updateMattermostDeployment(
 
 // checkUpdateJob checks whether update job status. In case job is not running it is launched
 func (r *ClusterInstallationReconciler) checkUpdateJob(
+	owner *v1beta1.Mattermost,
 	mattermost *mattermostv1alpha1.ClusterInstallation,
 	desired *appsv1.Deployment,
 	reqLogger logr.Logger,
@@ -397,7 +400,7 @@ func (r *ClusterInstallationReconciler) checkUpdateJob(
 		if k8sErrors.IsNotFound(err) {
 			// Job is not running, let's launch
 			reqLogger.Info("Launching update image job")
-			if err = r.Resources.LaunchMattermostUpdateJob(mattermost.Namespace, desired); err != nil {
+			if err = r.Resources.LaunchMattermostUpdateJob(owner, mattermost.Namespace, desired, reqLogger); err != nil {
 				return nil, errors.Wrap(err, "Launching update image job failed")
 			}
 			return nil, errors.New("Began update image job")
