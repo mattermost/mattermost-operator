@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/go-logr/logr"
-	"github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	mattermostApp "github.com/mattermost/mattermost-operator/pkg/mattermost"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
@@ -19,7 +18,7 @@ import (
 const UpdateJobName = "mattermost-update-check"
 
 func (r *ResourceHelper) LaunchMattermostUpdateJob(
-	owner *v1beta1.Mattermost,
+	owner metav1.Object,
 	jobNamespace string,
 	baseDeployment *appsv1.Deployment,
 	reqLogger logr.Logger,
