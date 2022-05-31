@@ -153,16 +153,6 @@ workflows:
               ignore:
                 - master
                 - /^v.*/
-      - e2e_removed_apis:
-          requires:
-            - lint
-            - unittest
-          filters:
-            branches:
-              ignore:
-                - master
-                - /^v.*/
-
       - push-docker-pr:
           context: matterbuild-docker
           requires:
