@@ -144,10 +144,18 @@ func (r *MattermostReconciler) Reconcile(ctx context.Context, request ctrl.Reque
 		return reconcile.Result{}, err
 	}
 
-	err = r.checkMattermost(mattermost, dbConfig, fileStoreConfig, &status, reqLogger)
-	if err != nil {
-		r.updateStatusReconcilingAndLogError(mattermost, status, reqLogger, err)
-		return reconcile.Result{}, err
+	recStatus := reconcileStatus{
+		Status: false,
+		Error:  nil,
+	}
+
+	recStatus = r.checkMattermost(mattermost, dbConfig, fileStoreConfig, &status, reqLogger)
+	if recStatus.Error != nil {
+		if recStatus.Status {
+			time.Sleep(5 * time.Second)
+		}
+		r.updateStatusReconcilingAndLogError(mattermost, status, reqLogger, recStatus.Error)
+		return reconcile.Result{}, recStatus.Error
 	}
 
 	status, err = r.checkMattermostHealth(mattermost, status, reqLogger)
