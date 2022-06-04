@@ -35,8 +35,10 @@ func (r *ResourceHelper) LaunchMattermostUpdateJob(
 
 // RestartMattermostUpdateJob removes existing update job if it exists and creates new one.
 func (r *ResourceHelper) RestartMattermostUpdateJob(
+	owner metav1.Object,
 	currentJob *batchv1.Job,
 	deployment *appsv1.Deployment,
+	reqLogger logr.Logger,
 ) error {
 	err := r.client.Delete(context.TODO(), currentJob, k8sClient.PropagationPolicy(metav1.DeletePropagationBackground))
 	if err != nil && !k8sErrors.IsNotFound(err) {
@@ -45,7 +47,7 @@ func (r *ResourceHelper) RestartMattermostUpdateJob(
 
 	job := PrepareMattermostJobTemplate(UpdateJobName, currentJob.Namespace, deployment)
 
-	err = r.client.Create(context.TODO(), job)
+	err = r.Create(owner, job, reqLogger)
 	if err != nil {
 		return err
 	}

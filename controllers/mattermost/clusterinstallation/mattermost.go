@@ -419,7 +419,7 @@ func (r *ClusterInstallationReconciler) checkUpdateJob(
 	}
 	if !isSameImage {
 		reqLogger.Info("Mattermost image changed, restarting update job")
-		err := r.Resources.RestartMattermostUpdateJob(job, desired)
+		err := r.Resources.RestartMattermostUpdateJob(mattermost, job, desired, reqLogger)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to restart update job")
 		}

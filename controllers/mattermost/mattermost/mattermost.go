@@ -377,7 +377,7 @@ func (r *MattermostReconciler) checkUpdateJob(
 	}
 	if !isSameImage {
 		reqLogger.Info("Mattermost image changed, restarting update job")
-		err := r.Resources.RestartMattermostUpdateJob(job, baseDeployment)
+		err := r.Resources.RestartMattermostUpdateJob(mattermost, job, baseDeployment, reqLogger)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to restart update job")
 		}
