@@ -278,6 +278,8 @@ func TestCheckMattermost(t *testing.T) {
 		// Assert owner references are set here
 		assert.NotEmpty(t, job.ObjectMeta.OwnerReferences)
 		assert.Equal(t, "Mattermost", job.ObjectMeta.OwnerReferences[0].Kind)
+		assert.Equal(t, mmName, job.ObjectMeta.OwnerReferences[0].Name)
+		assert.Equal(t, "installation.mattermost.com/v1beta1", job.ObjectMeta.OwnerReferences[0].APIVersion)
 
 		// Set job status to succeeded so that test can proceed
 		now := metav1.Now()
