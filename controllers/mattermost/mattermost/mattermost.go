@@ -310,23 +310,22 @@ func (r *MattermostReconciler) checkMattermostDeployment(
 
 	err = r.Resources.CreateDeploymentIfNotExists(mattermost, desired, reqLogger)
 	if err != nil {
-		recStatus.Error = errors.Wrap(err, "failed to create mattermost deployment")
+		recStatus.Error = errors.Wrap(recStatus.Error, "failed to create mattermost deployment")
 		return recStatus
 	}
 
 	current := &appsv1.Deployment{}
 	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: desired.Name, Namespace: desired.Namespace}, current)
 	if err != nil {
-		recStatus.Error = errors.Wrap(err, "failed to get mattermost deployment")
+		recStatus.Error = errors.Wrap(recStatus.Error, "failed to get mattermost deployment")
 		return recStatus
 	}
 
 	recStatus = r.updateMattermostDeployment(mattermost, current, desired, reqLogger)
 	if recStatus.Error != nil {
-		recStatus.Error = errors.Wrap(err, "failed to update mattermost deployment")
+		recStatus.Error = errors.Wrap(recStatus.Error, "failed to update mattermost deployment")
 		return recStatus
 	}
-
 	return recStatus
 }
 

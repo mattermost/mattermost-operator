@@ -333,7 +333,7 @@ func TestCheckMattermost(t *testing.T) {
 
 		recStatus = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
 		assert.Error(t, recStatus.Error)
-		assert.Contains(t, recStatus.Error, "Restarted update image job")
+		assert.Contains(t, recStatus.Error.Error(), "Restarted update image job")
 
 		// get new job, assert new image and change status to completed
 		restartedUpdateJob := batchv1.Job{}
