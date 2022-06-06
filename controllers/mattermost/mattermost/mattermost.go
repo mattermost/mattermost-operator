@@ -434,6 +434,7 @@ func (r *MattermostReconciler) updateMattermostDeployment(
 	}
 	if err != nil {
 		recStatus.Status = true
+		recStatus.Error = err
 		return recStatus
 	}
 
