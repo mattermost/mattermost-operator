@@ -3,11 +3,12 @@ package mattermost
 import (
 	"context"
 	"fmt"
+	"testing"
+
 	"github.com/go-logr/logr"
 	"github.com/sirupsen/logrus"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"testing"
 
 	"github.com/mattermost/mattermost-operator/pkg/resources"
 
@@ -274,11 +275,13 @@ func TestCheckMattermost(t *testing.T) {
 		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: updateJobName, Namespace: mmNamespace}, job)
 		require.NoError(t, err)
 
-		// TODO: assert owner references are set here
+		// Assert owner references are set here
+		assert.NotEmpty(t, job.ObjectMeta.OwnerReferences)
+		assert.Equal(t, "Mattermost", job.ObjectMeta.OwnerReferences[0].Kind)
 
 		// Set job status to succeeded so that test can proceed
 		now := metav1.Now()
-		job.Status =  batchv1.JobStatus{
+		job.Status = batchv1.JobStatus{
 			Succeeded:      1,
 			CompletionTime: &now,
 		}
