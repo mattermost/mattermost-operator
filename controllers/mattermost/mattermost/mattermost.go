@@ -22,8 +22,7 @@ import (
 )
 
 type reconcileStatus struct {
-	Status bool
-	Error  error
+	ResourcesReady bool
 }
 
 func (r *MattermostReconciler) checkMattermost(
@@ -31,73 +30,53 @@ func (r *MattermostReconciler) checkMattermost(
 	dbInfo mattermostApp.DatabaseConfig,
 	fileStoreInfo *mattermostApp.FileStoreInfo,
 	status *mmv1beta.MattermostStatus,
-	reqLogger logr.Logger) reconcileStatus {
+	reqLogger logr.Logger) (reconcileStatus, error) {
 	reqLogger = reqLogger.WithValues("Reconcile", "mattermost")
-
 	recStatus := reconcileStatus{
-		Status: false,
-		Error:  nil,
+		ResourcesReady: true,
 	}
 
 	err := r.checkLicence(mattermost)
-	if err.Error != nil {
-		recStatus.Error = errors.Wrap(err.Error, "failed to check mattermost license secret.")
-		return recStatus
+	if err != nil {
+		return recStatus, errors.Wrap(err, "failed to check mattermost license secret.")
 	}
 
 	err = r.checkMattermostService(mattermost, status, reqLogger)
-	if err.Error != nil {
-		recStatus.Error = err.Error
-		return recStatus
+	if err != nil {
+		return recStatus, err
 	}
 
 	err = r.checkMattermostRBAC(mattermost, reqLogger)
-	if err.Error != nil {
-		recStatus.Error = err.Error
-		return recStatus
+	if err != nil {
+		return recStatus, err
 	}
 
 	if !mattermost.Spec.UseServiceLoadBalancer {
 		err = r.checkMattermostIngress(mattermost, reqLogger)
-		if err.Error != nil {
-			recStatus.Error = err.Error
-			return recStatus
+		if err != nil {
+			return recStatus, err
 		}
 	}
 
-	err = r.checkMattermostDeployment(mattermost, dbInfo, fileStoreInfo, status, reqLogger)
-	if err.Error != nil {
-		recStatus.Error = err.Error
-		return recStatus
+	recStatus, err = r.checkMattermostDeployment(mattermost, dbInfo, fileStoreInfo, status, reqLogger)
+	if err != nil {
+		return recStatus, err
 	}
 
-	return recStatus
+	return recStatus, nil
 }
 
-func (r *MattermostReconciler) checkLicence(mattermost *mmv1beta.Mattermost) reconcileStatus {
-	recStatus := reconcileStatus{
-		Status: false,
-		Error:  nil,
-	}
-
+func (r *MattermostReconciler) checkLicence(mattermost *mmv1beta.Mattermost) error {
 	if mattermost.Spec.LicenseSecret == "" {
-		return recStatus
+		return nil
 	}
-
-	recStatus.Error = r.assertSecretContains(mattermost.Spec.LicenseSecret, "license", mattermost.Namespace)
-
-	return recStatus
+	return r.assertSecretContains(mattermost.Spec.LicenseSecret, "license", mattermost.Namespace)
 }
 
 func (r *MattermostReconciler) checkMattermostService(
 	mattermost *mmv1beta.Mattermost,
 	status *mmv1beta.MattermostStatus,
-	reqLogger logr.Logger) reconcileStatus {
-	recStatus := reconcileStatus{
-		Status: false,
-		Error:  nil,
-	}
-
+	reqLogger logr.Logger) error {
 	desired := mattermostApp.GenerateServiceV1Beta(mattermost)
 
 	patchedObj, applied, err := mattermost.Spec.ResourcePatch.ApplyToService(desired)
@@ -114,156 +93,108 @@ func (r *MattermostReconciler) checkMattermostService(
 
 	err = r.Resources.CreateServiceIfNotExists(mattermost, desired, reqLogger)
 	if err != nil {
-		recStatus.Error = err
-		return recStatus
+		return err
 	}
 
 	current := &corev1.Service{}
 	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: desired.Name, Namespace: desired.Namespace}, current)
 	if err != nil {
-		recStatus.Error = err
-		return recStatus
+		return err
 	}
 
 	resources.CopyServiceEmptyAutoAssignedFields(desired, current)
 
-	recStatus.Error = r.Resources.Update(current, desired, reqLogger)
-
-	return recStatus
+	return r.Resources.Update(current, desired, reqLogger)
 }
 
-func (r *MattermostReconciler) checkMattermostRBAC(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) reconcileStatus {
-	recStatus := reconcileStatus{
-		Status: false,
-		Error:  nil,
-	}
-
+func (r *MattermostReconciler) checkMattermostRBAC(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) error {
 	err := r.checkMattermostSA(mattermost, reqLogger)
-	if err.Error != nil {
-		recStatus.Error = errors.Wrap(err.Error, "failed to check mattermost ServiceAccount")
-		return recStatus
+	if err != nil {
+		return errors.Wrap(err, "failed to check mattermost ServiceAccount")
 	}
 	err = r.checkMattermostRole(mattermost, reqLogger)
-	if err.Error != nil {
-		recStatus.Error = errors.Wrap(err.Error, "failed to check mattermost Role")
-		return recStatus
+	if err != nil {
+		return errors.Wrap(err, "failed to check mattermost Role")
 	}
 	err = r.checkMattermostRoleBinding(mattermost, reqLogger)
-	if err.Error != nil {
-		recStatus.Error = errors.Wrap(err.Error, "failed to check mattermost RoleBinding")
-		return recStatus
+	if err != nil {
+		return errors.Wrap(err, "failed to check mattermost RoleBinding")
 	}
 
-	return recStatus
+	return nil
 }
 
-func (r *MattermostReconciler) checkMattermostSA(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) reconcileStatus {
-	recStatus := reconcileStatus{
-		Status: false,
-		Error:  nil,
-	}
-
+func (r *MattermostReconciler) checkMattermostSA(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) error {
 	desired := mattermostApp.GenerateServiceAccountV1Beta(mattermost, mattermost.Name)
 	err := r.Resources.CreateServiceAccountIfNotExists(mattermost, desired, reqLogger)
 	if err != nil {
-		recStatus.Error = err
-		return recStatus
+		return err
 	}
 
 	current := &corev1.ServiceAccount{}
 	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: desired.Name, Namespace: desired.Namespace}, current)
 	if err != nil {
-		recStatus.Error = err
-		return recStatus
+		return err
 	}
 
-	recStatus.Error = r.Resources.Update(current, desired, reqLogger)
-
-	return recStatus
+	return r.Resources.Update(current, desired, reqLogger)
 }
 
-func (r *MattermostReconciler) checkMattermostRole(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) reconcileStatus {
-	recStatus := reconcileStatus{
-		Status: false,
-		Error:  nil,
-	}
-
+func (r *MattermostReconciler) checkMattermostRole(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) error {
 	desired := mattermostApp.GenerateRoleV1Beta(mattermost, mattermost.Name)
 	err := r.Resources.CreateRoleIfNotExists(mattermost, desired, reqLogger)
 	if err != nil {
-		recStatus.Error = err
-		return recStatus
+		return err
 	}
 
 	current := &rbacv1.Role{}
 	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: desired.Name, Namespace: desired.Namespace}, current)
 	if err != nil {
-		recStatus.Error = err
-		return recStatus
+		return err
 	}
 
-	recStatus.Error = r.Resources.Update(current, desired, reqLogger)
-
-	return recStatus
+	return r.Resources.Update(current, desired, reqLogger)
 }
 
-func (r *MattermostReconciler) checkMattermostRoleBinding(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) reconcileStatus {
-	recStatus := reconcileStatus{
-		Status: false,
-		Error:  nil,
-	}
-
+func (r *MattermostReconciler) checkMattermostRoleBinding(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) error {
 	desired := mattermostApp.GenerateRoleBindingV1Beta(mattermost, mattermost.Name, mattermost.Name)
 	err := r.Resources.CreateRoleBindingIfNotExists(mattermost, desired, reqLogger)
 	if err != nil {
-		recStatus.Error = err
-		return recStatus
+		return err
 	}
 
 	current := &rbacv1.RoleBinding{}
 	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: desired.Name, Namespace: desired.Namespace}, current)
 	if err != nil {
-		recStatus.Error = err
-		return recStatus
+		return err
 	}
 
-	recStatus.Error = r.Resources.Update(current, desired, reqLogger)
-	return recStatus
+	return r.Resources.Update(current, desired, reqLogger)
 }
 
-func (r *MattermostReconciler) checkMattermostIngress(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) reconcileStatus {
-	recStatus := reconcileStatus{
-		Status: false,
-		Error:  nil,
-	}
-
+func (r *MattermostReconciler) checkMattermostIngress(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) error {
 	desired := mattermostApp.GenerateIngressV1Beta(mattermost)
 
 	if !mattermost.IngressEnabled() {
 		err := r.Resources.DeleteIngress(types.NamespacedName{Namespace: desired.Namespace, Name: desired.Name}, reqLogger)
 		if err != nil {
-			recStatus.Error = errors.Wrap(err, "failed to delete disabled ingress")
-			return recStatus
+			return errors.Wrap(err, "failed to delete disabled ingress")
 		}
-		return recStatus
+		return nil
 	}
 
 	err := r.Resources.CreateIngressIfNotExists(mattermost, desired, reqLogger)
 	if err != nil {
-		recStatus.Error = err
-		return recStatus
+		return err
 	}
 
 	current := &networkingv1.Ingress{}
 	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: desired.Name, Namespace: desired.Namespace}, current)
 	if err != nil {
-		recStatus.Error = err
-		return recStatus
+		return err
 	}
 
-	recStatus.Error = r.Resources.Update(current, desired, reqLogger)
-
-	return recStatus
+	return r.Resources.Update(current, desired, reqLogger)
 }
 
 func (r *MattermostReconciler) checkMattermostDeployment(
@@ -271,12 +202,7 @@ func (r *MattermostReconciler) checkMattermostDeployment(
 	dbConfig mattermostApp.DatabaseConfig,
 	fileStoreInfo *mattermostApp.FileStoreInfo,
 	status *mmv1beta.MattermostStatus,
-	reqLogger logr.Logger) reconcileStatus {
-
-	recStatus := reconcileStatus{
-		Status: false,
-		Error:  nil,
-	}
+	reqLogger logr.Logger) (reconcileStatus, error) {
 
 	desired := mattermostApp.GenerateDeploymentV1Beta(
 		mattermost,
@@ -287,6 +213,10 @@ func (r *MattermostReconciler) checkMattermostDeployment(
 		mattermost.Name,
 		mattermost.GetImageName(),
 	)
+
+	recStatus := reconcileStatus{
+		ResourcesReady: true,
+	}
 
 	patchedObj, applied, err := mattermost.Spec.ResourcePatch.ApplyToDeployment(desired)
 	if err != nil {
@@ -310,31 +240,24 @@ func (r *MattermostReconciler) checkMattermostDeployment(
 
 	err = r.Resources.CreateDeploymentIfNotExists(mattermost, desired, reqLogger)
 	if err != nil {
-		recStatus.Error = errors.Wrap(recStatus.Error, "failed to create mattermost deployment")
-		return recStatus
+		return recStatus, errors.Wrap(err, "failed to create mattermost deployment")
 	}
 
 	current := &appsv1.Deployment{}
 	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: desired.Name, Namespace: desired.Namespace}, current)
 	if err != nil {
-		recStatus.Error = errors.Wrap(recStatus.Error, "failed to get mattermost deployment")
-		return recStatus
+		return recStatus, errors.Wrap(err, "failed to get mattermost deployment")
 	}
 
-	recStatus = r.updateMattermostDeployment(mattermost, current, desired, reqLogger)
-	if recStatus.Error != nil {
-		recStatus.Error = errors.Wrap(recStatus.Error, "failed to update mattermost deployment")
-		return recStatus
+	recStatus, err = r.updateMattermostDeployment(mattermost, current, desired, reqLogger)
+	if err != nil {
+		return recStatus, errors.Wrap(err, "failed to update mattermost deployment")
 	}
-	return recStatus
+
+	return recStatus, nil
 }
 
-func (r *MattermostReconciler) checkMattermostDBSetupJob(mattermost *mmv1beta.Mattermost, deployment *appsv1.Deployment, reqLogger logr.Logger) reconcileStatus {
-	recStatus := reconcileStatus{
-		Status: false,
-		Error:  nil,
-	}
-
+func (r *MattermostReconciler) checkMattermostDBSetupJob(mattermost *mmv1beta.Mattermost, deployment *appsv1.Deployment, reqLogger logr.Logger) error {
 	desiredJob := resources.PrepareMattermostJobTemplate(mattermostApp.SetupJobName, mattermost.Namespace, deployment)
 	desiredJob.OwnerReferences = mattermostApp.MattermostOwnerReference(mattermost)
 
@@ -343,14 +266,12 @@ func (r *MattermostReconciler) checkMattermostDBSetupJob(mattermost *mmv1beta.Ma
 	if err != nil {
 		if k8sErrors.IsNotFound(err) {
 			reqLogger.Info("Creating DB setup job", "name", desiredJob.Name)
-			recStatus.Error = r.Resources.Create(mattermost, desiredJob, reqLogger)
-			return recStatus
+			return r.Resources.Create(mattermost, desiredJob, reqLogger)
 		}
-		recStatus.Error = errors.Wrap(err, "failed to get current db setup job")
-		return recStatus
+		return errors.Wrap(err, "failed to get current db setup job")
 	}
 	// For now, there is no need to perform job update, so just return.
-	return recStatus
+	return nil
 }
 
 // isMainDeploymentContainerImageSame checks whether main containers of specified deployments are the same or not.
@@ -400,22 +321,19 @@ func (r *MattermostReconciler) updateMattermostDeployment(
 	current *appsv1.Deployment,
 	desired *appsv1.Deployment,
 	reqLogger logr.Logger,
-) reconcileStatus {
+) (reconcileStatus, error) {
+	sameImage, err := r.isMainDeploymentContainerImageSame(current, desired)
 	recStatus := reconcileStatus{
-		Status: false,
-		Error:  nil,
+		ResourcesReady: true,
 	}
 
-	sameImage, err := r.isMainDeploymentContainerImageSame(current, desired)
 	if err != nil {
-		recStatus.Error = err
-		return recStatus
+		return recStatus, err
 	}
 
 	if sameImage {
-		recStatus.Error = r.Resources.Update(current, desired, reqLogger)
 		// Need to update other fields only, update job is not required
-		return recStatus
+		return recStatus, r.Resources.Update(current, desired, reqLogger)
 	}
 
 	// Image is not the same
@@ -432,15 +350,13 @@ func (r *MattermostReconciler) updateMattermostDeployment(
 		defer r.cleanupUpdateJob(job, reqLogger)
 	}
 	if err != nil {
-		recStatus.Status = true
-		recStatus.Error = err
-		return recStatus
+		recStatus.ResourcesReady = false
+		return recStatus, err
 	}
 
 	// Job completed successfully
-	recStatus.Error = r.Resources.Update(current, desired, reqLogger)
 
-	return recStatus
+	return recStatus, r.Resources.Update(current, desired, reqLogger)
 }
 
 // checkUpdateJob checks whether update job status. In case job is not running it is launched

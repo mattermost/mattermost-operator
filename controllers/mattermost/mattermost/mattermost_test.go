@@ -36,11 +36,6 @@ import (
 func TestCheckMattermost(t *testing.T) {
 	logger, _, reconciler := setupTestDeps(t)
 
-	recStatus := reconcileStatus{
-		Status: false,
-		Error:  nil,
-	}
-
 	mmName := "foo"
 	mmNamespace := "default"
 	replicas := int32(4)
@@ -65,8 +60,8 @@ func TestCheckMattermost(t *testing.T) {
 	var err error
 
 	t.Run("service", func(t *testing.T) {
-		recStatus = reconciler.checkMattermostService(mm, currentMMStatus, logger)
-		assert.NoError(t, recStatus.Error)
+		err = reconciler.checkMattermostService(mm, currentMMStatus, logger)
+		assert.NoError(t, err)
 
 		found := &corev1.Service{}
 		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
@@ -81,8 +76,8 @@ func TestCheckMattermost(t *testing.T) {
 
 		err = reconciler.Client.Update(context.TODO(), modified)
 		require.NoError(t, err)
-		recStatus = reconciler.checkMattermostService(mm, currentMMStatus, logger)
-		require.NoError(t, recStatus.Error)
+		err = reconciler.checkMattermostService(mm, currentMMStatus, logger)
+		require.NoError(t, err)
 		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
 		require.NoError(t, err)
 		assert.Equal(t, original.GetName(), found.GetName())
@@ -92,8 +87,8 @@ func TestCheckMattermost(t *testing.T) {
 	})
 
 	t.Run("service account", func(t *testing.T) {
-		recStatus = reconciler.checkMattermostSA(mm, logger)
-		assert.NoError(t, recStatus.Error)
+		err = reconciler.checkMattermostSA(mm, logger)
+		assert.NoError(t, err)
 
 		found := &corev1.ServiceAccount{}
 		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
@@ -102,15 +97,15 @@ func TestCheckMattermost(t *testing.T) {
 
 		err = reconciler.Client.Delete(context.TODO(), found)
 		require.NoError(t, err)
-		recStatus = reconciler.checkMattermostSA(mm, logger)
-		require.NoError(t, recStatus.Error)
+		err = reconciler.checkMattermostSA(mm, logger)
+		require.NoError(t, err)
 		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
 		require.NoError(t, err)
 	})
 
 	t.Run("role", func(t *testing.T) {
-		recStatus = reconciler.checkMattermostRole(mm, logger)
-		assert.NoError(t, recStatus.Error)
+		err = reconciler.checkMattermostRole(mm, logger)
+		assert.NoError(t, err)
 
 		found := &rbacv1.Role{}
 		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
@@ -123,8 +118,8 @@ func TestCheckMattermost(t *testing.T) {
 
 		err = reconciler.Client.Update(context.TODO(), modified)
 		require.NoError(t, err)
-		recStatus = reconciler.checkMattermostRole(mm, logger)
-		require.NoError(t, recStatus.Error)
+		err = reconciler.checkMattermostRole(mm, logger)
+		require.NoError(t, err)
 		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
 		require.NoError(t, err)
 		assert.Equal(t, original.GetName(), found.GetName())
@@ -133,8 +128,8 @@ func TestCheckMattermost(t *testing.T) {
 	})
 
 	t.Run("role binding", func(t *testing.T) {
-		recStatus = reconciler.checkMattermostRoleBinding(mm, logger)
-		assert.NoError(t, recStatus.Error)
+		err = reconciler.checkMattermostRoleBinding(mm, logger)
+		assert.NoError(t, err)
 
 		found := &rbacv1.RoleBinding{}
 		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
@@ -147,8 +142,8 @@ func TestCheckMattermost(t *testing.T) {
 
 		err = reconciler.Client.Update(context.TODO(), modified)
 		require.NoError(t, err)
-		recStatus = reconciler.checkMattermostRoleBinding(mm, logger)
-		require.NoError(t, recStatus.Error)
+		err = reconciler.checkMattermostRoleBinding(mm, logger)
+		require.NoError(t, err)
 		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
 		require.NoError(t, err)
 		assert.Equal(t, original.GetName(), found.GetName())
@@ -158,8 +153,8 @@ func TestCheckMattermost(t *testing.T) {
 
 	t.Run("ingress no tls", func(t *testing.T) {
 		mm.Spec.UseIngressTLS = false
-		recStatus = reconciler.checkMattermostIngress(mm, logger)
-		assert.NoError(t, recStatus.Error)
+		err = reconciler.checkMattermostIngress(mm, logger)
+		assert.NoError(t, err)
 
 		found := &v1beta1.Ingress{}
 		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
@@ -175,8 +170,8 @@ func TestCheckMattermost(t *testing.T) {
 
 		err = reconciler.Client.Update(context.TODO(), modified)
 		require.NoError(t, err)
-		recStatus = reconciler.checkMattermostIngress(mm, logger)
-		require.NoError(t, recStatus.Error)
+		err = reconciler.checkMattermostIngress(mm, logger)
+		require.NoError(t, err)
 		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
 		require.NoError(t, err)
 		assert.Equal(t, original.GetAnnotations(), found.GetAnnotations())
@@ -192,8 +187,8 @@ func TestCheckMattermost(t *testing.T) {
 			"test-ingress":                "blabla",
 		}
 
-		recStatus = reconciler.checkMattermostIngress(mm, logger)
-		assert.NoError(t, recStatus.Error)
+		err = reconciler.checkMattermostIngress(mm, logger)
+		assert.NoError(t, err)
 
 		found := &v1beta1.Ingress{}
 		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
@@ -211,8 +206,8 @@ func TestCheckMattermost(t *testing.T) {
 
 		err = reconciler.Client.Update(context.TODO(), modified)
 		require.NoError(t, err)
-		recStatus = reconciler.checkMattermostIngress(mm, logger)
-		require.NoError(t, recStatus.Error)
+		err = reconciler.checkMattermostIngress(mm, logger)
+		require.NoError(t, err)
 		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
 		require.NoError(t, err)
 		assert.Equal(t, original.GetAnnotations(), found.GetAnnotations())
@@ -223,8 +218,8 @@ func TestCheckMattermost(t *testing.T) {
 	})
 
 	t.Run("ingress disabled", func(t *testing.T) {
-		recStatus = reconciler.checkMattermostIngress(mm, logger)
-		assert.NoError(t, recStatus.Error)
+		err = reconciler.checkMattermostIngress(mm, logger)
+		assert.NoError(t, err)
 
 		found := &v1beta1.Ingress{}
 		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
@@ -233,8 +228,8 @@ func TestCheckMattermost(t *testing.T) {
 
 		mm.Spec.Ingress = &mmv1beta.Ingress{Enabled: false}
 
-		recStatus = reconciler.checkMattermostIngress(mm, logger)
-		require.NoError(t, recStatus.Error)
+		err = reconciler.checkMattermostIngress(mm, logger)
+		require.NoError(t, err)
 
 		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
 		require.Error(t, err)
@@ -264,8 +259,9 @@ func TestCheckMattermost(t *testing.T) {
 		err = reconciler.Client.Create(context.TODO(), job)
 		require.NoError(t, err)
 
-		recStatus = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
-		assert.NoError(t, recStatus.Error)
+		recStatus, err := reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
+		assert.NoError(t, err)
+		assert.Equal(t, true, recStatus.ResourcesReady)
 
 		//dbSetupJob := &batchv1.Job{}
 		//err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mattermost.SetupJobName, Namespace: mmNamespace}, dbSetupJob)
@@ -290,8 +286,8 @@ func TestCheckMattermost(t *testing.T) {
 
 		err = reconciler.Client.Update(context.TODO(), modified)
 		require.NoError(t, err)
-		recStatus = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
-		require.NoError(t, recStatus.Error)
+		recStatus, err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
+		require.NoError(t, err)
 		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
 		require.NoError(t, err)
 		assert.Equal(t, original.GetLabels(), found.GetLabels())
@@ -301,8 +297,9 @@ func TestCheckMattermost(t *testing.T) {
 
 	t.Run("restart update job", func(t *testing.T) {
 		// create deployment
-		recStatus = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
-		assert.NoError(t, recStatus.Error)
+		recStatus, err := reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
+		assert.NoError(t, err)
+		assert.Equal(t, true, recStatus.ResourcesReady)
 
 		// create update job with invalid image
 		updateName := "mattermost-update-check"
@@ -324,16 +321,16 @@ func TestCheckMattermost(t *testing.T) {
 				CompletionTime: &now,
 			},
 		}
-		err := reconciler.Client.Create(context.TODO(), invalidUpdateJob)
+		err = reconciler.Client.Create(context.TODO(), invalidUpdateJob)
 		require.NoError(t, err)
 
 		// should delete update job and create new and return error
 		newImage := "mattermost/new-image"
 		mm.Spec.Image = newImage
 
-		recStatus = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
-		assert.Error(t, recStatus.Error)
-		assert.Contains(t, recStatus.Error.Error(), "Restarted update image job")
+		recStatus, err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "Restarted update image job")
 
 		// get new job, assert new image and change status to completed
 		restartedUpdateJob := batchv1.Job{}
@@ -352,18 +349,13 @@ func TestCheckMattermost(t *testing.T) {
 		require.NoError(t, err)
 
 		// should succeed now
-		recStatus = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
-		assert.NoError(t, recStatus.Error)
+		recStatus, err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
+		assert.NoError(t, err)
 	})
 }
 
 func TestCheckMattermostExternalDBAndFileStore(t *testing.T) {
 	logger, _, reconciler := setupTestDeps(t)
-
-	recStatus := reconcileStatus{
-		Status: false,
-		Error:  nil,
-	}
 
 	mmName := "foo"
 	mmNamespace := "default"
@@ -426,8 +418,8 @@ func TestCheckMattermostExternalDBAndFileStore(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("service", func(t *testing.T) {
-		recStatus = reconciler.checkMattermostService(mm, currentMMStatus, logger)
-		assert.NoError(t, recStatus.Error)
+		err = reconciler.checkMattermostService(mm, currentMMStatus, logger)
+		assert.NoError(t, err)
 
 		found := &corev1.Service{}
 		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
@@ -442,8 +434,8 @@ func TestCheckMattermostExternalDBAndFileStore(t *testing.T) {
 
 		err = reconciler.Client.Update(context.TODO(), modified)
 		require.NoError(t, err)
-		recStatus = reconciler.checkMattermostService(mm, currentMMStatus, logger)
-		require.NoError(t, recStatus.Error)
+		err = reconciler.checkMattermostService(mm, currentMMStatus, logger)
+		require.NoError(t, err)
 		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
 		require.NoError(t, err)
 		assert.Equal(t, original.GetName(), found.GetName())
@@ -453,8 +445,8 @@ func TestCheckMattermostExternalDBAndFileStore(t *testing.T) {
 	})
 
 	t.Run("ingress", func(t *testing.T) {
-		recStatus = reconciler.checkMattermostIngress(mm, logger)
-		assert.NoError(t, recStatus.Error)
+		err = reconciler.checkMattermostIngress(mm, logger)
+		assert.NoError(t, err)
 
 		found := &v1beta1.Ingress{}
 		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
@@ -469,8 +461,8 @@ func TestCheckMattermostExternalDBAndFileStore(t *testing.T) {
 
 		err = reconciler.Client.Update(context.TODO(), modified)
 		require.NoError(t, err)
-		recStatus = reconciler.checkMattermostIngress(mm, logger)
-		require.NoError(t, recStatus.Error)
+		err = reconciler.checkMattermostIngress(mm, logger)
+		require.NoError(t, err)
 		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
 		require.NoError(t, err)
 		assert.Equal(t, original.GetAnnotations(), found.GetAnnotations())
@@ -502,8 +494,9 @@ func TestCheckMattermostExternalDBAndFileStore(t *testing.T) {
 		err := reconciler.Client.Create(context.TODO(), job)
 		require.NoError(t, err)
 
-		recStatus = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
-		assert.NoError(t, recStatus.Error)
+		recStatus, err := reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
+		assert.NoError(t, err)
+		assert.Equal(t, true, recStatus.ResourcesReady)
 
 		// TODO: uncomment when enabling back the db setup job
 		//dbSetupJob := &batchv1.Job{}
@@ -528,8 +521,8 @@ func TestCheckMattermostExternalDBAndFileStore(t *testing.T) {
 
 		err = reconciler.Client.Update(context.TODO(), modified)
 		require.NoError(t, err)
-		recStatus = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
-		require.NoError(t, recStatus.Error)
+		recStatus, err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
+		require.NoError(t, err)
 		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
 		require.NoError(t, err)
 		assert.Equal(t, original.Labels, found.Labels)
@@ -566,24 +559,24 @@ func TestSpecialCases(t *testing.T) {
 	t.Run("service - copy ClusterIP for LoadBalancer service", func(t *testing.T) {
 		// Create the service
 		err := reconciler.checkMattermostService(mm, currentMMStatus, logger)
-		require.NoError(t, err.Error)
+		require.NoError(t, err)
 
 		service := &corev1.Service{}
-		err.Error = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, service)
-		require.NoError(t, err.Error)
+		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, service)
+		require.NoError(t, err)
 
 		service.Spec.ClusterIPs = []string{"10.10.10.10", "10.10.10.11"}
 		service.Spec.ClusterIP = "10.10.10.10"
-		err.Error = reconciler.Client.Update(context.TODO(), service)
-		require.NoError(t, err.Error)
+		err = reconciler.Client.Update(context.TODO(), service)
+		require.NoError(t, err)
 
 		mm.Spec.ResourceLabels = map[string]string{"myLabel": "test"}
 		err = reconciler.checkMattermostService(mm, currentMMStatus, logger)
-		require.NoError(t, err.Error)
+		require.NoError(t, err)
 
 		modified := &corev1.Service{}
-		err.Error = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, modified)
-		require.NoError(t, err.Error)
+		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, modified)
+		require.NoError(t, err)
 		assert.Equal(t, service.Spec.ClusterIPs, modified.Spec.ClusterIPs)
 		assert.Equal(t, service.Spec.ClusterIP, modified.Spec.ClusterIP)
 	})
@@ -686,13 +679,14 @@ func Test_Patches(t *testing.T) {
 
 				dbInfo, fileStoreInfo := fixedDBAndFileStoreInfo(t, mm)
 
-				err := reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, &mmStatus, logger)
-				require.NoError(t, err.Error)
+				recStatus, err := reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, &mmStatus, logger)
+				require.NoError(t, err)
+				assert.Equal(t, true, recStatus.ResourcesReady)
 
 				deployKey := types.NamespacedName{Name: mmName, Namespace: mmNamespace}
 				deploy := appsv1.Deployment{}
-				err.Error = fakeClient.Get(context.Background(), deployKey, &deploy)
-				require.NoError(t, err.Error)
+				err = fakeClient.Get(context.Background(), deployKey, &deploy)
+				require.NoError(t, err)
 
 				testCase.assertFn(t, &deploy, mmStatus)
 			})
@@ -759,12 +753,12 @@ func Test_Patches(t *testing.T) {
 				mm.Spec.ResourcePatch = testCase.patch
 
 				err := reconciler.checkMattermostService(mm, &mmStatus, logger)
-				require.NoError(t, err.Error)
+				require.NoError(t, err)
 
 				deployKey := types.NamespacedName{Name: mmName, Namespace: mmNamespace}
 				svc := corev1.Service{}
-				err.Error = fakeClient.Get(context.Background(), deployKey, &svc)
-				require.NoError(t, err.Error)
+				err = fakeClient.Get(context.Background(), deployKey, &svc)
+				require.NoError(t, err)
 
 				testCase.assertFn(t, &svc, mmStatus)
 			})

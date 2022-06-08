@@ -25,6 +25,7 @@ import (
 )
 
 const healthCheckRequeueDelay = 6 * time.Second
+const resourcesReadyDelay = 10 * time.Second
 
 // MattermostReconciler reconciles a Mattermost object
 type MattermostReconciler struct {
@@ -144,18 +145,15 @@ func (r *MattermostReconciler) Reconcile(ctx context.Context, request ctrl.Reque
 		return reconcile.Result{}, err
 	}
 
-	recStatus := reconcileStatus{
-		Status: false,
-		Error:  nil,
+	recStatus, err := r.checkMattermost(mattermost, dbConfig, fileStoreConfig, &status, reqLogger)
+	if err != nil {
+		r.updateStatusReconcilingAndLogError(mattermost, status, reqLogger, err)
+		return reconcile.Result{}, err
 	}
 
-	recStatus = r.checkMattermost(mattermost, dbConfig, fileStoreConfig, &status, reqLogger)
-	if recStatus.Error != nil {
-		if recStatus.Status {
-			time.Sleep(5 * time.Second)
-		}
-		r.updateStatusReconcilingAndLogError(mattermost, status, reqLogger, recStatus.Error)
-		return reconcile.Result{}, recStatus.Error
+	if !recStatus.ResourcesReady {
+		reqLogger.Info("Mattermost resources not ready, dealying for 10 seconds!")
+		return ctrl.Result{RequeueAfter: resourcesReadyDelay}, nil
 	}
 
 	status, err = r.checkMattermostHealth(mattermost, status, reqLogger)
