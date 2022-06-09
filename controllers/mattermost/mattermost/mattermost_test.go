@@ -237,27 +237,7 @@ func TestCheckMattermost(t *testing.T) {
 	})
 
 	t.Run("deployment", func(t *testing.T) {
-		updateName := "mattermost-update-check"
-		now := metav1.Now()
-		job := &batchv1.Job{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      updateName,
-				Namespace: mm.GetNamespace(),
-			},
-			Spec: batchv1.JobSpec{Template: corev1.PodTemplateSpec{
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{Name: mmv1beta.MattermostAppContainerName, Image: mm.GetImageName()},
-					},
-				},
-			}},
-			Status: batchv1.JobStatus{
-				Succeeded:      1,
-				CompletionTime: &now,
-			},
-		}
-		err = reconciler.Client.Create(context.TODO(), job)
-		require.NoError(t, err)
+		updateJobName := "mattermost-update-check"
 
 		recStatus, err := reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
 		assert.NoError(t, err)
@@ -287,7 +267,35 @@ func TestCheckMattermost(t *testing.T) {
 		err = reconciler.Client.Update(context.TODO(), modified)
 		require.NoError(t, err)
 		recStatus, err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
+
+		// Update job should be launched, we expect error
+		err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
+		require.Error(t, err)
+
+		// Assert the job was created
+		job := &batchv1.Job{}
+		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: updateJobName, Namespace: mmNamespace}, job)
 		require.NoError(t, err)
+
+		// Assert owner references are set here
+		assert.NotEmpty(t, job.ObjectMeta.OwnerReferences)
+		assert.Equal(t, "Mattermost", job.ObjectMeta.OwnerReferences[0].Kind)
+		assert.Equal(t, mmName, job.ObjectMeta.OwnerReferences[0].Name)
+		assert.Equal(t, "installation.mattermost.com/v1beta1", job.ObjectMeta.OwnerReferences[0].APIVersion)
+
+		// Set job status to succeeded so that test can proceed
+		now := metav1.Now()
+		job.Status = batchv1.JobStatus{
+			Succeeded:      1,
+			CompletionTime: &now,
+		}
+		err = reconciler.Client.Update(context.TODO(), job)
+		require.NoError(t, err)
+
+		// Job is marked as succeeded, should proceed now.
+		err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
+		require.NoError(t, err)
+
 		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
 		require.NoError(t, err)
 		assert.Equal(t, original.GetLabels(), found.GetLabels())

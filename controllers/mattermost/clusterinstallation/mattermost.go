@@ -397,7 +397,7 @@ func (r *ClusterInstallationReconciler) checkUpdateJob(
 		if k8sErrors.IsNotFound(err) {
 			// Job is not running, let's launch
 			reqLogger.Info("Launching update image job")
-			if err = r.Resources.LaunchMattermostUpdateJob(mattermost.Namespace, desired); err != nil {
+			if err = r.Resources.LaunchMattermostUpdateJob(mattermost, mattermost.Namespace, desired, reqLogger); err != nil {
 				return nil, errors.Wrap(err, "Launching update image job failed")
 			}
 			return nil, errors.New("Began update image job")
@@ -419,7 +419,7 @@ func (r *ClusterInstallationReconciler) checkUpdateJob(
 	}
 	if !isSameImage {
 		reqLogger.Info("Mattermost image changed, restarting update job")
-		err := r.Resources.RestartMattermostUpdateJob(job, desired)
+		err := r.Resources.RestartMattermostUpdateJob(mattermost, job, desired, reqLogger)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to restart update job")
 		}
