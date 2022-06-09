@@ -346,6 +346,7 @@ func (r *MattermostReconciler) updateMattermostDeployment(
 
 	job, err := r.checkUpdateJob(mattermost.Namespace, desired, reqLogger)
 	if job != nil {
+		recStatus.ResourcesReady = true
 		// Job is done, need to cleanup
 		defer r.cleanupUpdateJob(job, reqLogger)
 	}
