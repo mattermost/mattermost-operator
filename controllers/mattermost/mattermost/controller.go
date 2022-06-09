@@ -152,7 +152,7 @@ func (r *MattermostReconciler) Reconcile(ctx context.Context, request ctrl.Reque
 	}
 
 	if !recStatus.ResourcesReady {
-		reqLogger.Info("Mattermost resources not ready, dealying for 10 seconds!")
+		reqLogger.Info("Mattermost resources not ready, delaying for 10 seconds!")
 		return ctrl.Result{RequeueAfter: resourcesReadyDelay}, nil
 	}
 
