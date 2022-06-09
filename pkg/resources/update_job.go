@@ -3,6 +3,7 @@ package resources
 import (
 	"context"
 
+	"github.com/go-logr/logr"
 	mattermostApp "github.com/mattermost/mattermost-operator/pkg/mattermost"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
@@ -17,12 +18,14 @@ import (
 const UpdateJobName = "mattermost-update-check"
 
 func (r *ResourceHelper) LaunchMattermostUpdateJob(
+	owner metav1.Object,
 	jobNamespace string,
 	baseDeployment *appsv1.Deployment,
+	reqLogger logr.Logger,
 ) error {
 	job := PrepareMattermostJobTemplate(UpdateJobName, jobNamespace, baseDeployment)
 
-	err := r.client.Create(context.TODO(), job)
+	err := r.Create(owner, job, reqLogger)
 	if err != nil && !k8sErrors.IsAlreadyExists(err) {
 		return err
 	}
@@ -32,8 +35,10 @@ func (r *ResourceHelper) LaunchMattermostUpdateJob(
 
 // RestartMattermostUpdateJob removes existing update job if it exists and creates new one.
 func (r *ResourceHelper) RestartMattermostUpdateJob(
+	owner metav1.Object,
 	currentJob *batchv1.Job,
 	deployment *appsv1.Deployment,
+	reqLogger logr.Logger,
 ) error {
 	err := r.client.Delete(context.TODO(), currentJob, k8sClient.PropagationPolicy(metav1.DeletePropagationBackground))
 	if err != nil && !k8sErrors.IsNotFound(err) {
@@ -42,7 +47,7 @@ func (r *ResourceHelper) RestartMattermostUpdateJob(
 
 	job := PrepareMattermostJobTemplate(UpdateJobName, currentJob.Namespace, deployment)
 
-	err = r.client.Create(context.TODO(), job)
+	err = r.Create(owner, job, reqLogger)
 	if err != nil {
 		return err
 	}

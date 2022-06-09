@@ -52,12 +52,13 @@ func (r *ResourceHelper) Create(owner v1.Object, desired Object, reqLogger logr.
 	if err != nil {
 		return errors.Wrap(err, "failed to apply annotation to the resource")
 	}
-	err = r.client.Create(context.TODO(), desired)
+
+	err = controllerutil.SetControllerReference(owner, desired, r.scheme)
 	if err != nil {
-		return errors.Wrap(err, "failed to create resource")
+		return errors.Wrap(err, "failed to set owner reference")
 	}
 
-	return controllerutil.SetControllerReference(owner, desired, r.scheme)
+	return r.client.Create(context.TODO(), desired)
 }
 
 func (r *ResourceHelper) Update(current, desired Object, reqLogger logr.Logger) error {
