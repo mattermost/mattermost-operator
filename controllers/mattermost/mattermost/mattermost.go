@@ -39,29 +39,29 @@ func (r *MattermostReconciler) checkMattermost(
 
 	err := r.checkLicence(mattermost)
 	if err != nil {
-		return recStatus, errors.Wrap(err, "failed to check mattermost license secret.")
+		return reconcileStatus{}, errors.Wrap(err, "failed to check mattermost license secret.")
 	}
 
 	err = r.checkMattermostService(mattermost, status, reqLogger)
 	if err != nil {
-		return recStatus, err
+		return reconcileStatus{}, err
 	}
 
 	err = r.checkMattermostRBAC(mattermost, reqLogger)
 	if err != nil {
-		return recStatus, err
+		return reconcileStatus{}, err
 	}
 
 	if !mattermost.Spec.UseServiceLoadBalancer {
 		err = r.checkMattermostIngress(mattermost, reqLogger)
 		if err != nil {
-			return recStatus, err
+			return reconcileStatus{}, err
 		}
 	}
 
 	recStatus, err = r.checkMattermostDeployment(mattermost, dbInfo, fileStoreInfo, status, reqLogger)
 	if err != nil {
-		return recStatus, err
+		return reconcileStatus{}, err
 	}
 
 	return recStatus, nil
@@ -241,18 +241,18 @@ func (r *MattermostReconciler) checkMattermostDeployment(
 
 	err = r.Resources.CreateDeploymentIfNotExists(mattermost, desired, reqLogger)
 	if err != nil {
-		return recStatus, errors.Wrap(err, "failed to create mattermost deployment")
+		return reconcileStatus{}, errors.Wrap(err, "failed to create mattermost deployment")
 	}
 
 	current := &appsv1.Deployment{}
 	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: desired.Name, Namespace: desired.Namespace}, current)
 	if err != nil {
-		return recStatus, errors.Wrap(err, "failed to get mattermost deployment")
+		return reconcileStatus{}, errors.Wrap(err, "failed to get mattermost deployment")
 	}
 
 	recStatus, err = r.updateMattermostDeployment(mattermost, current, desired, reqLogger)
 	if err != nil {
-		return recStatus, errors.Wrap(err, "failed to update mattermost deployment")
+		return reconcileStatus{}, errors.Wrap(err, "failed to update mattermost deployment")
 	}
 
 	return recStatus, nil
@@ -329,7 +329,7 @@ func (r *MattermostReconciler) updateMattermostDeployment(
 	}
 
 	if err != nil {
-		return recStatus, err
+		return reconcileStatus{}, err
 	}
 
 	if sameImage {
