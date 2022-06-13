@@ -271,6 +271,7 @@ func TestCheckMattermost(t *testing.T) {
 		// Update job should be launched, we expect error
 		recStatus, err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
 		require.Error(t, err)
+		assert.Equal(t, false, recStatus.ResourcesReady)
 
 		// Assert the job was created
 		job := &batchv1.Job{}
