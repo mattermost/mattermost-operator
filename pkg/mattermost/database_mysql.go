@@ -60,14 +60,14 @@ func (m *MySQLDBConfig) EnvVars(mattermost *mmv1beta.Mattermost) []corev1.EnvVar
 		{
 			Name: "MM_SQLSETTINGS_DATASOURCEREPLICAS",
 			Value: fmt.Sprintf(
-				"$(MYSQL_USERNAME):$(MYSQL_PASSWORD)@tcp(%s-mysql.%s:3306)/%s?readTimeout=30s&writeTimeout=30s",
+				"$(MYSQL_USERNAME):$(MYSQL_PASSWORD)@tcp(%s-mysql.%s.svc.cluster.local:3306)/%s?readTimeout=30s&writeTimeout=30s",
 				mysqlName, mattermost.Namespace, m.databaseName,
 			),
 		},
 		{
 			Name: "MM_CONFIG",
 			Value: fmt.Sprintf(
-				"mysql://$(MYSQL_USERNAME):$(MYSQL_PASSWORD)@tcp(%s-mysql-master.%s:3306)/%s?charset=utf8mb4,utf8&readTimeout=30s&writeTimeout=30s",
+				"mysql://$(MYSQL_USERNAME):$(MYSQL_PASSWORD)@tcp(%s-mysql-master.%s.svc.cluster.local:3306)/%s?charset=utf8mb4,utf8&readTimeout=30s&writeTimeout=30s",
 				mysqlName, mattermost.Namespace, m.databaseName,
 			),
 		},
@@ -90,7 +90,7 @@ func (m *MySQLDBConfig) InitContainers(mattermost *mmv1beta.Mattermost) []corev1
 			ImagePullPolicy: corev1.PullIfNotPresent,
 			Command: []string{
 				"sh", "-c",
-				fmt.Sprintf("until curl --max-time 5 http://%s-mysql-master.%s:3306; do echo waiting for mysql; sleep 5; done;",
+				fmt.Sprintf("until curl --max-time 5 http://%s-mysql-master.%s.svc.cluster.local:3306; do echo waiting for mysql; sleep 5; done;",
 					mysqlName, mattermost.Namespace,
 				),
 			},
