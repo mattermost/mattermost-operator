@@ -268,10 +268,10 @@ func TestCheckMattermost(t *testing.T) {
 		require.NoError(t, err)
 		recStatus, err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
 
-		// Update job should be launched, we expect error
+		// Update job should be launched, we do not expect error
 		recStatus, err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
-		require.Error(t, err)
-		assert.Equal(t, false, recStatus.ResourcesReady)
+		require.NoError(t, err)
+		assert.Equal(t, true, recStatus.ResourcesReady)
 
 		// Assert the job was created
 		job := &batchv1.Job{}
@@ -337,9 +337,10 @@ func TestCheckMattermost(t *testing.T) {
 		newImage := "mattermost/new-image"
 		mm.Spec.Image = newImage
 
+		// check deployment - update job is not completed, therefore resource is not ready
 		recStatus, err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "Restarted update image job")
+		assert.NoError(t, err)
+		assert.False(t, recStatus.ResourcesReady)
 
 		// get new job, assert new image and change status to completed
 		restartedUpdateJob := batchv1.Job{}
