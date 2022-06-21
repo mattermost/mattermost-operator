@@ -70,6 +70,6 @@ func (r *ResourceHelper) GetMinioService(mmName, mmNamespace string) (string, er
 		return "", err
 	}
 
-	connectionString := fmt.Sprintf("%s.%s:%d", minioService.Name, mmNamespace, minioService.Spec.Ports[0].Port)
+	connectionString := fmt.Sprintf("%s.%s.svc.cluster.local:%d", minioService.Name, mmNamespace, minioService.Spec.Ports[0].Port)
 	return connectionString, nil
 }
