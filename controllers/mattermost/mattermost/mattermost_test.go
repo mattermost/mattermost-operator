@@ -241,7 +241,7 @@ func TestCheckMattermost(t *testing.T) {
 
 		recStatus, err := reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
 		assert.NoError(t, err)
-		assert.Equal(t, true, recStatus.ResourcesReady)
+		assert.False(t, recStatus.ResourcesReady)
 
 		//dbSetupJob := &batchv1.Job{}
 		//err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mattermost.SetupJobName, Namespace: mmNamespace}, dbSetupJob)
@@ -268,10 +268,10 @@ func TestCheckMattermost(t *testing.T) {
 		require.NoError(t, err)
 		recStatus, err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
 
-		// Update job should be launched, we do not expect error
+		// Update job should be launched, we expect error
 		recStatus, err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
 		require.NoError(t, err)
-		assert.Equal(t, true, recStatus.ResourcesReady)
+		assert.False(t, recStatus.ResourcesReady)
 
 		// Assert the job was created
 		job := &batchv1.Job{}
@@ -308,7 +308,7 @@ func TestCheckMattermost(t *testing.T) {
 		// create deployment
 		recStatus, err := reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
 		assert.NoError(t, err)
-		assert.Equal(t, true, recStatus.ResourcesReady)
+		assert.False(t, recStatus.ResourcesReady)
 
 		// create update job with invalid image
 		updateName := "mattermost-update-check"

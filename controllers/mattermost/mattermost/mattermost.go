@@ -355,8 +355,11 @@ func (r *MattermostReconciler) updateMattermostDeployment(
 	}
 
 	// Job completed successfully
+	if recStatus.ResourcesReady {
+		return recStatus, r.Resources.Update(current, desired, reqLogger)
+	}
 
-	return recStatus, r.Resources.Update(current, desired, reqLogger)
+	return recStatus, nil
 }
 
 // checkUpdateJob checks whether update job status. In case job is not running it is launched
@@ -377,8 +380,8 @@ func (r *MattermostReconciler) checkUpdateJob(
 			if err = r.Resources.LaunchMattermostUpdateJob(mattermost, jobNamespace, baseDeployment, reqLogger); err != nil {
 				return nil, reconcileStatus{}, errors.Wrap(err, "Launching update image job failed")
 			}
-			reqLogger.Info("Began update image job")
 			recStatus.ResourcesReady = false
+			return nil, recStatus, errors.Wrap(err, "failed to restart update job")
 		}
 
 		return nil, reconcileStatus{}, errors.Wrap(err, "failed to determine if an update image job is already running")
@@ -398,24 +401,24 @@ func (r *MattermostReconciler) checkUpdateJob(
 		reqLogger.Info("Mattermost image changed, restarting update job")
 		err = r.Resources.RestartMattermostUpdateJob(mattermost, job, baseDeployment, reqLogger)
 		if err != nil {
-			reqLogger.Error(err, "failed to restart update job")
 			recStatus.ResourcesReady = false
+			return nil, recStatus, errors.Wrap(err, "failed to restart update job")
 		}
 
-		reqLogger.Error(err, "Restarted update image job")
 		recStatus.ResourcesReady = false
+		return nil, recStatus, errors.New("Restarted update image job")
 	}
 
 	if job.Status.CompletionTime == nil {
-		reqLogger.Error(err, "update image job still running")
 		recStatus.ResourcesReady = false
+		return nil, recStatus, errors.New("update image job still running")
 	}
 
 	// Job is completed, can check completion status
 
 	if job.Status.Failed > 0 {
-		reqLogger.Error(err, "update image job failed")
 		recStatus.ResourcesReady = false
+		return job, recStatus, errors.New("update image job failed")
 	}
 
 	reqLogger.Info("Update image job ran successfully")
