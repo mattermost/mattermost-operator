@@ -241,7 +241,7 @@ func TestCheckMattermost(t *testing.T) {
 
 		recStatus, err := reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
 		assert.NoError(t, err)
-		assert.False(t, recStatus.ResourcesReady)
+		assert.True(t, recStatus.ResourcesReady)
 
 		//dbSetupJob := &batchv1.Job{}
 		//err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mattermost.SetupJobName, Namespace: mmNamespace}, dbSetupJob)
@@ -266,9 +266,8 @@ func TestCheckMattermost(t *testing.T) {
 
 		err = reconciler.Client.Update(context.TODO(), modified)
 		require.NoError(t, err)
-		recStatus, err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
 
-		// Update job should be launched, we expect error
+		// Update job should be launched, we do not expect error
 		recStatus, err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
 		require.NoError(t, err)
 		assert.False(t, recStatus.ResourcesReady)
@@ -284,6 +283,10 @@ func TestCheckMattermost(t *testing.T) {
 		assert.Equal(t, mmName, job.ObjectMeta.OwnerReferences[0].Name)
 		assert.Equal(t, "installation.mattermost.com/v1beta1", job.ObjectMeta.OwnerReferences[0].APIVersion)
 
+		recStatus, err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
+		assert.NoError(t, err)
+		assert.False(t, recStatus.ResourcesReady)
+
 		// Set job status to succeeded so that test can proceed
 		now := metav1.Now()
 		job.Status = batchv1.JobStatus{
@@ -292,6 +295,7 @@ func TestCheckMattermost(t *testing.T) {
 		}
 		err = reconciler.Client.Update(context.TODO(), job)
 		require.NoError(t, err)
+		assert.False(t, recStatus.ResourcesReady)
 
 		// Job is marked as succeeded, should proceed now.
 		recStatus, err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
@@ -308,7 +312,7 @@ func TestCheckMattermost(t *testing.T) {
 		// create deployment
 		recStatus, err := reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
 		assert.NoError(t, err)
-		assert.False(t, recStatus.ResourcesReady)
+		assert.True(t, recStatus.ResourcesReady)
 
 		// create update job with invalid image
 		updateName := "mattermost-update-check"

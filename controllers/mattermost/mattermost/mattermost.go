@@ -381,7 +381,8 @@ func (r *MattermostReconciler) checkUpdateJob(
 				return nil, reconcileStatus{}, errors.Wrap(err, "Launching update image job failed")
 			}
 			recStatus.ResourcesReady = false
-			return nil, recStatus, errors.Wrap(err, "failed to restart update job")
+			reqLogger.Error(err, "failed to restart update job")
+			return nil, recStatus, nil
 		}
 
 		return nil, reconcileStatus{}, errors.Wrap(err, "failed to determine if an update image job is already running")
@@ -402,23 +403,27 @@ func (r *MattermostReconciler) checkUpdateJob(
 		err = r.Resources.RestartMattermostUpdateJob(mattermost, job, baseDeployment, reqLogger)
 		if err != nil {
 			recStatus.ResourcesReady = false
-			return nil, recStatus, errors.Wrap(err, "failed to restart update job")
+			reqLogger.Error(err, "failed to restart update job")
+			return nil, recStatus, nil
 		}
 
 		recStatus.ResourcesReady = false
-		return nil, recStatus, errors.New("Restarted update image job")
+		reqLogger.Info("Restarted update image job")
+		return nil, recStatus, nil
 	}
 
 	if job.Status.CompletionTime == nil {
 		recStatus.ResourcesReady = false
-		return nil, recStatus, errors.New("update image job still running")
+		reqLogger.Info("update image job still running")
+		return nil, recStatus, nil
 	}
 
 	// Job is completed, can check completion status
 
 	if job.Status.Failed > 0 {
 		recStatus.ResourcesReady = false
-		return job, recStatus, errors.New("update image job failed")
+		reqLogger.Info("update image job failed")
+		return job, recStatus, nil
 	}
 
 	reqLogger.Info("Update image job ran successfully")
