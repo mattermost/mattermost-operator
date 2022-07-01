@@ -295,11 +295,11 @@ func TestCheckMattermost(t *testing.T) {
 		}
 		err = reconciler.Client.Update(context.TODO(), job)
 		require.NoError(t, err)
-		assert.False(t, recStatus.ResourcesReady)
 
 		// Job is marked as succeeded, should proceed now.
 		recStatus, err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
 		require.NoError(t, err)
+		assert.True(t, recStatus.ResourcesReady)
 
 		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
 		require.NoError(t, err)

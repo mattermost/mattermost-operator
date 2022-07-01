@@ -381,7 +381,6 @@ func (r *MattermostReconciler) checkUpdateJob(
 				return nil, reconcileStatus{}, errors.Wrap(err, "Launching update image job failed")
 			}
 			recStatus.ResourcesReady = false
-			reqLogger.Error(err, "failed to restart update job")
 			return nil, recStatus, nil
 		}
 
@@ -403,8 +402,7 @@ func (r *MattermostReconciler) checkUpdateJob(
 		err = r.Resources.RestartMattermostUpdateJob(mattermost, job, baseDeployment, reqLogger)
 		if err != nil {
 			recStatus.ResourcesReady = false
-			reqLogger.Error(err, "failed to restart update job")
-			return nil, recStatus, nil
+			return nil, recStatus, errors.Wrap(err, "failed to restart update job")
 		}
 
 		recStatus.ResourcesReady = false
@@ -422,8 +420,7 @@ func (r *MattermostReconciler) checkUpdateJob(
 
 	if job.Status.Failed > 0 {
 		recStatus.ResourcesReady = false
-		reqLogger.Info("update image job failed")
-		return job, recStatus, nil
+		return job, recStatus, errors.New("update image job failed")
 	}
 
 	reqLogger.Info("Update image job ran successfully")
