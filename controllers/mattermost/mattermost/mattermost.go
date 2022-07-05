@@ -22,42 +22,49 @@ import (
 	k8sClient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+type reconcileStatus struct {
+	ResourcesReady bool
+}
+
 func (r *MattermostReconciler) checkMattermost(
 	mattermost *mmv1beta.Mattermost,
 	dbInfo mattermostApp.DatabaseConfig,
 	fileStoreInfo *mattermostApp.FileStoreInfo,
 	status *mmv1beta.MattermostStatus,
-	reqLogger logr.Logger) error {
+	reqLogger logr.Logger) (reconcileStatus, error) {
 	reqLogger = reqLogger.WithValues("Reconcile", "mattermost")
+	recStatus := reconcileStatus{
+		ResourcesReady: true,
+	}
 
 	err := r.checkLicence(mattermost)
 	if err != nil {
-		return errors.Wrap(err, "failed to check mattermost license secret.")
+		return reconcileStatus{}, errors.Wrap(err, "failed to check mattermost license secret.")
 	}
 
 	err = r.checkMattermostService(mattermost, status, reqLogger)
 	if err != nil {
-		return err
+		return reconcileStatus{}, err
 	}
 
 	err = r.checkMattermostRBAC(mattermost, reqLogger)
 	if err != nil {
-		return err
+		return reconcileStatus{}, err
 	}
 
 	if !mattermost.Spec.UseServiceLoadBalancer {
 		err = r.checkMattermostIngress(mattermost, reqLogger)
 		if err != nil {
-			return err
+			return reconcileStatus{}, err
 		}
 	}
 
-	err = r.checkMattermostDeployment(mattermost, dbInfo, fileStoreInfo, status, reqLogger)
+	recStatus, err = r.checkMattermostDeployment(mattermost, dbInfo, fileStoreInfo, status, reqLogger)
 	if err != nil {
-		return err
+		return reconcileStatus{}, err
 	}
 
-	return nil
+	return recStatus, nil
 }
 
 func (r *MattermostReconciler) checkLicence(mattermost *mmv1beta.Mattermost) error {
@@ -196,7 +203,7 @@ func (r *MattermostReconciler) checkMattermostDeployment(
 	dbConfig mattermostApp.DatabaseConfig,
 	fileStoreInfo *mattermostApp.FileStoreInfo,
 	status *mmv1beta.MattermostStatus,
-	reqLogger logr.Logger) error {
+	reqLogger logr.Logger) (reconcileStatus, error) {
 
 	desired := mattermostApp.GenerateDeploymentV1Beta(
 		mattermost,
@@ -207,6 +214,10 @@ func (r *MattermostReconciler) checkMattermostDeployment(
 		mattermost.Name,
 		mattermost.GetImageName(),
 	)
+
+	recStatus := reconcileStatus{
+		ResourcesReady: true,
+	}
 
 	patchedObj, applied, err := mattermost.Spec.ResourcePatch.ApplyToDeployment(desired)
 	if err != nil {
@@ -230,21 +241,21 @@ func (r *MattermostReconciler) checkMattermostDeployment(
 
 	err = r.Resources.CreateDeploymentIfNotExists(mattermost, desired, reqLogger)
 	if err != nil {
-		return errors.Wrap(err, "failed to create mattermost deployment")
+		return reconcileStatus{}, errors.Wrap(err, "failed to create mattermost deployment")
 	}
 
 	current := &appsv1.Deployment{}
 	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: desired.Name, Namespace: desired.Namespace}, current)
 	if err != nil {
-		return errors.Wrap(err, "failed to get mattermost deployment")
+		return reconcileStatus{}, errors.Wrap(err, "failed to get mattermost deployment")
 	}
 
-	err = r.updateMattermostDeployment(mattermost, current, desired, reqLogger)
+	recStatus, err = r.updateMattermostDeployment(mattermost, current, desired, reqLogger)
 	if err != nil {
-		return errors.Wrap(err, "failed to update mattermost deployment")
+		return reconcileStatus{}, errors.Wrap(err, "failed to update mattermost deployment")
 	}
 
-	return nil
+	return recStatus, nil
 }
 
 func (r *MattermostReconciler) checkMattermostDBSetupJob(mattermost *mmv1beta.Mattermost, deployment *appsv1.Deployment, reqLogger logr.Logger) error {
@@ -311,15 +322,19 @@ func (r *MattermostReconciler) updateMattermostDeployment(
 	current *appsv1.Deployment,
 	desired *appsv1.Deployment,
 	reqLogger logr.Logger,
-) error {
+) (reconcileStatus, error) {
 	sameImage, err := r.isMainDeploymentContainerImageSame(current, desired)
+	recStatus := reconcileStatus{
+		ResourcesReady: true,
+	}
+
 	if err != nil {
-		return err
+		return reconcileStatus{}, err
 	}
 
 	if sameImage {
 		// Need to update other fields only, update job is not required
-		return r.Resources.Update(current, desired, reqLogger)
+		return recStatus, r.Resources.Update(current, desired, reqLogger)
 	}
 
 	// Image is not the same
@@ -330,18 +345,21 @@ func (r *MattermostReconciler) updateMattermostDeployment(
 
 	reqLogger.Info("Current image is not the same as the requested, will upgrade the Mattermost installation")
 
-	job, err := r.checkUpdateJob(mattermost, mattermost.Namespace, desired, reqLogger)
+	job, recStatus, err := r.checkUpdateJob(mattermost, mattermost.Namespace, desired, reqLogger)
 	if job != nil {
 		// Job is done, need to cleanup
 		defer r.cleanupUpdateJob(job, reqLogger)
 	}
 	if err != nil {
-		return err
+		return recStatus, err
 	}
 
 	// Job completed successfully
+	if recStatus.ResourcesReady {
+		return recStatus, r.Resources.Update(current, desired, reqLogger)
+	}
 
-	return r.Resources.Update(current, desired, reqLogger)
+	return recStatus, nil
 }
 
 // checkUpdateJob checks whether update job status. In case job is not running it is launched
@@ -350,19 +368,23 @@ func (r *MattermostReconciler) checkUpdateJob(
 	jobNamespace string,
 	baseDeployment *appsv1.Deployment,
 	reqLogger logr.Logger,
-) (*batchv1.Job, error) {
+) (*batchv1.Job, reconcileStatus, error) {
+	recStatus := reconcileStatus{
+		ResourcesReady: true,
+	}
 	reqLogger.Info(fmt.Sprintf("Running Mattermost update image job check for image %s", mmv1beta.GetMattermostAppContainerFromDeployment(baseDeployment).Image))
 	job, err := r.Resources.FetchMattermostUpdateJob(jobNamespace)
 	if err != nil {
 		if k8sErrors.IsNotFound(err) {
 			reqLogger.Info("Launching update image job")
 			if err = r.Resources.LaunchMattermostUpdateJob(mattermost, jobNamespace, baseDeployment, reqLogger); err != nil {
-				return nil, errors.Wrap(err, "Launching update image job failed")
+				return nil, reconcileStatus{}, errors.Wrap(err, "Launching update image job failed")
 			}
-			return nil, errors.New("Began update image job")
+			recStatus.ResourcesReady = false
+			return nil, recStatus, nil
 		}
 
-		return nil, errors.Wrap(err, "failed to determine if an update image job is already running")
+		return nil, reconcileStatus{}, errors.Wrap(err, "failed to determine if an update image job is already running")
 	}
 
 	// Job is either running or completed
@@ -373,31 +395,37 @@ func (r *MattermostReconciler) checkUpdateJob(
 		job.Spec.Template.Spec.Containers,
 	)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to compare image of update job and desired deployment")
+		return nil, reconcileStatus{}, errors.Wrap(err, "failed to compare image of update job and desired deployment")
 	}
 	if !isSameImage {
 		reqLogger.Info("Mattermost image changed, restarting update job")
-		err := r.Resources.RestartMattermostUpdateJob(mattermost, job, baseDeployment, reqLogger)
+		err = r.Resources.RestartMattermostUpdateJob(mattermost, job, baseDeployment, reqLogger)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to restart update job")
+			recStatus.ResourcesReady = false
+			return nil, recStatus, errors.Wrap(err, "failed to restart update job")
 		}
 
-		return nil, errors.New("Restarted update image job")
+		recStatus.ResourcesReady = false
+		reqLogger.Info("Restarted update image job")
+		return nil, recStatus, nil
 	}
 
 	if job.Status.CompletionTime == nil {
-		return nil, errors.New("update image job still running")
+		recStatus.ResourcesReady = false
+		reqLogger.Info("update image job still running")
+		return nil, recStatus, nil
 	}
 
 	// Job is completed, can check completion status
 
 	if job.Status.Failed > 0 {
-		return job, errors.New("update image job failed")
+		recStatus.ResourcesReady = false
+		return job, recStatus, errors.New("update image job failed")
 	}
 
 	reqLogger.Info("Update image job ran successfully")
 
-	return job, nil
+	return job, recStatus, nil
 }
 
 // cleanupUpdateJob deletes update job and all pods of the job

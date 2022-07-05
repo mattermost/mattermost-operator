@@ -239,8 +239,9 @@ func TestCheckMattermost(t *testing.T) {
 	t.Run("deployment", func(t *testing.T) {
 		updateJobName := "mattermost-update-check"
 
-		err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
+		recStatus, err := reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
 		assert.NoError(t, err)
+		assert.True(t, recStatus.ResourcesReady)
 
 		//dbSetupJob := &batchv1.Job{}
 		//err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mattermost.SetupJobName, Namespace: mmNamespace}, dbSetupJob)
@@ -266,9 +267,10 @@ func TestCheckMattermost(t *testing.T) {
 		err = reconciler.Client.Update(context.TODO(), modified)
 		require.NoError(t, err)
 
-		// Update job should be launched, we expect error
-		err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
-		require.Error(t, err)
+		// Update job should be launched, we do not expect error
+		recStatus, err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
+		require.NoError(t, err)
+		assert.False(t, recStatus.ResourcesReady)
 
 		// Assert the job was created
 		job := &batchv1.Job{}
@@ -281,6 +283,10 @@ func TestCheckMattermost(t *testing.T) {
 		assert.Equal(t, mmName, job.ObjectMeta.OwnerReferences[0].Name)
 		assert.Equal(t, "installation.mattermost.com/v1beta1", job.ObjectMeta.OwnerReferences[0].APIVersion)
 
+		recStatus, err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
+		assert.NoError(t, err)
+		assert.False(t, recStatus.ResourcesReady)
+
 		// Set job status to succeeded so that test can proceed
 		now := metav1.Now()
 		job.Status = batchv1.JobStatus{
@@ -291,8 +297,9 @@ func TestCheckMattermost(t *testing.T) {
 		require.NoError(t, err)
 
 		// Job is marked as succeeded, should proceed now.
-		err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
+		recStatus, err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
 		require.NoError(t, err)
+		assert.True(t, recStatus.ResourcesReady)
 
 		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
 		require.NoError(t, err)
@@ -303,8 +310,9 @@ func TestCheckMattermost(t *testing.T) {
 
 	t.Run("restart update job", func(t *testing.T) {
 		// create deployment
-		err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
+		recStatus, err := reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
 		assert.NoError(t, err)
+		assert.True(t, recStatus.ResourcesReady)
 
 		// create update job with invalid image
 		updateName := "mattermost-update-check"
@@ -326,16 +334,17 @@ func TestCheckMattermost(t *testing.T) {
 				CompletionTime: &now,
 			},
 		}
-		err := reconciler.Client.Create(context.TODO(), invalidUpdateJob)
+		err = reconciler.Client.Create(context.TODO(), invalidUpdateJob)
 		require.NoError(t, err)
 
 		// should delete update job and create new and return error
 		newImage := "mattermost/new-image"
 		mm.Spec.Image = newImage
 
-		err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "Restarted update image job")
+		// check deployment - update job is not completed, therefore resource is not ready
+		recStatus, err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
+		assert.NoError(t, err)
+		assert.False(t, recStatus.ResourcesReady)
 
 		// get new job, assert new image and change status to completed
 		restartedUpdateJob := batchv1.Job{}
@@ -354,7 +363,7 @@ func TestCheckMattermost(t *testing.T) {
 		require.NoError(t, err)
 
 		// should succeed now
-		err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
+		recStatus, err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
 		assert.NoError(t, err)
 	})
 }
@@ -499,8 +508,9 @@ func TestCheckMattermostExternalDBAndFileStore(t *testing.T) {
 		err := reconciler.Client.Create(context.TODO(), job)
 		require.NoError(t, err)
 
-		err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
+		recStatus, err := reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
 		assert.NoError(t, err)
+		assert.Equal(t, true, recStatus.ResourcesReady)
 
 		// TODO: uncomment when enabling back the db setup job
 		//dbSetupJob := &batchv1.Job{}
@@ -525,7 +535,7 @@ func TestCheckMattermostExternalDBAndFileStore(t *testing.T) {
 
 		err = reconciler.Client.Update(context.TODO(), modified)
 		require.NoError(t, err)
-		err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
+		recStatus, err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
 		require.NoError(t, err)
 		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
 		require.NoError(t, err)
@@ -683,8 +693,9 @@ func Test_Patches(t *testing.T) {
 
 				dbInfo, fileStoreInfo := fixedDBAndFileStoreInfo(t, mm)
 
-				err := reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, &mmStatus, logger)
+				recStatus, err := reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, &mmStatus, logger)
 				require.NoError(t, err)
+				assert.Equal(t, true, recStatus.ResourcesReady)
 
 				deployKey := types.NamespacedName{Name: mmName, Namespace: mmNamespace}
 				deploy := appsv1.Deployment{}
