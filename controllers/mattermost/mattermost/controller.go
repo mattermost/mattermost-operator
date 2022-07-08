@@ -94,7 +94,8 @@ func (r *MattermostReconciler) Reconcile(ctx context.Context, request ctrl.Reque
 	}
 
 	if mattermost.Status.State != mmv1beta.Reconciling {
-		canProcess, err := r.startNonReconcilingMMProcessing(ctx, reqLogger)
+		var canProcess bool
+		canProcess, err = r.startNonReconcilingMMProcessing(ctx, reqLogger)
 		if err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "failed to verify reconciliation limit")
 		}

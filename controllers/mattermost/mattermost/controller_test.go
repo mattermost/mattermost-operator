@@ -480,7 +480,7 @@ func TestReconcilingLimit(t *testing.T) {
 		err = c.Create(context.TODO(), mm6)
 		require.NoError(t, err)
 		defer func() {
-			err := c.Delete(context.TODO(), mm6)
+			err = c.Delete(context.TODO(), mm6)
 			require.NoError(t, err)
 		}()
 		req6 := requestForCI(mm6)
@@ -493,7 +493,7 @@ func TestReconcilingLimit(t *testing.T) {
 		err = c.Create(context.TODO(), mm7)
 		require.NoError(t, err)
 		defer func() {
-			err := c.Delete(context.TODO(), mm7)
+			err = c.Delete(context.TODO(), mm7)
 			require.NoError(t, err)
 		}()
 		req7 := requestForCI(mm7)
