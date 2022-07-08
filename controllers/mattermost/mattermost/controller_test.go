@@ -479,6 +479,10 @@ func TestReconcilingLimit(t *testing.T) {
 		mm6 := newMattermost("sixth", "6", "")
 		err = c.Create(context.TODO(), mm6)
 		require.NoError(t, err)
+		defer func() {
+			err := c.Delete(context.TODO(), mm6)
+			require.NoError(t, err)
+		}()
 		req6 := requestForCI(mm6)
 		_, err = r.Reconcile(context.Background(), req6)
 		require.Error(t, err)
@@ -488,11 +492,38 @@ func TestReconcilingLimit(t *testing.T) {
 		mm7 := newMattermost("seventh", "7", "")
 		err = c.Create(context.TODO(), mm7)
 		require.NoError(t, err)
+		defer func() {
+			err := c.Delete(context.TODO(), mm7)
+			require.NoError(t, err)
+		}()
 		req7 := requestForCI(mm7)
 		result, err = r.Reconcile(context.Background(), req7)
 		require.NoError(t, err)
 		assert.Equal(t, requeueOnLimitDelay, result.RequeueAfter)
 		assertInstallationsCount(t, 3, 2)
+	})
+
+	t.Run("do not pick up when CRs are being processed", func(t *testing.T) {
+		// mock that 1 more installation is being processed which should prevent
+		// reconciler from picking up the new one
+		r.reconcilingRateLimiter.nonReconcilingBeingProcessed = 1
+		assertInstallationsCount(t, 1, 1)
+
+		mm8 := newMattermost("eight", "8", "")
+		err = c.Create(context.TODO(), mm8)
+		require.NoError(t, err)
+
+		req6 := requestForCI(mm8)
+		result, err := r.Reconcile(context.Background(), req6)
+		require.NoError(t, err)
+		assert.Equal(t, requeueOnLimitDelay, result.RequeueAfter)
+		assertInstallationsCount(t, 2, 1)
+
+		// reset the processed ones, so that CR should be picked up now
+		r.reconcilingRateLimiter.nonReconcilingBeingProcessed = 0
+		_, err = r.Reconcile(context.Background(), req6)
+		require.Error(t, err)
+		assertInstallationsCount(t, 2, 2)
 	})
 }
 
