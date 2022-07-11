@@ -56,6 +56,14 @@ func init() {
 type Config struct {
 	MaxReconcilingInstallations int           `envconfig:"default=20"`
 	RequeueOnLimitDelay         time.Duration `envconfig:"default=20s"`
+	MaxReconcileConcurrency     int           `envconfig:"default=1"`
+}
+
+func (c Config) String() string {
+	return fmt.Sprintf(
+		"MaxReconcilingInstallations=%d RequeueOnLimitDelay=%s MaxReconcileConcurrency=%d",
+		c.MaxReconcilingInstallations, c.RequeueOnLimitDelay, c.MaxReconcileConcurrency,
+	)
 }
 
 func main() {
@@ -87,6 +95,7 @@ func main() {
 		logger.Error(err, "Unable to read environment configuration")
 		os.Exit(1)
 	}
+	logger.Info("Loaded Operator env config", "config", config.String())
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,
@@ -126,7 +135,7 @@ func main() {
 		config.MaxReconcilingInstallations,
 		config.RequeueOnLimitDelay,
 	).
-		SetupWithManager(mgr); err != nil {
+		SetupWithManager(mgr, config.MaxReconcileConcurrency); err != nil {
 		logger.Error(err, "Unable to create controller", "controller", "Mattermost")
 		os.Exit(1)
 	}

@@ -3,7 +3,10 @@ package mattermost
 import (
 	"context"
 	"fmt"
+	"github.com/pkg/errors"
 	"reflect"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sync"
 	"time"
 
 	"github.com/mattermost/mattermost-operator/pkg/resources"
@@ -13,7 +16,6 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 
 	"github.com/go-logr/logr"
-	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -30,12 +32,13 @@ const resourcesReadyDelay = 10 * time.Second
 // MattermostReconciler reconciles a Mattermost object
 type MattermostReconciler struct {
 	client.Client
-	NonCachedAPIReader  client.Reader
-	Log                 logr.Logger
-	Scheme              *runtime.Scheme
-	MaxReconciling      int
-	RequeueOnLimitDelay time.Duration
-	Resources           *resources.ResourceHelper
+	NonCachedAPIReader     client.Reader
+	Log                    logr.Logger
+	Scheme                 *runtime.Scheme
+	MaxReconciling         int
+	RequeueOnLimitDelay    time.Duration
+	Resources              *resources.ResourceHelper
+	reconcilingRateLimiter unstableInstallationsRateLimiter
 }
 
 func NewMattermostReconciler(mgr ctrl.Manager, maxReconciling int, requeueOnLimitDelay time.Duration) *MattermostReconciler {
@@ -47,10 +50,14 @@ func NewMattermostReconciler(mgr ctrl.Manager, maxReconciling int, requeueOnLimi
 		MaxReconciling:      maxReconciling,
 		RequeueOnLimitDelay: requeueOnLimitDelay,
 		Resources:           resources.NewResourceHelper(mgr.GetClient(), mgr.GetScheme()),
+		reconcilingRateLimiter: unstableInstallationsRateLimiter{
+			nonReconcilingBeingProcessed: 0,
+			Mutex:                        sync.Mutex{},
+		},
 	}
 }
 
-func (r *MattermostReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *MattermostReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrency int) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&mmv1beta.Mattermost{}).
 		Owns(&corev1.Service{}).
@@ -58,6 +65,9 @@ func (r *MattermostReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&networkingv1.Ingress{}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&batchv1.Job{}).
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: maxConcurrency,
+		}).
 		Complete(r)
 }
 
@@ -84,17 +94,23 @@ func (r *MattermostReconciler) Reconcile(ctx context.Context, request ctrl.Reque
 	}
 
 	if mattermost.Status.State != mmv1beta.Reconciling {
-		var mmListInstallations mmv1beta.MattermostList
-		err = r.Client.List(ctx, &mmListInstallations)
+		var canProcess bool
+		canProcess, err = r.startNonReconcilingMMProcessing(ctx, reqLogger)
 		if err != nil {
-			return reconcile.Result{}, errors.Wrap(err, "failed to list Mattermosts")
+			return reconcile.Result{}, errors.Wrap(err, "failed to verify reconciliation limit")
 		}
-
-		// Check if limit of Mattermosts reconciling at the same time is reached.
-		if countReconciling(mmListInstallations.Items) >= r.MaxReconciling {
+		if !canProcess {
 			reqLogger.Info(fmt.Sprintf("Reached limit of reconciling installations, requeuing in %s", r.RequeueOnLimitDelay.String()))
-			return ctrl.Result{RequeueAfter: r.RequeueOnLimitDelay}, nil
+			return reconcile.Result{RequeueAfter: r.RequeueOnLimitDelay}, nil
 		}
+		defer func() {
+			// We only count MMs that are being processed but are not in
+			// `reconciling` state, therefore when the function exists,
+			// regardless if the MM will be marked as `reconciling` or not we
+			// can decrement the counter. Status update will occur before
+			// decrement, so we are not risking races.
+			r.reconcilingRateLimiter.decrementProcessing()
+		}()
 	}
 
 	// We copy status to not to refetch the resource
@@ -178,6 +194,45 @@ func (r *MattermostReconciler) Reconcile(ctx context.Context, request ctrl.Reque
 func (r *MattermostReconciler) updateSpec(ctx context.Context, reqLogger logr.Logger, updated *mmv1beta.Mattermost) error {
 	reqLogger.Info("Updating Mattermost spec")
 	return r.Client.Update(ctx, updated)
+}
+
+// startNonReconcilingMMProcessing verifies if the new Mattermost in
+// non-reconciling state can be currently processed by the Operator by checking
+// if the rate limit has been reached.
+// Returns false when rate limit is reached and processing cannot be started.
+func (r *MattermostReconciler) startNonReconcilingMMProcessing(ctx context.Context, reqLogger logr.Logger) (bool, error) {
+	r.reconcilingRateLimiter.Lock()
+	defer r.reconcilingRateLimiter.Unlock()
+
+	var mmListInstallations mmv1beta.MattermostList
+	err := r.Client.List(ctx, &mmListInstallations)
+	if err != nil {
+		return false, errors.Wrap(err, "failed to list Mattermosts")
+	}
+
+	// Check if limit of Mattermosts reconciling at the same time is reached.
+	if countReconciling(mmListInstallations.Items)+r.reconcilingRateLimiter.nonReconcilingBeingProcessed >= r.MaxReconciling {
+		reqLogger.Info(fmt.Sprintf("Reached limit of reconciling or processing installations, requeuing in %s", r.RequeueOnLimitDelay.String()))
+		return false, nil
+	}
+
+	r.reconcilingRateLimiter.nonReconcilingBeingProcessed += 1
+
+	return true, nil
+}
+
+type unstableInstallationsRateLimiter struct {
+	// Number of CRs that are being actively processed by the reconciler but are
+	// not (yet) in Reconciling state. To respect the rate limit with multiple
+	// reconcilers we need to sync with mutex.
+	nonReconcilingBeingProcessed int
+	sync.Mutex
+}
+
+func (rl *unstableInstallationsRateLimiter) decrementProcessing() {
+	rl.Lock()
+	defer rl.Unlock()
+	rl.nonReconcilingBeingProcessed -= 1
 }
 
 func countReconciling(mattermosts []mmv1beta.Mattermost) int {
