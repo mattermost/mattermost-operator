@@ -245,20 +245,29 @@ func TestReconcile(t *testing.T) {
 			require.Equal(t, res, reconcile.Result{})
 		})
 
+		changeMMPodsPhase := func(phase corev1.PodPhase, limit int) {
+			updated := 0
+			for _, pod := range pods.Items {
+				for i := 0; i < int(replicas); i++ {
+					if pod.ObjectMeta.Name == fmt.Sprintf("%s-pod-%d", mmName, i) {
+						pod.Status.Phase = phase
+						err = c.Update(context.TODO(), pod.DeepCopy())
+						require.NoError(t, err)
+						updated += 1
+					}
+					if updated >= limit {
+						return
+					}
+				}
+			}
+		}
+
 		// Make pods not running
 		pods = &corev1.PodList{}
 		err = c.List(context.TODO(), pods)
 		require.NoError(t, err)
 
-		for _, pod := range pods.Items {
-			for i := 0; i < int(replicas); i++ {
-				if pod.ObjectMeta.Name == fmt.Sprintf("%s-pod-%d", mmName, i) {
-					pod.Status.Phase = corev1.PodPending
-					err = c.Update(context.TODO(), pod.DeepCopy())
-					require.NoError(t, err)
-				}
-			}
-		}
+		changeMMPodsPhase(corev1.PodPending, int(replicas))
 
 		t.Run("pods not running", func(t *testing.T) {
 			res, err = r.Reconcile(context.Background(), req)
@@ -266,20 +275,29 @@ func TestReconcile(t *testing.T) {
 			require.Equal(t, res, reconcile.Result{RequeueAfter: 6 * time.Second})
 		})
 
+		// Make one pod running - state Ready
+		pods = &corev1.PodList{}
+		err = c.List(context.TODO(), pods)
+		require.NoError(t, err)
+
+		changeMMPodsPhase(corev1.PodRunning, 1)
+
+		t.Run("one pod running - ready state", func(t *testing.T) {
+			res, err = r.Reconcile(context.Background(), req)
+			require.NoError(t, err)
+			require.Equal(t, res, reconcile.Result{RequeueAfter: 6 * time.Second})
+
+			err = c.Get(context.TODO(), mmKey, mm)
+			require.NoError(t, err)
+			assert.Equal(t, mmv1beta.Ready, mm.Status.State)
+		})
+
 		// Make pods running
 		pods = &corev1.PodList{}
 		err = c.List(context.TODO(), pods)
 		require.NoError(t, err)
 
-		for _, pod := range pods.Items {
-			for i := 0; i < int(replicas); i++ {
-				if pod.ObjectMeta.Name == fmt.Sprintf("%s-pod-%d", mmName, i) {
-					pod.Status.Phase = corev1.PodRunning
-					err = c.Update(context.TODO(), pod.DeepCopy())
-					require.NoError(t, err)
-				}
-			}
-		}
+		changeMMPodsPhase(corev1.PodRunning, int(replicas))
 
 		t.Run("no reconcile errors", func(t *testing.T) {
 			res, err = r.Reconcile(context.Background(), req)

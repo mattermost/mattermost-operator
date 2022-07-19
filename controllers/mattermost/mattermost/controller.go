@@ -178,7 +178,7 @@ func (r *MattermostReconciler) Reconcile(ctx context.Context, request ctrl.Reque
 		if statusErr != nil {
 			reqLogger.Error(statusErr, "Error updating status")
 		}
-		reqLogger.Error(err, "Error checking Mattermost health")
+		reqLogger.Info("Mattermost instance not healthy", "msg", err.Error())
 		return reconcile.Result{RequeueAfter: healthCheckRequeueDelay}, nil
 	}
 
