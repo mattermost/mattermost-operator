@@ -335,6 +335,9 @@ type RunningState string
 const (
 	// Reconciling is the state when the Mattermost instance is being updated
 	Reconciling RunningState = "reconciling"
+	// Ready is the state when the Mattermost instance is ready to start serving
+	// traffic but not fully stable.
+	Ready RunningState = "ready"
 	// Stable is the state when the Mattermost instance is fully running
 	Stable RunningState = "stable"
 )

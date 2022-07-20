@@ -53,11 +53,8 @@ func (r *MattermostReconciler) checkMattermostHealth(mattermost *mmv1beta.Matter
 		replicas = *mattermost.Spec.Replicas
 	}
 
-	if podsStatus.UpdatedReplicas != replicas {
-		return status, fmt.Errorf("found %d updated replicas, but wanted %d", podsStatus.UpdatedReplicas, replicas)
-	}
-	if podsStatus.Replicas != replicas {
-		return status, fmt.Errorf("found %d pods, but wanted %d", podsStatus.Replicas, replicas)
+	if podsStatus.UpdatedReplicas == 0 {
+		return status, fmt.Errorf("mattermost pods not yet updated")
 	}
 
 	status.Image = mattermost.Spec.Image
@@ -80,6 +77,17 @@ func (r *MattermostReconciler) checkMattermostHealth(mattermost *mmv1beta.Matter
 
 	if endpoint != "" {
 		status.Endpoint = endpoint
+	}
+
+	// At least one pod is updated and LB/Ingress is ready therefore we are at
+	// least ready to server traffic.
+	status.State = mmv1beta.Ready
+
+	if podsStatus.UpdatedReplicas != replicas {
+		return status, fmt.Errorf("found %d updated replicas, but wanted %d", podsStatus.UpdatedReplicas, replicas)
+	}
+	if podsStatus.Replicas != replicas {
+		return status, fmt.Errorf("found %d pods, but wanted %d", podsStatus.Replicas, replicas)
 	}
 
 	// Everything checks out. The installation is stable.
