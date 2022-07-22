@@ -177,3 +177,20 @@ func (r *ResourceHelper) DeleteIngress(key types.NamespacedName, reqLogger logr.
 	}
 	return nil
 }
+
+func (r *ResourceHelper) DeleteService(key types.NamespacedName, reqLogger logr.Logger) error {
+	foundService := &corev1.Service{}
+	err := r.client.Get(context.TODO(), key, foundService)
+	if err != nil && k8sErrors.IsNotFound(err) {
+		return nil
+	} else if err != nil {
+		return errors.Wrap(err, "failed to check if service exists")
+	}
+
+	reqLogger.Info("Deleting service", "name", foundService.Name)
+	err = r.client.Delete(context.TODO(), foundService)
+	if err != nil {
+		return errors.Wrap(err, "failed to delete service")
+	}
+	return nil
+}
