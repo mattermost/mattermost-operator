@@ -104,6 +104,7 @@ func (r *MattermostReconciler) checkMattermostService(
 	}
 
 	if current.Spec.Type != desired.Spec.Type && current.Spec.Type != "" {
+		reqLogger.Info("Recreate service due to service type change", "name", current.Name)
 		err := r.Resources.DeleteService(types.NamespacedName{Namespace: current.Namespace, Name: current.Name}, reqLogger)
 		if err != nil {
 			return errors.Wrap(err, "failed to delete service")
