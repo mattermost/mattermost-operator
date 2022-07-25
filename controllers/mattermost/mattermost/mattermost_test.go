@@ -96,21 +96,15 @@ func TestCheckMattermost(t *testing.T) {
 		require.NotNil(t, found)
 
 		original := found.DeepCopy()
-		modified := found.DeepCopy()
-		modified.Labels = nil
-		modified.Annotations = nil
-		modified.Spec = corev1.ServiceSpec{}
-		modified.Spec.Type = corev1.ServiceTypeLoadBalancer
 
-		err = reconciler.Client.Update(context.TODO(), modified)
-		require.NoError(t, err)
+		mm.Spec.UseServiceLoadBalancer = true
 		err = reconciler.checkMattermostService(mm, currentMMStatus, logger)
 		require.NoError(t, err)
 		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
 		require.NoError(t, err)
 		assert.Equal(t, original.GetName(), found.GetName())
 		assert.Equal(t, original.GetNamespace(), found.GetNamespace())
-		assert.Equal(t, corev1.ServiceTypeClusterIP, found.Spec.Type)
+		assert.Equal(t, corev1.ServiceTypeLoadBalancer, found.Spec.Type)
 	})
 
 	t.Run("service account", func(t *testing.T) {
