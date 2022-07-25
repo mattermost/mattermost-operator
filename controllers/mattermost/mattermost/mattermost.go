@@ -108,6 +108,7 @@ func (r *MattermostReconciler) checkMattermostService(
 		if err != nil {
 			return errors.Wrap(err, "failed to delete service")
 		}
+		return r.Resources.Create(mattermost, desired, reqLogger)
 	}
 
 	resources.CopyServiceEmptyAutoAssignedFields(desired, current)
