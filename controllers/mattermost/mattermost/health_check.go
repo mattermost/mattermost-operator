@@ -53,7 +53,7 @@ func (r *MattermostReconciler) checkMattermostHealth(mattermost *mmv1beta.Matter
 		replicas = *mattermost.Spec.Replicas
 	}
 
-	if podsStatus.UpdatedReplicas == 0 {
+	if replicas > 0 && podsStatus.UpdatedReplicas == 0 {
 		return status, fmt.Errorf("mattermost pods not yet updated")
 	}
 
@@ -79,9 +79,11 @@ func (r *MattermostReconciler) checkMattermostHealth(mattermost *mmv1beta.Matter
 		status.Endpoint = endpoint
 	}
 
-	// At least one pod is updated and LB/Ingress is ready therefore we are at
-	// least ready to server traffic.
-	status.State = mmv1beta.Ready
+	if replicas > 0 {
+		// At least one pod is updated and LB/Ingress is ready therefore we are at
+		// least ready to server traffic.
+		status.State = mmv1beta.Ready
+	}
 
 	if podsStatus.UpdatedReplicas != replicas {
 		return status, fmt.Errorf("found %d updated replicas, but wanted %d", podsStatus.UpdatedReplicas, replicas)

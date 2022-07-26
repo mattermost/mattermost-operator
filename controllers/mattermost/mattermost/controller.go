@@ -210,6 +210,7 @@ func (r *MattermostReconciler) startNonReconcilingMMProcessing(ctx context.Conte
 		return false, errors.Wrap(err, "failed to list Mattermosts")
 	}
 
+	reqLogger.Info("Non reconciling being processed", "processing", r.reconcilingRateLimiter.nonReconcilingBeingProcessed)
 	// Check if limit of Mattermosts reconciling at the same time is reached.
 	if countReconciling(mmListInstallations.Items)+r.reconcilingRateLimiter.nonReconcilingBeingProcessed >= r.MaxReconciling {
 		reqLogger.Info(fmt.Sprintf("Reached limit of reconciling or processing installations, requeuing in %s", r.RequeueOnLimitDelay.String()))
