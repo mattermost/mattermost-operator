@@ -103,6 +103,17 @@ func (r *MattermostReconciler) checkMattermostService(
 		return err
 	}
 
+	if current.Spec.Type != desired.Spec.Type && current.Spec.Type != "" {
+		reqLogger.Info("Recreating service due to service type change", "name", current.Name)
+		err := r.Resources.DeleteService(types.NamespacedName{Namespace: current.Namespace, Name: current.Name}, reqLogger)
+		if err != nil {
+			return errors.Wrap(err, "failed to delete service")
+		}
+		reqLogger.Info("Creating service", "name", desired.Name)
+
+		return r.Resources.Create(mattermost, desired, reqLogger)
+	}
+
 	resources.CopyServiceEmptyAutoAssignedFields(desired, current)
 
 	return r.Resources.Update(current, desired, reqLogger)

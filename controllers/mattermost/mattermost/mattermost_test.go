@@ -86,6 +86,27 @@ func TestCheckMattermost(t *testing.T) {
 		assert.Equal(t, original.Spec.Ports, found.Spec.Ports)
 	})
 
+	t.Run("recreate service on type change", func(t *testing.T) {
+		err = reconciler.checkMattermostService(mm, currentMMStatus, logger)
+		assert.NoError(t, err)
+
+		found := &corev1.Service{}
+		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
+		require.NoError(t, err)
+		require.NotNil(t, found)
+
+		original := found.DeepCopy()
+
+		mm.Spec.UseServiceLoadBalancer = true
+		err = reconciler.checkMattermostService(mm, currentMMStatus, logger)
+		require.NoError(t, err)
+		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
+		require.NoError(t, err)
+		assert.Equal(t, original.GetName(), found.GetName())
+		assert.Equal(t, original.GetNamespace(), found.GetNamespace())
+		assert.Equal(t, corev1.ServiceTypeLoadBalancer, found.Spec.Type)
+	})
+
 	t.Run("service account", func(t *testing.T) {
 		err = reconciler.checkMattermostSA(mm, logger)
 		assert.NoError(t, err)

@@ -87,6 +87,7 @@ func configureMattermostService(service *corev1.Service) *corev1.Service {
 		},
 	}
 	service.Spec.ClusterIP = corev1.ClusterIPNone
+	service.Spec.Type = corev1.ServiceTypeClusterIP
 
 	return service
 }
