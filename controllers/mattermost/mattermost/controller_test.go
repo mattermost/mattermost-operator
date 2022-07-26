@@ -183,6 +183,30 @@ func TestReconcile(t *testing.T) {
 		err = c.Update(context.TODO(), replicaSet)
 		require.NoError(t, err)
 
+		t.Run("succeed if 0 replicas expected", func(t *testing.T) {
+			orgReplicas := mm.Spec.Replicas
+			replicasZero := int32(0)
+			mm.Spec.Replicas = &replicasZero
+
+			err = c.Update(context.TODO(), mm)
+			require.NoError(t, err)
+			// Revert changes for purpose of other tests
+			defer func() {
+				mm.Spec.Replicas = orgReplicas
+				mm.Status = mmv1beta.MattermostStatus{}
+				err = c.Update(context.TODO(), mm)
+				require.NoError(t, err)
+			}()
+
+			res, err = r.Reconcile(context.Background(), req)
+			require.NoError(t, err)
+			assert.Empty(t, res)
+
+			err = c.Get(context.TODO(), mmKey, mm)
+			require.NoError(t, err)
+			assert.Equal(t, mmv1beta.Stable, mm.Status.State)
+		})
+
 		// Create expected mattermost pods.
 		podTemplate := corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
