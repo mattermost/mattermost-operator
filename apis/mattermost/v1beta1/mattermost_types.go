@@ -101,6 +101,11 @@ type MattermostSpec struct {
 	FileStore     FileStore     `json:"fileStore,omitempty"`
 	ElasticSearch ElasticSearch `json:"elasticSearch,omitempty"`
 
+	// PodTemplate defines the configuration related to template for the Mattermost pods.
+	// Currently this only supports securityContext and containerSecurityContext.
+	// +optional
+	PodTemplate PodTemplate `json:"podTemplate,omitempty"`
+
 	// Advanced settings - it is recommended to leave the default configuration
 	// for below settings, unless a very specific use case arises.
 
@@ -172,6 +177,17 @@ type Ingress struct {
 // IngressHost specifies additional hosts configuration.
 type IngressHost struct {
 	HostName string `json:"hostName,omitempty"`
+}
+
+// PodTemplate defines the configuration related to template for the Mattermost pods.
+// Currently this only supports securityContext and containerSecurityContext.
+type PodTemplate struct {
+	// Defines the security context for the Mattermost app server pods.
+	// +optional
+	SecurityContext v1.PodSecurityContext `json:"securityContext,omitempty"`
+	// Defines the security context for the Mattermost app server container.
+	// +optional
+	ContainerSecurityContext v1.SecurityContext `json:"containerSecurityContext,omitempty"`
 }
 
 // Scheduling defines the configuration related to scheduling of the Mattermost pods
