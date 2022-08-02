@@ -101,11 +101,6 @@ type MattermostSpec struct {
 	FileStore     FileStore     `json:"fileStore,omitempty"`
 	ElasticSearch ElasticSearch `json:"elasticSearch,omitempty"`
 
-	// PodTemplate defines the configuration related to template for the Mattermost pods.
-	// Currently this only supports securityContext and containerSecurityContext.
-	// +optional
-	PodTemplate PodTemplate `json:"podTemplate,omitempty"`
-
 	// Advanced settings - it is recommended to leave the default configuration
 	// for below settings, unless a very specific use case arises.
 
@@ -117,6 +112,10 @@ type MattermostSpec struct {
 	// These settings generally don't need to be changed.
 	// +optional
 	Probes Probes `json:"probes,omitempty"`
+
+	// PodTemplate defines configuration for the template for Mattermost pods.
+	// +optional
+	PodTemplate PodTemplate `json:"podTemplate,omitempty"`
 
 	// PodExtensions specify custom extensions for Mattermost pods.
 	// This can be used for custom readiness checks etc.
@@ -179,17 +178,6 @@ type IngressHost struct {
 	HostName string `json:"hostName,omitempty"`
 }
 
-// PodTemplate defines the configuration related to template for the Mattermost pods.
-// Currently this only supports securityContext and containerSecurityContext.
-type PodTemplate struct {
-	// Defines the security context for the Mattermost app server pods.
-	// +optional
-	SecurityContext v1.PodSecurityContext `json:"securityContext,omitempty"`
-	// Defines the security context for the Mattermost app server container.
-	// +optional
-	ContainerSecurityContext v1.SecurityContext `json:"containerSecurityContext,omitempty"`
-}
-
 // Scheduling defines the configuration related to scheduling of the Mattermost pods
 // as well as resource constraints.
 type Scheduling struct {
@@ -218,6 +206,16 @@ type Probes struct {
 	// Defines the probe to check if the application is ready to accept traffic.
 	// +optional
 	ReadinessProbe v1.Probe `json:"readinessProbe,omitempty"`
+}
+
+// PodTemplate defines configuration for the template for Mattermost pods.
+type PodTemplate struct {
+	// Defines the security context for the Mattermost app server pods.
+	// +optional
+	SecurityContext v1.PodSecurityContext `json:"securityContext,omitempty"`
+	// Defines the security context for the Mattermost app server container.
+	// +optional
+	ContainerSecurityContext v1.SecurityContext `json:"containerSecurityContext,omitempty"`
 }
 
 // PodExtensions specify customized extensions for a pod.

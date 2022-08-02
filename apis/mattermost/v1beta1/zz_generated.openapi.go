@@ -279,13 +279,6 @@ func schema_mattermost_operator_apis_mattermost_v1beta1_MattermostSpec(ref commo
 							Ref:     ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.ElasticSearch"),
 						},
 					},
-					"podTemplate": {
-						SchemaProps: spec.SchemaProps{
-							Description: "PodTemplate defines the configuration related to template for the Mattermost pods. Currently this only supports securityContext and containerSecurityContext.",
-							Default:     map[string]interface{}{},
-							Ref:         ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.PodTemplate"),
-						},
-					},
 					"scheduling": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Scheduling defines the configuration related to scheduling of the Mattermost pods as well as resource constraints. These settings generally don't need to be changed.",
@@ -298,6 +291,13 @@ func schema_mattermost_operator_apis_mattermost_v1beta1_MattermostSpec(ref commo
 							Description: "Probes defines configuration of liveness and readiness probe for Mattermost pods. These settings generally don't need to be changed.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.Probes"),
+						},
+					},
+					"podTemplate": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PodTemplate defines configuration for the template for Mattermost pods.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.PodTemplate"),
 						},
 					},
 					"podExtensions": {

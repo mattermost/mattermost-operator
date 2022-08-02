@@ -1697,9 +1697,8 @@ spec:
                     type: array
                 type: object
               podTemplate:
-                description: PodTemplate defines the configuration related to template
-                  for the Mattermost pods. Currently this only supports securityContext
-                  and containerSecurityContext.
+                description: PodTemplate defines configuration for the template for
+                  Mattermost pods.
                 properties:
                   containerSecurityContext:
                     description: Defines the security context for the Mattermost app
