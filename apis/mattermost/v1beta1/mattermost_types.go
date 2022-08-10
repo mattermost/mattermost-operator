@@ -212,10 +212,10 @@ type Probes struct {
 type PodTemplate struct {
 	// Defines the security context for the Mattermost app server pods.
 	// +optional
-	SecurityContext v1.PodSecurityContext `json:"securityContext,omitempty"`
+	SecurityContext *v1.PodSecurityContext `json:"securityContext,omitempty"`
 	// Defines the security context for the Mattermost app server container.
 	// +optional
-	ContainerSecurityContext v1.SecurityContext `json:"containerSecurityContext,omitempty"`
+	ContainerSecurityContext *v1.SecurityContext `json:"containerSecurityContext,omitempty"`
 }
 
 // PodExtensions specify customized extensions for a pod.
