@@ -1700,6 +1700,13 @@ spec:
                 description: PodTemplate defines configuration for the template for
                   Mattermost pods.
                 properties:
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    description: Defines annotations to add to the Mattermost app
+                      server pods. Overrides of default prometheus annotations are
+                      ignored.
+                    type: object
                   containerSecurityContext:
                     description: Defines the security context for the Mattermost app
                       server container.
@@ -1868,6 +1875,13 @@ spec:
                               takes precedence.
                             type: string
                         type: object
+                    type: object
+                  labels:
+                    additionalProperties:
+                      type: string
+                    description: Defines labels to add to the Mattermost app server
+                      pods. Overrides what is set in ResourceLabels, does not override
+                      default labels (app and cluster labels).
                     type: object
                   securityContext:
                     description: Defines the security context for the Mattermost app

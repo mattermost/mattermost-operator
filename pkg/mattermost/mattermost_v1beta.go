@@ -220,13 +220,21 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 	volumeMounts := mattermost.Spec.VolumeMounts
 	podAnnotations := map[string]string{}
 
+	// Set user specified annotations
+	if mattermost.Spec.PodTemplate.Annotations != nil {
+		podAnnotations = mattermost.Spec.PodTemplate.Annotations
+	}
+
 	// Mattermost License
 	if len(mattermost.Spec.LicenseSecret) != 0 {
 		env, vMount, volume, annotations := mattermostLicenceConfig(mattermost.Spec.LicenseSecret)
 		envVarGeneral = append(envVarGeneral, env)
 		volumeMounts = append(volumeMounts, vMount)
 		volumes = append(volumes, volume)
-		podAnnotations = annotations
+		// Add prometheus annotations, overwriting user specified if needed
+		for k, v := range annotations {
+			podAnnotations[k] = v
+		}
 	}
 
 	// Concat EnvVars

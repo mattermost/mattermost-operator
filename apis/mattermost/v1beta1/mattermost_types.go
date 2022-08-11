@@ -216,6 +216,14 @@ type PodTemplate struct {
 	// Defines the security context for the Mattermost app server container.
 	// +optional
 	ContainerSecurityContext *v1.SecurityContext `json:"containerSecurityContext,omitempty"`
+	// Defines annotations to add to the Mattermost app server pods.
+	// Overrides of default prometheus annotations are ignored.
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+	// Defines labels to add to the Mattermost app server pods.
+	// Overrides what is set in ResourceLabels, does not override default labels (app and cluster labels).
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
 }
 
 // PodExtensions specify customized extensions for a pod.
