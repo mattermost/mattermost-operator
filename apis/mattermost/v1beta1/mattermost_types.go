@@ -113,6 +113,10 @@ type MattermostSpec struct {
 	// +optional
 	Probes Probes `json:"probes,omitempty"`
 
+	// PodTemplate defines configuration for the template for Mattermost pods.
+	// +optional
+	PodTemplate PodTemplate `json:"podTemplate,omitempty"`
+
 	// PodExtensions specify custom extensions for Mattermost pods.
 	// This can be used for custom readiness checks etc.
 	// These settings generally don't need to be changed.
@@ -202,6 +206,16 @@ type Probes struct {
 	// Defines the probe to check if the application is ready to accept traffic.
 	// +optional
 	ReadinessProbe v1.Probe `json:"readinessProbe,omitempty"`
+}
+
+// PodTemplate defines configuration for the template for Mattermost pods.
+type PodTemplate struct {
+	// Defines the security context for the Mattermost app server pods.
+	// +optional
+	SecurityContext *v1.PodSecurityContext `json:"securityContext,omitempty"`
+	// Defines the security context for the Mattermost app server container.
+	// +optional
+	ContainerSecurityContext *v1.SecurityContext `json:"containerSecurityContext,omitempty"`
 }
 
 // PodExtensions specify customized extensions for a pod.
