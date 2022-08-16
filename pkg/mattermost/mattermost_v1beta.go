@@ -221,8 +221,8 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 	podAnnotations := map[string]string{}
 
 	// Set user specified annotations
-	if mattermost.Spec.PodTemplate.Annotations != nil {
-		podAnnotations = mattermost.Spec.PodTemplate.Annotations
+	if mattermost.Spec.PodTemplate.ExtraAnnotations != nil {
+		podAnnotations = mattermost.Spec.PodTemplate.ExtraAnnotations
 	}
 
 	// Mattermost License
@@ -274,7 +274,7 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels:      mattermost.MattermostLabels(deploymentName),
+					Labels:      mattermost.MattermostPodLabels(deploymentName),
 					Annotations: podAnnotations,
 				},
 				Spec: corev1.PodSpec{

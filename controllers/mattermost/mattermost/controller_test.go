@@ -211,7 +211,7 @@ func TestReconcile(t *testing.T) {
 		podTemplate := corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: mmNamespace,
-				Labels:    mm.MattermostLabels(mmName),
+				Labels:    mm.MattermostPodLabels(mmName),
 			},
 			Spec: corev1.PodSpec{
 				Containers: []corev1.Container{

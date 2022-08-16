@@ -430,15 +430,15 @@ func (in *PodTemplate) DeepCopyInto(out *PodTemplate) {
 		*out = new(v1.SecurityContext)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.Annotations != nil {
-		in, out := &in.Annotations, &out.Annotations
+	if in.ExtraAnnotations != nil {
+		in, out := &in.ExtraAnnotations, &out.ExtraAnnotations
 		*out = make(map[string]string, len(*in))
 		for key, val := range *in {
 			(*out)[key] = val
 		}
 	}
-	if in.Labels != nil {
-		in, out := &in.Labels, &out.Labels
+	if in.ExtraLabels != nil {
+		in, out := &in.ExtraLabels, &out.ExtraLabels
 		*out = make(map[string]string, len(*in))
 		for key, val := range *in {
 			(*out)[key] = val

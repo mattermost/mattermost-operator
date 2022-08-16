@@ -219,11 +219,11 @@ type PodTemplate struct {
 	// Defines annotations to add to the Mattermost app server pods.
 	// Overrides of default prometheus annotations are ignored.
 	// +optional
-	Annotations map[string]string `json:"annotations,omitempty"`
+	ExtraAnnotations map[string]string `json:"extraAnnotations,omitempty"`
 	// Defines labels to add to the Mattermost app server pods.
 	// Overrides what is set in ResourceLabels, does not override default labels (app and cluster labels).
 	// +optional
-	Labels map[string]string `json:"labels,omitempty"`
+	ExtraLabels map[string]string `json:"extraLabels,omitempty"`
 }
 
 // PodExtensions specify customized extensions for a pod.
