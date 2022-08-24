@@ -220,13 +220,21 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 	volumeMounts := mattermost.Spec.VolumeMounts
 	podAnnotations := map[string]string{}
 
+	// Set user specified annotations
+	if mattermost.Spec.PodTemplate.ExtraAnnotations != nil {
+		podAnnotations = mattermost.Spec.PodTemplate.ExtraAnnotations
+	}
+
 	// Mattermost License
 	if len(mattermost.Spec.LicenseSecret) != 0 {
 		env, vMount, volume, annotations := mattermostLicenceConfig(mattermost.Spec.LicenseSecret)
 		envVarGeneral = append(envVarGeneral, env)
 		volumeMounts = append(volumeMounts, vMount)
 		volumes = append(volumes, volume)
-		podAnnotations = annotations
+		// Add prometheus annotations, overwriting user specified if needed
+		for k, v := range annotations {
+			podAnnotations[k] = v
+		}
 	}
 
 	// Concat EnvVars
@@ -266,7 +274,7 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels:      mattermost.MattermostLabels(deploymentName),
+					Labels:      mattermost.MattermostPodLabels(deploymentName),
 					Annotations: podAnnotations,
 				},
 				Spec: corev1.PodSpec{

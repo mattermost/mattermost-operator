@@ -201,13 +201,40 @@ func MattermostSelectorLabels(name string) map[string]string {
 // MattermostLabels returns the labels for selecting the resources
 // belonging to the given mattermost.
 func (mm *Mattermost) MattermostLabels(name string) map[string]string {
-	l := MattermostResourceLabels(name)
+	l := map[string]string{}
+	// Set resourceLabels ("global") as the initial labels
+	if mm.Spec.ResourceLabels != nil {
+		l = mm.Spec.ResourceLabels
+	}
+	// Overwrite with default labels
+	for k, v := range MattermostResourceLabels(name) {
+		l[k] = v
+	}
 	l[ClusterLabel] = name
 	l["app"] = MattermostAppContainerName
 
-	for k, v := range mm.Spec.ResourceLabels {
+	return l
+}
+
+// MattermostPodLabels returns the labels for selecting the pods
+// belonging to the given mattermost.
+func (mm *Mattermost) MattermostPodLabels(name string) map[string]string {
+	l := map[string]string{}
+	// Set resourceLabels ("global") as the initial labels
+	if mm.Spec.ResourceLabels != nil {
+		l = mm.Spec.ResourceLabels
+	}
+	// Overwrite with pod specific labels
+	for k, v := range mm.Spec.PodTemplate.ExtraLabels {
 		l[k] = v
 	}
+	// Overwrite with default labels
+	for k, v := range MattermostResourceLabels(name) {
+		l[k] = v
+	}
+	l[ClusterLabel] = name
+	l["app"] = MattermostAppContainerName
+
 	return l
 }
 

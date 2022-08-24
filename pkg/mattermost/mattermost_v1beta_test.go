@@ -35,6 +35,19 @@ func TestGenerateService_V1Beta(t *testing.T) {
 				UseServiceLoadBalancer: true,
 			},
 		},
+		{
+			name: "has labels",
+			spec: mmv1beta.MattermostSpec{
+				ResourceLabels: map[string]string{
+					"resource": "label",
+				},
+				PodTemplate: mmv1beta.PodTemplate{
+					ExtraLabels: map[string]string{
+						"pod": "label",
+					},
+				},
+			},
+		},
 	}
 
 	expectPort := func(t *testing.T, service *corev1.Service, portNumber int32, appProtocol *string) {
@@ -48,6 +61,25 @@ func TestGenerateService_V1Beta(t *testing.T) {
 			}
 		}
 		assert.Fail(t, fmt.Sprintf("failed to find port %d on service", portNumber))
+	}
+
+	expectLabels := func(t *testing.T, service *corev1.Service, mmspec mmv1beta.MattermostSpec) {
+		t.Helper()
+		if mmspec.ResourceLabels != nil {
+			for k, v := range mmspec.ResourceLabels {
+				if service.Labels[k] != v {
+					assert.Fail(t, fmt.Sprint("Resource labels not found on service"))
+				}
+			}
+		}
+		if mmspec.PodTemplate.ExtraLabels != nil {
+			for k, v := range mmspec.PodTemplate.ExtraLabels {
+				if service.Labels[k] == v {
+					assert.Fail(t, fmt.Sprint("Pod labels should not be applied to service"))
+				}
+			}
+		}
+		return
 	}
 
 	for _, tt := range tests {
@@ -66,6 +98,10 @@ func TestGenerateService_V1Beta(t *testing.T) {
 			} else {
 				expectPort(t, service, 8065, utils.NewString("http"))
 				expectPort(t, service, 8067, utils.NewString("http"))
+			}
+
+			if mattermost.Spec.ResourceLabels != nil || mattermost.Spec.PodTemplate.ExtraLabels != nil {
+				expectLabels(t, service, mattermost.Spec)
 			}
 		})
 	}
@@ -563,6 +599,73 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 				"MM_ELASTICSEARCHSETTINGS_PASSWORD":        "password",
 			},
 		},
+		{
+			name: "precedence order of labels",
+			spec: mmv1beta.MattermostSpec{
+				PodTemplate: mmv1beta.PodTemplate{
+					ExtraLabels: map[string]string{
+						"app": "extraLabels",
+						"pod": "extraLabels",
+					},
+				},
+				ResourceLabels: map[string]string{
+					"app":      "resourceLabels",
+					"pod":      "resourceLabels",
+					"resource": "resourceLabels",
+				},
+			},
+			want: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"app":      "mattermost",
+								"pod":      "extraLabels",
+								"resource": "resourceLabels",
+							},
+						},
+						Spec: corev1.PodSpec{},
+					},
+				},
+			},
+		},
+		{
+			name: "precedence order of annotations",
+			spec: mmv1beta.MattermostSpec{
+				LicenseSecret: "license-secret", // Add license for Prometheus annotations
+				PodTemplate: mmv1beta.PodTemplate{
+					ExtraAnnotations: map[string]string{
+						"prometheus.io/path": "/notmetrics",
+						"owner":              "test",
+					},
+				},
+			},
+			want: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: map[string]string{
+								"owner":              "test",
+								"prometheus.io/path": "/metrics",
+							},
+						},
+						Spec: corev1.PodSpec{
+							Volumes: []corev1.Volume{
+								{
+									Name: "mattermost-license",
+									VolumeSource: corev1.VolumeSource{
+										Secret: &corev1.SecretVolumeSource{
+											SecretName: "license-secret",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			requiredEnvVals: map[string]string{"MM_SERVICESETTINGS_LICENSEFILELOCATION": "/mattermost-license/license"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -640,6 +743,18 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 
 			// Container check.
 			assert.Equal(t, 1, len(deployment.Spec.Template.Spec.Containers))
+
+			// Label/Annotation checks
+			if tt.want.Spec.Template.ObjectMeta.Labels != nil {
+				for k, v := range tt.want.Spec.Template.ObjectMeta.Labels {
+					assert.Equal(t, deployment.Spec.Template.Labels[k], v)
+				}
+			}
+			if tt.want.Spec.Template.ObjectMeta.Annotations != nil {
+				for k, v := range tt.want.Spec.Template.ObjectMeta.Annotations {
+					assert.Equal(t, deployment.Spec.Template.Annotations[k], v)
+				}
+			}
 		})
 	}
 

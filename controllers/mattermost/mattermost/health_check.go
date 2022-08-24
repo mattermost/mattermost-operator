@@ -27,7 +27,7 @@ func (r *MattermostReconciler) checkMattermostHealth(mattermost *mmv1beta.Matter
 		ResourcePatch: currentStatus.ResourcePatch,
 	}
 
-	labels := mattermost.MattermostLabels(mattermost.Name)
+	labels := mattermost.MattermostPodLabels(mattermost.Name)
 	listOptions := []client.ListOption{
 		client.InNamespace(mattermost.Namespace),
 		client.MatchingLabels(labels),
