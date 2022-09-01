@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/go-logr/logr"
+	"github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	mattermostApp "github.com/mattermost/mattermost-operator/pkg/mattermost"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
@@ -94,17 +95,21 @@ func PrepareMattermostJobTemplate(name, namespace string, baseDeployment *appsv1
 		job.Spec.Template.Spec.InitContainers,
 	)
 
-	// We dont need to validate the readiness/liveness for this short lived job.
 	for i := range job.Spec.Template.Spec.Containers {
+		if job.Spec.Template.Spec.Containers[i].Name != v1beta1.MattermostAppContainerName {
+			continue
+		}
+
+		// We dont need to validate the readiness/liveness for this short lived job.
 		job.Spec.Template.Spec.Containers[i].LivenessProbe = nil
 		job.Spec.Template.Spec.Containers[i].ReadinessProbe = nil
+
+		// We don't want the full server to start so we print the version and exit
+		job.Spec.Template.Spec.Containers[i].Args = []string{"version"}
 	}
 
 	// Override values for job-specific behavior.
 	job.Spec.Template.Spec.RestartPolicy = corev1.RestartPolicyNever
-	for i := range job.Spec.Template.Spec.Containers {
-		job.Spec.Template.Spec.Containers[i].Command = []string{"mattermost", "version"}
-	}
 
 	return job
 }
