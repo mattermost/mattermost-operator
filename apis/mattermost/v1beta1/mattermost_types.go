@@ -115,7 +115,7 @@ type MattermostSpec struct {
 
 	// PodTemplate defines configuration for the template for Mattermost pods.
 	// +optional
-	PodTemplate PodTemplate `json:"podTemplate,omitempty"`
+	PodTemplate *PodTemplate `json:"podTemplate,omitempty"`
 
 	// PodExtensions specify custom extensions for Mattermost pods.
 	// This can be used for custom readiness checks etc.

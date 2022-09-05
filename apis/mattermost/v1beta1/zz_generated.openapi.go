@@ -296,7 +296,6 @@ func schema_mattermost_operator_apis_mattermost_v1beta1_MattermostSpec(ref commo
 					"podTemplate": {
 						SchemaProps: spec.SchemaProps{
 							Description: "PodTemplate defines configuration for the template for Mattermost pods.",
-							Default:     map[string]interface{}{},
 							Ref:         ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.PodTemplate"),
 						},
 					},

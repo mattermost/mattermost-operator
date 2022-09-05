@@ -224,9 +224,11 @@ func (mm *Mattermost) MattermostPodLabels(name string) map[string]string {
 	if mm.Spec.ResourceLabels != nil {
 		l = mm.Spec.ResourceLabels
 	}
-	// Overwrite with pod specific labels
-	for k, v := range mm.Spec.PodTemplate.ExtraLabels {
-		l[k] = v
+	if mm.Spec.PodTemplate != nil {
+		// Overwrite with pod specific labels
+		for k, v := range mm.Spec.PodTemplate.ExtraLabels {
+			l[k] = v
+		}
 	}
 	// Overwrite with default labels
 	for k, v := range MattermostResourceLabels(name) {
