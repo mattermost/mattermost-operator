@@ -3,7 +3,7 @@ package e2e
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
+	"os"
 
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	"github.com/pkg/errors"
@@ -14,7 +14,7 @@ import (
 )
 
 func CreateFromFile(ctx context.Context, k8sClient client.Client, namespace, path string) (func(), error) {
-	content, err := ioutil.ReadFile(path)
+	content, err := os.ReadFile(path)
 	if err != nil {
 		return func() {}, errors.Wrap(err, "failed to read file content")
 	}
