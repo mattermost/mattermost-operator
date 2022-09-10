@@ -6,7 +6,6 @@ import (
 	"time"
 
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
-	"github.com/mattermost/mattermost-operator/test/e2e"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -59,7 +58,7 @@ func (m *mattermostInstance) Create() {
 func (m *mattermostInstance) CreateAndWait() {
 	m.Create()
 
-	err := e2e.WaitForMattermostStable(m.t, m.k8sClient, m.Namespace(), m.timeoutWait)
+	err := WaitForMattermostStable(m.t, m.k8sClient, m.Namespace(), m.timeoutWait)
 	require.NoError(m.t, err)
 }
 

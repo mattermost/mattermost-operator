@@ -5,6 +5,7 @@ import (
 
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	pkgUtils "github.com/mattermost/mattermost-operator/pkg/utils"
+	"github.com/mattermost/mattermost-operator/test/e2e"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -50,7 +51,7 @@ func TestMattermostCustomIngressOk(t *testing.T) {
 		},
 	}
 
-	instance := NewMattermostInstance(t, k8sClient, mattermost)
+	instance := e2e.NewMattermostInstance(t, k8sClient, mattermost)
 	defer instance.Destroy()
 
 	instance.CreateAndWait()
