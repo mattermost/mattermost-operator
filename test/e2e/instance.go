@@ -16,6 +16,7 @@ const (
 	mattermostInstanceCreationTimeout = 15 * time.Second
 	mattermostInstanceWaitTimeout     = 3 * time.Minute
 	mattermostInstanceGetTimeout      = 60 * time.Second
+	mattermostInstanceUpdateTimeout   = 60 * time.Second
 )
 
 // mattermostInstance defines a mattermost instance that is created in the test k8s cluster in order to ease the creation,
@@ -28,6 +29,7 @@ type mattermostInstance struct {
 	timeoutCreate  time.Duration
 	timeoutWait    time.Duration
 	timeoutGet     time.Duration
+	timeoutUpdate  time.Duration
 	k8sClient      client.Client
 	namespaceName  types.NamespacedName
 	created        bool
@@ -57,7 +59,11 @@ func (m *mattermostInstance) Create() {
 // CreateAndWait Creates the instance within the cluster and waits until is a stable instance (failing if not)
 func (m *mattermostInstance) CreateAndWait() {
 	m.Create()
+	m.Wait()
+}
 
+// Wait wait for the mattermost to be stable
+func (m *mattermostInstance) Wait() {
 	err := WaitForMattermostStable(m.t, m.k8sClient, m.Namespace(), m.timeoutWait)
 	require.NoError(m.t, err)
 }
@@ -84,6 +90,20 @@ func (m *mattermostInstance) Get() mmv1beta.Mattermost {
 	return mattermost
 }
 
+// Update updates the mattermost instance definition
+func (m *mattermostInstance) Update(mattermost *mmv1beta.Mattermost) {
+	ctx, cancel := context.WithTimeout(context.Background(), m.timeoutUpdate)
+	defer cancel()
+	err := m.k8sClient.Update(ctx, mattermost)
+	require.NoError(m.t, err, "Error updating mattermost instance from cluster")
+}
+
+// UpdateAndWait Updates the mattermost instance definition and waits for the instance to be stable
+func (m *mattermostInstance) UpdateAndWait(mattermost *mmv1beta.Mattermost) {
+	m.Update(mattermost)
+	m.Wait()
+}
+
 func NewMattermostInstance(t *testing.T, k8sClient client.Client, mattermost *mmv1beta.Mattermost) *mattermostInstance {
 	return &mattermostInstance{
 		t:              t,
@@ -92,6 +112,7 @@ func NewMattermostInstance(t *testing.T, k8sClient client.Client, mattermost *mm
 		timeoutCreate:  mattermostInstanceCreationTimeout,
 		timeoutWait:    mattermostInstanceWaitTimeout,
 		timeoutGet:     mattermostInstanceGetTimeout,
+		timeoutUpdate:  mattermostInstanceUpdateTimeout,
 	}
 }
 
