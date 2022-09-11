@@ -62,10 +62,10 @@ func (m *mattermostInstance) CreateAndWait() {
 	m.Wait()
 }
 
-// Wait wait for the mattermost to be stable
+// Wait waits for the mattermost instance to be stable
 func (m *mattermostInstance) Wait() {
 	err := WaitForMattermostStable(m.t, m.k8sClient, m.Namespace(), m.timeoutWait)
-	require.NoError(m.t, err)
+	require.NoError(m.t, err, "Timed out waiting for a stable mattermost instance")
 }
 
 // Destroy destroys the created instance

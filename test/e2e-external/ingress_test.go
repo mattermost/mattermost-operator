@@ -29,7 +29,8 @@ func TestMattermostCustomIngressOk(t *testing.T) {
 		},
 		Spec: mmv1beta.MattermostSpec{
 			Ingress: &mmv1beta.Ingress{
-				Host: "e2e-test-ingress.mattermost.dev",
+				Enabled: true,
+				Host:    "e2e-test-ingress-1.mattermost.dev",
 				Hosts: []mmv1beta.IngressHost{
 					{
 						HostName: "e2e-test-ingress-1.mattermost.dev",
@@ -53,6 +54,7 @@ func TestMattermostCustomIngressOk(t *testing.T) {
 		},
 	}
 
+	ctx := context.Background()
 	instance := e2e.NewMattermostInstance(t, k8sClient, mattermost)
 	defer instance.Destroy()
 
@@ -60,13 +62,30 @@ func TestMattermostCustomIngressOk(t *testing.T) {
 
 	clusterMattermost := instance.Get()
 
-	// Check entire ingress object
+	// Check entire in-cluster mattermost ingress spec
 	require.Equal(t, mattermost.Spec.Ingress, clusterMattermost.Spec.Ingress, "Mattermost Ingress spec should be the same as defined")
 
-	// Check specific attributes individually, in case deep equality fails for wathever reason
-	require.Equal(t, mattermost.Spec.Ingress.Hosts, clusterMattermost.Spec.Ingress.Hosts, "Spec should have same hosts defined")
-	require.Equal(t, mattermost.Spec.Ingress.Annotations, clusterMattermost.Spec.Ingress.Annotations, "Spec should contain specified annotations")
-	require.Equal(t, mattermost.Spec.Ingress.IngressClass, clusterMattermost.Spec.Ingress.IngressClass, "Spec should contain the same ingress class")
+	// Check ingress existence
+	var mmIngress networkingv1.Ingress
+	err = k8sClient.Get(ctx, instance.Namespace(), &mmIngress)
+	require.NoError(t, err, "Ingress should be present in cluster")
+
+	// Check ingress configuration6
+	mmIngressHosts := []string{}
+	for _, rule := range mmIngress.Spec.Rules {
+		mmIngressHosts = append(mmIngressHosts, rule.Host)
+	}
+	mattermostSpecHosts := []string{}
+	for _, host := range mattermost.Spec.Ingress.Hosts {
+		mattermostSpecHosts = append(mattermostSpecHosts, host.HostName)
+	}
+
+	require.Equal(t, mattermostSpecHosts, mmIngressHosts, "Ingress should contain rules for each specified host")
+	require.Equal(t, mattermost.Spec.Ingress.IngressClass, mmIngress.Spec.IngressClassName, "Ingress should have same ingress class defined")
+	for key, value := range mattermost.Spec.Ingress.Annotations {
+		require.Contains(t, mmIngress.Annotations, key, "Ingress should contain specified annotation")
+		require.Equal(t, mmIngress.Annotations[key], value, "Ingress annottation value should be the one specified")
+	}
 }
 
 func TestMattermostIngressDisableOk(t *testing.T) {
