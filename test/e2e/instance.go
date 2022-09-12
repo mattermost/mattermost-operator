@@ -7,6 +7,7 @@ import (
 
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	"github.com/stretchr/testify/require"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -31,7 +32,6 @@ type mattermostInstance struct {
 	timeoutUpdate  time.Duration
 	k8sClient      client.Client
 	namespaceName  types.NamespacedName
-	created        bool
 }
 
 // Namespace returns the NamespacedName in order to retrieve the object easily
@@ -51,8 +51,6 @@ func (m *mattermostInstance) Create() {
 
 	err := m.k8sClient.Create(ctx, m.mattermostSpec)
 	require.NoError(m.t, err)
-
-	m.created = true
 }
 
 // CreateAndWait Creates the instance within the cluster and waits until is a stable instance (failing if not)
@@ -69,12 +67,10 @@ func (m *mattermostInstance) Wait() {
 
 // Destroy destroys the created instance
 func (m *mattermostInstance) Destroy() {
-	if !m.created {
-		return
-	}
-
 	err := m.k8sClient.Delete(context.Background(), m.mattermostSpec)
-	require.NoError(m.t, err)
+	if !k8serrors.IsNotFound(err) {
+		require.NoError(m.t, err)
+	}
 }
 
 // Get retrieves the mattermost instance spec from the cluster
