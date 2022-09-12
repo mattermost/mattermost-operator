@@ -253,12 +253,9 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 	liveness, readiness := setProbes(mattermost.Spec.Probes.LivenessProbe, mattermost.Spec.Probes.ReadinessProbe)
 
 	var containerSecurityContext *corev1.SecurityContext
-	if mattermost.Spec.PodTemplate != nil && mattermost.Spec.PodTemplate.ContainerSecurityContext != nil {
-		containerSecurityContext = mattermost.Spec.PodTemplate.ContainerSecurityContext
-	}
-
 	var podSecurityContext *corev1.PodSecurityContext
-	if mattermost.Spec.PodTemplate != nil && mattermost.Spec.PodTemplate.SecurityContext != nil {
+	if mattermost.Spec.PodTemplate != nil {
+		containerSecurityContext = mattermost.Spec.PodTemplate.ContainerSecurityContext
 		podSecurityContext = mattermost.Spec.PodTemplate.SecurityContext
 	}
 
