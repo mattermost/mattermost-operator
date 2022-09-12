@@ -84,7 +84,7 @@ func TestMattermostIngress(t *testing.T) {
 			mattermostSpecHosts = append(mattermostSpecHosts, host.HostName)
 		}
 
-		require.Equal(t, mattermostSpecHosts, mmIngressHosts, "Ingress should contain rules for each specified host")
+		require.ElementsMatch(t, mattermostSpecHosts, mmIngressHosts, "Ingress should contain rules for each specified host")
 		require.Equal(t, mattermost.Spec.Ingress.IngressClass, mmIngress.Spec.IngressClassName, "Ingress should have same ingress class defined")
 		for key, value := range mattermost.Spec.Ingress.Annotations {
 			require.Contains(t, mmIngress.Annotations, key, "Ingress should contain specified annotation")
