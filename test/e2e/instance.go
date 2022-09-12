@@ -7,7 +7,6 @@ import (
 
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	"github.com/stretchr/testify/require"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -113,33 +112,5 @@ func NewMattermostInstance(t *testing.T, k8sClient client.Client, mattermost *mm
 		timeoutWait:    mattermostInstanceWaitTimeout,
 		timeoutGet:     mattermostInstanceGetTimeout,
 		timeoutUpdate:  mattermostInstanceUpdateTimeout,
-	}
-}
-
-func ExampleMattermostInstance() {
-	var t testing.T
-	var k8sClient client.Client
-	specName := "mm-provided-name"
-
-	mattermost := &mmv1beta.Mattermost{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: specName,
-		},
-		// ...
-	}
-
-	// Setup the test instance
-	instance := NewMattermostInstance(&t, k8sClient, mattermost)
-	defer instance.Destroy()
-
-	// Create the instance on the cluster and wait for creation
-	instance.CreateAndWait()
-
-	// Retrieve the instance to check against it
-	clusterMattermost := instance.Get()
-
-	// Tests here
-	if clusterMattermost.Name != specName {
-		t.Errorf("Name should be `%s`", specName)
 	}
 }
