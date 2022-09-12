@@ -284,7 +284,11 @@ func (in *MattermostSpec) DeepCopyInto(out *MattermostSpec) {
 	out.ElasticSearch = in.ElasticSearch
 	in.Scheduling.DeepCopyInto(&out.Scheduling)
 	in.Probes.DeepCopyInto(&out.Probes)
-	in.PodTemplate.DeepCopyInto(&out.PodTemplate)
+	if in.PodTemplate != nil {
+		in, out := &in.PodTemplate, &out.PodTemplate
+		*out = new(PodTemplate)
+		(*in).DeepCopyInto(*out)
+	}
 	in.PodExtensions.DeepCopyInto(&out.PodExtensions)
 	if in.ResourcePatch != nil {
 		in, out := &in.ResourcePatch, &out.ResourcePatch

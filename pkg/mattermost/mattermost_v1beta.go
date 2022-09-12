@@ -221,7 +221,7 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 	podAnnotations := map[string]string{}
 
 	// Set user specified annotations
-	if mattermost.Spec.PodTemplate.ExtraAnnotations != nil {
+	if mattermost.Spec.PodTemplate != nil && mattermost.Spec.PodTemplate.ExtraAnnotations != nil {
 		podAnnotations = mattermost.Spec.PodTemplate.ExtraAnnotations
 	}
 
@@ -251,6 +251,13 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 	maxSurge := intstr.FromInt(defaultMaxSurge)
 
 	liveness, readiness := setProbes(mattermost.Spec.Probes.LivenessProbe, mattermost.Spec.Probes.ReadinessProbe)
+
+	var containerSecurityContext *corev1.SecurityContext
+	var podSecurityContext *corev1.PodSecurityContext
+	if mattermost.Spec.PodTemplate != nil {
+		containerSecurityContext = mattermost.Spec.PodTemplate.ContainerSecurityContext
+		podSecurityContext = mattermost.Spec.PodTemplate.SecurityContext
+	}
 
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -302,7 +309,7 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 							LivenessProbe:   liveness,
 							VolumeMounts:    volumeMounts,
 							Resources:       mattermost.Spec.Scheduling.Resources,
-							SecurityContext: mattermost.Spec.PodTemplate.ContainerSecurityContext,
+							SecurityContext: containerSecurityContext,
 						},
 					},
 					ImagePullSecrets: mattermost.Spec.ImagePullSecrets,
@@ -312,7 +319,7 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 					Affinity:         mattermost.Spec.Scheduling.Affinity,
 					NodeSelector:     mattermost.Spec.Scheduling.NodeSelector,
 					Tolerations:      mattermost.Spec.Scheduling.Tolerations,
-					SecurityContext:  mattermost.Spec.PodTemplate.SecurityContext,
+					SecurityContext:  podSecurityContext,
 				},
 			},
 		},

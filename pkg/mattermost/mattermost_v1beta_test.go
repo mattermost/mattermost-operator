@@ -41,7 +41,7 @@ func TestGenerateService_V1Beta(t *testing.T) {
 				ResourceLabels: map[string]string{
 					"resource": "label",
 				},
-				PodTemplate: mmv1beta.PodTemplate{
+				PodTemplate: &mmv1beta.PodTemplate{
 					ExtraLabels: map[string]string{
 						"pod": "label",
 					},
@@ -100,7 +100,7 @@ func TestGenerateService_V1Beta(t *testing.T) {
 				expectPort(t, service, 8067, utils.NewString("http"))
 			}
 
-			if mattermost.Spec.ResourceLabels != nil || mattermost.Spec.PodTemplate.ExtraLabels != nil {
+			if mattermost.Spec.ResourceLabels != nil || (mattermost.Spec.PodTemplate != nil && mattermost.Spec.PodTemplate.ExtraLabels != nil) {
 				expectLabels(t, service, mattermost.Spec)
 			}
 		})
@@ -602,7 +602,7 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 		{
 			name: "precedence order of labels",
 			spec: mmv1beta.MattermostSpec{
-				PodTemplate: mmv1beta.PodTemplate{
+				PodTemplate: &mmv1beta.PodTemplate{
 					ExtraLabels: map[string]string{
 						"app": "extraLabels",
 						"pod": "extraLabels",
@@ -633,7 +633,7 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 			name: "precedence order of annotations",
 			spec: mmv1beta.MattermostSpec{
 				LicenseSecret: "license-secret", // Add license for Prometheus annotations
-				PodTemplate: mmv1beta.PodTemplate{
+				PodTemplate: &mmv1beta.PodTemplate{
 					ExtraAnnotations: map[string]string{
 						"prometheus.io/path": "/notmetrics",
 						"owner":              "test",
