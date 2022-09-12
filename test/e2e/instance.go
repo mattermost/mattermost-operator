@@ -95,7 +95,7 @@ func (m *mattermostInstance) Update(mattermost *mmv1beta.Mattermost) {
 	ctx, cancel := context.WithTimeout(context.Background(), m.timeoutUpdate)
 	defer cancel()
 	err := m.k8sClient.Update(ctx, mattermost)
-	require.NoError(m.t, err, "Error updating mattermost instance from cluster")
+	require.NoError(m.t, err, "Error updating mattermost instance")
 }
 
 // UpdateAndWait Updates the mattermost instance definition and waits for the instance to be stable
