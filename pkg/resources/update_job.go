@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
+	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	mattermostApp "github.com/mattermost/mattermost-operator/pkg/mattermost"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
@@ -23,8 +24,9 @@ func (r *ResourceHelper) LaunchMattermostUpdateJob(
 	jobNamespace string,
 	baseDeployment *appsv1.Deployment,
 	reqLogger logr.Logger,
+	updateJobSpec *mmv1beta.UpdateJob,
 ) error {
-	job := PrepareMattermostJobTemplate(UpdateJobName, jobNamespace, baseDeployment)
+	job := PrepareMattermostJobTemplate(UpdateJobName, jobNamespace, baseDeployment, updateJobSpec)
 
 	err := r.Create(owner, job, reqLogger)
 	if err != nil && !k8sErrors.IsAlreadyExists(err) {
@@ -40,13 +42,14 @@ func (r *ResourceHelper) RestartMattermostUpdateJob(
 	currentJob *batchv1.Job,
 	deployment *appsv1.Deployment,
 	reqLogger logr.Logger,
+	updateJobSpec *mmv1beta.UpdateJob,
 ) error {
 	err := r.client.Delete(context.TODO(), currentJob, k8sClient.PropagationPolicy(metav1.DeletePropagationBackground))
 	if err != nil && !k8sErrors.IsNotFound(err) {
 		return errors.Wrapf(err, "failed to delete outdated update job")
 	}
 
-	job := PrepareMattermostJobTemplate(UpdateJobName, currentJob.Namespace, deployment)
+	job := PrepareMattermostJobTemplate(UpdateJobName, currentJob.Namespace, deployment, updateJobSpec)
 
 	err = r.Create(owner, job, reqLogger)
 	if err != nil {
@@ -70,8 +73,26 @@ func (r *ResourceHelper) FetchMattermostUpdateJob(namespace string) (*batchv1.Jo
 	return job, err
 }
 
-func PrepareMattermostJobTemplate(name, namespace string, baseDeployment *appsv1.Deployment) *batchv1.Job {
+func PrepareMattermostJobTemplate(name, namespace string, baseDeployment *appsv1.Deployment, updateJobSpec *mmv1beta.UpdateJob) *batchv1.Job {
 	backoffLimit := int32(10)
+
+	podAnnotations := map[string]string{}
+	podLabels := map[string]string{}
+
+	if updateJobSpec != nil {
+		// Set user specified annotations
+		if updateJobSpec.ExtraAnnotations != nil {
+			podAnnotations = updateJobSpec.ExtraAnnotations
+		}
+
+		// Set user specified labels
+		if updateJobSpec.ExtraLabels != nil {
+			podLabels = updateJobSpec.ExtraLabels
+		}
+	}
+
+	// Set default app label always
+	podLabels["app"] = name
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -81,7 +102,8 @@ func PrepareMattermostJobTemplate(name, namespace string, baseDeployment *appsv1
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{"app": name},
+					Labels:      podLabels,
+					Annotations: podAnnotations,
 				},
 				Spec: *baseDeployment.Spec.Template.Spec.DeepCopy(),
 			},

@@ -3357,6 +3357,27 @@ spec:
                   Setting new Size will override previous values regardless if set
                   by Size or manually.'
                 type: string
+              updateJob:
+                description: UpdateJob defines configuration for the template for
+                  the update job.
+                properties:
+                  disabled:
+                    description: Determines whether to disable the Operator's creation
+                      of the update job.
+                    type: boolean
+                  extraAnnotations:
+                    additionalProperties:
+                      type: string
+                    description: Defines annotations to add to the update job pod.
+                    type: object
+                  extraLabels:
+                    additionalProperties:
+                      type: string
+                    description: Defines labels to add to the update job pod. Overrides
+                      what is set in ResourceLabels, does not override default label
+                      (app label).
+                    type: object
+                type: object
               useIngressTLS:
                 description: 'UseIngressTLS specifies whether TLS secret should be
                   configured for Ingress. Deprecated: Use Spec.Ingress.TLSSecret.'
