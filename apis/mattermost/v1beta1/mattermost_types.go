@@ -117,6 +117,10 @@ type MattermostSpec struct {
 	// +optional
 	PodTemplate *PodTemplate `json:"podTemplate,omitempty"`
 
+	// UpdateJob defines configuration for the template for the update job.
+	// +optional
+	UpdateJob *UpdateJob `json:"updateJob,omitempty"`
+
 	// PodExtensions specify custom extensions for Mattermost pods.
 	// This can be used for custom readiness checks etc.
 	// These settings generally don't need to be changed.
@@ -222,6 +226,20 @@ type PodTemplate struct {
 	ExtraAnnotations map[string]string `json:"extraAnnotations,omitempty"`
 	// Defines labels to add to the Mattermost app server pods.
 	// Overrides what is set in ResourceLabels, does not override default labels (app and cluster labels).
+	// +optional
+	ExtraLabels map[string]string `json:"extraLabels,omitempty"`
+}
+
+// UpdateJob defines configuration for the template for the update job pod.
+type UpdateJob struct {
+	// Determines whether to disable the Operator's creation of the update job.
+	// +optional
+	Disabled bool `json:"disabled,omitempty"`
+	// Defines annotations to add to the update job pod.
+	// +optional
+	ExtraAnnotations map[string]string `json:"extraAnnotations,omitempty"`
+	// Defines labels to add to the update job pod.
+	// Overrides what is set in ResourceLabels, does not override default label (app label).
 	// +optional
 	ExtraLabels map[string]string `json:"extraLabels,omitempty"`
 }

@@ -270,7 +270,7 @@ func (r *MattermostReconciler) checkMattermostDeployment(
 }
 
 func (r *MattermostReconciler) checkMattermostDBSetupJob(mattermost *mmv1beta.Mattermost, deployment *appsv1.Deployment, reqLogger logr.Logger) error {
-	desiredJob := resources.PrepareMattermostJobTemplate(mattermostApp.SetupJobName, mattermost.Namespace, deployment)
+	desiredJob := resources.PrepareMattermostJobTemplate(mattermostApp.SetupJobName, mattermost.Namespace, deployment, mattermost.Spec.UpdateJob)
 	desiredJob.OwnerReferences = mattermostApp.MattermostOwnerReference(mattermost)
 
 	currentJob := &batchv1.Job{}
@@ -349,12 +349,18 @@ func (r *MattermostReconciler) updateMattermostDeployment(
 	}
 
 	// Image is not the same
+
+	reqLogger.Info("Current image is not the same as the requested, will upgrade the Mattermost installation")
+
+	if mattermost.Spec.UpdateJob != nil && mattermost.Spec.UpdateJob.Disabled {
+		reqLogger.Info("Update job is disabled, new image will rollout without being verified")
+		return recStatus, r.Resources.Update(current, desired, reqLogger)
+	}
+
 	// Run a single-pod job with the new mattermost image
 	// It will check whether new image is operational
 	// and may perform any database migrations before altering the deployment.
 	// If this fails, we will return and not upgrade the deployment.
-
-	reqLogger.Info("Current image is not the same as the requested, will upgrade the Mattermost installation")
 
 	job, recStatus, err := r.checkUpdateJob(mattermost, mattermost.Namespace, desired, reqLogger)
 	if job != nil {
@@ -388,7 +394,7 @@ func (r *MattermostReconciler) checkUpdateJob(
 	if err != nil {
 		if k8sErrors.IsNotFound(err) {
 			reqLogger.Info("Launching update image job")
-			if err = r.Resources.LaunchMattermostUpdateJob(mattermost, jobNamespace, baseDeployment, reqLogger); err != nil {
+			if err = r.Resources.LaunchMattermostUpdateJob(mattermost, jobNamespace, baseDeployment, reqLogger, mattermost.Spec.UpdateJob); err != nil {
 				return nil, reconcileStatus{}, errors.Wrap(err, "Launching update image job failed")
 			}
 			recStatus.ResourcesReady = false
@@ -410,7 +416,7 @@ func (r *MattermostReconciler) checkUpdateJob(
 	}
 	if !isSameImage {
 		reqLogger.Info("Mattermost image changed, restarting update job")
-		err = r.Resources.RestartMattermostUpdateJob(mattermost, job, baseDeployment, reqLogger)
+		err = r.Resources.RestartMattermostUpdateJob(mattermost, job, baseDeployment, reqLogger, mattermost.Spec.UpdateJob)
 		if err != nil {
 			recStatus.ResourcesReady = false
 			return nil, recStatus, errors.Wrap(err, "failed to restart update job")

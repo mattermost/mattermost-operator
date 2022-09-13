@@ -20,6 +20,7 @@ import (
 	k8sClient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1"
+
 	"github.com/mattermost/mattermost-operator/pkg/database"
 	mattermostApp "github.com/mattermost/mattermost-operator/pkg/mattermost"
 )
@@ -235,7 +236,7 @@ func (r *ClusterInstallationReconciler) checkMattermostDeployment(mattermost *ma
 }
 
 func (r *ClusterInstallationReconciler) checkMattermostDBSetupJob(mattermost *mattermostv1alpha1.ClusterInstallation, deployment *appsv1.Deployment, reqLogger logr.Logger) error {
-	desiredJob := resources.PrepareMattermostJobTemplate(mattermostApp.SetupJobName, mattermost.Namespace, deployment)
+	desiredJob := resources.PrepareMattermostJobTemplate(mattermostApp.SetupJobName, mattermost.Namespace, deployment, nil)
 	desiredJob.OwnerReferences = mattermostApp.ClusterInstallationOwnerReference(mattermost)
 
 	currentJob := &batchv1.Job{}
@@ -397,7 +398,7 @@ func (r *ClusterInstallationReconciler) checkUpdateJob(
 		if k8sErrors.IsNotFound(err) {
 			// Job is not running, let's launch
 			reqLogger.Info("Launching update image job")
-			if err = r.Resources.LaunchMattermostUpdateJob(mattermost, mattermost.Namespace, desired, reqLogger); err != nil {
+			if err = r.Resources.LaunchMattermostUpdateJob(mattermost, mattermost.Namespace, desired, reqLogger, nil); err != nil {
 				return nil, errors.Wrap(err, "Launching update image job failed")
 			}
 			return nil, errors.New("Began update image job")
@@ -419,7 +420,7 @@ func (r *ClusterInstallationReconciler) checkUpdateJob(
 	}
 	if !isSameImage {
 		reqLogger.Info("Mattermost image changed, restarting update job")
-		err := r.Resources.RestartMattermostUpdateJob(mattermost, job, desired, reqLogger)
+		err := r.Resources.RestartMattermostUpdateJob(mattermost, job, desired, reqLogger, nil)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to restart update job")
 		}

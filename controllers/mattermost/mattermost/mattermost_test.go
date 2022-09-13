@@ -389,6 +389,149 @@ func TestCheckMattermost(t *testing.T) {
 	})
 }
 
+func TestCheckMattermostUpdateJob(t *testing.T) {
+	logger, _, reconciler := setupTestDeps(t)
+
+	mmName := "foo"
+	mmNamespace := "default"
+	replicas := int32(4)
+	extraLabels := map[string]string{
+		"app":   "test",
+		"owner": "test",
+		"foo":   "bar",
+	}
+	extraAnnotations := map[string]string{
+		"owner": "test",
+		"foo":   "bar",
+	}
+	updateJobSpec := mmv1beta.UpdateJob{
+		ExtraLabels:      extraLabels,
+		ExtraAnnotations: extraAnnotations,
+	}
+
+	mm := &mmv1beta.Mattermost{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      mmName,
+			Namespace: mmNamespace,
+			UID:       types.UID("test"),
+		},
+		Spec: mmv1beta.MattermostSpec{
+			Replicas:    &replicas,
+			Image:       "mattermost/mattermost-enterprise-edition",
+			Version:     operatortest.LatestStableMattermostVersion,
+			IngressName: "foo.mattermost.dev",
+			UpdateJob:   &updateJobSpec,
+		},
+	}
+
+	currentMMStatus := &mmv1beta.MattermostStatus{}
+
+	dbInfo, fileStoreInfo := fixedDBAndFileStoreInfo(t, mm)
+
+	t.Run("update job extra labels and annotations", func(t *testing.T) {
+		updateJobName := "mattermost-update-check"
+
+		recStatus, err := reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
+		assert.NoError(t, err)
+		assert.True(t, recStatus.ResourcesReady)
+
+		found := &appsv1.Deployment{}
+		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
+		require.NoError(t, err)
+		require.NotNil(t, found)
+		assert.Equal(t, mm.Name, found.Spec.Template.Spec.ServiceAccountName)
+
+		modified := found.DeepCopy()
+		modified.Spec.Template.Spec.Containers[0].Image = "not-mattermost:latest"
+
+		err = reconciler.Client.Update(context.TODO(), modified)
+		require.NoError(t, err)
+
+		// Update job should be launched, we do not expect error
+		recStatus, err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
+		require.NoError(t, err)
+		assert.False(t, recStatus.ResourcesReady)
+
+		// Assert the job was created
+		job := &batchv1.Job{}
+		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: updateJobName, Namespace: mmNamespace}, job)
+		require.NoError(t, err)
+
+		// Assert labels are set here
+		for k, v := range extraLabels {
+			assert.Equal(t, job.Spec.Template.ObjectMeta.Labels[k], v)
+		}
+		// Validate we aren't overriding the app label
+		assert.Equal(t, job.Spec.Template.ObjectMeta.Labels["app"], updateJobName)
+		// Assert annotations are set here
+		for k, v := range extraAnnotations {
+			assert.Equal(t, job.Spec.Template.ObjectMeta.Annotations[k], v)
+		}
+	})
+}
+
+func TestCheckMattermostUpdateJobDisabled(t *testing.T) {
+	logger, _, reconciler := setupTestDeps(t)
+
+	mmName := "foo"
+	mmNamespace := "default"
+	replicas := int32(4)
+	updateJobSpec := mmv1beta.UpdateJob{
+		Disabled: true,
+	}
+
+	mm := &mmv1beta.Mattermost{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      mmName,
+			Namespace: mmNamespace,
+			UID:       types.UID("test"),
+		},
+		Spec: mmv1beta.MattermostSpec{
+			Replicas:    &replicas,
+			Image:       "mattermost/mattermost-enterprise-edition",
+			Version:     operatortest.LatestStableMattermostVersion,
+			IngressName: "foo.mattermost.dev",
+			UpdateJob:   &updateJobSpec,
+		},
+	}
+
+	currentMMStatus := &mmv1beta.MattermostStatus{}
+
+	dbInfo, fileStoreInfo := fixedDBAndFileStoreInfo(t, mm)
+
+	t.Run("no update job", func(t *testing.T) {
+		updateJobName := "mattermost-update-check"
+
+		recStatus, err := reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
+		assert.NoError(t, err)
+		assert.True(t, recStatus.ResourcesReady)
+
+		found := &appsv1.Deployment{}
+		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
+		require.NoError(t, err)
+		require.NotNil(t, found)
+		assert.Equal(t, mm.Name, found.Spec.Template.Spec.ServiceAccountName)
+
+		modified := found.DeepCopy()
+		modified.Spec.Template.Spec.Containers[0].Image = "not-mattermost:latest"
+
+		err = reconciler.Client.Update(context.TODO(), modified)
+		require.NoError(t, err)
+
+		// Update job should NOT be launched, we do not expect error
+		recStatus, err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
+		require.NoError(t, err)
+		assert.True(t, recStatus.ResourcesReady)
+
+		// Assert the job was NOT created
+		job := &batchv1.Job{}
+		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: updateJobName, Namespace: mmNamespace}, job)
+		require.Error(t, err)
+		require.True(t, k8sErrors.IsNotFound(err), "expected not found error when getting job")
+		require.Equal(t, job, &batchv1.Job{})
+	})
+}
+
 func TestCheckMattermostExternalDBAndFileStore(t *testing.T) {
 	logger, _, reconciler := setupTestDeps(t)
 
