@@ -26,4 +26,4 @@ echo "Running operators e2e..."
 go test ./test/e2e --timeout 45m -v
 
 echo "Running external DB and File Store e2e..."
-go test ./test/e2e-extenal --timeout 15m -v
+go test ./test/e2e-external --timeout 15m -v
