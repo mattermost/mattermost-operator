@@ -27,6 +27,12 @@ func (e *ExternalFileStore) InitContainers(_ *mmv1beta.Mattermost) []corev1.Cont
 	return []corev1.Container{}
 }
 
+type LocalFileStore struct{}
+
+func (e *LocalFileStore) InitContainers(_ *mmv1beta.Mattermost) []corev1.Container {
+	return []corev1.Container{}
+}
+
 type OperatorManagedMinioConfig struct {
 	secretName string
 	minioURL   string
@@ -107,5 +113,15 @@ func NewOperatorManagedFileStoreInfo(mattermost *mmv1beta.Mattermost, secret, mi
 		url:        minioURL,
 		useS3SSL:   false,
 		config:     &OperatorManagedMinioConfig{minioURL: minioURL, secretName: secret},
+	}
+}
+
+func NewLocalFileStoreInfo() *FileStoreInfo {
+	return &FileStoreInfo{
+		secretName: "",
+		bucketName: "",
+		url:        "",
+		useS3SSL:   false,
+		config:     &LocalFileStore{},
 	}
 }

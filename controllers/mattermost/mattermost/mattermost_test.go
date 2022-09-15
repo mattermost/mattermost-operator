@@ -26,6 +26,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1beta1 "k8s.io/api/networking/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -714,6 +715,110 @@ func TestCheckMattermostExternalDBAndFileStore(t *testing.T) {
 			err := reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mattermostmysql.DefaultDatabaseSecretName(mmName), Namespace: mmNamespace}, dbSecret)
 			require.Error(t, err)
 		})
+	})
+}
+
+func TestCheckMattermostLocalFileStore(t *testing.T) {
+	logger, _, reconciler := setupTestDeps(t)
+
+	mmName := "foo"
+	mmNamespace := "default"
+	replicas := int32(4)
+	mm := &mmv1beta.Mattermost{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      mmName,
+			Namespace: mmNamespace,
+			UID:       types.UID("test"),
+		},
+		Spec: mmv1beta.MattermostSpec{
+			Replicas:    &replicas,
+			Image:       "mattermost/mattermost-enterprise-edition",
+			Version:     operatortest.LatestStableMattermostVersion,
+			IngressName: "foo.mattermost.dev",
+			FileStore: mmv1beta.FileStore{
+				Local: &mmv1beta.LocalFileStore{
+					Enabled:     true,
+					StorageSize: "1Gi",
+				},
+			},
+		},
+	}
+	currentMMStatus := &mmv1beta.MattermostStatus{}
+
+	dbInfo, err := mattermostApp.NewMySQLDBConfig(corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "dbSecret"},
+		Data: map[string][]byte{
+			"ROOT_PASSWORD": []byte("root-pass"),
+			"USER":          []byte("user"),
+			"PASSWORD":      []byte("pass"),
+			"DATABASE":      []byte("db"),
+		},
+	})
+	require.NoError(t, err)
+
+	fileStoreInfo, err := reconciler.checkLocalFileStore(mm, logger)
+	require.NoError(t, err)
+
+	t.Run("deployment", func(t *testing.T) {
+		updateName := "mattermost-update-check"
+		now := metav1.Now()
+		job := &batchv1.Job{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      updateName,
+				Namespace: mm.GetNamespace(),
+			},
+			Spec: batchv1.JobSpec{Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: mmv1beta.MattermostAppContainerName, Image: mm.GetImageName()},
+					},
+				},
+			}},
+			Status: batchv1.JobStatus{
+				Succeeded:      1,
+				CompletionTime: &now,
+			},
+		}
+		err = reconciler.Client.Create(context.TODO(), job)
+		require.NoError(t, err)
+
+		recStatus, recErr := reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
+		assert.NoError(t, recErr)
+		assert.Equal(t, true, recStatus.ResourcesReady)
+
+		foundDeploy := &appsv1.Deployment{}
+		deployErr := reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, foundDeploy)
+		require.NoError(t, deployErr)
+		require.NotNil(t, foundDeploy)
+	})
+
+	t.Run("pvc", func(t *testing.T) {
+		foundPvc := &corev1.PersistentVolumeClaim{}
+		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, foundPvc)
+		require.NoError(t, err)
+		require.NotNil(t, foundPvc)
+
+		expectedStorage := resource.MustParse("1Gi")
+		actualStorage := foundPvc.Spec.Resources.Requests.Storage()
+
+		assert.Equal(t, expectedStorage, *actualStorage)
+	})
+
+	t.Run("update pvc", func(t *testing.T) {
+		mm.Spec.FileStore.Local.StorageSize = "2Gi"
+
+		_, err := reconciler.checkLocalFileStore(mm, logger)
+		require.NoError(t, err)
+
+		foundPvc := &corev1.PersistentVolumeClaim{}
+		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, foundPvc)
+		require.NoError(t, err)
+		require.NotNil(t, foundPvc)
+
+		expectedStorage := resource.MustParse("2Gi")
+		actualStorage := foundPvc.Spec.Resources.Requests.Storage()
+
+		assert.Equal(t, expectedStorage, *actualStorage)
 	})
 }
 

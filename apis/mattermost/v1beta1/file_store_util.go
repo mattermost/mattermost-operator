@@ -25,6 +25,11 @@ func (fs *FileStore) IsExternal() bool {
 	return fs.External != nil && fs.External.URL != ""
 }
 
+// IsLocal returns true if the filestore requested is local (PVC backed).
+func (fs *FileStore) IsLocal() bool {
+	return fs.Local != nil && fs.Local.Enabled
+}
+
 func (fs *FileStore) ensureDefault() {
 	if fs.OperatorManaged == nil {
 		fs.OperatorManaged = &OperatorManagedMinio{}

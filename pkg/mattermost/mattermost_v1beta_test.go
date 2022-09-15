@@ -388,6 +388,36 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 			requiredEnvVals: map[string]string{"MM_FILESETTINGS_AMAZONS3SSL": "false"},
 		},
 		{
+			name: "local file store",
+			spec: mmv1beta.MattermostSpec{
+				FileStore: mmv1beta.FileStore{
+					Local: &mmv1beta.LocalFileStore{
+						Enabled: true,
+					},
+				},
+			},
+			want: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Volumes: []corev1.Volume{
+								{
+									Name: "mattermost-data",
+									VolumeSource: corev1.VolumeSource{
+										PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+											ClaimName: "",
+											ReadOnly:  false,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			requiredEnvVals: map[string]string{"MM_FILESETTINGS_DRIVERNAME": "local"},
+		},
+		{
 			name: "override envs set by default with ones in MM spec",
 			spec: mmv1beta.MattermostSpec{
 				MattermostEnv: []corev1.EnvVar{

@@ -323,6 +323,9 @@ type FileStore struct {
 	// Defines the configuration of file store managed by Kubernetes operator.
 	// +optional
 	OperatorManaged *OperatorManagedMinio `json:"operatorManaged,omitempty"`
+	// Defines the configuration of PVC backed storage (local). This is NOT recommended for production environments.
+	// +optional
+	Local *LocalFileStore `json:"local,omitempty"`
 }
 
 // ExternalFileStore defines the configuration of the external file store that should be used by Mattermost.
@@ -353,6 +356,16 @@ type OperatorManagedMinio struct {
 	// Defines the resource requests and limits for the Minio pods.
 	// +optional
 	Resources v1.ResourceRequirements `json:"resources,omitempty"`
+}
+
+// LocalFileStore defines the configuration of the local file store that should be used by Mattermost (PVC configuration).
+type LocalFileStore struct {
+	// Set to use local (PVC) storage, require explicit enabled to prevent accidental misconfiguration.
+	Enabled bool `json:"enabled"`
+	// Defines the storage size for the PVC. (default 50Gi)
+	// +optional
+	// +kubebuilder:validation:Pattern=^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$
+	StorageSize string `json:"storageSize,omitempty"`
 }
 
 // ElasticSearch defines the ElasticSearch configuration for Mattermost.
