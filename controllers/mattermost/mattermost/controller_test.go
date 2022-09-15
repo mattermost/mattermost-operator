@@ -1,7 +1,6 @@
 package mattermost
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -207,35 +206,14 @@ func TestReconcile(t *testing.T) {
 			assert.Equal(t, mmv1beta.Stable, mm.Status.State)
 		})
 
-		// Create expected mattermost pods.
-		podTemplate := corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: mmNamespace,
-				Labels:    mm.MattermostPodLabels(mmName),
-			},
-			Spec: corev1.PodSpec{
-				Containers: []corev1.Container{
-					{
-						Name:  mmv1beta.MattermostAppContainerName,
-						Image: mm.GetImageName(),
-					},
-				},
-			},
-			Status: corev1.PodStatus{
-				Phase: corev1.PodRunning,
-				Conditions: []corev1.PodCondition{
-					{
-						Type:   corev1.PodReady,
-						Status: corev1.ConditionFalse,
-					},
-				},
-			},
-		}
-		for i := 0; i < int(replicas); i++ {
-			podTemplate.ObjectMeta.Name = fmt.Sprintf("%s-pod-%d", mmName, i)
-			err = c.Create(context.TODO(), podTemplate.DeepCopy())
-			require.NoError(t, err)
-		}
+		// Update Deployment status - Replicas created
+		var deployment appsv1.Deployment
+		err = r.Get(context.TODO(), mmKey, &deployment)
+		require.NoError(t, err)
+		deployment.Status.Replicas = replicas
+
+		err = r.Update(context.TODO(), &deployment)
+		require.NoError(t, err)
 
 		t.Run("pods not ready", func(t *testing.T) {
 			res, err = r.Reconcile(context.Background(), req)
@@ -243,25 +221,10 @@ func TestReconcile(t *testing.T) {
 			require.Equal(t, res, reconcile.Result{RequeueAfter: 6 * time.Second})
 		})
 
-		// Make pods ready
-		pods := &corev1.PodList{}
-		err = c.List(context.TODO(), pods)
+		// Update ReplicaSet status - Replicas Available
+		replicaSet.Status.AvailableReplicas = replicas
+		err = r.Update(context.TODO(), replicaSet)
 		require.NoError(t, err)
-
-		for _, pod := range pods.Items {
-			for i := 0; i < int(replicas); i++ {
-				if pod.ObjectMeta.Name == fmt.Sprintf("%s-pod-%d", mmName, i) {
-					pod.Status.Conditions = []corev1.PodCondition{
-						{
-							Type:   corev1.PodReady,
-							Status: corev1.ConditionTrue,
-						},
-					}
-					err = c.Update(context.TODO(), pod.DeepCopy())
-					require.NoError(t, err)
-				}
-			}
-		}
 
 		t.Run("no reconcile errors", func(t *testing.T) {
 			res, err = r.Reconcile(context.Background(), req)
@@ -269,29 +232,10 @@ func TestReconcile(t *testing.T) {
 			require.Equal(t, res, reconcile.Result{})
 		})
 
-		changeMMPodsPhase := func(phase corev1.PodPhase, limit int) {
-			updated := 0
-			for _, pod := range pods.Items {
-				for i := 0; i < int(replicas); i++ {
-					if pod.ObjectMeta.Name == fmt.Sprintf("%s-pod-%d", mmName, i) {
-						pod.Status.Phase = phase
-						err = c.Update(context.TODO(), pod.DeepCopy())
-						require.NoError(t, err)
-						updated += 1
-					}
-					if updated >= limit {
-						return
-					}
-				}
-			}
-		}
-
-		// Make pods not running
-		pods = &corev1.PodList{}
-		err = c.List(context.TODO(), pods)
+		// Update ReplicaSet status - Replicas not available
+		replicaSet.Status.AvailableReplicas = 0
+		err = r.Update(context.TODO(), replicaSet)
 		require.NoError(t, err)
-
-		changeMMPodsPhase(corev1.PodPending, int(replicas))
 
 		t.Run("pods not running", func(t *testing.T) {
 			res, err = r.Reconcile(context.Background(), req)
@@ -299,12 +243,10 @@ func TestReconcile(t *testing.T) {
 			require.Equal(t, res, reconcile.Result{RequeueAfter: 6 * time.Second})
 		})
 
-		// Make one pod running - state Ready
-		pods = &corev1.PodList{}
-		err = c.List(context.TODO(), pods)
+		// Update ReplicaSet status - One pod available - ready state
+		replicaSet.Status.AvailableReplicas = 1
+		err = r.Update(context.TODO(), replicaSet)
 		require.NoError(t, err)
-
-		changeMMPodsPhase(corev1.PodRunning, 1)
 
 		t.Run("one pod running - ready state", func(t *testing.T) {
 			res, err = r.Reconcile(context.Background(), req)
@@ -316,12 +258,10 @@ func TestReconcile(t *testing.T) {
 			assert.Equal(t, mmv1beta.Ready, mm.Status.State)
 		})
 
-		// Make pods running
-		pods = &corev1.PodList{}
-		err = c.List(context.TODO(), pods)
+		// Update ReplicaSet status - Replicas Available
+		replicaSet.Status.AvailableReplicas = replicas
+		err = r.Update(context.TODO(), replicaSet)
 		require.NoError(t, err)
-
-		changeMMPodsPhase(corev1.PodRunning, int(replicas))
 
 		t.Run("no reconcile errors", func(t *testing.T) {
 			res, err = r.Reconcile(context.Background(), req)

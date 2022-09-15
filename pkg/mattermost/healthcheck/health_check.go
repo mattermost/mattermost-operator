@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
-	v1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -37,66 +36,19 @@ type PodRolloutStatus struct {
 	UpdatedReplicas int32
 }
 
-func (hc *HealthChecker) CheckPodsRollOut(desiredImage string) (PodRolloutStatus, error) {
-	pods := &corev1.PodList{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
-		},
-	}
-
-	err := hc.apiReader.List(context.TODO(), pods, hc.listOptions...)
-	if err != nil {
-		return PodRolloutStatus{}, errors.Wrap(err, "unable to get pod list")
-	}
-
-	var replicas = int32(len(pods.Items))
-	var updatedReplicas int32
-
-	for _, pod := range pods.Items {
-		if pod.Status.Phase != corev1.PodRunning || pod.DeletionTimestamp != nil {
-			if pod.DeletionTimestamp != nil {
-				hc.logger.Info(fmt.Sprintf("mattermost pod not terminated: pod %s is in state '%s'", pod.Name, pod.Status.Phase))
-				continue
-			}
-			hc.logger.Info(fmt.Sprintf("mattermost pod not ready: pod %s is in state '%s'", pod.Name, pod.Status.Phase))
-			continue
-		}
-		if len(pod.Spec.Containers) == 0 {
-			hc.logger.Info(fmt.Sprintf("mattermost pod %s has no containers", pod.Name))
-			continue
-		}
-		mmContainer := v1beta.GetMattermostAppContainer(pod.Spec.Containers)
-		if mmContainer == nil {
-			hc.logger.Info(fmt.Sprintf("mattermost container not found in the pod %s", pod.Name))
-			continue
-		}
-		if mmContainer.Image != desiredImage {
-			hc.logger.Info(fmt.Sprintf("mattermost pod %s is running incorrect image", pod.Name))
-			continue
-		}
-		if !isPodReady(pod) {
-			hc.logger.Info(fmt.Sprintf("mattermost pod %s is not ready", pod.Name))
-			continue
-		}
-
-		updatedReplicas++
-	}
-
-	return PodRolloutStatus{Replicas: replicas, UpdatedReplicas: updatedReplicas}, nil
-}
-
-func (hc *HealthChecker) AssertDeploymentRolloutStarted(name, namespace string) error {
+// CheckReplicaSetRollout checks if new deployment version was
+// already rolled out.
+func (hc *HealthChecker) CheckReplicaSetRollout(name, namespace string) (PodRolloutStatus, error) {
 	// To prevent race condition that new pods did not start rolling out and
 	// old ones are still ready, we need to check if Deployment was picked up by controller.
 	deployment := &appsv1.Deployment{}
 	deploymentKey := types.NamespacedName{Name: name, Namespace: namespace}
 	err := hc.apiReader.Get(context.TODO(), deploymentKey, deployment)
 	if err != nil {
-		return errors.Wrap(err, "failed to get deployment")
+		return PodRolloutStatus{}, errors.Wrap(err, "failed to get deployment")
 	}
 	if deployment.Generation != deployment.Status.ObservedGeneration {
-		return errors.New("mattermost deployment not yet picked up by the Deployment controller")
+		return PodRolloutStatus{}, errors.New("mattermost deployment not yet picked up by the Deployment controller")
 	}
 
 	// We check if new ReplicaSet was created and it was observed by the controller
@@ -104,23 +56,31 @@ func (hc *HealthChecker) AssertDeploymentRolloutStarted(name, namespace string) 
 	replicaSets := &appsv1.ReplicaSetList{}
 	err = hc.apiReader.List(context.TODO(), replicaSets, hc.listOptions...)
 	if err != nil {
-		return errors.Wrap(err, "failed to list replicaSets")
+		return PodRolloutStatus{}, errors.Wrap(err, "failed to list replicaSets")
 	}
 
-	replicaSetReady := false
+	var replicaSet *appsv1.ReplicaSet
 	for _, rep := range replicaSets.Items {
 		if getRevision(rep.Annotations) == getRevision(deployment.Annotations) {
 			if rep.Status.ObservedGeneration > 0 {
-				replicaSetReady = true
+				replicaSet = &rep
 				break
 			}
 		}
 	}
-	if !replicaSetReady {
-		return errors.New("replicaSet did not start rolling pods")
+	if replicaSet == nil {
+		return PodRolloutStatus{}, errors.New("replicaSet did not start rolling pods")
 	}
 
-	return nil
+	return PodRolloutStatus{
+		// To be compatible with previous behavior we take the number of
+		// replicas from deployment as there might be still old
+		// ReplicaSet instance, but we only care about updated replicas
+		// that are available, therefore we check most current
+		// ReplicaSet status.
+		Replicas:        deployment.Status.Replicas,
+		UpdatedReplicas: replicaSet.Status.AvailableReplicas,
+	}, nil
 }
 
 func (hc *HealthChecker) CheckServiceLoadBalancer() (string, error) {
