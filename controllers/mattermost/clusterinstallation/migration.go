@@ -218,7 +218,7 @@ func (r *ClusterInstallationReconciler) isDeploymentReady(mm *mmv1beta.Mattermos
 
 	healthChecker := healthcheck.NewHealthChecker(r.NonCachedAPIReader, listOptions, logger)
 
-	status, err := healthChecker.CheckReplicaSetRollout(mm.Name, mm.Namespace)
+	status, err := healthChecker.CheckPodsRollOut(mm.GetImageName())
 	if err != nil {
 		return false, errors.Wrap(err, "failed to check if pods are ready")
 	}

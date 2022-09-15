@@ -211,7 +211,6 @@ func TestReconcile(t *testing.T) {
 		err = r.Get(context.TODO(), mmKey, &deployment)
 		require.NoError(t, err)
 		deployment.Status.Replicas = replicas
-
 		err = r.Update(context.TODO(), &deployment)
 		require.NoError(t, err)
 
@@ -222,6 +221,12 @@ func TestReconcile(t *testing.T) {
 		})
 
 		// Update ReplicaSet status - Replicas Available
+		err = r.Get(context.TODO(), mmKey, &deployment)
+		require.NoError(t, err)
+		deployment.Status.Replicas = replicas
+		err = r.Update(context.TODO(), &deployment)
+		require.NoError(t, err)
+
 		replicaSet.Status.AvailableReplicas = replicas
 		err = r.Update(context.TODO(), replicaSet)
 		require.NoError(t, err)

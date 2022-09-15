@@ -1,7 +1,6 @@
 package clusterinstallation
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -164,35 +163,14 @@ func TestReconcile(t *testing.T) {
 		err = c.Update(context.TODO(), replicaSet)
 		require.NoError(t, err)
 
-		// Create expected mattermost pods.
-		podTemplate := corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: ciNamespace,
-				Labels:    ci.ClusterInstallationLabels(ciName),
-			},
-			Spec: corev1.PodSpec{
-				Containers: []corev1.Container{
-					{
-						Name:  mmv1beta.MattermostAppContainerName,
-						Image: ci.GetImageName(),
-					},
-				},
-			},
-			Status: corev1.PodStatus{
-				Phase: corev1.PodRunning,
-				Conditions: []corev1.PodCondition{
-					{
-						Type:   corev1.PodReady,
-						Status: corev1.ConditionFalse,
-					},
-				},
-			},
-		}
-		for i := 0; i < int(replicas); i++ {
-			podTemplate.ObjectMeta.Name = fmt.Sprintf("%s-pod-%d", ciName, i)
-			err = c.Create(context.TODO(), podTemplate.DeepCopy())
-			require.NoError(t, err)
-		}
+		// Update Deployment status - Replicas created
+		var deployment appsv1.Deployment
+		err = r.Get(context.TODO(), ciKey, &deployment)
+		require.NoError(t, err)
+		deployment.Status.Replicas = replicas
+
+		err = r.Update(context.TODO(), &deployment)
+		require.NoError(t, err)
 
 		t.Run("pods not ready", func(t *testing.T) {
 			res, err = r.Reconcile(context.Background(), req)
@@ -200,25 +178,10 @@ func TestReconcile(t *testing.T) {
 			require.Equal(t, res, reconcile.Result{RequeueAfter: 6 * time.Second})
 		})
 
-		// Make pods ready
-		pods := &corev1.PodList{}
-		err = c.List(context.TODO(), pods)
+		// Update ReplicaSet status - Replicas Available
+		replicaSet.Status.AvailableReplicas = replicas
+		err = r.Update(context.TODO(), replicaSet)
 		require.NoError(t, err)
-
-		for _, pod := range pods.Items {
-			for i := 0; i < int(replicas); i++ {
-				if pod.ObjectMeta.Name == fmt.Sprintf("%s-pod-%d", ciName, i) {
-					pod.Status.Conditions = []corev1.PodCondition{
-						{
-							Type:   corev1.PodReady,
-							Status: corev1.ConditionTrue,
-						},
-					}
-					err = c.Update(context.TODO(), pod.DeepCopy())
-					require.NoError(t, err)
-				}
-			}
-		}
 
 		t.Run("no reconcile errors", func(t *testing.T) {
 			res, err = r.Reconcile(context.Background(), req)
@@ -226,20 +189,10 @@ func TestReconcile(t *testing.T) {
 			require.Equal(t, res, reconcile.Result{})
 		})
 
-		// Make pods not running
-		pods = &corev1.PodList{}
-		err = c.List(context.TODO(), pods)
+		// Update ReplicaSet status - Replicas not available
+		replicaSet.Status.AvailableReplicas = 0
+		err = r.Update(context.TODO(), replicaSet)
 		require.NoError(t, err)
-
-		for _, pod := range pods.Items {
-			for i := 0; i < int(replicas); i++ {
-				if pod.ObjectMeta.Name == fmt.Sprintf("%s-pod-%d", ciName, i) {
-					pod.Status.Phase = corev1.PodPending
-					err = c.Update(context.TODO(), pod.DeepCopy())
-					require.NoError(t, err)
-				}
-			}
-		}
 
 		t.Run("pods not running", func(t *testing.T) {
 			res, err = r.Reconcile(context.Background(), req)
@@ -247,20 +200,10 @@ func TestReconcile(t *testing.T) {
 			require.Equal(t, res, reconcile.Result{RequeueAfter: 6 * time.Second})
 		})
 
-		// Make pods running
-		pods = &corev1.PodList{}
-		err = c.List(context.TODO(), pods)
+		// Update ReplicaSet status - Replicas Available
+		replicaSet.Status.AvailableReplicas = replicas
+		err = r.Update(context.TODO(), replicaSet)
 		require.NoError(t, err)
-
-		for _, pod := range pods.Items {
-			for i := 0; i < int(replicas); i++ {
-				if pod.ObjectMeta.Name == fmt.Sprintf("%s-pod-%d", ciName, i) {
-					pod.Status.Phase = corev1.PodRunning
-					err = c.Update(context.TODO(), pod.DeepCopy())
-					require.NoError(t, err)
-				}
-			}
-		}
 
 		t.Run("no reconcile errors", func(t *testing.T) {
 			res, err = r.Reconcile(context.Background(), req)
@@ -314,57 +257,35 @@ func TestReconcile(t *testing.T) {
 					Namespace: ciNamespace,
 					Labels:    ci.ClusterInstallationLabels(deployment.Name),
 				},
-				Status: appsv1.ReplicaSetStatus{ObservedGeneration: 1},
+				Status: appsv1.ReplicaSetStatus{
+					ObservedGeneration: 1,
+					AvailableReplicas: replicas,
+				},
 			}
 			err = c.Create(context.TODO(), replicaSet)
 			require.NoError(t, err)
-
-			podTemplate := corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: ciNamespace,
-					Labels:    ci.ClusterInstallationLabels(deployment.Name),
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Name:  mmv1beta.MattermostAppContainerName,
-							Image: deployment.GetDeploymentImageName(),
-						},
-					},
-				},
-				Status: corev1.PodStatus{
-					Phase: corev1.PodRunning,
-					Conditions: []corev1.PodCondition{
-						{
-							Type:   corev1.PodReady,
-							Status: corev1.ConditionTrue,
-						},
-					},
-				},
-			}
-
-			for i := 0; i < int(replicas); i++ {
-				podTemplate.ObjectMeta.Name = fmt.Sprintf("%s-pod-%d", deployment.Name, i)
-				err = c.Create(context.TODO(), podTemplate.DeepCopy())
-				require.NoError(t, err)
-			}
-
-			podList := &corev1.PodList{
-				TypeMeta: metav1.TypeMeta{
-					Kind:       "Pod",
-					APIVersion: "v1",
-				},
-			}
-			listOptions := []client.ListOption{
-				client.InNamespace(ciNamespace),
-				client.MatchingLabels(ci.ClusterInstallationLabels(deployment.Name)),
-			}
-			err = c.List(context.TODO(), podList, listOptions...)
-			require.NoError(t, err)
-			require.Equal(t, int(replicas), len(podList.Items))
 		}
 
 		t.Run("blue", func(t *testing.T) {
+			t.Run("create deployment", func(t *testing.T) {
+				res, err = r.Reconcile(context.Background(), req)
+				require.NoError(t, err)
+				require.Equal(t, res, reconcile.Result{RequeueAfter: healthCheckRequeueDelay})
+			})
+			var blueDeployment appsv1.Deployment
+			err = r.Get(context.TODO(), types.NamespacedName{Name: ci.Spec.BlueGreen.Blue.Name, Namespace: ci.Namespace}, &blueDeployment)
+			require.NoError(t, err)
+			blueDeployment.Status.Replicas = replicas
+			err = r.Update(context.TODO(), &blueDeployment)
+			require.NoError(t, err)
+
+			var greenDeployment appsv1.Deployment
+			err = r.Get(context.TODO(), types.NamespacedName{Name: ci.Spec.BlueGreen.Green.Name, Namespace: ci.Namespace}, &greenDeployment)
+			require.NoError(t, err)
+			greenDeployment.Status.Replicas = replicas
+			err = r.Update(context.TODO(), &greenDeployment)
+			require.NoError(t, err)
+
 			t.Run("no reconcile errors", func(t *testing.T) {
 				res, err = r.Reconcile(context.Background(), req)
 				require.NoError(t, err)
@@ -437,6 +358,19 @@ func TestReconcile(t *testing.T) {
 		t.Run("clean up", func(t *testing.T) {
 			ci.Spec.BlueGreen.Enable = false
 			err = c.Update(context.TODO(), ci)
+			require.NoError(t, err)
+
+			t.Run("create deployment", func(t *testing.T) {
+				res, err = r.Reconcile(context.Background(), req)
+				require.NoError(t, err)
+				require.Equal(t, res, reconcile.Result{RequeueAfter: healthCheckRequeueDelay})
+			})
+
+			var deployment appsv1.Deployment
+			err = r.Get(context.TODO(), ciKey, &deployment)
+			require.NoError(t, err)
+			deployment.Status.Replicas = replicas
+			err = r.Update(context.TODO(), &deployment)
 			require.NoError(t, err)
 
 			t.Run("no reconcile errors", func(t *testing.T) {

@@ -3,6 +3,7 @@ package healthcheck
 import (
 	"context"
 	"fmt"
+	v1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
@@ -34,6 +35,58 @@ func NewHealthChecker(apiReader client.Reader, listOpts []client.ListOption, log
 type PodRolloutStatus struct {
 	Replicas        int32
 	UpdatedReplicas int32
+}
+
+// CheckPodsRollOut checks if pods are running with new image.
+// Deprecated: It is maintained only for purpose of old migration code.
+// CheckReplicaSetRollout should be sufficient for other cases.
+func (hc *HealthChecker) CheckPodsRollOut(desiredImage string) (PodRolloutStatus, error) {
+	pods := &corev1.PodList{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: "v1",
+		},
+	}
+
+	err := hc.apiReader.List(context.TODO(), pods, hc.listOptions...)
+	if err != nil {
+		return PodRolloutStatus{}, errors.Wrap(err, "unable to get pod list")
+	}
+
+	var replicas = int32(len(pods.Items))
+	var updatedReplicas int32
+
+	for _, pod := range pods.Items {
+		if pod.Status.Phase != corev1.PodRunning || pod.DeletionTimestamp != nil {
+			if pod.DeletionTimestamp != nil {
+				hc.logger.Info(fmt.Sprintf("mattermost pod not terminated: pod %s is in state '%s'", pod.Name, pod.Status.Phase))
+				continue
+			}
+			hc.logger.Info(fmt.Sprintf("mattermost pod not ready: pod %s is in state '%s'", pod.Name, pod.Status.Phase))
+			continue
+		}
+		if len(pod.Spec.Containers) == 0 {
+			hc.logger.Info(fmt.Sprintf("mattermost pod %s has no containers", pod.Name))
+			continue
+		}
+		mmContainer := v1beta.GetMattermostAppContainer(pod.Spec.Containers)
+		if mmContainer == nil {
+			hc.logger.Info(fmt.Sprintf("mattermost container not found in the pod %s", pod.Name))
+			continue
+		}
+		if mmContainer.Image != desiredImage {
+			hc.logger.Info(fmt.Sprintf("mattermost pod %s is running incorrect image", pod.Name))
+			continue
+		}
+		if !isPodReady(pod) {
+			hc.logger.Info(fmt.Sprintf("mattermost pod %s is not ready", pod.Name))
+			continue
+		}
+
+		updatedReplicas++
+	}
+
+	return PodRolloutStatus{Replicas: replicas, UpdatedReplicas: updatedReplicas}, nil
 }
 
 // CheckReplicaSetRollout checks if new deployment version was
