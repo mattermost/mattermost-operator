@@ -10,10 +10,9 @@ import (
 	operatortest "github.com/mattermost/mattermost-operator/test"
 	"github.com/mattermost/mattermost-operator/test/e2e"
 	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func Test_MattermostExternalServices(t *testing.T) {
@@ -84,17 +83,10 @@ func checkVersionUpgrade(t *testing.T, mattermost *mmv1beta.Mattermost) {
 	err = e2e.WaitForMattermostStable(t, k8sClient, mmNamespaceName, 3*time.Minute)
 	require.NoError(t, err)
 
-	// list of pods with new version
-	pods := corev1.PodList{}
-	listOptions := []client.ListOption{
-		client.InNamespace(newMattermost.Namespace),
-		client.MatchingLabels(map[string]string{"app": "mattermost", mmv1beta.ClusterResourceLabel: newMattermost.Name}),
-	}
-	err = k8sClient.List(context.TODO(), &pods, listOptions...)
+	var mmDeployment appsv1.Deployment
+	err = k8sClient.Get(context.TODO(), mmNamespaceName, &mmDeployment)
 	require.NoError(t, err)
-	require.Equal(t, 1, len(pods.Items))
-
-	// check if pod has the new version
-	pod := pods.Items[0]
-	require.Equal(t, "mattermost/mattermost-enterprise-edition:"+operatortest.LatestStableMattermostVersion, pod.Spec.Containers[0].Image)
+	// check if deployment has the new version
+	require.Equal(t, "mattermost/mattermost-enterprise-edition:"+operatortest.LatestStableMattermostVersion,
+		mmDeployment.Spec.Template.Spec.Containers[0].Image)
 }
