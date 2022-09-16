@@ -60,6 +60,27 @@ func WaitForMattermostStable(t *testing.T, k8sClient client.Client, mmKey types.
 	return nil
 }
 
+func WaitForMattermostToReconcile(t *testing.T, k8sClient client.Client, mmKey types.NamespacedName, timeout time.Duration) error {
+	newMattermost := &operator.Mattermost{}
+	err := wait.Poll(3*time.Second, timeout, func() (done bool, err error) {
+		errClient := k8sClient.Get(context.TODO(), mmKey, newMattermost)
+		if errClient != nil {
+			return false, errClient
+		}
+
+		if newMattermost.Status.State == operator.Reconciling {
+			return true, nil
+		}
+		t.Logf("Waiting for Reconcilication to start (Status:%s)\n", newMattermost.Status.State)
+		return false, nil
+	})
+	if err != nil {
+		return err
+	}
+	t.Logf("Reconcilication started (%s)\n", newMattermost.Status.State)
+	return nil
+}
+
 func waitForStatefulSet(t *testing.T, dynclient client.Client, namespace, name string, replicas int, retryInterval, timeout time.Duration) error {
 	statefulset := &appsv1.StatefulSet{}
 	err := wait.Poll(retryInterval, timeout, func() (done bool, err error) {
