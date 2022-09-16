@@ -174,7 +174,7 @@ func TestOtherUtils(t *testing.T) {
 	}
 
 	t.Run("get image name", func(t *testing.T) {
-		assert.Equal(t, "mattermost/mattermost-enterprise-edition:6.2.1", mm.GetImageName())
+		assert.Equal(t, "mattermost/mattermost-enterprise-edition:"+operatortest.LatestStableMattermostVersion, mm.GetImageName())
 
 		mm.Spec.Version = "sha256:3c37"
 
