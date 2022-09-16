@@ -35,14 +35,9 @@ func (r *MattermostReconciler) checkMattermostHealth(mattermost *mmv1beta.Matter
 
 	healthChecker := healthcheck.NewHealthChecker(r.NonCachedAPIReader, listOptions, logger)
 
-	err := healthChecker.AssertDeploymentRolloutStarted(mattermost.Name, mattermost.Namespace)
+	podsStatus, err := healthChecker.CheckReplicaSetRollout(mattermost.Name, mattermost.Namespace)
 	if err != nil {
 		return status, errors.Wrap(err, "rollout not yet started")
-	}
-
-	podsStatus, err := healthChecker.CheckPodsRollOut(mattermost.GetImageName())
-	if err != nil {
-		return status, errors.Wrap(err, "failed to check pods status")
 	}
 
 	status.UpdatedReplicas = podsStatus.UpdatedReplicas

@@ -95,14 +95,9 @@ func (r *ClusterInstallationReconciler) checkClusterInstallation(namespace, name
 
 	healthChecker := healthcheck.NewHealthChecker(r.NonCachedAPIReader, listOptions, logger)
 
-	err := healthChecker.AssertDeploymentRolloutStarted(name, namespace)
+	podsStatus, err := healthChecker.CheckReplicaSetRollout(name, namespace)
 	if err != nil {
 		return status, errors.Wrap(err, "rollout not yet started")
-	}
-
-	podsStatus, err := healthChecker.CheckPodsRollOut(imageName)
-	if err != nil {
-		return status, errors.Wrap(err, "failed to check pods status")
 	}
 
 	status.UpdatedReplicas = podsStatus.UpdatedReplicas
