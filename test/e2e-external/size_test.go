@@ -19,8 +19,8 @@ func TestMattermostSize(t *testing.T) {
 	name := "test-mm"
 	mmNamespaceName := types.NamespacedName{Namespace: namespace, Name: name}
 
-	testEnv, err := SetupTestEnv(k8sClient, namespace)
-	require.NoError(t, err)
+	testEnv, setupErr := SetupTestEnv(k8sClient, namespace)
+	require.NoError(t, setupErr)
 	defer testEnv.CleanupFunc()
 
 	mattermost := &mmv1beta.Mattermost{
@@ -103,7 +103,7 @@ func TestMattermostSize(t *testing.T) {
 		mmSize := mmv1alpha.Size100String
 		t.Logf("updating size in mattermost object with %s\n", mmSize)
 		var newMattermost mmv1beta.Mattermost
-		err = k8sClient.Get(context.TODO(), mmNamespaceName, &newMattermost)
+		err := k8sClient.Get(context.TODO(), mmNamespaceName, &newMattermost)
 		require.NoError(t, err)
 
 		clusterSize, err := mmv1alpha.GetClusterSize(mmSize)
