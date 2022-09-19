@@ -185,7 +185,12 @@ func (r *MattermostReconciler) checkMattermostRoleBinding(mattermost *mmv1beta.M
 }
 
 func (r *MattermostReconciler) checkMattermostIngress(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) error {
-	desired := mattermostApp.GenerateIngressV1Beta(mattermost)
+	var desired *networkingv1.Ingress
+	desired = mattermostApp.GenerateIngressV1Beta(mattermost)
+
+	if mattermost.Spec.AWSLoadBalancerController.Enable {
+		desired = mattermostApp.GenerateALBIngressV1Beta(mattermost)
+	}
 
 	if !mattermost.IngressEnabled() {
 		err := r.Resources.DeleteIngress(types.NamespacedName{Namespace: desired.Namespace, Name: desired.Name}, reqLogger)
@@ -214,8 +219,8 @@ func (r *MattermostReconciler) checkMattermostDeployment(
 	dbConfig mattermostApp.DatabaseConfig,
 	fileStoreInfo *mattermostApp.FileStoreInfo,
 	status *mmv1beta.MattermostStatus,
-	reqLogger logr.Logger) (reconcileStatus, error) {
-
+	reqLogger logr.Logger) (reconcileStatus, error,
+) {
 	desired := mattermostApp.GenerateDeploymentV1Beta(
 		mattermost,
 		dbConfig,

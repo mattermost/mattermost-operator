@@ -295,7 +295,7 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbIn
 	// TODO: DB setup job is temporarily disabled as `mattermost version` command
 	// does not account for the custom configuration
 	// Add init container to wait for DB setup job to complete
-	//initContainers = append(initContainers, waitForSetupJobContainer())
+	// initContainers = append(initContainers, waitForSetupJobContainer())
 
 	// ES section vars
 	envVarES := []corev1.EnvVar{}

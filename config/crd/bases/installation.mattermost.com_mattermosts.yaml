@@ -55,6 +55,19 @@ spec:
           spec:
             description: MattermostSpec defines the desired state of Mattermost
             properties:
+              AwsLoadBalancerController:
+                properties:
+                  certificateARN:
+                    description: Certificate arn for the ALB, required if SSL enabled
+                    type: string
+                  enable:
+                    description: An AWS ALB Ingress will be created instead of nginx
+                    type: boolean
+                  internetFacing:
+                    description: Whether the Ingress will be internetfacing, default
+                      is false
+                    type: boolean
+                type: object
               database:
                 description: External Services
                 properties:
