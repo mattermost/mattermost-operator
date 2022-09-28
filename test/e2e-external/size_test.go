@@ -10,7 +10,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"testing"
-	"time"
 )
 
 // TestMattermostSize checks defaulting & updating replicas & resources from size.
@@ -41,16 +40,17 @@ func TestMattermostSize(t *testing.T) {
 		},
 	}
 
+	mmSize := mmv1alpha.CloudSize10String
+	mattermost.Spec.Size = mmSize
+	instance := e2e.NewMattermostInstance(t, k8sClient, mattermost)
+
 	{
-		t.Log("create and waiting for Mattermost to be stable")
-		mmSize := mmv1alpha.CloudSize10String
 		clusterSize, err := mmv1alpha.GetClusterSize(mmSize)
 		require.NoError(t, err)
 
-		mattermost.Spec.Size = mmSize
-		instance := e2e.NewMattermostInstance(t, k8sClient, mattermost)
-		defer instance.Destroy()
+		t.Log("create and waiting for Mattermost to be stable")
 		instance.CreateAndWait()
+		defer instance.Destroy()
 
 		t.Log("checking mattermost replicas & resources")
 		var newMattermost mmv1beta.Mattermost
@@ -66,7 +66,7 @@ func TestMattermostSize(t *testing.T) {
 
 		t.Log("checking deployment replicas & resources")
 		var mmDeployment appsv1.Deployment
-		err = k8sClient.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, &mmDeployment)
+		err = k8sClient.Get(context.TODO(), mmNamespaceName, &mmDeployment)
 		require.NoError(t, err)
 		require.Equal(t, clusterSize.App.Replicas, *mmDeployment.Spec.Replicas)
 		// compare resources in deployment
@@ -75,53 +75,42 @@ func TestMattermostSize(t *testing.T) {
 
 	{
 		mmSize := mmv1alpha.CloudSize100String
-		t.Logf("updating scheduling resources in mattermost object with %s\n", mmSize)
-		// update scheduling resource
 		clusterSize, err := mmv1alpha.GetClusterSize(mmSize)
 		require.NoError(t, err)
 
+		t.Logf("updating scheduling resources in mattermost object with %s\n", mmSize)
 		var newMattermost mmv1beta.Mattermost
 		err = k8sClient.Get(context.TODO(), mmNamespaceName, &newMattermost)
 		require.NoError(t, err)
 		newMattermost.Spec.Scheduling.Resources = clusterSize.App.Resources
-		err = k8sClient.Update(context.TODO(), &newMattermost)
-		require.NoError(t, err)
-
-		t.Log("waiting for objects to be updated")
-		err = e2e.WaitForMattermostStable(t, k8sClient, mmNamespaceName, time.Minute*3)
-		require.NoError(t, err)
+		instance.UpdateAndWait(&newMattermost)
 
 		// compare resources with deployment
 		t.Log("checking deployment resources")
 		var mmDeployment appsv1.Deployment
-		err = k8sClient.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, &mmDeployment)
+		err = k8sClient.Get(context.TODO(), mmNamespaceName, &mmDeployment)
 		require.NoError(t, err)
 		compareResources(t, clusterSize.App.Resources, mmDeployment.Spec.Template.Spec.Containers[0].Resources)
 	}
 
 	{
 		mmSize := mmv1alpha.Size100String
-		t.Logf("updating size in mattermost object with %s\n", mmSize)
-		var newMattermost mmv1beta.Mattermost
-		err := k8sClient.Get(context.TODO(), mmNamespaceName, &newMattermost)
-		require.NoError(t, err)
-
 		clusterSize, err := mmv1alpha.GetClusterSize(mmSize)
 		require.NoError(t, err)
 
-		newMattermost.Spec.Size = mmSize
-		// update size in mattermost
-		err = k8sClient.Update(context.TODO(), &newMattermost)
+		t.Logf("updating size in mattermost object with %s\n", mmSize)
+		var newMattermost mmv1beta.Mattermost
+		err = k8sClient.Get(context.TODO(), mmNamespaceName, &newMattermost)
 		require.NoError(t, err)
 
-		t.Log("waiting for objects to be updated")
-		err = e2e.WaitForMattermostStable(t, k8sClient, mmNamespaceName, time.Minute*3)
-		require.NoError(t, err)
+		// update size in mattermost
+		newMattermost.Spec.Size = mmSize
+		instance.UpdateAndWait(&newMattermost)
 
 		// compare replicas & resources
 		t.Log("checking deployment resources")
 		var mmDeployment appsv1.Deployment
-		err = k8sClient.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, &mmDeployment)
+		err = k8sClient.Get(context.TODO(), mmNamespaceName, &mmDeployment)
 		require.NoError(t, err)
 		require.Equal(t, clusterSize.App.Replicas, *mmDeployment.Spec.Replicas)
 		compareResources(t, clusterSize.App.Resources, mmDeployment.Spec.Template.Spec.Containers[0].Resources)
