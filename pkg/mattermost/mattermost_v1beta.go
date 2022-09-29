@@ -178,10 +178,12 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 	envVarDB := db.EnvVars(mattermost)
 	initContainers := db.InitContainers(mattermost)
 
-	// File Store
-	envVarFileStore := []corev1.EnvVar{}
+	// Base volumes
 	volumes := mattermost.Spec.Volumes
 	volumeMounts := mattermost.Spec.VolumeMounts
+
+	// File Store
+	envVarFileStore := []corev1.EnvVar{}
 	if mattermost.Spec.FileStore.Local != nil && mattermost.Spec.FileStore.Local.Enabled {
 		envVarFileStore = localFileEnvVars(mmv1beta.DefaultLocalFilePath)
 		vMount, volume := mattermostLocalFileStoreConfig(mattermost.Name)
