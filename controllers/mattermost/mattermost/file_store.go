@@ -16,7 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func (r *MattermostReconciler) checkFileStore(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) (*mattermostApp.FileStoreInfo, error) {
+func (r *MattermostReconciler) checkFileStore(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) (mattermostApp.FileStoreConfig, error) {
 	reqLogger = reqLogger.WithValues("Reconcile", "fileStore")
 
 	if mattermost.Spec.FileStore.IsExternal() {
@@ -30,7 +30,7 @@ func (r *MattermostReconciler) checkFileStore(mattermost *mmv1beta.Mattermost, r
 	return r.checkOperatorManagedMinio(mattermost, reqLogger)
 }
 
-func (r *MattermostReconciler) checkExternalFileStore(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) (*mattermostApp.FileStoreInfo, error) {
+func (r *MattermostReconciler) checkExternalFileStore(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) (mattermostApp.FileStoreConfig, error) {
 	secret := &corev1.Secret{}
 	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: mattermost.Spec.FileStore.External.Secret, Namespace: mattermost.Namespace}, secret)
 	if err != nil {
@@ -41,7 +41,7 @@ func (r *MattermostReconciler) checkExternalFileStore(mattermost *mmv1beta.Matte
 	return mattermostApp.NewExternalFileStoreInfo(mattermost, *secret)
 }
 
-func (r *MattermostReconciler) checkLocalFileStore(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) (*mattermostApp.FileStoreInfo, error) {
+func (r *MattermostReconciler) checkLocalFileStore(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) (mattermostApp.FileStoreConfig, error) {
 	// Default 1Gi volume using default storage class
 	storageSize := mmv1beta.DefaultFilestoreStorageSize
 	if mattermost.Spec.FileStore.Local.StorageSize != "" {
@@ -87,11 +87,10 @@ func (r *MattermostReconciler) checkLocalFileStore(mattermost *mmv1beta.Mattermo
 		return nil, err
 	}
 
-	// Return a boilerplate spec since we don't have any external connection info
 	return mattermostApp.NewLocalFileStoreInfo(), nil
 }
 
-func (r *MattermostReconciler) checkOperatorManagedMinio(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) (*mattermostApp.FileStoreInfo, error) {
+func (r *MattermostReconciler) checkOperatorManagedMinio(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) (mattermostApp.FileStoreConfig, error) {
 	secret, err := r.checkMattermostMinioSecret(mattermost, reqLogger)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to check Minio secret")

@@ -3,11 +3,12 @@ package mattermost
 import (
 	"context"
 	"fmt"
-	"github.com/pkg/errors"
 	"reflect"
-	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sync"
 	"time"
+
+	"github.com/pkg/errors"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 
 	"github.com/mattermost/mattermost-operator/pkg/resources"
 

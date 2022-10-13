@@ -18,24 +18,63 @@ type FileStoreInfo struct {
 	bucketName string
 	url        string
 	useS3SSL   bool
-	config     FileStoreConfig
 }
 
-type ExternalFileStore struct{}
+type ExternalFileStore struct {
+	fsInfo FileStoreInfo
+}
+
+func (e *ExternalFileStore) EnvVars(_ *mmv1beta.Mattermost) []corev1.EnvVar {
+	return s3EnvVars(&e.fsInfo)
+}
 
 func (e *ExternalFileStore) InitContainers(_ *mmv1beta.Mattermost) []corev1.Container {
 	return []corev1.Container{}
 }
 
+func (e *ExternalFileStore) Volumes(_ *mmv1beta.Mattermost) ([]corev1.Volume, []corev1.VolumeMount) {
+	return []corev1.Volume{}, []corev1.VolumeMount{}
+}
+
 type LocalFileStore struct{}
+
+func (e *LocalFileStore) EnvVars(_ *mmv1beta.Mattermost) []corev1.EnvVar {
+	return localFileEnvVars(mmv1beta.DefaultLocalFilePath)
+}
 
 func (e *LocalFileStore) InitContainers(_ *mmv1beta.Mattermost) []corev1.Container {
 	return []corev1.Container{}
 }
 
+func (e *LocalFileStore) Volumes(mm *mmv1beta.Mattermost) ([]corev1.Volume, []corev1.VolumeMount) {
+	volumes := []corev1.Volume{
+		{
+			Name: "mattermost-data",
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: mm.Name,
+				},
+			},
+		},
+	}
+
+	volumeMounts := []corev1.VolumeMount{
+		{
+			MountPath: mmv1beta.DefaultLocalFilePath,
+			Name:      "mattermost-data",
+		},
+	}
+	return volumes, volumeMounts
+}
+
 type OperatorManagedMinioConfig struct {
+	fsInfo     FileStoreInfo
 	secretName string
 	minioURL   string
+}
+
+func (e *OperatorManagedMinioConfig) EnvVars(_ *mmv1beta.Mattermost) []corev1.EnvVar {
+	return s3EnvVars(&e.fsInfo)
 }
 
 func (e *OperatorManagedMinioConfig) InitContainers(mattermost *mmv1beta.Mattermost) []corev1.Container {
@@ -75,7 +114,11 @@ func (e *OperatorManagedMinioConfig) InitContainers(mattermost *mmv1beta.Matterm
 	return initContainers
 }
 
-func NewExternalFileStoreInfo(mattermost *mmv1beta.Mattermost, secret corev1.Secret) (*FileStoreInfo, error) {
+func (e *OperatorManagedMinioConfig) Volumes(_ *mmv1beta.Mattermost) ([]corev1.Volume, []corev1.VolumeMount) {
+	return []corev1.Volume{}, []corev1.VolumeMount{}
+}
+
+func NewExternalFileStoreInfo(mattermost *mmv1beta.Mattermost, secret corev1.Secret) (FileStoreConfig, error) {
 	if mattermost.Spec.FileStore.External == nil {
 		return nil, errors.New("external file store configuration not provided")
 	}
@@ -97,31 +140,29 @@ func NewExternalFileStoreInfo(mattermost *mmv1beta.Mattermost, secret corev1.Sec
 		return nil, fmt.Errorf("external filestore Secret %s does not have an 'secretkey' value", secret.Name)
 	}
 
-	return &FileStoreInfo{
-		secretName: secret.Name,
-		bucketName: bucket,
-		url:        url,
-		useS3SSL:   true,
-		config:     &ExternalFileStore{},
+	return &ExternalFileStore{
+		fsInfo: FileStoreInfo{
+			secretName: secret.Name,
+			bucketName: bucket,
+			url:        url,
+			useS3SSL:   true,
+		},
 	}, nil
 }
 
-func NewOperatorManagedFileStoreInfo(mattermost *mmv1beta.Mattermost, secret, minioURL string) *FileStoreInfo {
-	return &FileStoreInfo{
+func NewOperatorManagedFileStoreInfo(mattermost *mmv1beta.Mattermost, secret, minioURL string) FileStoreConfig {
+	return &OperatorManagedMinioConfig{
+		fsInfo: FileStoreInfo{
+			secretName: secret,
+			bucketName: mattermost.Name,
+			url:        minioURL,
+			useS3SSL:   false,
+		},
+		minioURL:   minioURL,
 		secretName: secret,
-		bucketName: mattermost.Name,
-		url:        minioURL,
-		useS3SSL:   false,
-		config:     &OperatorManagedMinioConfig{minioURL: minioURL, secretName: secret},
 	}
 }
 
-func NewLocalFileStoreInfo() *FileStoreInfo {
-	return &FileStoreInfo{
-		secretName: "",
-		bucketName: "",
-		url:        "",
-		useS3SSL:   false,
-		config:     &LocalFileStore{},
-	}
+func NewLocalFileStoreInfo() FileStoreConfig {
+	return &LocalFileStore{}
 }

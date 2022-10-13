@@ -1069,7 +1069,7 @@ func setupTestDeps(t *testing.T) (logr.Logger, client.Client, *MattermostReconci
 	return logger, c, r
 }
 
-func fixedDBAndFileStoreInfo(t *testing.T, mm *mmv1beta.Mattermost) (mattermostApp.DatabaseConfig, *mattermostApp.FileStoreInfo) {
+func fixedDBAndFileStoreInfo(t *testing.T, mm *mmv1beta.Mattermost) (mattermostApp.DatabaseConfig, mattermostApp.FileStoreConfig) {
 	dbInfo, err := mattermostApp.NewMySQLDBConfig(corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{Name: "dbSecret"},
 		Data: map[string][]byte{
@@ -1081,8 +1081,8 @@ func fixedDBAndFileStoreInfo(t *testing.T, mm *mmv1beta.Mattermost) (mattermostA
 	})
 	require.NoError(t, err)
 
-	fileStoreInfo := mattermostApp.NewOperatorManagedFileStoreInfo(mm, "fileStoreSecret", "http://minio:9000")
+	fsConfig := mattermostApp.NewOperatorManagedFileStoreInfo(mm, "fileStoreSecret", "http://minio:9000")
 	require.NoError(t, err)
 
-	return dbInfo, fileStoreInfo
+	return dbInfo, fsConfig
 }

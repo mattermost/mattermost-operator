@@ -28,7 +28,9 @@ type DatabaseConfig interface {
 }
 
 type FileStoreConfig interface {
+	EnvVars(mattermost *mmv1beta.Mattermost) []corev1.EnvVar
 	InitContainers(mattermost *mmv1beta.Mattermost) []corev1.Container
+	Volumes(mattermost *mmv1beta.Mattermost) ([]corev1.Volume, []corev1.VolumeMount)
 }
 
 // GenerateServiceV1Beta returns the service for the Mattermost app.
@@ -173,7 +175,7 @@ func makeIngressRules(hosts []string, mattermost *mmv1beta.Mattermost) []network
 }
 
 // GenerateDeploymentV1Beta returns the deployment for Mattermost app.
-func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig, fileStore *FileStoreInfo, deploymentName, ingressHost, serviceAccountName, containerImage string) *appsv1.Deployment {
+func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig, fileStore FileStoreConfig, deploymentName, ingressHost, serviceAccountName, containerImage string) *appsv1.Deployment {
 	// DB
 	envVarDB := db.EnvVars(mattermost)
 	initContainers := db.InitContainers(mattermost)
@@ -183,16 +185,11 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 	volumeMounts := mattermost.Spec.VolumeMounts
 
 	// File Store
-	envVarFileStore := []corev1.EnvVar{}
-	if mattermost.Spec.FileStore.Local != nil && mattermost.Spec.FileStore.Local.Enabled {
-		envVarFileStore = localFileEnvVars(mmv1beta.DefaultLocalFilePath)
-		vMount, volume := mattermostLocalFileStoreConfig(mattermost.Name)
-		volumeMounts = append(volumeMounts, vMount)
-		volumes = append(volumes, volume)
-	} else {
-		envVarFileStore = s3EnvVars(fileStore)
-	}
-	initContainers = append(initContainers, fileStore.config.InitContainers(mattermost)...)
+	envVarFileStore := fileStore.EnvVars(mattermost)
+	fsVolumes, fsVmounts := fileStore.Volumes(mattermost)
+	volumes = append(volumes, fsVolumes...)
+	volumeMounts = append(volumeMounts, fsVmounts...)
+	initContainers = append(initContainers, fileStore.InitContainers(mattermost)...)
 
 	// Extensions
 	if mattermost.Spec.PodExtensions.InitContainers != nil {
@@ -449,20 +446,4 @@ func mattermostLicenceConfig(secret string) (corev1.EnvVar, corev1.VolumeMount, 
 		"prometheus.io/port":   "8067",
 	}
 	return envVar, volumeMount, volume, annotations
-}
-
-func mattermostLocalFileStoreConfig(pvcName string) (corev1.VolumeMount, corev1.Volume) {
-	volumeMount := corev1.VolumeMount{
-		MountPath: mmv1beta.DefaultLocalFilePath,
-		Name:      "mattermost-data",
-	}
-	volume := corev1.Volume{
-		Name: "mattermost-data",
-		VolumeSource: corev1.VolumeSource{
-			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-				ClaimName: pvcName,
-			},
-		},
-	}
-	return volumeMount, volume
 }
