@@ -37,10 +37,12 @@ func GenerateServiceV1Beta(mattermost *mmv1beta.Mattermost) *corev1.Service {
 		"service.alpha.kubernetes.io/tolerate-unready-endpoints": "true",
 	}
 
-	if mattermost.Spec.AWSLoadBalancerController.Enable {
-		// Create a NodePort service because the ALB requires it
-		service := newServiceV1Beta(mattermost, mergeStringMaps(baseAnnotations, mattermost.Spec.ServiceAnnotations))
-		return configureMattermostServiceNodePort(service)
+	if mattermost.Spec.AWSLoadBalancerController != nil {
+		if mattermost.Spec.AWSLoadBalancerController.Enabled {
+			// Create a NodePort service because the ALB requires it
+			service := newServiceV1Beta(mattermost, mergeStringMaps(baseAnnotations, mattermost.Spec.ServiceAnnotations))
+			return configureMattermostServiceNodePort(service)
+		}
 	}
 
 	if mattermost.Spec.UseServiceLoadBalancer {

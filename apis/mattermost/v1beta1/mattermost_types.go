@@ -183,7 +183,7 @@ type Ingress struct {
 type AWSLoadBalancerController struct {
 	// An AWS ALB Ingress will be created instead of nginx
 	// +optional
-	Enable bool `json:"enable,omitempty"`
+	Enabled bool `json:"enable,omitempty"`
 
 	// Certificate arn for the ALB, required if SSL enabled
 	// +optional

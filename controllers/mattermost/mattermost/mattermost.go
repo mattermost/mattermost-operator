@@ -188,8 +188,10 @@ func (r *MattermostReconciler) checkMattermostIngress(mattermost *mmv1beta.Matte
 	var desired *networkingv1.Ingress
 	desired = mattermostApp.GenerateIngressV1Beta(mattermost)
 
-	if mattermost.Spec.AWSLoadBalancerController.Enable {
-		desired = mattermostApp.GenerateALBIngressV1Beta(mattermost)
+	if mattermost.Spec.AWSLoadBalancerController != nil {
+		if mattermost.Spec.AWSLoadBalancerController.Enabled {
+			desired = mattermostApp.GenerateALBIngressV1Beta(mattermost)
+		}
 	}
 
 	if !mattermost.IngressEnabled() {
