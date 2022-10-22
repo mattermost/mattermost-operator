@@ -198,7 +198,7 @@ func schema_mattermost_operator_apis_mattermost_v1beta1_MattermostSpec(ref commo
 							Ref:         ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.Ingress"),
 						},
 					},
-					"AwsLoadBalancerController": {
+					"awsLoadBalancerController": {
 						SchemaProps: spec.SchemaProps{
 							Ref: ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.AWSLoadBalancerController"),
 						},

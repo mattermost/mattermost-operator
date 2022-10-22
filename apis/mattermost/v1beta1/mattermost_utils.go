@@ -45,6 +45,10 @@ const (
 
 // SetDefaults set the missing values in the manifest to the default ones
 func (mm *Mattermost) SetDefaults() error {
+	if mm.AWSIngressEnabled() && len(mm.Spec.AWSLoadBalancerController.Hosts) == 0 {
+		return errors.New("awsLoadBalancercontroller.hosts is required, but not set")
+	}
+
 	if mm.IngressEnabled() && mm.GetIngressHost() == "" {
 		return errors.New("ingress.host required, but not set")
 	}
@@ -69,7 +73,14 @@ func (mm *Mattermost) IngressEnabled() bool {
 	if mm.Spec.Ingress != nil {
 		return mm.Spec.Ingress.Enabled
 	}
-	return true
+	return false
+}
+
+func (mm *Mattermost) AWSIngressEnabled() bool {
+	if mm.Spec.AWSLoadBalancerController != nil {
+		return mm.Spec.AWSLoadBalancerController.Enabled
+	}
+	return false
 }
 
 // GetIngressHost returns Mattermost primary Ingress host.
@@ -105,6 +116,18 @@ func (mm *Mattermost) GetIngressHostNames() []string {
 				hosts = append(hosts, host.HostName)
 				hostsSet[host.HostName] = struct{}{}
 			}
+		}
+	}
+
+	return hosts
+}
+
+func (mm *Mattermost) GetAWSIngressHostNames() []string {
+	hosts := []string{}
+
+	if mm.Spec.AWSLoadBalancerController != nil {
+		for _, host := range mm.Spec.AWSLoadBalancerController.Hosts {
+			hosts = append(hosts, host.HostName)
 		}
 	}
 

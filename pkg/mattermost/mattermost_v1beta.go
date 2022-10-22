@@ -192,7 +192,7 @@ func GenerateALBIngressV1Beta(mattermost *mmv1beta.Mattermost) *networkingv1.Ing
 		ingressAnnotations[k] = v
 	}
 
-	hosts := mattermost.GetIngressHostNames()
+	hosts := mattermost.GetAWSIngressHostNames()
 
 	ingress := &networkingv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{

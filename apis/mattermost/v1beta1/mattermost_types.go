@@ -77,7 +77,7 @@ type MattermostSpec struct {
 	Ingress *Ingress `json:"ingress,omitempty"`
 
 	// +optional
-	AWSLoadBalancerController *AWSLoadBalancerController `json:"AwsLoadBalancerController,omitempty"`
+	AWSLoadBalancerController *AWSLoadBalancerController `json:"awsLoadBalancerController,omitempty"`
 	// Volumes allows for mounting volumes from various sources into the
 	// Mattermost application pods.
 	// +optional
@@ -183,7 +183,7 @@ type Ingress struct {
 type AWSLoadBalancerController struct {
 	// An AWS ALB Ingress will be created instead of nginx
 	// +optional
-	Enabled bool `json:"enable,omitempty"`
+	Enabled bool `json:"enabled,omitempty"`
 
 	// Certificate arn for the ALB, required if SSL enabled
 	// +optional
@@ -192,6 +192,10 @@ type AWSLoadBalancerController struct {
 	// Whether the Ingress will be internetfacing, default is false
 	// +optional
 	InternetFacing bool `json:"internetFacing,omitempty"`
+
+	// Hosts allows specifying additional domain names for Mattermost to use.
+	// +optional
+	Hosts []IngressHost `json:"hosts,omitempty"`
 }
 
 // IngressHost specifies additional hosts configuration.
