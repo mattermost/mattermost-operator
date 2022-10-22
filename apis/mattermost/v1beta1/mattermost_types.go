@@ -77,7 +77,7 @@ type MattermostSpec struct {
 	Ingress *Ingress `json:"ingress,omitempty"`
 
 	// +optional
-	AWSLoadBalancerController AWSLoadBalancerController `json:"AwsLoadBalancerController,omitempty"`
+	AWSLoadBalancerController *AWSLoadBalancerController `json:"AwsLoadBalancerController,omitempty"`
 	// Volumes allows for mounting volumes from various sources into the
 	// Mattermost application pods.
 	// +optional

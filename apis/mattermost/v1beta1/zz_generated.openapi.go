@@ -200,8 +200,7 @@ func schema_mattermost_operator_apis_mattermost_v1beta1_MattermostSpec(ref commo
 					},
 					"AwsLoadBalancerController": {
 						SchemaProps: spec.SchemaProps{
-							Default: map[string]interface{}{},
-							Ref:     ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.AWSLoadBalancerController"),
+							Ref: ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.AWSLoadBalancerController"),
 						},
 					},
 					"volumes": {

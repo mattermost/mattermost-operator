@@ -270,7 +270,11 @@ func (in *MattermostSpec) DeepCopyInto(out *MattermostSpec) {
 		*out = new(Ingress)
 		(*in).DeepCopyInto(*out)
 	}
-	out.AWSLoadBalancerController = in.AWSLoadBalancerController
+	if in.AWSLoadBalancerController != nil {
+		in, out := &in.AWSLoadBalancerController, &out.AWSLoadBalancerController
+		*out = new(AWSLoadBalancerController)
+		**out = **in
+	}
 	if in.Volumes != nil {
 		in, out := &in.Volumes, &out.Volumes
 		*out = make([]v1.Volume, len(*in))
