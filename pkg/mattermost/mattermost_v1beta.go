@@ -203,8 +203,7 @@ func GenerateALBIngressV1Beta(mattermost *mmv1beta.Mattermost) *networkingv1.Ing
 			Annotations:     ingressAnnotations,
 		},
 		Spec: networkingv1.IngressSpec{
-			Rules:            makeIngressRules(hosts, mattermost),
-			IngressClassName: pkgUtils.NewString("alb"),
+			Rules: makeIngressRules(hosts, mattermost),
 		},
 	}
 

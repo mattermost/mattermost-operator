@@ -49,7 +49,7 @@ func (mm *Mattermost) SetDefaults() error {
 		return errors.New("awsLoadBalancercontroller.hosts is required, but not set")
 	}
 
-	if mm.IngressEnabled() && mm.GetIngressHost() == "" {
+	if !mm.AWSIngressEnabled() && mm.IngressEnabled() && mm.GetIngressHost() == "" {
 		return errors.New("ingress.host required, but not set")
 	}
 	if mm.Spec.Image == "" {
@@ -73,7 +73,7 @@ func (mm *Mattermost) IngressEnabled() bool {
 	if mm.Spec.Ingress != nil {
 		return mm.Spec.Ingress.Enabled
 	}
-	return false
+	return true
 }
 
 func (mm *Mattermost) AWSIngressEnabled() bool {
