@@ -135,6 +135,20 @@ func (r *ResourceHelper) CreateIngressIfNotExists(owner v1.Object, ingress *netw
 	return nil
 }
 
+func (r *ResourceHelper) CreateIngressClassIfNotExists(owner v1.Object, ingressClass *networkingv1.IngressClass, reqLogger logr.Logger) error {
+	foundIngressClass := &networkingv1.IngressClass{}
+
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: ingressClass.Name, Namespace: ingressClass.Namespace}, foundIngressClass)
+	if err != nil && k8sErrors.IsNotFound(err) {
+		reqLogger.Info("Creating ingressClass", "name", ingressClass.Name)
+		return r.Create(owner, ingressClass, reqLogger)
+	} else if err != nil {
+		return errors.Wrap(err, "failed to check if ingressClass exists")
+	}
+
+	return nil
+}
+
 func (r *ResourceHelper) CreateDeploymentIfNotExists(owner v1.Object, deployment *appsv1.Deployment, reqLogger logr.Logger) error {
 	foundDeployment := &appsv1.Deployment{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: deployment.Name, Namespace: deployment.Namespace}, foundDeployment)
@@ -158,6 +172,23 @@ func (r *ResourceHelper) CreateRoleIfNotExists(owner v1.Object, role *rbacv1.Rol
 		return errors.Wrap(err, "failed to check if role exists")
 	}
 
+	return nil
+}
+
+func (r *ResourceHelper) DeleteIngressClass(key types.NamespacedName, reqLogger logr.Logger) error {
+	foundIngressClass := &networkingv1.IngressClass{}
+	err := r.client.Get(context.TODO(), key, foundIngressClass)
+	if err != nil && k8sErrors.IsNotFound(err) {
+		return nil
+	} else if err != nil {
+		return errors.Wrap(err, "failed to check if ingressClass exists")
+	}
+
+	reqLogger.Info("Deleting ingressClass", "name", foundIngressClass.Name)
+	err = r.client.Delete(context.TODO(), foundIngressClass)
+	if err != nil {
+		return errors.Wrap(err, "failed to delete ingressClass")
+	}
 	return nil
 }
 

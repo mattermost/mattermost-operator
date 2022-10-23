@@ -73,6 +73,9 @@ spec:
                           type: string
                       type: object
                     type: array
+                  ingressClassName:
+                    description: IngressClassName for your ingress
+                    type: string
                   internetFacing:
                     description: Whether the Ingress will be internetfacing, default
                       is false

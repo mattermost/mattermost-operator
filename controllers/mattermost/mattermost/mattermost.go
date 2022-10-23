@@ -53,6 +53,14 @@ func (r *MattermostReconciler) checkMattermost(
 	}
 
 	if !mattermost.Spec.UseServiceLoadBalancer {
+
+		if mattermost.Spec.AWSLoadBalancerController != nil && mattermost.Spec.AWSLoadBalancerController.IngressClassName == "" {
+			err := r.checkMattermostIngressClass(mattermost, reqLogger)
+			if err != nil {
+				return reconcileStatus{}, err
+			}
+		}
+
 		err = r.checkMattermostIngress(mattermost, reqLogger)
 		if err != nil {
 			return reconcileStatus{}, err
@@ -208,6 +216,32 @@ func (r *MattermostReconciler) checkMattermostIngress(mattermost *mmv1beta.Matte
 	}
 
 	current := &networkingv1.Ingress{}
+	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: desired.Name, Namespace: desired.Namespace}, current)
+	if err != nil {
+		return err
+	}
+
+	return r.Resources.Update(current, desired, reqLogger)
+}
+
+func (r *MattermostReconciler) checkMattermostIngressClass(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) error {
+	var desired *networkingv1.IngressClass
+	desired = mattermostApp.GenerateALBIngressClassV1Beta(mattermost)
+
+	if mattermost.Spec.AWSLoadBalancerController == nil {
+		err := r.Resources.DeleteIngressClass(types.NamespacedName{Namespace: desired.Namespace, Name: desired.Name}, reqLogger)
+		if err != nil {
+			return errors.Wrap(err, "failed to delete disabled ingressClass")
+		}
+		return nil
+	}
+
+	err := r.Resources.CreateIngressClassIfNotExists(mattermost, desired, reqLogger)
+	if err != nil {
+		return err
+	}
+
+	current := &networkingv1.IngressClass{}
 	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: desired.Name, Namespace: desired.Namespace}, current)
 	if err != nil {
 		return err

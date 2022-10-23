@@ -170,6 +170,22 @@ func GenerateIngressV1Beta(mattermost *mmv1beta.Mattermost) *networkingv1.Ingres
 	return ingress
 }
 
+func GenerateALBIngressClassV1Beta(mattermost *mmv1beta.Mattermost) *networkingv1.IngressClass {
+	ingressClass := &networkingv1.IngressClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "alb",
+			Namespace:       mattermost.Namespace,
+			Labels:          mattermost.MattermostLabels(mattermost.Name),
+			OwnerReferences: MattermostOwnerReference(mattermost),
+		},
+		Spec: networkingv1.IngressClassSpec{
+			Controller: "ingress.k8s.aws/alb",
+		},
+	}
+
+	return ingressClass
+}
+
 // GenerateIngressALBIngressV1Beta returns the AWS ALB ingress for the Mattermost app.
 func GenerateALBIngressV1Beta(mattermost *mmv1beta.Mattermost) *networkingv1.Ingress {
 	ingressAnnotations := map[string]string{}
@@ -205,6 +221,14 @@ func GenerateALBIngressV1Beta(mattermost *mmv1beta.Mattermost) *networkingv1.Ing
 		Spec: networkingv1.IngressSpec{
 			Rules: makeIngressRules(hosts, mattermost),
 		},
+	}
+
+	if mattermost.Spec.AWSLoadBalancerController.IngressClassName != "" {
+		ingress.Spec.IngressClassName = pkgUtils.NewString(mattermost.Spec.AWSLoadBalancerController.IngressClassName)
+	}
+
+	if mattermost.Spec.AWSLoadBalancerController.IngressClassName == "" {
+		ingress.Spec.IngressClassName = pkgUtils.NewString("alb")
 	}
 
 	return ingress

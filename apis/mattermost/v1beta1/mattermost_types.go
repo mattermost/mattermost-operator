@@ -196,6 +196,10 @@ type AWSLoadBalancerController struct {
 	// Hosts allows specifying additional domain names for Mattermost to use.
 	// +optional
 	Hosts []IngressHost `json:"hosts,omitempty"`
+
+	// IngressClassName for your ingress
+	// +optional
+	IngressClassName string `json:"ingressClassName,omitempty"`
 }
 
 // IngressHost specifies additional hosts configuration.
