@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"testing"
 
+	pkgUtils "github.com/mattermost/mattermost-operator/pkg/utils"
+
 	"github.com/go-logr/logr"
 	"github.com/sirupsen/logrus"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
@@ -386,6 +388,132 @@ func TestCheckMattermost(t *testing.T) {
 		// should succeed now
 		recStatus, err = reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
 		assert.NoError(t, err)
+	})
+}
+
+func TestCheckMattermostAWSIngress(t *testing.T) {
+	logger, _, reconciler := setupTestDeps(t)
+
+	mmName := "foo"
+	mmNamespace := "default"
+	replicas := int32(4)
+	mm := &mmv1beta.Mattermost{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      mmName,
+			Namespace: mmNamespace,
+			UID:       types.UID("test"),
+		},
+		Spec: mmv1beta.MattermostSpec{
+			Replicas: &replicas,
+			Image:    "mattermost/mattermost-enterprise-edition",
+			Version:  operatortest.LatestStableMattermostVersion,
+			AWSLoadBalancerController: &mmv1beta.AWSLoadBalancerController{
+				Enabled: true,
+				Hosts: []mmv1beta.IngressHost{
+					{
+						HostName: "test.example.com",
+					},
+				},
+			},
+		},
+	}
+
+	currentMMStatus := &mmv1beta.MattermostStatus{}
+
+	var err error
+
+	t.Run("service", func(t *testing.T) {
+		err = reconciler.checkMattermostService(mm, currentMMStatus, logger)
+		assert.NoError(t, err)
+
+		found := &corev1.Service{}
+		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
+		require.NoError(t, err)
+		require.NotNil(t, found)
+
+		original := found.DeepCopy()
+		modified := found.DeepCopy()
+		modified.Labels = nil
+		modified.Annotations = nil
+		modified.Spec = corev1.ServiceSpec{}
+
+		err = reconciler.Client.Update(context.TODO(), modified)
+		require.NoError(t, err)
+		err = reconciler.checkMattermostService(mm, currentMMStatus, logger)
+		require.NoError(t, err)
+		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
+		require.NoError(t, err)
+		assert.Equal(t, original.GetName(), found.GetName())
+		assert.Equal(t, original.GetNamespace(), found.GetNamespace())
+		assert.Equal(t, original.Spec.Selector, found.Spec.Selector)
+		assert.Equal(t, original.Spec.Ports, found.Spec.Ports)
+		assert.Equal(t, corev1.ServiceTypeNodePort, found.Spec.Type)
+	})
+
+	t.Run("ingress with tls", func(t *testing.T) {
+		mm.Spec.AWSLoadBalancerController.CertificateARN = "test-arn"
+
+		err = reconciler.checkMattermostIngress(mm, logger)
+		assert.NoError(t, err)
+
+		found := &v1beta1.Ingress{}
+		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
+		require.NoError(t, err)
+		require.NotNil(t, found)
+
+		original := found.DeepCopy()
+		modified := found.DeepCopy()
+		modified.Labels = nil
+		modified.Annotations = nil
+		modified.Spec = v1beta1.IngressSpec{}
+
+		err = reconciler.Client.Update(context.TODO(), modified)
+		require.NoError(t, err)
+		err = reconciler.checkMattermostIngress(mm, logger)
+		require.NoError(t, err)
+		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
+		require.NoError(t, err)
+		assert.Equal(t, original.GetAnnotations(), found.GetAnnotations())
+		assert.Equal(t, original.GetName(), found.GetName())
+		assert.Equal(t, original.GetNamespace(), found.GetNamespace())
+		assert.Equal(t, original.Spec.Rules, found.Spec.Rules)
+		assert.Contains(t, found.Annotations, "alb.ingress.kubernetes.io/scheme")
+		assert.Contains(t, found.Annotations, "alb.ingress.kubernetes.io/certificate-arn")
+		assert.Contains(t, found.Annotations, "alb.ingress.kubernetes.io/ssl-redirect")
+		assert.Contains(t, found.Annotations, "alb.ingress.kubernetes.io/listen-ports")
+	})
+
+	t.Run("ingress with specific ingress class", func(t *testing.T) {
+		mm.Spec.AWSLoadBalancerController.IngressClassName = "testClass"
+
+		err = reconciler.checkMattermostIngress(mm, logger)
+		assert.NoError(t, err)
+
+		found := &v1beta1.Ingress{}
+		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
+		require.NoError(t, err)
+		require.NotNil(t, found)
+
+		original := found.DeepCopy()
+		modified := found.DeepCopy()
+		modified.Labels = nil
+		modified.Annotations = nil
+		modified.Spec = v1beta1.IngressSpec{}
+
+		err = reconciler.Client.Update(context.TODO(), modified)
+		require.NoError(t, err)
+		err = reconciler.checkMattermostIngress(mm, logger)
+		require.NoError(t, err)
+		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
+		require.NoError(t, err)
+		assert.Equal(t, original.GetAnnotations(), found.GetAnnotations())
+		assert.Equal(t, original.GetName(), found.GetName())
+		assert.Equal(t, original.GetNamespace(), found.GetNamespace())
+		assert.Equal(t, found.Spec.IngressClassName, pkgUtils.NewString("testClass"))
+
+		foundIngressClass := &v1beta1.IngressClass{}
+		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, foundIngressClass)
+		require.Error(t, err)
 	})
 }
 
