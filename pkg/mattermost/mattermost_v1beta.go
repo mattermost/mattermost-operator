@@ -199,9 +199,9 @@ func GenerateALBIngressV1Beta(mattermost *mmv1beta.Mattermost) *networkingv1.Ing
 	if mattermost.Spec.AWSLoadBalancerController.CertificateARN != "" {
 		ingressAnnotations["alb.ingress.kubernetes.io/certificate-arn"] = mattermost.Spec.AWSLoadBalancerController.CertificateARN
 		ingressAnnotations["alb.ingress.kubernetes.io/ssl-redirect"] = "443"
-		ingressAnnotations["alb.ingress.kubernetes.io/listen-ports"] = `'[{"HTTP": 80}, {"HTTPS":443}]'`
+		ingressAnnotations["alb.ingress.kubernetes.io/listen-ports"] = "[{\"HTTP\": 80}, {\"HTTPS\":443}]"
 	} else {
-		ingressAnnotations["alb.ingress.kubernetes.io/listen-ports"] = `'[{"HTTP": 8065}]'`
+		ingressAnnotations["alb.ingress.kubernetes.io/listen-ports"] = "[{\"HTTP\": 8065}]"
 	}
 
 	for k, v := range mattermost.GetIngresAnnotations() {
