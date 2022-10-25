@@ -53,9 +53,8 @@ func (r *MattermostReconciler) checkMattermost(
 	}
 
 	if !mattermost.Spec.UseServiceLoadBalancer {
-
 		if mattermost.Spec.AWSLoadBalancerController != nil && mattermost.Spec.AWSLoadBalancerController.IngressClassName == "" {
-			err := r.checkMattermostIngressClass(mattermost, reqLogger)
+			err = r.checkMattermostIngressClass(mattermost, reqLogger)
 			if err != nil {
 				return reconcileStatus{}, err
 			}
