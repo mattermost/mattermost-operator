@@ -53,11 +53,9 @@ func (r *MattermostReconciler) checkMattermost(
 	}
 
 	if !mattermost.Spec.UseServiceLoadBalancer {
-		if mattermost.Spec.AWSLoadBalancerController != nil && mattermost.Spec.AWSLoadBalancerController.IngressClassName == "" {
-			err = r.checkMattermostIngressClass(mattermost, reqLogger)
-			if err != nil {
-				return reconcileStatus{}, err
-			}
+		err = r.checkMattermostIngressClass(mattermost, reqLogger)
+		if err != nil {
+			return reconcileStatus{}, err
 		}
 
 		err = r.checkMattermostIngress(mattermost, reqLogger)
@@ -201,7 +199,7 @@ func (r *MattermostReconciler) checkMattermostIngress(mattermost *mmv1beta.Matte
 		}
 	}
 
-	if !mattermost.IngressEnabled() && !mattermost.AWSIngressEnabled() {
+	if !mattermost.IngressEnabled() && !mattermost.AWSLoadBalancerEnabled() {
 		err := r.Resources.DeleteIngress(types.NamespacedName{Namespace: desired.Namespace, Name: desired.Name}, reqLogger)
 		if err != nil {
 			return errors.Wrap(err, "failed to delete disabled ingress")
@@ -254,8 +252,7 @@ func (r *MattermostReconciler) checkMattermostDeployment(
 	dbConfig mattermostApp.DatabaseConfig,
 	fileStoreInfo *mattermostApp.FileStoreInfo,
 	status *mmv1beta.MattermostStatus,
-	reqLogger logr.Logger) (reconcileStatus, error,
-) {
+	reqLogger logr.Logger) (reconcileStatus, error) {
 	desired := mattermostApp.GenerateDeploymentV1Beta(
 		mattermost,
 		dbConfig,

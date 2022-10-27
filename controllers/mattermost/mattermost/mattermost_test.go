@@ -391,7 +391,7 @@ func TestCheckMattermost(t *testing.T) {
 	})
 }
 
-func TestCheckMattermostAWSIngress(t *testing.T) {
+func TestCheckMattermostAWSLoadBalancer(t *testing.T) {
 	logger, _, reconciler := setupTestDeps(t)
 
 	mmName := "foo"

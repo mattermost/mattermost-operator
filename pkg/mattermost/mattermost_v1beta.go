@@ -37,12 +37,10 @@ func GenerateServiceV1Beta(mattermost *mmv1beta.Mattermost) *corev1.Service {
 		"service.alpha.kubernetes.io/tolerate-unready-endpoints": "true",
 	}
 
-	if mattermost.Spec.AWSLoadBalancerController != nil {
-		if mattermost.Spec.AWSLoadBalancerController.Enabled {
-			// Create a NodePort service because the ALB requires it
-			service := newServiceV1Beta(mattermost, mergeStringMaps(baseAnnotations, mattermost.Spec.ServiceAnnotations))
-			return configureMattermostServiceNodePort(service)
-		}
+	if mattermost.Spec.AWSLoadBalancerController != nil && mattermost.Spec.AWSLoadBalancerController.Enabled {
+		// Create a NodePort service because the ALB requires it
+		service := newServiceV1Beta(mattermost, mergeStringMaps(baseAnnotations, mattermost.Spec.ServiceAnnotations))
+		return configureMattermostServiceNodePort(service)
 	}
 
 	if mattermost.Spec.UseServiceLoadBalancer {
@@ -199,16 +197,16 @@ func GenerateALBIngressV1Beta(mattermost *mmv1beta.Mattermost) *networkingv1.Ing
 	if mattermost.Spec.AWSLoadBalancerController.CertificateARN != "" {
 		ingressAnnotations["alb.ingress.kubernetes.io/certificate-arn"] = mattermost.Spec.AWSLoadBalancerController.CertificateARN
 		ingressAnnotations["alb.ingress.kubernetes.io/ssl-redirect"] = "443"
-		ingressAnnotations["alb.ingress.kubernetes.io/listen-ports"] = "[{\"HTTP\": 80}, {\"HTTPS\":443}]"
+		ingressAnnotations["alb.ingress.kubernetes.io/listen-ports"] = `[{"HTTP": 80}, {"HTTPS":443}]`
 	} else {
-		ingressAnnotations["alb.ingress.kubernetes.io/listen-ports"] = "[{\"HTTP\": 8065}]"
+		ingressAnnotations["alb.ingress.kubernetes.io/listen-ports"] = `[{"HTTP": 8065}]`
 	}
 
 	for k, v := range mattermost.GetIngresAnnotations() {
 		ingressAnnotations[k] = v
 	}
 
-	hosts := mattermost.GetAWSIngressHostNames()
+	hosts := mattermost.GetAWSLoadBalancerHostNames()
 
 	ingress := &networkingv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
