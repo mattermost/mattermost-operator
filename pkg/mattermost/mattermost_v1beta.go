@@ -171,7 +171,7 @@ func GenerateIngressV1Beta(mattermost *mmv1beta.Mattermost) *networkingv1.Ingres
 func GenerateALBIngressClassV1Beta(mattermost *mmv1beta.Mattermost) *networkingv1.IngressClass {
 	ingressClass := &networkingv1.IngressClass{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            "alb",
+			Name:            mattermost.Name,
 			Namespace:       mattermost.Namespace,
 			Labels:          mattermost.MattermostLabels(mattermost.Name),
 			OwnerReferences: MattermostOwnerReference(mattermost),
@@ -226,7 +226,7 @@ func GenerateALBIngressV1Beta(mattermost *mmv1beta.Mattermost) *networkingv1.Ing
 	}
 
 	if mattermost.Spec.AWSLoadBalancerController.IngressClassName == "" {
-		ingress.Spec.IngressClassName = pkgUtils.NewString("alb")
+		ingress.Spec.IngressClassName = pkgUtils.NewString(mattermost.Name)
 	}
 
 	return ingress
