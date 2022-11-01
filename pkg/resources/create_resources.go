@@ -161,6 +161,19 @@ func (r *ResourceHelper) CreateRoleIfNotExists(owner v1.Object, role *rbacv1.Rol
 	return nil
 }
 
+func (r *ResourceHelper) CreatePvcIfNotExists(owner v1.Object, pvc *corev1.PersistentVolumeClaim, reqLogger logr.Logger) error {
+	foundPvc := &corev1.PersistentVolumeClaim{}
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: pvc.Name, Namespace: pvc.Namespace}, foundPvc)
+	if err != nil && k8sErrors.IsNotFound(err) {
+		reqLogger.Info("Creating pvc", "name", pvc.Name)
+		return r.Create(owner, pvc, reqLogger)
+	} else if err != nil {
+		return errors.Wrap(err, "failed to check if pvc exists")
+	}
+
+	return nil
+}
+
 func (r *ResourceHelper) DeleteIngress(key types.NamespacedName, reqLogger logr.Logger) error {
 	foundIngress := &networkingv1.Ingress{}
 	err := r.client.Get(context.TODO(), key, foundIngress)
