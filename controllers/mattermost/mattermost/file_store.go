@@ -42,7 +42,6 @@ func (r *MattermostReconciler) checkExternalFileStore(mattermost *mmv1beta.Matte
 }
 
 func (r *MattermostReconciler) checkLocalFileStore(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) (mattermostApp.FileStoreConfig, error) {
-	// Default 1Gi volume using default storage class
 	storageSize := mmv1beta.DefaultFilestoreStorageSize
 	if mattermost.Spec.FileStore.Local.StorageSize != "" {
 		storageSize = mattermost.Spec.FileStore.Local.StorageSize
