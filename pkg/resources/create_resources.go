@@ -190,6 +190,9 @@ func (r *ResourceHelper) DeleteIngressClass(key types.NamespacedName, reqLogger 
 		return errors.Wrap(err, "failed to delete ingressClass")
 	}
 
+	return nil
+}
+
 func (r *ResourceHelper) CreatePvcIfNotExists(owner v1.Object, pvc *corev1.PersistentVolumeClaim, reqLogger logr.Logger) error {
 	foundPvc := &corev1.PersistentVolumeClaim{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: pvc.Name, Namespace: pvc.Namespace}, foundPvc)

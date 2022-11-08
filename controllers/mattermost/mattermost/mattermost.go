@@ -223,7 +223,7 @@ func (r *MattermostReconciler) checkMattermostIngressClass(mattermost *mmv1beta.
 	var desired *networkingv1.IngressClass
 	desired = mattermostApp.GenerateALBIngressClassV1Beta(mattermost)
 
-	if mattermost.Spec.AWSLoadBalancerController == nil {
+	if mattermost.Spec.AWSLoadBalancerController == nil || mattermost.Spec.AWSLoadBalancerController.Enabled == false || mattermost.Spec.AWSLoadBalancerController.IngressClassName != "" {
 		err := r.Resources.DeleteIngressClass(types.NamespacedName{Namespace: desired.Namespace, Name: desired.Name}, reqLogger)
 		if err != nil {
 			return errors.Wrap(err, "failed to delete disabled ingressClass")
