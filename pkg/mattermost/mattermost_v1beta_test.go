@@ -298,7 +298,7 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 		name            string
 		spec            mmv1beta.MattermostSpec
 		database        DatabaseConfig
-		fileStore       *FileStoreInfo
+		fileStore       FileStoreConfig
 		want            *appsv1.Deployment
 		requiredEnv     []string
 		requiredEnvVals map[string]string
@@ -364,12 +364,13 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 		{
 			name: "external file store",
 			spec: mmv1beta.MattermostSpec{},
-			fileStore: &FileStoreInfo{
-				secretName: "file-store-secret",
-				bucketName: "file-store-bucket",
-				url:        "s3.amazon.com",
-				useS3SSL:   true,
-				config:     &ExternalFileStore{},
+			fileStore: &ExternalFileStore{
+				fsInfo: FileStoreInfo{
+					secretName: "file-store-secret",
+					bucketName: "file-store-bucket",
+					url:        "s3.amazon.com",
+					useS3SSL:   true,
+				},
 			},
 			want:            &appsv1.Deployment{},
 			requiredEnvVals: map[string]string{"MM_FILESETTINGS_AMAZONS3SSL": "true"},
@@ -377,15 +378,41 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 		{
 			name: "operator managed file store",
 			spec: mmv1beta.MattermostSpec{},
-			fileStore: &FileStoreInfo{
-				secretName: "file-store-secret",
-				bucketName: "file-store-bucket",
-				url:        "minio.local.com",
-				useS3SSL:   false,
-				config:     &OperatorManagedMinioConfig{},
+			fileStore: &OperatorManagedMinioConfig{
+				fsInfo: FileStoreInfo{
+					secretName: "file-store-secret",
+					bucketName: "file-store-bucket",
+					url:        "minio.local.com",
+					useS3SSL:   false,
+				},
 			},
 			want:            &appsv1.Deployment{},
 			requiredEnvVals: map[string]string{"MM_FILESETTINGS_AMAZONS3SSL": "false"},
+		},
+		{
+			name:      "local file store",
+			spec:      mmv1beta.MattermostSpec{},
+			fileStore: &LocalFileStore{},
+			want: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Volumes: []corev1.Volume{
+								{
+									Name: "mattermost-data",
+									VolumeSource: corev1.VolumeSource{
+										PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+											ClaimName: "",
+											ReadOnly:  false,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			requiredEnvVals: map[string]string{"MM_FILESETTINGS_DRIVERNAME": "local"},
 		},
 		{
 			name: "override envs set by default with ones in MM spec",
@@ -394,12 +421,13 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 					{Name: "MM_FILESETTINGS_AMAZONS3SSL", Value: "false"},
 				},
 			},
-			fileStore: &FileStoreInfo{
-				secretName: "file-store-secret",
-				bucketName: "file-store-bucket",
-				url:        "s3.amazon.com",
-				useS3SSL:   true,
-				config:     &ExternalFileStore{},
+			fileStore: &ExternalFileStore{
+				fsInfo: FileStoreInfo{
+					secretName: "file-store-secret",
+					bucketName: "file-store-bucket",
+					url:        "s3.amazon.com",
+					useS3SSL:   true,
+				},
 			},
 			want:            &appsv1.Deployment{},
 			requiredEnvVals: map[string]string{"MM_FILESETTINGS_AMAZONS3SSL": "false"},
@@ -735,7 +763,7 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 				assertEnvVarExists(t, "MYSQL_PASSWORD", mattermostAppContainer.Env)
 			}
 
-			if _, ok := fileStoreInfo.config.(*OperatorManagedMinioConfig); ok {
+			if _, ok := fileStoreInfo.(*OperatorManagedMinioConfig); ok {
 				expectedInitContainers += 2
 			}
 
@@ -854,7 +882,7 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 				mattermost := &mmv1beta.Mattermost{
 					Spec: testCase.mmSpec,
 				}
-				deployment := GenerateDeploymentV1Beta(mattermost, testCase.dbConfig, &FileStoreInfo{config: &ExternalFileStore{}}, "", "", "", "image")
+				deployment := GenerateDeploymentV1Beta(mattermost, testCase.dbConfig, &ExternalFileStore{}, "", "", "", "image")
 				assert.Equal(t, testCase.expectedInitContainers, deployment.Spec.Template.Spec.InitContainers)
 			})
 		}
@@ -865,7 +893,7 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 			Spec: mmv1beta.MattermostSpec{},
 		}
 		dbCfg := &ExternalDBConfig{dbType: database.PostgreSQLDatabase, hasDBCheckURL: true}
-		fileStoreCfg := &FileStoreInfo{config: &ExternalFileStore{}}
+		fileStoreCfg := &ExternalFileStore{}
 
 		deployment := GenerateDeploymentV1Beta(mattermost, dbCfg, fileStoreCfg, "", "my-mattermost.com", "", "")
 		mattermostAppContainer := mmv1beta.GetMattermostAppContainer(deployment.Spec.Template.Spec.Containers)

@@ -12,6 +12,7 @@ rules:
       - configmaps
       - secrets
       - serviceaccounts
+      - persistentvolumeclaims
     verbs:
       - '*'
   - apiGroups:

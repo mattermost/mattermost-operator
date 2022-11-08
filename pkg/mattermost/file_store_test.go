@@ -28,13 +28,14 @@ func TestFileStore(t *testing.T) {
 			},
 		}
 
-		fileStore := NewOperatorManagedFileStoreInfo(mattermost, secret, minioURL)
-		initContainers := fileStore.config.InitContainers(mattermost)
+		config := NewOperatorManagedFileStoreInfo(mattermost, secret, minioURL)
+		fileStore := config.(*OperatorManagedMinioConfig)
+		initContainers := fileStore.InitContainers(mattermost)
 		assert.Equal(t, 2, len(initContainers))
-		assert.Equal(t, secret, fileStore.secretName)
-		assert.Equal(t, minioURL, fileStore.url)
-		assert.Equal(t, "mm-test", fileStore.bucketName)
-		assert.Equal(t, false, fileStore.useS3SSL)
+		assert.Equal(t, secret, fileStore.fsInfo.secretName)
+		assert.Equal(t, minioURL, fileStore.fsInfo.url)
+		assert.Equal(t, "mm-test", fileStore.fsInfo.bucketName)
+		assert.Equal(t, false, fileStore.fsInfo.useS3SSL)
 	})
 
 	t.Run("external file store", func(t *testing.T) {
@@ -54,13 +55,14 @@ func TestFileStore(t *testing.T) {
 			},
 		}
 
-		fileStore, err := NewExternalFileStoreInfo(mattermost, secret)
+		config, err := NewExternalFileStoreInfo(mattermost, secret)
+		fileStore := config.(*ExternalFileStore)
 		require.NoError(t, err)
-		initContainers := fileStore.config.InitContainers(mattermost)
+		initContainers := fileStore.InitContainers(mattermost)
 		assert.Equal(t, 0, len(initContainers))
-		assert.Equal(t, "external-file-store", fileStore.secretName)
-		assert.Equal(t, minioURL, fileStore.url)
-		assert.Equal(t, "test-bucket", fileStore.bucketName)
-		assert.Equal(t, true, fileStore.useS3SSL)
+		assert.Equal(t, "external-file-store", fileStore.fsInfo.secretName)
+		assert.Equal(t, minioURL, fileStore.fsInfo.url)
+		assert.Equal(t, "test-bucket", fileStore.fsInfo.bucketName)
+		assert.Equal(t, true, fileStore.fsInfo.useS3SSL)
 	})
 }

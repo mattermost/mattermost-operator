@@ -44,7 +44,20 @@ func generalMattermostEnvVars(siteURL string) []corev1.EnvVar {
 	return envs
 }
 
-func fileStoreEnvVars(fileStore *FileStoreInfo) []corev1.EnvVar {
+func localFileEnvVars(filePath string) []corev1.EnvVar {
+	return []corev1.EnvVar{
+		{
+			Name:  "MM_FILESETTINGS_DRIVERNAME",
+			Value: "local",
+		},
+		{
+			Name:  "MM_FILESETTINGS_DIRECTORY",
+			Value: filePath,
+		},
+	}
+}
+
+func s3EnvVars(fileStore *FileStoreInfo) []corev1.EnvVar {
 	minioAccessEnv := EnvSourceFromSecret(fileStore.secretName, fileStoreSecretAccessKey)
 	minioSecretEnv := EnvSourceFromSecret(fileStore.secretName, fileStoreSecretSecretKey)
 

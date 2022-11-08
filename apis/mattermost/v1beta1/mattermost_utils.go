@@ -24,12 +24,14 @@ const (
 	DefaultMattermostSize = "5000users"
 	// DefaultMattermostDatabaseType is the default Mattermost database
 	DefaultMattermostDatabaseType = "mysql"
-	// DefaultFilestoreStorageSize is the default Storage size for Minio
+	// DefaultFilestoreStorageSize is the default Storage size for Minio or Local Storage
 	DefaultFilestoreStorageSize = "50Gi"
 	// DefaultStorageSize is the default Storage size for the Database
 	DefaultStorageSize = "50Gi"
 	// DefaultPullPolicy is the default Pull Policy used by Mattermost app container
 	DefaultPullPolicy = corev1.PullIfNotPresent
+	// DefaultLocalFilePath is the default file path used with local (PVC) storage
+	DefaultLocalFilePath = "/mattermost/data"
 
 	// ClusterLabel is the label applied across all components
 	ClusterLabel = "installation.mattermost.com/installation"

@@ -29,7 +29,7 @@ type reconcileStatus struct {
 func (r *MattermostReconciler) checkMattermost(
 	mattermost *mmv1beta.Mattermost,
 	dbInfo mattermostApp.DatabaseConfig,
-	fileStoreInfo *mattermostApp.FileStoreInfo,
+	fsConfig mattermostApp.FileStoreConfig,
 	status *mmv1beta.MattermostStatus,
 	reqLogger logr.Logger) (reconcileStatus, error) {
 	reqLogger = reqLogger.WithValues("Reconcile", "mattermost")
@@ -64,7 +64,7 @@ func (r *MattermostReconciler) checkMattermost(
 		}
 	}
 
-	recStatus, err = r.checkMattermostDeployment(mattermost, dbInfo, fileStoreInfo, status, reqLogger)
+	recStatus, err = r.checkMattermostDeployment(mattermost, dbInfo, fsConfig, status, reqLogger)
 	if err != nil {
 		return reconcileStatus{}, err
 	}
@@ -248,13 +248,13 @@ func (r *MattermostReconciler) checkMattermostIngressClass(mattermost *mmv1beta.
 func (r *MattermostReconciler) checkMattermostDeployment(
 	mattermost *mmv1beta.Mattermost,
 	dbConfig mattermostApp.DatabaseConfig,
-	fileStoreInfo *mattermostApp.FileStoreInfo,
+	fsConfig mattermostApp.FileStoreConfig,
 	status *mmv1beta.MattermostStatus,
 	reqLogger logr.Logger) (reconcileStatus, error) {
 	desired := mattermostApp.GenerateDeploymentV1Beta(
 		mattermost,
 		dbConfig,
-		fileStoreInfo,
+		fsConfig,
 		mattermost.Name,
 		mattermost.GetIngressHost(),
 		mattermost.Name,

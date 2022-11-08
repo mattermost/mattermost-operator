@@ -189,6 +189,17 @@ func (r *ResourceHelper) DeleteIngressClass(key types.NamespacedName, reqLogger 
 	if err != nil {
 		return errors.Wrap(err, "failed to delete ingressClass")
 	}
+
+func (r *ResourceHelper) CreatePvcIfNotExists(owner v1.Object, pvc *corev1.PersistentVolumeClaim, reqLogger logr.Logger) error {
+	foundPvc := &corev1.PersistentVolumeClaim{}
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: pvc.Name, Namespace: pvc.Namespace}, foundPvc)
+	if err != nil && k8sErrors.IsNotFound(err) {
+		reqLogger.Info("Creating pvc", "name", pvc.Name)
+		return r.Create(owner, pvc, reqLogger)
+	} else if err != nil {
+		return errors.Wrap(err, "failed to check if pvc exists")
+	}
+
 	return nil
 }
 

@@ -28,7 +28,9 @@ type DatabaseConfig interface {
 }
 
 type FileStoreConfig interface {
+	EnvVars(mattermost *mmv1beta.Mattermost) []corev1.EnvVar
 	InitContainers(mattermost *mmv1beta.Mattermost) []corev1.Container
+	Volumes(mattermost *mmv1beta.Mattermost) ([]corev1.Volume, []corev1.VolumeMount)
 }
 
 // GenerateServiceV1Beta returns the service for the Mattermost app.
@@ -263,14 +265,21 @@ func makeIngressRules(hosts []string, mattermost *mmv1beta.Mattermost) []network
 }
 
 // GenerateDeploymentV1Beta returns the deployment for Mattermost app.
-func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig, fileStore *FileStoreInfo, deploymentName, ingressHost, serviceAccountName, containerImage string) *appsv1.Deployment {
+func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig, fileStore FileStoreConfig, deploymentName, ingressHost, serviceAccountName, containerImage string) *appsv1.Deployment {
 	// DB
 	envVarDB := db.EnvVars(mattermost)
 	initContainers := db.InitContainers(mattermost)
 
+	// Base volumes
+	volumes := mattermost.Spec.Volumes
+	volumeMounts := mattermost.Spec.VolumeMounts
+
 	// File Store
-	envVarFileStore := fileStoreEnvVars(fileStore)
-	initContainers = append(initContainers, fileStore.config.InitContainers(mattermost)...)
+	envVarFileStore := fileStore.EnvVars(mattermost)
+	fsVolumes, fsVmounts := fileStore.Volumes(mattermost)
+	volumes = append(volumes, fsVolumes...)
+	volumeMounts = append(volumeMounts, fsVmounts...)
+	initContainers = append(initContainers, fileStore.InitContainers(mattermost)...)
 
 	// Extensions
 	if mattermost.Spec.PodExtensions.InitContainers != nil {
@@ -305,9 +314,7 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 		Value: bodySize,
 	})
 
-	// Prepare volumes
-	volumes := mattermost.Spec.Volumes
-	volumeMounts := mattermost.Spec.VolumeMounts
+	// Prepare annotations
 	podAnnotations := map[string]string{}
 
 	// Set user specified annotations
