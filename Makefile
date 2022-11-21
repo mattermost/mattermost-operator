@@ -89,6 +89,10 @@ CONTROLLER_GEN_VER := v0.7.0
 CONTROLLER_GEN_BIN := controller-gen
 CONTROLLER_GEN := $(TOOLS_BIN_DIR)/$(CONTROLLER_GEN_BIN)
 
+KUSTOMIZE_VER := v3.3.0
+KUSTOMIZE_BIN := kustomize
+KUSTOMIZE := $(TOOLS_BIN_DIR)/$(KUSTOMIZE_BIN)
+
 ## --------------------------------------
 ## Rules
 ## --------------------------------------
@@ -217,20 +221,7 @@ kind-load-image: ## Loads Mattermost Operator image to Kind cluster
 kind-destroy: ## Destroy Kind cluster
 	kind delete cluster --name "${KIND_CLUSTER}"
 
-kustomize:
-ifeq (, $(shell which kustomize))
-	@{ \
-	set -e ;\
-	KUSTOMIZE_GEN_TMP_DIR=$$(mktemp -d) ;\
-	cd $$KUSTOMIZE_GEN_TMP_DIR ;\
-	go mod init tmp ;\
-	go get sigs.k8s.io/kustomize/kustomize/v3@v3.5.4 ;\
-	rm -rf $$KUSTOMIZE_GEN_TMP_DIR ;\
-	}
-KUSTOMIZE=$(GOBIN)/kustomize
-else
-KUSTOMIZE=$(shell which kustomize)
-endif
+kustomize: $(KUSTOMIZE)
 
 .PHONY: bundle
 bundle: operator-sdk manifests ## Generate bundle manifests and metadata, then validate generated files.
@@ -265,6 +256,10 @@ $(YQ_GEN): ## Build yq
 
 $(CONTROLLER_GEN): ## Build controller-gen
 	GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) sigs.k8s.io/controller-tools/cmd/controller-gen $(CONTROLLER_GEN_BIN) $(CONTROLLER_GEN_VER)
+
+$(KUSTOMIZE): ## Build kustomize
+	GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) sigs.k8s.io/kustomize/kustomize/v3 $(KUSTOMIZE_BIN) $(KUSTOMIZE_VER)
+
 
 .PHONY: check-modules
 check-modules: $(OUTDATED_GEN) ## Check outdated modules
