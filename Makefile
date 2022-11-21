@@ -1,45 +1,61 @@
-.PHONY: all check-style unittest generate build clean build-image operator-sdk yaml
+# Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
+# See LICENSE.txt for license information.
 
-# Current Operator version - used for bundle
-VERSION ?= 1.8.0
-# Default bundle image tag
-BUNDLE_IMG ?= controller-bundle:$(VERSION)
+################################################################################
+##                             VERSION PARAMS                                 ##
+################################################################################
+
+## Tool Versions
+VERSION ?= 1.8.0 # Current Operator version - used for bundle
+GOLANG_VERSION := $(shell cat go.mod | grep "^go " | cut -d " " -f 2)
+SDK_VERSION = v1.0.1
+
+## Docker Build Versions
+BUILD_IMAGE = golang:$(GOLANG_VERSION)
+BASE_IMAGE = gcr.io/distroless/static:nonroot
+
+################################################################################
+
+GO ?= $(shell command -v go 2> /dev/null)
+PACKAGES=$(shell go list ./...)
+TEST_PACKAGES=$(shell go list ./...| grep -v test/e2e)
+
+OPERATOR_IMAGE ?= mattermost/mattermost-operator:test
+MACHINE = $(shell uname -m)
+GOFLAGS ?= $(GOFLAGS:) -mod=vendor
+BUILD_TIME := $(shell date -u +%Y%m%d.%H%M%S)
+BUILD_HASH := $(shell git rev-parse HEAD)
+
+BUNDLE_IMG ?= controller-bundle:$(VERSION) # Default bundle image tag
+CRD_OPTIONS ?= "crd" # Image URL to use all building/pushing image targets
+
+################################################################################
+
 # Options for 'bundle-build'
 ifneq ($(origin CHANNELS), undefined)
-BUNDLE_CHANNELS := --channels=$(CHANNELS)
+	BUNDLE_CHANNELS := --channels=$(CHANNELS)
 endif
 ifneq ($(origin DEFAULT_CHANNEL), undefined)
-BUNDLE_DEFAULT_CHANNEL := --default-channel=$(DEFAULT_CHANNEL)
+	BUNDLE_DEFAULT_CHANNEL := --default-channel=$(DEFAULT_CHANNEL)
 endif
-BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 
-# Image URL to use all building/pushing image targets
-OPERATOR_IMAGE ?= mattermost/mattermost-operator:test
-CRD_OPTIONS ?= "crd"
+BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
-GOBIN=$(shell go env GOPATH)/bin
+	GOBIN=$(shell go env GOPATH)/bin
 else
-GOBIN=$(shell go env GOBIN)
+	GOBIN=$(shell go env GOBIN)
 endif
 
-SDK_VERSION = v1.0.1
-MACHINE = $(shell uname -m)
-BUILD_IMAGE = golang:1.17
-BASE_IMAGE = gcr.io/distroless/static:nonroot
 GOROOT ?= $(shell go env GOROOT)
 GOPATH ?= $(shell go env GOPATH)
-GOFLAGS ?= $(GOFLAGS:) -mod=vendor
-GO=go
-BUILD_TIME := $(shell date -u +%Y%m%d.%H%M%S)
-BUILD_HASH := $(shell git rev-parse HEAD)
+
 GO_LINKER_FLAGS ?= -ldflags\
 				   "-X 'github.com/mattermost/mattermost-operator/version.buildTime=$(BUILD_TIME)'\
 					  -X 'github.com/mattermost/mattermost-operator/version.buildHash=$(BUILD_HASH)'"\
 
-PACKAGES=$(shell go list ./...)
-TEST_PACKAGES=$(shell go list ./...| grep -v test/e2e)
+
 INSTALL_YAML=docs/mattermost-operator/mattermost-operator.yaml
 GO_INSTALL = ./scripts/go_install.sh
 
@@ -76,6 +92,8 @@ CONTROLLER_GEN := $(TOOLS_BIN_DIR)/$(CONTROLLER_GEN_BIN)
 ## --------------------------------------
 ## Rules
 ## --------------------------------------
+
+.PHONY: all check-style unittest generate build clean build-image operator-sdk yaml
 
 all: generate check-style unittest build
 

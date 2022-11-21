@@ -1,5 +1,5 @@
 # Build the mattermost operator
-ARG BUILD_IMAGE=golang:1.17
+ARG BUILD_IMAGE=golang:1.19
 ARG BASE_IMAGE=gcr.io/distroless/static:nonroot
 
 FROM ${BUILD_IMAGE} as builder

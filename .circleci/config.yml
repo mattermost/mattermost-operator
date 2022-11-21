@@ -7,7 +7,7 @@ executors:
   default:
     working_directory: /home/circleci/go/src/github.com/mattermost/mattermost-operator
     docker:
-      - image: cimg/go:1.17
+      - image: cimg/go:1.19
 jobs:
   lint:
     executor:
