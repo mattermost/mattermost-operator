@@ -259,7 +259,7 @@ func TestReconcile(t *testing.T) {
 				},
 				Status: appsv1.ReplicaSetStatus{
 					ObservedGeneration: 1,
-					AvailableReplicas: replicas,
+					AvailableReplicas:  replicas,
 				},
 			}
 			err = c.Create(context.TODO(), replicaSet)

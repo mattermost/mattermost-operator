@@ -1986,6 +1986,22 @@ spec:
                         description: Set to use an external MinIO deployment or S3.
                         type: string
                     type: object
+                  local:
+                    description: Defines the configuration of PVC backed storage (local).
+                      This is NOT recommended for production environments.
+                    properties:
+                      enabled:
+                        description: Set to use local (PVC) storage, require explicit
+                          enabled to prevent accidental misconfiguration.
+                        type: boolean
+                      storageSize:
+                        description: Defines the storage size for the PVC. (default
+                          50Gi)
+                        pattern: ^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$
+                        type: string
+                    required:
+                    - enabled
+                    type: object
                   operatorManaged:
                     description: Defines the configuration of file store managed by
                       Kubernetes operator.
@@ -6758,6 +6774,7 @@ rules:
   - configmaps
   - secrets
   - serviceaccounts
+  - persistentvolumeclaims
   verbs:
   - '*'
 - apiGroups:

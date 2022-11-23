@@ -9,18 +9,26 @@ package main
 // The rest is written by Dustin Sallings
 
 import (
-	"bytes"
 	"fmt"
 	"go/build"
 	"io/ioutil"
-	"log"
+	"os"
 	"path/filepath"
 	"strings"
 
 	"golang.org/x/tools/cover"
 )
 
-func findFile(file string) (string, error) {
+func findFile(rootPackage string, rootDir string, file string) (string, error) {
+	// If we find a file that is inside the root package, we already know
+	// where it should be!
+	if rootPackage != "" {
+		if relPath, _ := filepath.Rel(rootPackage, file); !strings.HasPrefix(relPath, "..") {
+			// The file is inside the root package...
+			return filepath.Join(rootDir, relPath), nil
+		}
+	}
+
 	dir, file := filepath.Split(file)
 	pkg, err := build.Import(dir, ".", build.FindOnly)
 	if err != nil {
@@ -104,27 +112,45 @@ func mergeTwoProfBlock(left, right []cover.ProfileBlock) []cover.ProfileBlock {
 
 // toSF converts profiles to sourcefiles for coveralls.
 func toSF(profs []*cover.Profile) ([]*SourceFile, error) {
+	// find root package to reduce build.Import calls when importing files from relative root
+	// https://github.com/mattn/goveralls/pull/195
+	rootDirectory, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("get working dir: %v", err)
+	}
+	rootPackage := findRootPackage(rootDirectory)
+
 	var rv []*SourceFile
 	for _, prof := range profs {
-		path, err := findFile(prof.FileName)
+		path, err := findFile(rootPackage, rootDirectory, prof.FileName)
 		if err != nil {
-			log.Fatalf("Can't find %v", err)
-		}
-		fb, err := ioutil.ReadFile(path)
-		if err != nil {
-			log.Fatalf("Error reading %v: %v", path, err)
+			return nil, fmt.Errorf("cannot find file %q: %v", prof.FileName, err)
 		}
 		sf := &SourceFile{
-			Name:     getCoverallsSourceFileName(path),
-			Source:   string(fb),
-			Coverage: make([]interface{}, 1+bytes.Count(fb, []byte{'\n'})),
+			Name: getCoverallsSourceFileName(path),
 		}
-
+		lineLookup := map[int]int{}
+		maxLineNo := 0
 		for _, block := range prof.Blocks {
 			for i := block.StartLine; i <= block.EndLine; i++ {
-				count, _ := sf.Coverage[i-1].(int)
-				sf.Coverage[i-1] = count + block.Count
+				lineLookup[i] += block.Count
 			}
+			if block.EndLine > maxLineNo {
+				maxLineNo = block.EndLine
+			}
+		}
+		sf.Coverage = make([]interface{}, maxLineNo)
+		for i := 1; i <= maxLineNo; i++ {
+			if c, ok := lineLookup[i]; ok {
+				sf.Coverage[i-1] = c
+			}
+		}
+		if *uploadSource {
+			fb, err := ioutil.ReadFile(path)
+			if err != nil {
+				return nil, fmt.Errorf("cannot read source of file %q: %v", path, err)
+			}
+			sf.Source = string(fb)
 		}
 
 		rv = append(rv, sf)
@@ -138,7 +164,7 @@ func parseCover(fn string) ([]*SourceFile, error) {
 	for _, p := range strings.Split(fn, ",") {
 		profs, err := cover.ParseProfiles(p)
 		if err != nil {
-			return nil, fmt.Errorf("Error parsing coverage: %v", err)
+			return nil, fmt.Errorf("error parsing coverage: %v", err)
 		}
 		pfss = append(pfss, profs)
 	}

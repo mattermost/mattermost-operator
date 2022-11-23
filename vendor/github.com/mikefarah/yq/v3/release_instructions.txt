@@ -4,6 +4,7 @@
 - tag git with same version number
 - make sure local build passes
 - push tag to git
+  - 3.4.0, v3
   - git push --tags
 - make local xcompile (builds binaries for all platforms)
 
@@ -30,7 +31,7 @@
 
 - docker
   - build and push latest and new version tag
-  - docker build .  -t mikefarah/yq:latest -t mikefarah/yq:VERSION 
+  - docker build .  -t mikefarah/yq:latest -t mikefarah/yq:3 -t mikefarah/yq:3.X
 
 - debian package
   - ensure you get all vendor dependencies before packaging
