@@ -80,20 +80,7 @@ func configureMattermostLoadBalancerService(service *corev1.Service) *corev1.Ser
 }
 
 func configureMattermostService(service *corev1.Service) *corev1.Service {
-	service.Spec.Ports = []corev1.ServicePort{
-		{
-			Port:        8065,
-			Name:        "app",
-			AppProtocol: pkgUtils.NewString("http"),
-			TargetPort:  intstr.FromString("app"),
-		},
-		{
-			Port:        8067,
-			Name:        "metrics",
-			AppProtocol: pkgUtils.NewString("http"),
-			TargetPort:  intstr.FromString("metrics"),
-		},
-	}
+	service = configureMattermostServicePorts(service)
 	service.Spec.ClusterIP = corev1.ClusterIPNone
 	service.Spec.Type = corev1.ServiceTypeClusterIP
 
@@ -101,6 +88,13 @@ func configureMattermostService(service *corev1.Service) *corev1.Service {
 }
 
 func configureMattermostServiceNodePort(service *corev1.Service) *corev1.Service {
+	service = configureMattermostServicePorts(service)
+	service.Spec.Type = corev1.ServiceTypeNodePort
+
+	return service
+}
+
+func configureMattermostServicePorts(service *corev1.Service) *corev1.Service {
 	service.Spec.Ports = []corev1.ServicePort{
 		{
 			Port:        8065,
@@ -115,7 +109,6 @@ func configureMattermostServiceNodePort(service *corev1.Service) *corev1.Service
 			TargetPort:  intstr.FromString("metrics"),
 		},
 	}
-	service.Spec.Type = corev1.ServiceTypeNodePort
 
 	return service
 }
