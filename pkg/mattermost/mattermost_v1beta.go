@@ -39,7 +39,7 @@ func GenerateServiceV1Beta(mattermost *mmv1beta.Mattermost) *corev1.Service {
 		"service.alpha.kubernetes.io/tolerate-unready-endpoints": "true",
 	}
 
-	if mattermost.Spec.AWSLoadBalancerController != nil && mattermost.Spec.AWSLoadBalancerController.Enabled {
+	if mattermost.AWSLoadBalancerEnabled() {
 		// Create a NodePort service because the ALB requires it
 		service := newServiceV1Beta(mattermost, mergeStringMaps(baseAnnotations, mattermost.Spec.ServiceAnnotations))
 		return configureMattermostServiceNodePort(service)
@@ -225,9 +225,7 @@ func GenerateALBIngressV1Beta(mattermost *mmv1beta.Mattermost) *networkingv1.Ing
 
 	if mattermost.Spec.AWSLoadBalancerController.IngressClassName != "" {
 		ingress.Spec.IngressClassName = pkgUtils.NewString(mattermost.Spec.AWSLoadBalancerController.IngressClassName)
-	}
-
-	if mattermost.Spec.AWSLoadBalancerController.IngressClassName == "" {
+	} else {
 		ingress.Spec.IngressClassName = pkgUtils.NewString(mattermost.Name)
 	}
 
