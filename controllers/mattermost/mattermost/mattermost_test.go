@@ -897,6 +897,87 @@ func TestCheckMattermostExternalDBAndFileStore(t *testing.T) {
 	})
 }
 
+func TestCheckMattermostExternalVolumeFileStore(t *testing.T) {
+	logger, _, reconciler := setupTestDeps(t)
+
+	mmName := "foo"
+	mmNamespace := "default"
+	replicas := int32(4)
+	mm := &mmv1beta.Mattermost{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      mmName,
+			Namespace: mmNamespace,
+			UID:       types.UID("test"),
+		},
+		Spec: mmv1beta.MattermostSpec{
+			Replicas:    &replicas,
+			Image:       "mattermost/mattermost-enterprise-edition",
+			Version:     operatortest.LatestStableMattermostVersion,
+			IngressName: "foo.mattermost.dev",
+			FileStore: mmv1beta.FileStore{
+				ExternalVolume: &mmv1beta.ExternalVolumeFileStore{
+					VolumeName:      "pv1",
+					VolumeClaimName: "pvc1",
+				},
+			},
+		},
+	}
+	currentMMStatus := &mmv1beta.MattermostStatus{}
+
+	dbInfo, err := mattermostApp.NewMySQLDBConfig(corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "dbSecret"},
+		Data: map[string][]byte{
+			"ROOT_PASSWORD": []byte("root-pass"),
+			"USER":          []byte("user"),
+			"PASSWORD":      []byte("pass"),
+			"DATABASE":      []byte("db"),
+		},
+	})
+	require.NoError(t, err)
+
+	pv := &corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      mm.Spec.FileStore.ExternalVolume.VolumeName,
+			Namespace: mm.GetNamespace(),
+		},
+		Spec: corev1.PersistentVolumeSpec{},
+	}
+	err = reconciler.Client.Create(context.TODO(), pv)
+	require.NoError(t, err)
+
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      mm.Spec.FileStore.ExternalVolume.VolumeClaimName,
+			Namespace: mm.GetNamespace(),
+		},
+	}
+	err = reconciler.Client.Create(context.TODO(), pvc)
+	require.NoError(t, err)
+
+	fileStoreInfo, err := reconciler.checkExternalVolumeFileStore(mm, logger)
+	require.NoError(t, err)
+
+	t.Run("deployment", func(t *testing.T) {
+		recStatus, recErr := reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
+		assert.NoError(t, recErr)
+		assert.Equal(t, true, recStatus.ResourcesReady)
+
+		foundDeploy := &appsv1.Deployment{}
+		deployErr := reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, foundDeploy)
+		require.NoError(t, deployErr)
+		require.NotNil(t, foundDeploy)
+		require.Len(t, foundDeploy.Spec.Template.Spec.Volumes, 1)
+		require.Len(t, foundDeploy.Spec.Template.Spec.Containers, 1)
+
+		foundDeploymentPV := foundDeploy.Spec.Template.Spec.Volumes[0]
+		assert.Equal(t, mm.Spec.FileStore.ExternalVolume.VolumeName, foundDeploymentPV.Name)
+		assert.Equal(t, mm.Spec.FileStore.ExternalVolume.VolumeClaimName, foundDeploymentPV.PersistentVolumeClaim.ClaimName)
+
+		foundMMContainer := foundDeploy.Spec.Template.Spec.Containers[0]
+		assert.Contains(t, foundMMContainer.Env, corev1.EnvVar{Name: "MM_FILESETTINGS_DRIVERNAME", Value: "local"})
+	})
+}
+
 func TestCheckMattermostLocalFileStore(t *testing.T) {
 	logger, _, reconciler := setupTestDeps(t)
 

@@ -23,6 +23,10 @@ func (r *MattermostReconciler) checkFileStore(mattermost *mmv1beta.Mattermost, r
 		return r.checkExternalFileStore(mattermost, reqLogger)
 	}
 
+	if mattermost.Spec.FileStore.IsExternalVolume() {
+		return r.checkExternalVolumeFileStore(mattermost, reqLogger)
+	}
+
 	if mattermost.Spec.FileStore.IsLocal() {
 		return r.checkLocalFileStore(mattermost, reqLogger)
 	}
@@ -39,6 +43,36 @@ func (r *MattermostReconciler) checkExternalFileStore(mattermost *mmv1beta.Matte
 	}
 
 	return mattermostApp.NewExternalFileStoreInfo(mattermost, *secret)
+}
+
+func (r *MattermostReconciler) checkExternalVolumeFileStore(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) (mattermostApp.FileStoreConfig, error) {
+	fsc, err := mattermostApp.NewExternalVolumeFileStoreInfo(mattermost)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create external volume FileStoreConfig")
+	}
+
+	// Ensure the PV and PVC exist.
+	pv := &corev1.PersistentVolume{}
+	err = r.Client.Get(context.TODO(), types.NamespacedName{
+		Name:      mattermost.Spec.FileStore.ExternalVolume.VolumeName,
+		Namespace: mattermost.Namespace,
+	}, pv)
+	if err != nil {
+		reqLogger.Error(err, "failed to get specified PV for external volume storage")
+		return nil, err
+	}
+
+	pvc := &corev1.PersistentVolumeClaim{}
+	err = r.Client.Get(context.TODO(), types.NamespacedName{
+		Name:      mattermost.Spec.FileStore.ExternalVolume.VolumeClaimName,
+		Namespace: mattermost.Namespace,
+	}, pvc)
+	if err != nil {
+		reqLogger.Error(err, "failed to get specified PVC for external volume storage")
+		return nil, err
+	}
+
+	return fsc, nil
 }
 
 func (r *MattermostReconciler) checkLocalFileStore(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) (mattermostApp.FileStoreConfig, error) {

@@ -345,6 +345,9 @@ type FileStore struct {
 	// Defines the configuration of an external file store.
 	// +optional
 	External *ExternalFileStore `json:"external,omitempty"`
+	// Defines the configuration of externally managed PVC backed storage.
+	// +optional
+	ExternalVolume *ExternalVolumeFileStore `json:"externalVolume,omitempty"`
 	// Defines the configuration of file store managed by Kubernetes operator.
 	// +optional
 	OperatorManaged *OperatorManagedMinio `json:"operatorManaged,omitempty"`
@@ -362,6 +365,15 @@ type ExternalFileStore struct {
 	// Optionally enter the name of already existing secret.
 	// Secret should have two values: "accesskey" and "secretkey".
 	Secret string `json:"secret,omitempty"`
+}
+
+// ExternalVolumeFileStore defines the configuration of an externally managed
+// volume file store.
+type ExternalVolumeFileStore struct {
+	// The name of the externally managed volume to be mounted for file storage.
+	VolumeName string `json:"volumeName,omitempty"`
+	// The name of the matching volume claim for the externally managed volume.
+	VolumeClaimName string `json:"volumeClaimName,omitempty"`
 }
 
 // OperatorManagedMinio defines the configuration of a Minio file store managed by Kubernetes Operator.

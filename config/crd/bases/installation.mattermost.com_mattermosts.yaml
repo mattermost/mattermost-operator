@@ -245,6 +245,19 @@ spec:
                         description: Set to use an external MinIO deployment or S3.
                         type: string
                     type: object
+                  externalVolume:
+                    description: Defines the configuration of externally managed PVC
+                      backed storage.
+                    properties:
+                      volumeClaimName:
+                        description: The name of the matching volume claim for the
+                          externally managed volume.
+                        type: string
+                      volumeName:
+                        description: The name of the externally managed volume to
+                          be mounted for file storage.
+                        type: string
+                    type: object
                   local:
                     description: Defines the configuration of PVC backed storage (local).
                       This is NOT recommended for production environments.

@@ -65,4 +65,51 @@ func TestFileStore(t *testing.T) {
 		assert.Equal(t, "test-bucket", fileStore.fsInfo.bucketName)
 		assert.Equal(t, true, fileStore.fsInfo.useS3SSL)
 	})
+
+	t.Run("external volume file store", func(t *testing.T) {
+		t.Run("valid", func(t *testing.T) {
+			mattermost.Spec.FileStore = mmv1beta.FileStore{
+				ExternalVolume: &mmv1beta.ExternalVolumeFileStore{
+					VolumeName:      "pv1",
+					VolumeClaimName: "pvc1",
+				},
+			}
+
+			config, err := NewExternalVolumeFileStoreInfo(mattermost)
+			require.NoError(t, err)
+
+			fileStore := config.(*ExternalVolumeFileStore)
+			assert.Len(t, fileStore.InitContainers(mattermost), 0)
+			assert.Equal(t, fileStore.EnvVars(mattermost), localFileEnvVars(mmv1beta.DefaultLocalFilePath))
+
+			volumes, volumeMounts := fileStore.Volumes(mattermost)
+			require.Len(t, volumes, 1)
+			require.Len(t, volumeMounts, 1)
+			assert.Equal(t, mattermost.Spec.FileStore.ExternalVolume.VolumeName, volumes[0].Name)
+			assert.Equal(t, mattermost.Spec.FileStore.ExternalVolume.VolumeClaimName, volumes[0].PersistentVolumeClaim.ClaimName)
+			assert.Equal(t, mattermost.Spec.FileStore.ExternalVolume.VolumeName, volumeMounts[0].Name)
+		})
+	})
+
+	t.Run("missing volume name", func(t *testing.T) {
+		mattermost.Spec.FileStore = mmv1beta.FileStore{
+			ExternalVolume: &mmv1beta.ExternalVolumeFileStore{
+				VolumeClaimName: "pvc1",
+			},
+		}
+
+		_, err := NewExternalVolumeFileStoreInfo(mattermost)
+		require.Error(t, err)
+	})
+
+	t.Run("missing volume claim name", func(t *testing.T) {
+		mattermost.Spec.FileStore = mmv1beta.FileStore{
+			ExternalVolume: &mmv1beta.ExternalVolumeFileStore{
+				VolumeName: "pv1",
+			},
+		}
+
+		_, err := NewExternalVolumeFileStoreInfo(mattermost)
+		require.Error(t, err)
+	})
 }
