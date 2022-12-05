@@ -39,6 +39,12 @@ func GenerateServiceV1Beta(mattermost *mmv1beta.Mattermost) *corev1.Service {
 		"service.alpha.kubernetes.io/tolerate-unready-endpoints": "true",
 	}
 
+	if mattermost.AWSLoadBalancerEnabled() {
+		// Create a NodePort service because the ALB requires it
+		service := newServiceV1Beta(mattermost, mergeStringMaps(baseAnnotations, mattermost.Spec.ServiceAnnotations))
+		return configureMattermostServiceNodePort(service)
+	}
+
 	if mattermost.Spec.UseServiceLoadBalancer {
 		// Create a LoadBalancer service with additional annotations provided in
 		// the Mattermost Spec. The LoadBalancer is directly accessible from
@@ -74,6 +80,21 @@ func configureMattermostLoadBalancerService(service *corev1.Service) *corev1.Ser
 }
 
 func configureMattermostService(service *corev1.Service) *corev1.Service {
+	service = configureMattermostServicePorts(service)
+	service.Spec.ClusterIP = corev1.ClusterIPNone
+	service.Spec.Type = corev1.ServiceTypeClusterIP
+
+	return service
+}
+
+func configureMattermostServiceNodePort(service *corev1.Service) *corev1.Service {
+	service = configureMattermostServicePorts(service)
+	service.Spec.Type = corev1.ServiceTypeNodePort
+
+	return service
+}
+
+func configureMattermostServicePorts(service *corev1.Service) *corev1.Service {
 	service.Spec.Ports = []corev1.ServicePort{
 		{
 			Port:        8065,
@@ -88,8 +109,6 @@ func configureMattermostService(service *corev1.Service) *corev1.Service {
 			TargetPort:  intstr.FromString("metrics"),
 		},
 	}
-	service.Spec.ClusterIP = corev1.ClusterIPNone
-	service.Spec.Type = corev1.ServiceTypeClusterIP
 
 	return service
 }
@@ -139,6 +158,68 @@ func GenerateIngressV1Beta(mattermost *mmv1beta.Mattermost) *networkingv1.Ingres
 				SecretName: mattermost.GetIngressTLSSecret(),
 			},
 		}
+	}
+
+	return ingress
+}
+
+func GenerateALBIngressClassV1Beta(mattermost *mmv1beta.Mattermost) *networkingv1.IngressClass {
+	ingressClass := &networkingv1.IngressClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            mattermost.Name,
+			Namespace:       mattermost.Namespace,
+			Labels:          mattermost.MattermostLabels(mattermost.Name),
+			OwnerReferences: MattermostOwnerReference(mattermost),
+		},
+		Spec: networkingv1.IngressClassSpec{
+			Controller: "ingress.k8s.aws/alb",
+		},
+	}
+
+	return ingressClass
+}
+
+// GenerateIngressALBIngressV1Beta returns the AWS ALB ingress for the Mattermost app.
+func GenerateALBIngressV1Beta(mattermost *mmv1beta.Mattermost) *networkingv1.Ingress {
+	ingressAnnotations := map[string]string{}
+
+	if mattermost.Spec.AWSLoadBalancerController.InternetFacing {
+		ingressAnnotations["alb.ingress.kubernetes.io/scheme"] = "internet-facing"
+	} else {
+		ingressAnnotations["alb.ingress.kubernetes.io/scheme"] = "internal"
+	}
+
+	if mattermost.Spec.AWSLoadBalancerController.CertificateARN != "" {
+		ingressAnnotations["alb.ingress.kubernetes.io/certificate-arn"] = mattermost.Spec.AWSLoadBalancerController.CertificateARN
+		ingressAnnotations["alb.ingress.kubernetes.io/ssl-redirect"] = "443"
+		ingressAnnotations["alb.ingress.kubernetes.io/listen-ports"] = `[{"HTTP": 80}, {"HTTPS":443}]`
+	} else {
+		ingressAnnotations["alb.ingress.kubernetes.io/listen-ports"] = `[{"HTTP": 8065}]`
+	}
+
+	for k, v := range mattermost.GetIngresAnnotations() {
+		ingressAnnotations[k] = v
+	}
+
+	hosts := mattermost.GetAWSLoadBalancerHostNames()
+
+	ingress := &networkingv1.Ingress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            mattermost.Name,
+			Namespace:       mattermost.Namespace,
+			Labels:          mattermost.MattermostLabels(mattermost.Name),
+			OwnerReferences: MattermostOwnerReference(mattermost),
+			Annotations:     ingressAnnotations,
+		},
+		Spec: networkingv1.IngressSpec{
+			Rules: makeIngressRules(hosts, mattermost),
+		},
+	}
+
+	if mattermost.Spec.AWSLoadBalancerController.IngressClassName != "" {
+		ingress.Spec.IngressClassName = pkgUtils.NewString(mattermost.Spec.AWSLoadBalancerController.IngressClassName)
+	} else {
+		ingress.Spec.IngressClassName = pkgUtils.NewString(mattermost.Name)
 	}
 
 	return ingress
@@ -199,7 +280,7 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 	// TODO: DB setup job is temporarily disabled as `mattermost version` command
 	// does not account for the custom configuration
 	// Add init container to wait for DB setup job to complete
-	//initContainers = append(initContainers, waitForSetupJobContainer())
+	// initContainers = append(initContainers, waitForSetupJobContainer())
 
 	// ES section vars
 	envVarES := []corev1.EnvVar{}

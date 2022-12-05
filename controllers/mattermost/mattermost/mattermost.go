@@ -53,6 +53,11 @@ func (r *MattermostReconciler) checkMattermost(
 	}
 
 	if !mattermost.Spec.UseServiceLoadBalancer {
+		err = r.checkMattermostIngressClass(mattermost, reqLogger)
+		if err != nil {
+			return reconcileStatus{}, err
+		}
+
 		err = r.checkMattermostIngress(mattermost, reqLogger)
 		if err != nil {
 			return reconcileStatus{}, err
@@ -187,7 +192,11 @@ func (r *MattermostReconciler) checkMattermostRoleBinding(mattermost *mmv1beta.M
 func (r *MattermostReconciler) checkMattermostIngress(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) error {
 	desired := mattermostApp.GenerateIngressV1Beta(mattermost)
 
-	if !mattermost.IngressEnabled() {
+	if mattermost.AWSLoadBalancerEnabled() {
+		desired = mattermostApp.GenerateALBIngressV1Beta(mattermost)
+	}
+
+	if !mattermost.IngressEnabled() && !mattermost.AWSLoadBalancerEnabled() {
 		err := r.Resources.DeleteIngress(types.NamespacedName{Namespace: desired.Namespace, Name: desired.Name}, reqLogger)
 		if err != nil {
 			return errors.Wrap(err, "failed to delete disabled ingress")
@@ -209,13 +218,37 @@ func (r *MattermostReconciler) checkMattermostIngress(mattermost *mmv1beta.Matte
 	return r.Resources.Update(current, desired, reqLogger)
 }
 
+func (r *MattermostReconciler) checkMattermostIngressClass(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) error {
+	desired := mattermostApp.GenerateALBIngressClassV1Beta(mattermost)
+
+	if !mattermost.AWSLoadBalancerEnabled() || mattermost.Spec.AWSLoadBalancerController.IngressClassName != "" {
+		err := r.Resources.DeleteIngressClass(types.NamespacedName{Namespace: desired.Namespace, Name: desired.Name}, reqLogger)
+		if err != nil {
+			return errors.Wrap(err, "failed to delete disabled ingressClass")
+		}
+		return nil
+	}
+
+	err := r.Resources.CreateIngressClassIfNotExists(mattermost, desired, reqLogger)
+	if err != nil {
+		return err
+	}
+
+	current := &networkingv1.IngressClass{}
+	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: desired.Name, Namespace: desired.Namespace}, current)
+	if err != nil {
+		return err
+	}
+
+	return r.Resources.Update(current, desired, reqLogger)
+}
+
 func (r *MattermostReconciler) checkMattermostDeployment(
 	mattermost *mmv1beta.Mattermost,
 	dbConfig mattermostApp.DatabaseConfig,
 	fsConfig mattermostApp.FileStoreConfig,
 	status *mmv1beta.MattermostStatus,
 	reqLogger logr.Logger) (reconcileStatus, error) {
-
 	desired := mattermostApp.GenerateDeploymentV1Beta(
 		mattermost,
 		dbConfig,
