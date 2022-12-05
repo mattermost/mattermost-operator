@@ -253,10 +253,6 @@ spec:
                         description: The name of the matching volume claim for the
                           externally managed volume.
                         type: string
-                      volumeName:
-                        description: The name of the externally managed volume to
-                          be mounted for file storage.
-                        type: string
                     type: object
                   local:
                     description: Defines the configuration of PVC backed storage (local).

@@ -51,17 +51,7 @@ func (r *MattermostReconciler) checkExternalVolumeFileStore(mattermost *mmv1beta
 		return nil, errors.Wrap(err, "failed to create external volume FileStoreConfig")
 	}
 
-	// Ensure the PV and PVC exist.
-	pv := &corev1.PersistentVolume{}
-	err = r.Client.Get(context.TODO(), types.NamespacedName{
-		Name:      mattermost.Spec.FileStore.ExternalVolume.VolumeName,
-		Namespace: mattermost.Namespace,
-	}, pv)
-	if err != nil {
-		reqLogger.Error(err, "failed to get specified PV for external volume storage")
-		return nil, err
-	}
-
+	// Ensure that the PVC exists and is bound.
 	pvc := &corev1.PersistentVolumeClaim{}
 	err = r.Client.Get(context.TODO(), types.NamespacedName{
 		Name:      mattermost.Spec.FileStore.ExternalVolume.VolumeClaimName,
@@ -69,6 +59,11 @@ func (r *MattermostReconciler) checkExternalVolumeFileStore(mattermost *mmv1beta
 	}, pvc)
 	if err != nil {
 		reqLogger.Error(err, "failed to get specified PVC for external volume storage")
+		return nil, err
+	}
+	if pvc.Status.Phase != corev1.ClaimBound {
+		err := errors.Errorf("specified PVC for external volume storage is not %s (%s)", corev1.ClaimBound, pvc.Status.Phase)
+		reqLogger.Error(err, "failed checking PVC status")
 		return nil, err
 	}
 

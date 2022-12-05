@@ -70,7 +70,6 @@ func TestFileStore(t *testing.T) {
 		t.Run("valid", func(t *testing.T) {
 			mattermost.Spec.FileStore = mmv1beta.FileStore{
 				ExternalVolume: &mmv1beta.ExternalVolumeFileStore{
-					VolumeName:      "pv1",
 					VolumeClaimName: "pvc1",
 				},
 			}
@@ -85,28 +84,15 @@ func TestFileStore(t *testing.T) {
 			volumes, volumeMounts := fileStore.Volumes(mattermost)
 			require.Len(t, volumes, 1)
 			require.Len(t, volumeMounts, 1)
-			assert.Equal(t, mattermost.Spec.FileStore.ExternalVolume.VolumeName, volumes[0].Name)
+			assert.Equal(t, FileStoreDefaultVolumeName, volumes[0].Name)
 			assert.Equal(t, mattermost.Spec.FileStore.ExternalVolume.VolumeClaimName, volumes[0].PersistentVolumeClaim.ClaimName)
-			assert.Equal(t, mattermost.Spec.FileStore.ExternalVolume.VolumeName, volumeMounts[0].Name)
+			assert.Equal(t, FileStoreDefaultVolumeName, volumeMounts[0].Name)
 		})
-	})
-
-	t.Run("missing volume name", func(t *testing.T) {
-		mattermost.Spec.FileStore = mmv1beta.FileStore{
-			ExternalVolume: &mmv1beta.ExternalVolumeFileStore{
-				VolumeClaimName: "pvc1",
-			},
-		}
-
-		_, err := NewExternalVolumeFileStoreInfo(mattermost)
-		require.Error(t, err)
 	})
 
 	t.Run("missing volume claim name", func(t *testing.T) {
 		mattermost.Spec.FileStore = mmv1beta.FileStore{
-			ExternalVolume: &mmv1beta.ExternalVolumeFileStore{
-				VolumeName: "pv1",
-			},
+			ExternalVolume: &mmv1beta.ExternalVolumeFileStore{},
 		}
 
 		_, err := NewExternalVolumeFileStoreInfo(mattermost)

@@ -9,6 +9,10 @@ import (
 )
 
 const (
+	// FileStoreDefaultVolumeName is the default volume name for Mattermost
+	// filestore data.
+	FileStoreDefaultVolumeName = "mattermost-data"
+
 	fileStoreSecretAccessKey = "accesskey"
 	fileStoreSecretSecretKey = "secretkey"
 )
@@ -37,7 +41,6 @@ func (e *ExternalFileStore) Volumes(_ *mmv1beta.Mattermost) ([]corev1.Volume, []
 }
 
 type ExternalVolumeFileStore struct {
-	VolumeName      string
 	VolumeClaimName string
 }
 
@@ -52,7 +55,7 @@ func (fs *ExternalVolumeFileStore) InitContainers(_ *mmv1beta.Mattermost) []core
 func (fs *ExternalVolumeFileStore) Volumes(mm *mmv1beta.Mattermost) ([]corev1.Volume, []corev1.VolumeMount) {
 	volumes := []corev1.Volume{
 		{
-			Name: fs.VolumeName,
+			Name: FileStoreDefaultVolumeName,
 			VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 					ClaimName: fs.VolumeClaimName,
@@ -63,7 +66,7 @@ func (fs *ExternalVolumeFileStore) Volumes(mm *mmv1beta.Mattermost) ([]corev1.Vo
 
 	volumeMounts := []corev1.VolumeMount{
 		{
-			Name:      fs.VolumeName,
+			Name:      FileStoreDefaultVolumeName,
 			MountPath: mmv1beta.DefaultLocalFilePath,
 		},
 	}
@@ -83,7 +86,7 @@ func (e *LocalFileStore) InitContainers(_ *mmv1beta.Mattermost) []corev1.Contain
 func (e *LocalFileStore) Volumes(mm *mmv1beta.Mattermost) ([]corev1.Volume, []corev1.VolumeMount) {
 	volumes := []corev1.Volume{
 		{
-			Name: "mattermost-data",
+			Name: FileStoreDefaultVolumeName,
 			VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 					ClaimName: mm.Name,
@@ -95,7 +98,7 @@ func (e *LocalFileStore) Volumes(mm *mmv1beta.Mattermost) ([]corev1.Volume, []co
 	volumeMounts := []corev1.VolumeMount{
 		{
 			MountPath: mmv1beta.DefaultLocalFilePath,
-			Name:      "mattermost-data",
+			Name:      FileStoreDefaultVolumeName,
 		},
 	}
 	return volumes, volumeMounts
@@ -187,18 +190,12 @@ func NewExternalVolumeFileStoreInfo(mattermost *mmv1beta.Mattermost) (FileStoreC
 		return nil, errors.New("external volume file store configuration not provided")
 	}
 
-	volumeName := mattermost.Spec.FileStore.ExternalVolume.VolumeName
-	if volumeName == "" {
-		return nil, errors.New("external volume name is empty")
-	}
-
 	volumeClaimName := mattermost.Spec.FileStore.ExternalVolume.VolumeClaimName
 	if volumeClaimName == "" {
 		return nil, errors.New("external volume claim name is empty")
 	}
 
 	return &ExternalVolumeFileStore{
-		VolumeName:      volumeName,
 		VolumeClaimName: volumeClaimName,
 	}, nil
 }

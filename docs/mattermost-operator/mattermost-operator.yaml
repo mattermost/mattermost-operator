@@ -1822,6 +1822,32 @@ spec:
           spec:
             description: MattermostSpec defines the desired state of Mattermost
             properties:
+              awsLoadBalancerController:
+                properties:
+                  certificateARN:
+                    description: Certificate arn for the ALB, required if SSL enabled
+                    type: string
+                  enabled:
+                    description: An AWS ALB Ingress will be created instead of nginx
+                    type: boolean
+                  hosts:
+                    description: Hosts allows specifying additional domain names for
+                      Mattermost to use.
+                    items:
+                      description: IngressHost specifies additional hosts configuration.
+                      properties:
+                        hostName:
+                          type: string
+                      type: object
+                    type: array
+                  ingressClassName:
+                    description: IngressClassName for your ingress
+                    type: string
+                  internetFacing:
+                    description: Whether the Ingress will be internetfacing, default
+                      is false
+                    type: boolean
+                type: object
               database:
                 description: External Services
                 properties:
@@ -1993,10 +2019,6 @@ spec:
                       volumeClaimName:
                         description: The name of the matching volume claim for the
                           externally managed volume.
-                        type: string
-                      volumeName:
-                        description: The name of the externally managed volume to
-                          be mounted for file storage.
                         type: string
                     type: object
                   local:
@@ -6840,6 +6862,7 @@ rules:
   - networking.k8s.io
   resources:
   - ingresses
+  - ingressclasses
   verbs:
   - '*'
 - apiGroups:

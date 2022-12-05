@@ -916,7 +916,6 @@ func TestCheckMattermostExternalVolumeFileStore(t *testing.T) {
 			IngressName: "foo.mattermost.dev",
 			FileStore: mmv1beta.FileStore{
 				ExternalVolume: &mmv1beta.ExternalVolumeFileStore{
-					VolumeName:      "pv1",
 					VolumeClaimName: "pvc1",
 				},
 			},
@@ -935,20 +934,13 @@ func TestCheckMattermostExternalVolumeFileStore(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	pv := &corev1.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      mm.Spec.FileStore.ExternalVolume.VolumeName,
-			Namespace: mm.GetNamespace(),
-		},
-		Spec: corev1.PersistentVolumeSpec{},
-	}
-	err = reconciler.Client.Create(context.TODO(), pv)
-	require.NoError(t, err)
-
 	pvc := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      mm.Spec.FileStore.ExternalVolume.VolumeClaimName,
 			Namespace: mm.GetNamespace(),
+		},
+		Status: corev1.PersistentVolumeClaimStatus{
+			Phase: corev1.ClaimBound,
 		},
 	}
 	err = reconciler.Client.Create(context.TODO(), pvc)
@@ -970,7 +962,7 @@ func TestCheckMattermostExternalVolumeFileStore(t *testing.T) {
 		require.Len(t, foundDeploy.Spec.Template.Spec.Containers, 1)
 
 		foundDeploymentPV := foundDeploy.Spec.Template.Spec.Volumes[0]
-		assert.Equal(t, mm.Spec.FileStore.ExternalVolume.VolumeName, foundDeploymentPV.Name)
+		assert.Equal(t, mattermostApp.FileStoreDefaultVolumeName, foundDeploymentPV.Name)
 		assert.Equal(t, mm.Spec.FileStore.ExternalVolume.VolumeClaimName, foundDeploymentPV.PersistentVolumeClaim.ClaimName)
 
 		foundMMContainer := foundDeploy.Spec.Template.Spec.Containers[0]

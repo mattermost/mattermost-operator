@@ -370,8 +370,6 @@ type ExternalFileStore struct {
 // ExternalVolumeFileStore defines the configuration of an externally managed
 // volume file store.
 type ExternalVolumeFileStore struct {
-	// The name of the externally managed volume to be mounted for file storage.
-	VolumeName string `json:"volumeName,omitempty"`
 	// The name of the matching volume claim for the externally managed volume.
 	VolumeClaimName string `json:"volumeClaimName,omitempty"`
 }
