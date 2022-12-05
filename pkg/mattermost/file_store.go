@@ -9,6 +9,10 @@ import (
 )
 
 const (
+	// FileStoreDefaultVolumeName is the default volume name for Mattermost
+	// filestore data.
+	FileStoreDefaultVolumeName = "mattermost-data"
+
 	fileStoreSecretAccessKey = "accesskey"
 	fileStoreSecretSecretKey = "secretkey"
 )
@@ -36,6 +40,39 @@ func (e *ExternalFileStore) Volumes(_ *mmv1beta.Mattermost) ([]corev1.Volume, []
 	return []corev1.Volume{}, []corev1.VolumeMount{}
 }
 
+type ExternalVolumeFileStore struct {
+	VolumeClaimName string
+}
+
+func (fs *ExternalVolumeFileStore) EnvVars(_ *mmv1beta.Mattermost) []corev1.EnvVar {
+	return localFileEnvVars(mmv1beta.DefaultLocalFilePath)
+}
+
+func (fs *ExternalVolumeFileStore) InitContainers(_ *mmv1beta.Mattermost) []corev1.Container {
+	return []corev1.Container{}
+}
+
+func (fs *ExternalVolumeFileStore) Volumes(mm *mmv1beta.Mattermost) ([]corev1.Volume, []corev1.VolumeMount) {
+	volumes := []corev1.Volume{
+		{
+			Name: FileStoreDefaultVolumeName,
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: fs.VolumeClaimName,
+				},
+			},
+		},
+	}
+
+	volumeMounts := []corev1.VolumeMount{
+		{
+			Name:      FileStoreDefaultVolumeName,
+			MountPath: mmv1beta.DefaultLocalFilePath,
+		},
+	}
+	return volumes, volumeMounts
+}
+
 type LocalFileStore struct{}
 
 func (e *LocalFileStore) EnvVars(_ *mmv1beta.Mattermost) []corev1.EnvVar {
@@ -49,7 +86,7 @@ func (e *LocalFileStore) InitContainers(_ *mmv1beta.Mattermost) []corev1.Contain
 func (e *LocalFileStore) Volumes(mm *mmv1beta.Mattermost) ([]corev1.Volume, []corev1.VolumeMount) {
 	volumes := []corev1.Volume{
 		{
-			Name: "mattermost-data",
+			Name: FileStoreDefaultVolumeName,
 			VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 					ClaimName: mm.Name,
@@ -61,7 +98,7 @@ func (e *LocalFileStore) Volumes(mm *mmv1beta.Mattermost) ([]corev1.Volume, []co
 	volumeMounts := []corev1.VolumeMount{
 		{
 			MountPath: mmv1beta.DefaultLocalFilePath,
-			Name:      "mattermost-data",
+			Name:      FileStoreDefaultVolumeName,
 		},
 	}
 	return volumes, volumeMounts
@@ -122,12 +159,10 @@ func NewExternalFileStoreInfo(mattermost *mmv1beta.Mattermost, secret corev1.Sec
 	if mattermost.Spec.FileStore.External == nil {
 		return nil, errors.New("external file store configuration not provided")
 	}
-
 	bucket := mattermost.Spec.FileStore.External.Bucket
 	if bucket == "" {
 		return nil, errors.New("external file store bucket is empty")
 	}
-
 	url := mattermost.Spec.FileStore.External.URL
 	if url == "" {
 		return nil, errors.New("external file store URL is empty")
@@ -147,6 +182,21 @@ func NewExternalFileStoreInfo(mattermost *mmv1beta.Mattermost, secret corev1.Sec
 			url:        url,
 			useS3SSL:   true,
 		},
+	}, nil
+}
+
+func NewExternalVolumeFileStoreInfo(mattermost *mmv1beta.Mattermost) (FileStoreConfig, error) {
+	if mattermost.Spec.FileStore.ExternalVolume == nil {
+		return nil, errors.New("external volume file store configuration not provided")
+	}
+
+	volumeClaimName := mattermost.Spec.FileStore.ExternalVolume.VolumeClaimName
+	if volumeClaimName == "" {
+		return nil, errors.New("external volume claim name is empty")
+	}
+
+	return &ExternalVolumeFileStore{
+		VolumeClaimName: volumeClaimName,
 	}, nil
 }
 

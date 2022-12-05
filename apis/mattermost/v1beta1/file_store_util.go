@@ -25,6 +25,12 @@ func (fs *FileStore) IsExternal() bool {
 	return fs.External != nil && fs.External.URL != ""
 }
 
+// IsExternalVolume returns true if the filestore requested is an externally
+// managed volume.
+func (fs *FileStore) IsExternalVolume() bool {
+	return fs.ExternalVolume != nil && fs.ExternalVolume.VolumeClaimName != ""
+}
+
 // IsLocal returns true if the filestore requested is local (PVC backed).
 func (fs *FileStore) IsLocal() bool {
 	return fs.Local != nil && fs.Local.Enabled
