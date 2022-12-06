@@ -15,6 +15,8 @@ spec:
     enabled: true                                 # If disabled Ingress will not be created by Mattermost Operator.
     hosts: 
       - hostName: 'example.mattermost-example.com'
+    annotations:
+      "example": "annotation"
     certificateARN: 'arn:aws:acm:region:account:certificate/certificate_ID' # AWS ACM Certificate ARN for TLS.
     internetFacing: true                          # If the ALB is internetfacing or not
     ingressClassName: 'alb'                       # IngressClass to use for the Ingress resource. If empty, Mattermost Operator will create one.
