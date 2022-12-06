@@ -13,10 +13,8 @@ spec:
   size: 5000users                                 # Size of the Mattermost installation, typically based on the number of users. This a is write-only field - its value is erased after setting appropriate values of resources. Automatically sets the replica and resource limits for Minio, databases and app servers based on the number provided here. Accepts 100users, 1000users, 5000users, 10000users, or 25000users. Manually setting replicas or resources will override the values set by 'size'.
   awsLoadBalancerController:
     enabled: true                                 # If disabled Ingress will not be created by Mattermost Operator.
-    host: example.mattermost-example.com          # Hostnames used for Ingress, e.g. example.mattermost-example.com. Required when Ingress is enabled.
     hosts: 
       - hostName: 'example.mattermost-example.com'
-    annotations: {}                               # Custom annotations propagated to Ingress resource.
     certificateARN: 'arn:aws:acm:region:account:certificate/certificate_ID' # AWS ACM Certificate ARN for TLS.
     internetFacing: true                          # If the ALB is internetfacing or not
     ingressClassName: 'alb'                       # IngressClass to use for the Ingress resource. If empty, Mattermost Operator will create one.
