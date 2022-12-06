@@ -522,6 +522,32 @@ func TestCheckMattermostAWSLoadBalancer(t *testing.T) {
 		require.Error(t, err)
 	})
 
+	t.Run("ingress with custom annotations", func(t *testing.T) {
+		mm.Spec.AWSLoadBalancerController = &mmv1beta.AWSLoadBalancerController{
+			Enabled: true,
+			Hosts: []mmv1beta.IngressHost{
+				{
+					HostName: "test.example.com",
+				},
+			},
+		}
+		mm.Spec.AWSLoadBalancerController.Annotations = map[string]string{
+			"test": "test",
+		}
+
+		err = reconciler.checkMattermostIngress(mm, logger)
+		assert.NoError(t, err)
+
+		found := &v1beta1.Ingress{}
+		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
+		require.NoError(t, err)
+		require.NotNil(t, found)
+
+		assert.Contains(t, found.Annotations, "alb.ingress.kubernetes.io/scheme")
+		assert.Contains(t, found.Annotations, "alb.ingress.kubernetes.io/listen-ports")
+		assert.Contains(t, found.Annotations, "test")
+	})
+
 	t.Run("disable and enable aws load balancer", func(t *testing.T) {
 		mm.Spec.AWSLoadBalancerController.Enabled = false
 		err = reconciler.checkMattermostIngress(mm, logger)

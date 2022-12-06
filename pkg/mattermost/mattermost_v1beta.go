@@ -197,7 +197,7 @@ func GenerateALBIngressV1Beta(mattermost *mmv1beta.Mattermost) *networkingv1.Ing
 		ingressAnnotations["alb.ingress.kubernetes.io/listen-ports"] = `[{"HTTP": 8065}]`
 	}
 
-	for k, v := range mattermost.GetIngresAnnotations() {
+	for k, v := range mattermost.GetAWSLoadBalancerIngressAnnotations() {
 		ingressAnnotations[k] = v
 	}
 

@@ -144,6 +144,11 @@ func (mm *Mattermost) GetIngresAnnotations() map[string]string {
 	return mm.Spec.Ingress.Annotations
 }
 
+// GetIngresAnnotations returns Mattermost Ingress annotations.
+func (mm *Mattermost) GetAWSLoadBalancerIngressAnnotations() map[string]string {
+	return mm.Spec.AWSLoadBalancerController.Annotations
+}
+
 // GetIngressTLSSecret returns Mattermost Ingress TLS secret.
 func (mm *Mattermost) GetIngressTLSSecret() string {
 	if mm.Spec.Ingress != nil {
