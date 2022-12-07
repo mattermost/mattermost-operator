@@ -185,6 +185,28 @@ func NewExternalFileStoreInfo(mattermost *mmv1beta.Mattermost, secret corev1.Sec
 	}, nil
 }
 
+func NewExternalFileStoreInfoWithoutSecret(mattermost *mmv1beta.Mattermost) (FileStoreConfig, error) {
+	if mattermost.Spec.FileStore.External == nil {
+		return nil, errors.New("external file store configuration not provided")
+	}
+	bucket := mattermost.Spec.FileStore.External.Bucket
+	if bucket == "" {
+		return nil, errors.New("external file store bucket is empty")
+	}
+	url := mattermost.Spec.FileStore.External.URL
+	if url == "" {
+		return nil, errors.New("external file store URL is empty")
+	}
+
+	return &ExternalFileStore{
+		fsInfo: FileStoreInfo{
+			bucketName: bucket,
+			url:        url,
+			useS3SSL:   true,
+		},
+	}, nil
+}
+
 func NewExternalVolumeFileStoreInfo(mattermost *mmv1beta.Mattermost) (FileStoreConfig, error) {
 	if mattermost.Spec.FileStore.ExternalVolume == nil {
 		return nil, errors.New("external volume file store configuration not provided")

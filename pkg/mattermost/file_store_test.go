@@ -66,6 +66,31 @@ func TestFileStore(t *testing.T) {
 		assert.Equal(t, true, fileStore.fsInfo.useS3SSL)
 	})
 
+	t.Run("external file store using service account", func(t *testing.T) {
+		mattermost.Spec.FileStore = mmv1beta.FileStore{
+			External: &mmv1beta.ExternalFileStore{
+				URL:               minioURL,
+				Bucket:            "test-bucket",
+				UseServiceAccount: true,
+			},
+		}
+
+		config, err := NewExternalFileStoreInfoWithoutSecret(mattermost)
+		fileStore := config.(*ExternalFileStore)
+		require.NoError(t, err)
+		initContainers := fileStore.InitContainers(mattermost)
+		assert.Equal(t, 0, len(initContainers))
+		assert.Equal(t, "", fileStore.fsInfo.secretName)
+		assert.Equal(t, minioURL, fileStore.fsInfo.url)
+		assert.Equal(t, "test-bucket", fileStore.fsInfo.bucketName)
+		assert.Equal(t, true, fileStore.fsInfo.useS3SSL)
+
+		envs := fileStore.EnvVars(mattermost)
+		assert.Equal(t, 4, len(envs))
+		assert.NotContains(t, envs, "MM_FILESETTINGS_AMAZONS3ACCESSKEYID")
+		assert.NotContains(t, envs, "MM_FILESETTINGS_AMAZONS3SECRETACCESSKEY")
+	})
+
 	t.Run("external volume file store", func(t *testing.T) {
 		t.Run("valid", func(t *testing.T) {
 			mattermost.Spec.FileStore = mmv1beta.FileStore{

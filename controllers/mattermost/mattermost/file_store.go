@@ -35,6 +35,10 @@ func (r *MattermostReconciler) checkFileStore(mattermost *mmv1beta.Mattermost, r
 }
 
 func (r *MattermostReconciler) checkExternalFileStore(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) (mattermostApp.FileStoreConfig, error) {
+	if mattermost.Spec.FileStore.IsExternal() && mattermost.Spec.FileStore.External.UseServiceAccount {
+		return mattermostApp.NewExternalFileStoreInfoWithoutSecret(mattermost)
+	}
+
 	secret := &corev1.Secret{}
 	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: mattermost.Spec.FileStore.External.Secret, Namespace: mattermost.Namespace}, secret)
 	if err != nil {

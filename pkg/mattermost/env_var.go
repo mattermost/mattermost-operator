@@ -61,18 +61,10 @@ func s3EnvVars(fileStore *FileStoreInfo) []corev1.EnvVar {
 	minioAccessEnv := EnvSourceFromSecret(fileStore.secretName, fileStoreSecretAccessKey)
 	minioSecretEnv := EnvSourceFromSecret(fileStore.secretName, fileStoreSecretSecretKey)
 
-	return []corev1.EnvVar{
+	envs := []corev1.EnvVar{
 		{
 			Name:  "MM_FILESETTINGS_DRIVERNAME",
 			Value: "amazons3",
-		},
-		{
-			Name:      "MM_FILESETTINGS_AMAZONS3ACCESSKEYID",
-			ValueFrom: minioAccessEnv,
-		},
-		{
-			Name:      "MM_FILESETTINGS_AMAZONS3SECRETACCESSKEY",
-			ValueFrom: minioSecretEnv,
 		},
 		{
 			Name:  "MM_FILESETTINGS_AMAZONS3BUCKET",
@@ -87,6 +79,19 @@ func s3EnvVars(fileStore *FileStoreInfo) []corev1.EnvVar {
 			Value: strconv.FormatBool(fileStore.useS3SSL),
 		},
 	}
+
+	if fileStore.secretName != "" {
+		envs = append(envs, corev1.EnvVar{
+			Name:      "MM_FILESETTINGS_AMAZONS3ACCESSKEYID",
+			ValueFrom: minioAccessEnv,
+		})
+		envs = append(envs, corev1.EnvVar{
+			Name:      "MM_FILESETTINGS_AMAZONS3SECRETACCESSKEY",
+			ValueFrom: minioSecretEnv,
+		})
+	}
+
+	return envs
 }
 
 func elasticSearchEnvVars(host, user, password string) []corev1.EnvVar {
