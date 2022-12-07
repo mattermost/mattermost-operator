@@ -200,6 +200,10 @@ type AWSLoadBalancerController struct {
 	// IngressClassName for your ingress
 	// +optional
 	IngressClassName string `json:"ingressClassName,omitempty"`
+
+	// Annotations defines annotations passed to the Ingress associated with Mattermost.
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 // IngressHost specifies additional hosts configuration.

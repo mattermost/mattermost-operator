@@ -57,6 +57,12 @@ spec:
             properties:
               awsLoadBalancerController:
                 properties:
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    description: Annotations defines annotations passed to the Ingress
+                      associated with Mattermost.
+                    type: object
                   certificateARN:
                     description: Certificate arn for the ALB, required if SSL enabled
                     type: string
