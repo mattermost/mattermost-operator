@@ -22,10 +22,50 @@ func TestMattermost_SetDefaults(t *testing.T) {
 		err := mm.SetDefaults()
 		require.NoError(t, err)
 	})
+	t.Run("minio only set if other filestores types are not", func(t *testing.T) {
+		t.Run("external", func(t *testing.T) {
+			mm := &Mattermost{Spec: MattermostSpec{
+				Ingress:   &Ingress{Enabled: false},
+				FileStore: FileStore{External: &ExternalFileStore{URL: "test"}},
+			}}
+			err := mm.SetDefaults()
+			require.NoError(t, err)
+			require.True(t, mm.Spec.FileStore.IsExternal())
+			assert.Nil(t, mm.Spec.FileStore.OperatorManaged)
+		})
+		t.Run("externalVolume", func(t *testing.T) {
+			mm := &Mattermost{Spec: MattermostSpec{
+				Ingress:   &Ingress{Enabled: false},
+				FileStore: FileStore{ExternalVolume: &ExternalVolumeFileStore{VolumeClaimName: "test"}},
+			}}
+			err := mm.SetDefaults()
+			require.NoError(t, err)
+			require.True(t, mm.Spec.FileStore.IsExternalVolume())
+			assert.Nil(t, mm.Spec.FileStore.OperatorManaged)
+		})
+		t.Run("local", func(t *testing.T) {
+			mm := &Mattermost{Spec: MattermostSpec{
+				Ingress:   &Ingress{Enabled: false},
+				FileStore: FileStore{Local: &LocalFileStore{Enabled: true}},
+			}}
+			err := mm.SetDefaults()
+			require.NoError(t, err)
+			require.True(t, mm.Spec.FileStore.IsLocal())
+			assert.Nil(t, mm.Spec.FileStore.OperatorManaged)
+		})
+		t.Run("filestore empty", func(t *testing.T) {
+			mm := &Mattermost{Spec: MattermostSpec{
+				Ingress: &Ingress{Enabled: false},
+			}}
+			err := mm.SetDefaults()
+			require.NoError(t, err)
+			assert.NotNil(t, mm.Spec.FileStore.OperatorManaged)
+		})
+	})
+
 }
 
 func TestMattermost_IngressAccessors(t *testing.T) {
-
 	for _, testCase := range []struct {
 		description  string
 		mmSpec       MattermostSpec
@@ -112,7 +152,6 @@ func TestMattermost_IngressAccessors(t *testing.T) {
 }
 
 func TestMattermost_GetIngressHostNames(t *testing.T) {
-
 	for _, testCase := range []struct {
 		description   string
 		mmSpec        MattermostSpec
