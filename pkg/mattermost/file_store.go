@@ -155,7 +155,7 @@ func (e *OperatorManagedMinioConfig) Volumes(_ *mmv1beta.Mattermost) ([]corev1.V
 	return []corev1.Volume{}, []corev1.VolumeMount{}
 }
 
-func NewExternalFileStoreInfo(mattermost *mmv1beta.Mattermost, secret corev1.Secret) (FileStoreConfig, error) {
+func NewExternalFileStoreInfo(mattermost *mmv1beta.Mattermost, secret *corev1.Secret) (FileStoreConfig, error) {
 	if mattermost.Spec.FileStore.External == nil {
 		return nil, errors.New("external file store configuration not provided")
 	}
@@ -166,6 +166,16 @@ func NewExternalFileStoreInfo(mattermost *mmv1beta.Mattermost, secret corev1.Sec
 	url := mattermost.Spec.FileStore.External.URL
 	if url == "" {
 		return nil, errors.New("external file store URL is empty")
+	}
+
+	if secret == nil {
+		return &ExternalFileStore{
+			fsInfo: FileStoreInfo{
+				bucketName: bucket,
+				url:        url,
+				useS3SSL:   true,
+			},
+		}, nil
 	}
 
 	if _, ok := secret.Data["accesskey"]; !ok {
@@ -178,28 +188,6 @@ func NewExternalFileStoreInfo(mattermost *mmv1beta.Mattermost, secret corev1.Sec
 	return &ExternalFileStore{
 		fsInfo: FileStoreInfo{
 			secretName: secret.Name,
-			bucketName: bucket,
-			url:        url,
-			useS3SSL:   true,
-		},
-	}, nil
-}
-
-func NewExternalFileStoreInfoWithoutSecret(mattermost *mmv1beta.Mattermost) (FileStoreConfig, error) {
-	if mattermost.Spec.FileStore.External == nil {
-		return nil, errors.New("external file store configuration not provided")
-	}
-	bucket := mattermost.Spec.FileStore.External.Bucket
-	if bucket == "" {
-		return nil, errors.New("external file store bucket is empty")
-	}
-	url := mattermost.Spec.FileStore.External.URL
-	if url == "" {
-		return nil, errors.New("external file store URL is empty")
-	}
-
-	return &ExternalFileStore{
-		fsInfo: FileStoreInfo{
 			bucketName: bucket,
 			url:        url,
 			useS3SSL:   true,

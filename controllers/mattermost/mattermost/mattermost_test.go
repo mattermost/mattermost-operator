@@ -780,7 +780,7 @@ func TestCheckMattermostExternalDBAndFileStore(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	fileStoreInfo, err := mattermostApp.NewExternalFileStoreInfo(mm, corev1.Secret{
+	fileStoreInfo, err := mattermostApp.NewExternalFileStoreInfo(mm, &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{Name: "fileStoreSecret"},
 		Data: map[string][]byte{
 			"accesskey": []byte("my-key"),

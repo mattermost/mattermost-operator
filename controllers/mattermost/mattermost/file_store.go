@@ -36,7 +36,7 @@ func (r *MattermostReconciler) checkFileStore(mattermost *mmv1beta.Mattermost, r
 
 func (r *MattermostReconciler) checkExternalFileStore(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) (mattermostApp.FileStoreConfig, error) {
 	if mattermost.Spec.FileStore.External.UseServiceAccount {
-		return mattermostApp.NewExternalFileStoreInfoWithoutSecret(mattermost)
+		return mattermostApp.NewExternalFileStoreInfo(mattermost, nil)
 	}
 
 	secret := &corev1.Secret{}
@@ -46,7 +46,7 @@ func (r *MattermostReconciler) checkExternalFileStore(mattermost *mmv1beta.Matte
 		return nil, err
 	}
 
-	return mattermostApp.NewExternalFileStoreInfo(mattermost, *secret)
+	return mattermostApp.NewExternalFileStoreInfo(mattermost, secret)
 }
 
 func (r *MattermostReconciler) checkExternalVolumeFileStore(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) (mattermostApp.FileStoreConfig, error) {

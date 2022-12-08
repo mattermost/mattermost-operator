@@ -47,7 +47,7 @@ func TestFileStore(t *testing.T) {
 			},
 		}
 
-		secret := corev1.Secret{
+		secret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{Name: "external-file-store"},
 			Data: map[string][]byte{
 				"accesskey": []byte("key"),
@@ -75,7 +75,7 @@ func TestFileStore(t *testing.T) {
 			},
 		}
 
-		config, err := NewExternalFileStoreInfoWithoutSecret(mattermost)
+		config, err := NewExternalFileStoreInfo(mattermost, nil)
 		fileStore := config.(*ExternalFileStore)
 		require.NoError(t, err)
 		initContainers := fileStore.InitContainers(mattermost)

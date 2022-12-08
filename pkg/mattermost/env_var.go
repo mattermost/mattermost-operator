@@ -58,9 +58,6 @@ func localFileEnvVars(filePath string) []corev1.EnvVar {
 }
 
 func s3EnvVars(fileStore *FileStoreInfo) []corev1.EnvVar {
-	minioAccessEnv := EnvSourceFromSecret(fileStore.secretName, fileStoreSecretAccessKey)
-	minioSecretEnv := EnvSourceFromSecret(fileStore.secretName, fileStoreSecretSecretKey)
-
 	envs := []corev1.EnvVar{
 		{
 			Name:  "MM_FILESETTINGS_DRIVERNAME",
@@ -81,6 +78,9 @@ func s3EnvVars(fileStore *FileStoreInfo) []corev1.EnvVar {
 	}
 
 	if fileStore.secretName != "" {
+		minioAccessEnv := EnvSourceFromSecret(fileStore.secretName, fileStoreSecretAccessKey)
+		minioSecretEnv := EnvSourceFromSecret(fileStore.secretName, fileStoreSecretSecretKey)
+
 		envs = append(envs, corev1.EnvVar{
 			Name:      "MM_FILESETTINGS_AMAZONS3ACCESSKEYID",
 			ValueFrom: minioAccessEnv,
