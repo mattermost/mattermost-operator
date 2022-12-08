@@ -143,6 +143,23 @@ func (r *MattermostReconciler) checkMattermostRBAC(mattermost *mmv1beta.Mattermo
 
 func (r *MattermostReconciler) checkMattermostSA(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) error {
 	desired := mattermostApp.GenerateServiceAccountV1Beta(mattermost, mattermost.Name)
+
+	if mattermost.Spec.FileStore.External != nil && mattermost.Spec.FileStore.External.UseServiceAccount {
+		current := &corev1.ServiceAccount{}
+		err := r.Client.Get(context.TODO(), types.NamespacedName{Name: desired.Name, Namespace: desired.Namespace}, current)
+		if err != nil && k8sErrors.IsNotFound(err) {
+			return errors.Wrap(err, "service account needs to be created manually if fileStore.external.useServiceAccount is true")
+		} else if err != nil {
+			return errors.Wrap(err, "failed to check if service account exists")
+		}
+
+		if _, ok := current.Annotations["eks.amazonaws.com/role-arn"]; !ok {
+			return fmt.Errorf(`service account does not have "eks.amazonaws.com/role-arn" annotation, which is required if fileStore.external.useServiceAccount is true`)
+		}
+
+		return nil
+	}
+
 	err := r.Resources.CreateServiceAccountIfNotExists(mattermost, desired, reqLogger)
 	if err != nil {
 		return err

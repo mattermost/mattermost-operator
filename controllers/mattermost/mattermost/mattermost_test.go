@@ -125,6 +125,48 @@ func TestCheckMattermost(t *testing.T) {
 		require.NoError(t, err)
 		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
 		require.NoError(t, err)
+		err = reconciler.Client.Delete(context.TODO(), found)
+		require.NoError(t, err)
+
+		mm.Spec.FileStore.External = &mmv1beta.ExternalFileStore{
+			UseServiceAccount: true,
+		}
+		sa := &corev1.ServiceAccount{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					"eks.amazonaws.com/role-arn": "asd",
+				},
+				Name:      mmName,
+				Namespace: mmNamespace,
+			},
+		}
+		err = reconciler.Client.Create(context.TODO(), sa)
+		require.NoError(t, err)
+		err = reconciler.checkMattermostSA(mm, logger)
+		assert.NoError(t, err)
+		found2 := &corev1.ServiceAccount{}
+		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found2)
+		require.NoError(t, err)
+		require.Equal(t, "asd", found2.Annotations["eks.amazonaws.com/role-arn"])
+		err = reconciler.Client.Delete(context.TODO(), sa)
+		require.NoError(t, err)
+
+		err = reconciler.checkMattermostSA(mm, logger)
+		require.Error(t, err)
+		require.Equal(t, `service account needs to be created manually if fileStore.external.useServiceAccount is true: serviceaccounts "foo" not found`, err.Error())
+
+		sa2 := &corev1.ServiceAccount{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      mmName,
+				Namespace: mmNamespace,
+			},
+		}
+		err = reconciler.Client.Create(context.TODO(), sa2)
+		require.NoError(t, err)
+
+		err = reconciler.checkMattermostSA(mm, logger)
+		require.Error(t, err)
+		require.Equal(t, `service account does not have "eks.amazonaws.com/role-arn" annotation, which is required if fileStore.external.useServiceAccount is true`, err.Error())
 	})
 
 	t.Run("role", func(t *testing.T) {
