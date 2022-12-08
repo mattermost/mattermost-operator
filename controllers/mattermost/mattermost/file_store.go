@@ -2,6 +2,7 @@ package mattermost
 
 import (
 	"context"
+	"fmt"
 
 	mattermostMinio "github.com/mattermost/mattermost-operator/pkg/components/minio"
 	minioOperator "github.com/minio/minio-operator/pkg/apis/miniocontroller/v1beta1"
@@ -11,6 +12,7 @@ import (
 	mattermostApp "github.com/mattermost/mattermost-operator/pkg/mattermost"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -36,6 +38,18 @@ func (r *MattermostReconciler) checkFileStore(mattermost *mmv1beta.Mattermost, r
 
 func (r *MattermostReconciler) checkExternalFileStore(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) (mattermostApp.FileStoreConfig, error) {
 	if mattermost.Spec.FileStore.External.UseServiceAccount {
+		current := &corev1.ServiceAccount{}
+		err := r.Client.Get(context.TODO(), types.NamespacedName{Name: mattermost.Name, Namespace: mattermost.Namespace}, current)
+		if err != nil && k8sErrors.IsNotFound(err) {
+			return nil, errors.Wrap(err, "service account needs to be created manually if fileStore.external.useServiceAccount is true")
+		} else if err != nil {
+			return nil, errors.Wrap(err, "failed to check if service account exists")
+		}
+
+		if _, ok := current.Annotations["eks.amazonaws.com/role-arn"]; !ok {
+			return nil, fmt.Errorf(`service account does not have "eks.amazonaws.com/role-arn" annotation, which is required if fileStore.external.useServiceAccount is true`)
+		}
+
 		return mattermostApp.NewExternalFileStoreInfo(mattermost, nil)
 	}
 
