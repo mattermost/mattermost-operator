@@ -12,7 +12,7 @@ import (
 
 // SetDefaults sets the missing values in FileStore to the default ones.
 func (fs *FileStore) SetDefaults() {
-	if fs.IsExternal() {
+	if fs.IsExternal() || fs.IsExternalVolume() || fs.IsLocal() {
 		return
 	}
 
