@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
-	v1beta1Minio "github.com/minio/minio-operator/pkg/apis/miniocontroller/v1beta1"
+	minioOperator "github.com/minio/operator/pkg/apis/minio.min.io/v2"
 	v1alpha1MySQL "github.com/presslabs/mysql-operator/pkg/apis/mysql/v1alpha1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -37,7 +37,7 @@ func SetupTest() (TestEnvironment, error) {
 		return TestEnvironment{}, err
 	}
 
-	err = v1beta1Minio.AddToScheme(scheme.Scheme)
+	err = minioOperator.AddToScheme(scheme.Scheme)
 	if err != nil {
 		return TestEnvironment{}, err
 	}

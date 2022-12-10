@@ -13,7 +13,7 @@ import (
 	"github.com/mattermost/mattermost-operator/controllers/mattermost/mattermost"
 	"github.com/mattermost/mattermost-operator/controllers/mattermost/mattermostrestoredb"
 	"github.com/mattermost/mattermost-operator/pkg/resources"
-	v1beta1Minio "github.com/minio/minio-operator/pkg/apis/miniocontroller/v1beta1"
+	minioOperator "github.com/minio/operator/pkg/apis/minio.min.io/v2"
 	v1alpha1MySQL "github.com/presslabs/mysql-operator/pkg/apis/mysql/v1alpha1"
 	"github.com/sirupsen/logrus"
 	"github.com/vrischmann/envconfig"
@@ -49,7 +49,7 @@ func init() {
 	utilruntime.Must(mmv1beta.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 
-	utilruntime.Must(v1beta1Minio.AddToScheme(scheme))
+	utilruntime.Must(minioOperator.AddToScheme(scheme))
 	utilruntime.Must(v1alpha1MySQL.SchemeBuilder.AddToScheme(scheme))
 }
 

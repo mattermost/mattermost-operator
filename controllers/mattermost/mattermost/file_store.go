@@ -4,7 +4,7 @@ import (
 	"context"
 
 	mattermostMinio "github.com/mattermost/mattermost-operator/pkg/components/minio"
-	minioOperator "github.com/minio/minio-operator/pkg/apis/miniocontroller/v1beta1"
+	minioOperator "github.com/minio/operator/pkg/apis/minio.min.io/v2"
 
 	"github.com/go-logr/logr"
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
@@ -95,7 +95,7 @@ func (r *MattermostReconciler) checkOperatorManagedMinio(mattermost *mmv1beta.Ma
 		return nil, errors.Wrap(err, "failed to check Minio secret")
 	}
 
-	err = r.checkMinioInstance(mattermost, reqLogger)
+	err = r.checkMinioTenant(mattermost, reqLogger)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to check Minio instance")
 	}
@@ -117,15 +117,15 @@ func (r *MattermostReconciler) checkMattermostMinioSecret(mattermost *mmv1beta.M
 	return desired, nil
 }
 
-func (r *MattermostReconciler) checkMinioInstance(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) error {
+func (r *MattermostReconciler) checkMinioTenant(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) error {
 	desired := mattermostMinio.InstanceV1Beta(mattermost)
 
-	err := r.Resources.CreateMinioInstanceIfNotExists(mattermost, desired, reqLogger)
+	err := r.Resources.CreateMinioTenantIfNotExists(mattermost, desired, reqLogger)
 	if err != nil {
 		return err
 	}
 
-	current := &minioOperator.MinIOInstance{}
+	current := &minioOperator.Tenant{}
 	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: desired.Name, Namespace: desired.Namespace}, current)
 	if err != nil {
 		return err

@@ -11,7 +11,7 @@ import (
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1"
 	mattermostMinio "github.com/mattermost/mattermost-operator/pkg/components/minio"
 
-	minioOperator "github.com/minio/minio-operator/pkg/apis/miniocontroller/v1beta1"
+	minioOperator "github.com/minio/operator/pkg/apis/minio.min.io/v2"
 )
 
 func (r *ClusterInstallationReconciler) checkMinio(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
@@ -26,7 +26,7 @@ func (r *ClusterInstallationReconciler) checkMinio(mattermost *mattermostv1alpha
 		return nil
 	}
 
-	return r.checkMinioInstance(mattermost, reqLogger)
+	return r.checkMinioTenant(mattermost, reqLogger)
 }
 
 func (r *ClusterInstallationReconciler) checkCustomMinioSecret(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
@@ -58,15 +58,15 @@ func (r *ClusterInstallationReconciler) checkMinioSecret(mattermost *mattermostv
 	return r.checkMattermostMinioSecret(mattermost, reqLogger)
 }
 
-func (r *ClusterInstallationReconciler) checkMinioInstance(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
+func (r *ClusterInstallationReconciler) checkMinioTenant(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) error {
 	desired := mattermostMinio.Instance(mattermost)
 
-	err := r.Resources.CreateMinioInstanceIfNotExists(mattermost, desired, reqLogger)
+	err := r.Resources.CreateMinioTenantIfNotExists(mattermost, desired, reqLogger)
 	if err != nil {
 		return err
 	}
 
-	current := &minioOperator.MinIOInstance{}
+	current := &minioOperator.Tenant{}
 	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: desired.Name, Namespace: desired.Namespace}, current)
 	if err != nil {
 		return err

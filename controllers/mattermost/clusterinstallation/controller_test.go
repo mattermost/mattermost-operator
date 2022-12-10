@@ -27,8 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1"
-	minioOperator "github.com/minio/minio-operator/pkg/apis/miniocontroller/v1beta1"
-	v1beta1Minio "github.com/minio/minio-operator/pkg/apis/miniocontroller/v1beta1"
+	minioOperator "github.com/minio/operator/pkg/apis/minio.min.io/v2"
 	mysqlOperator "github.com/presslabs/mysql-operator/pkg/apis/mysql/v1alpha1"
 	v1alpha1MySQL "github.com/presslabs/mysql-operator/pkg/apis/mysql/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -110,7 +109,7 @@ func TestReconcile(t *testing.T) {
 
 	t.Run("minio", func(t *testing.T) {
 		t.Run("instance", func(t *testing.T) {
-			minio := &minioOperator.MinIOInstance{}
+			minio := &minioOperator.Tenant{}
 			err = c.Get(context.TODO(), ciMinioKey, minio)
 			require.NoError(t, err)
 		})
@@ -751,7 +750,7 @@ func prepAllDependencyTestResources(client client.Client, ci *mattermostv1alpha1
 func prepareSchema(t *testing.T, scheme *runtime.Scheme) *runtime.Scheme {
 	err := mattermostv1alpha1.AddToScheme(scheme)
 	require.NoError(t, err)
-	err = v1beta1Minio.AddToScheme(scheme)
+	err = minioOperator.AddToScheme(scheme)
 	require.NoError(t, err)
 	err = v1alpha1MySQL.SchemeBuilder.AddToScheme(scheme)
 	require.NoError(t, err)

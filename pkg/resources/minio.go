@@ -3,8 +3,10 @@ package resources
 import (
 	"context"
 	"fmt"
+
 	"github.com/go-logr/logr"
-	minioOperator "github.com/minio/minio-operator/pkg/apis/miniocontroller/v1beta1"
+
+	minioOperator "github.com/minio/operator/pkg/apis/minio.min.io/v2"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -12,12 +14,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func (r *ResourceHelper) CreateMinioInstanceIfNotExists(owner v1.Object, instance *minioOperator.MinIOInstance, logger logr.Logger) error {
-	foundInstance := &minioOperator.MinIOInstance{}
-	err := r.client.Get(context.TODO(), types.NamespacedName{Name: instance.Name, Namespace: instance.Namespace}, foundInstance)
+func (r *ResourceHelper) CreateMinioTenantIfNotExists(owner v1.Object, tenant *minioOperator.Tenant, logger logr.Logger) error {
+	foundInstance := &minioOperator.Tenant{}
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: tenant.Name, Namespace: tenant.Namespace}, foundInstance)
 	if err != nil && kerrors.IsNotFound(err) {
 		logger.Info("Creating minio instance")
-		return r.Create(owner, instance, logger)
+		return r.Create(owner, tenant, logger)
 	} else if err != nil {
 		logger.Error(err, "Unable to get minio instance")
 		return err
