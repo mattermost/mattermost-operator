@@ -13,11 +13,8 @@ EOF
 kubectl apply -n mysql-operator -f "${DIR}"/../docs/mysql-operator/mysql-operator.yaml
 
 ## Create the minio operator
-# Apply Namespace if already exists
-cat <<EOF | kubectl apply -f -
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: minio-operator
-EOF
-kubectl apply -n minio-operator -f "${DIR}"/../docs/minio-operator/minio-operator.yaml
+KERNEL_NAME=$(uname -o  | tr '[:upper:]' '[:lower:]')
+curl https://github.com/minio/operator/releases/download/v${MINIO_OPERATOR_VERSION}/kubectl-minio_${MINIO_OPERATOR_VERSION}_${KERNEL_NAME}_$(uname -m) -L -o bin/kubectl-minio
+chmod +x bin/kubectl-minio
+export PATH=$(pwd)/bin:$PATH
+kubectl minio init

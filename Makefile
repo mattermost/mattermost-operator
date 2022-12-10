@@ -14,6 +14,11 @@ SDK_VERSION = v1.0.1
 BUILD_IMAGE = golang:$(GOLANG_VERSION)
 BASE_IMAGE = gcr.io/distroless/static:nonroot
 
+## Minio operator
+# Without the v prefix \/
+MINIO_OPERATOR_VERSION = 4.5.5
+export MINIO_OPERATOR_VERSION
+
 ################################################################################
 
 GO ?= $(shell command -v go 2> /dev/null)
