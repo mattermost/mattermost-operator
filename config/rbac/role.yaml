@@ -107,10 +107,9 @@ rules:
       - patch
       - delete
   - apiGroups:
-      - miniocontroller.min.io
+      - minio.min.io
     resources:
-      - minioinstances
-      - minioinstances/status
+      - tenants
     verbs:
       - get
       - list
