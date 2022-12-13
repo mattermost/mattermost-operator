@@ -2,7 +2,6 @@ package clusterinstallation
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -36,13 +35,11 @@ func (r *ClusterInstallationReconciler) checkCustomMinioSecret(mattermost *matte
 		reqLogger.Error(err, "failed to check if custom minio secret exists")
 		return err
 	}
-	// Validate custom secret required fields
-	if _, ok := secret.Data["accesskey"]; !ok {
-		return fmt.Errorf("custom Minio Secret %s does not have an 'accesskey' value", mattermost.Spec.Minio.Secret)
+
+	if err := r.Resources.ValidateMinioSecret(secret, r.Log); err != nil {
+		return err
 	}
-	if _, ok := secret.Data["secretkey"]; !ok {
-		return fmt.Errorf("custom Minio Secret %s does not have an 'secretkey' value", mattermost.Spec.Minio.Secret)
-	}
+
 	return nil
 }
 

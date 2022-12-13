@@ -31,6 +31,7 @@ func Instance(mattermost *mattermostv1alpha1.ClusterInstallation) *minioOperator
 		mattermostv1alpha1.ClusterInstallationResourceLabels(mattermost.Name),
 		mattermostApp.ClusterInstallationOwnerReference(mattermost),
 		mattermost.Spec.Minio.Replicas,
+		mattermost.Spec.Minio.VolumesPerServer,
 		mattermost.Spec.Minio.StorageSize,
 	)
 }
@@ -57,7 +58,8 @@ func InstanceV1Beta(mattermost *mmv1beta.Mattermost) *minioOperator.Tenant {
 		mattermost.Namespace,
 		mmv1beta.MattermostResourceLabels(mattermost.Name),
 		mattermostApp.MattermostOwnerReference(mattermost),
-		*mattermost.Spec.FileStore.OperatorManaged.Replicas,
+		*mattermost.Spec.FileStore.OperatorManaged.Servers,
+		*mattermost.Spec.FileStore.OperatorManaged.VolumesPerServer,
 		mattermost.Spec.FileStore.OperatorManaged.StorageSize,
 	)
 }
@@ -86,7 +88,8 @@ func newMinioTenant(
 	namespace string,
 	labels map[string]string,
 	ownerRefs []metav1.OwnerReference,
-	replicas int32,
+	servers int32,
+	volumesPerServer int32,
 	storageSize string,
 ) *minioOperator.Tenant {
 	return &minioOperator.Tenant{
@@ -99,8 +102,8 @@ func newMinioTenant(
 		Spec: minioOperator.TenantSpec{
 			Pools: []minioOperator.Pool{
 				{
-					Servers:          replicas,
-					VolumesPerServer: 1,
+					Servers:          servers,
+					VolumesPerServer: volumesPerServer,
 					VolumeClaimTemplate: &corev1.PersistentVolumeClaim{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: name,
@@ -118,15 +121,19 @@ func newMinioTenant(
 					},
 				},
 			},
-			Mountpath:   "/export",
-			CredsSecret: &corev1.LocalObjectReference{Name: name},
+			Mountpath:     "/export",
+			Configuration: &corev1.LocalObjectReference{Name: name},
 		},
 	}
 }
 
 func minioSecretData() map[string][]byte {
-	data := make(map[string][]byte, 2)
-	data["accesskey"] = utils.New16ID()
-	data["secretkey"] = utils.New28ID()
+	// credentials can also be generated using minioOperator.GenerateCredentials() but the original
+	// method was left to allow us more control.
+	data := make(map[string][]byte, 1)
+	data["config.env"] = []byte(minioOperator.GenerateTenantConfigurationFile(map[string]string{
+		"MINIO_ROOT_USER":     string(utils.New16ID()),
+		"MINIO_ROOT_PASSWORD": string(utils.New28ID()),
+	}))
 	return data
 }

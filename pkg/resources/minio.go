@@ -41,17 +41,27 @@ func (r *ResourceHelper) CreateOrUpdateMinioSecret(owner v1.Object, desired *cor
 	}
 
 	// Validate secret required fields, if not exist recreate.
-	if _, ok := current.Data["accesskey"]; !ok {
-		logger.Info("minio secret does not have an 'accesskey' value, overriding", "name", desired.Name)
+	if err := r.ValidateMinioSecret(current, logger); err != nil {
+		logger.Info("minio secret validation error", "name", desired.Name, "error", err)
 		return r.Update(current, desired, logger)
 	}
-	if _, ok := current.Data["secretkey"]; !ok {
-		logger.Info("minio secret does not have an 'secretkey' value, overriding", "name", desired.Name)
-		return r.Update(current, desired, logger)
-	}
+
 	// Preserve data fields
 	desired.Data = current.Data
 	return r.Update(current, desired, logger)
+}
+
+func (r *ResourceHelper) ValidateMinioSecret(secret *corev1.Secret, logger logr.Logger) error {
+	// Validate custom secret required fields
+	if _, ok := secret.Data["config.env"]; !ok {
+		return fmt.Errorf("custom Minio Secret %s/%s does not have an 'config.env' key", secret.Namespace, secret.Name)
+	}
+
+	if len(secret.Data["config.env"]) == 0 {
+		return fmt.Errorf("custom Minio Secret %s/%s 'config.env' value is empty", secret.Namespace, secret.Name)
+	}
+
+	return nil
 }
 
 func (r *ResourceHelper) createMinioSecret(owner v1.Object, desired *corev1.Secret, logger logr.Logger) error {
@@ -65,7 +75,7 @@ func (r *ResourceHelper) createMinioSecret(owner v1.Object, desired *corev1.Secr
 }
 
 func (r *ResourceHelper) GetMinioService(mmName, mmNamespace string) (string, error) {
-	minioServiceName := fmt.Sprintf("%s-minio-hl-svc", mmName)
+	minioServiceName := fmt.Sprintf("%s-minio-hl", mmName)
 	minioService := &corev1.Service{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: minioServiceName, Namespace: mmNamespace}, minioService)
 	if err != nil {

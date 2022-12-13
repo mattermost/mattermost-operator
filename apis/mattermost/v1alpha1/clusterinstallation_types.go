@@ -168,6 +168,14 @@ type Minio struct {
 	// More info: https://docs.min.io/docs/distributed-minio-quickstart-guide.html
 	// +optional
 	Replicas int32 `json:"replicas,omitempty"`
+	// Defines the number of servers (pods) to launch in minio. Keep in mind that the number of
+	// volumes*servers should be >=4.
+	// +optional
+	Servers int32 `json:"servers,omitempty"`
+	// Defines how many volumes each server should have. Keep in mind that the number of volumes*servers
+	// should be >= 4.
+	// +optional
+	VolumesPerServer int32 `json:"volumesPerServer,omitempty"`
 	// Defines the resource requests and limits for the Minio pods.
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`

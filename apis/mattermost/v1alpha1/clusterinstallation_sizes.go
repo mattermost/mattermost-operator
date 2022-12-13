@@ -9,7 +9,7 @@ import (
 // ClusterInstallationSize is sizing configuration used to convert user count to replica and resource requirements.
 type ClusterInstallationSize struct {
 	App      ComponentSize
-	Minio    ComponentSize
+	Minio    MinioSize
 	Database ComponentSize
 }
 
@@ -17,6 +17,11 @@ type ClusterInstallationSize struct {
 type ComponentSize struct {
 	Replicas  int32
 	Resources corev1.ResourceRequirements
+}
+
+type MinioSize struct {
+	ComponentSize
+	VolumesPerReplica int32
 }
 
 // Size100String represents estimated installation sizing for 100 users.
@@ -36,12 +41,15 @@ var size100 = ClusterInstallationSize{
 			},
 		},
 	},
-	Minio: ComponentSize{
-		Replicas: 1,
-		Resources: corev1.ResourceRequirements{
-			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("100m"),
-				corev1.ResourceMemory: resource.MustParse("256Mi"),
+	Minio: MinioSize{
+		VolumesPerReplica: 4,
+		ComponentSize: ComponentSize{
+			Replicas: 1,
+			Resources: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("100m"),
+					corev1.ResourceMemory: resource.MustParse("256Mi"),
+				},
 			},
 		},
 	},
@@ -73,12 +81,15 @@ var cloudSize10 = ClusterInstallationSize{
 			},
 		},
 	},
-	Minio: ComponentSize{
-		Replicas: 4,
-		Resources: corev1.ResourceRequirements{
-			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("100m"),
-				corev1.ResourceMemory: resource.MustParse("256Mi"),
+	Minio: MinioSize{
+		VolumesPerReplica: 2,
+		ComponentSize: ComponentSize{
+			Replicas: 4,
+			Resources: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("100m"),
+					corev1.ResourceMemory: resource.MustParse("256Mi"),
+				},
 			},
 		},
 	},
@@ -110,12 +121,15 @@ var cloudSize100 = ClusterInstallationSize{
 			},
 		},
 	},
-	Minio: ComponentSize{
-		Replicas: 4,
-		Resources: corev1.ResourceRequirements{
-			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("100m"),
-				corev1.ResourceMemory: resource.MustParse("256Mi"),
+	Minio: MinioSize{
+		VolumesPerReplica: 2,
+		ComponentSize: ComponentSize{
+			Replicas: 4,
+			Resources: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("100m"),
+					corev1.ResourceMemory: resource.MustParse("256Mi"),
+				},
 			},
 		},
 	},
@@ -147,12 +161,15 @@ var size1000 = ClusterInstallationSize{
 			},
 		},
 	},
-	Minio: ComponentSize{
-		Replicas: 4,
-		Resources: corev1.ResourceRequirements{
-			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("150m"),
-				corev1.ResourceMemory: resource.MustParse("512Mi"),
+	Minio: MinioSize{
+		VolumesPerReplica: 2,
+		ComponentSize: ComponentSize{
+			Replicas: 4,
+			Resources: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("100m"),
+					corev1.ResourceMemory: resource.MustParse("256Mi"),
+				},
 			},
 		},
 	},
@@ -184,12 +201,15 @@ var size5000 = ClusterInstallationSize{
 			},
 		},
 	},
-	Minio: ComponentSize{
-		Replicas: 4,
-		Resources: corev1.ResourceRequirements{
-			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("200m"),
-				corev1.ResourceMemory: resource.MustParse("500Mi"),
+	Minio: MinioSize{
+		VolumesPerReplica: 2,
+		ComponentSize: ComponentSize{
+			Replicas: 4,
+			Resources: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("100m"),
+					corev1.ResourceMemory: resource.MustParse("256Mi"),
+				},
 			},
 		},
 	},
@@ -221,12 +241,15 @@ var size10000 = ClusterInstallationSize{
 			},
 		},
 	},
-	Minio: ComponentSize{
-		Replicas: 4,
-		Resources: corev1.ResourceRequirements{
-			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("200m"),
-				corev1.ResourceMemory: resource.MustParse("500Mi"),
+	Minio: MinioSize{
+		VolumesPerReplica: 2,
+		ComponentSize: ComponentSize{
+			Replicas: 4,
+			Resources: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("100m"),
+					corev1.ResourceMemory: resource.MustParse("256Mi"),
+				},
 			},
 		},
 	},
@@ -258,12 +281,15 @@ var size25000 = ClusterInstallationSize{
 			},
 		},
 	},
-	Minio: ComponentSize{
-		Replicas: 4,
-		Resources: corev1.ResourceRequirements{
-			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("200m"),
-				corev1.ResourceMemory: resource.MustParse("500Mi"),
+	Minio: MinioSize{
+		VolumesPerReplica: 2,
+		ComponentSize: ComponentSize{
+			Replicas: 4,
+			Resources: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("100m"),
+					corev1.ResourceMemory: resource.MustParse("256Mi"),
+				},
 			},
 		},
 	},
@@ -297,12 +323,15 @@ var sizeMiniSingleton = ClusterInstallationSize{
 			},
 		},
 	},
-	Minio: ComponentSize{
-		Replicas: 1,
-		Resources: corev1.ResourceRequirements{
-			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("200m"),
-				corev1.ResourceMemory: resource.MustParse("512Mi"),
+	Minio: MinioSize{
+		VolumesPerReplica: 4,
+		ComponentSize: ComponentSize{
+			Replicas: 1,
+			Resources: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("100m"),
+					corev1.ResourceMemory: resource.MustParse("256Mi"),
+				},
 			},
 		},
 	},
@@ -334,12 +363,15 @@ var sizeMiniHA = ClusterInstallationSize{
 			},
 		},
 	},
-	Minio: ComponentSize{
-		Replicas: 4,
-		Resources: corev1.ResourceRequirements{
-			Requests: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("200m"),
-				corev1.ResourceMemory: resource.MustParse("512Mi"),
+	Minio: MinioSize{
+		VolumesPerReplica: 2,
+		ComponentSize: ComponentSize{
+			Replicas: 4,
+			Resources: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("100m"),
+					corev1.ResourceMemory: resource.MustParse("256Mi"),
+				},
 			},
 		},
 	},
@@ -447,6 +479,12 @@ func (mattermost *ClusterInstallation) setDefaultReplicasAndResources() {
 
 	if mattermost.Spec.Minio.Replicas == 0 {
 		mattermost.Spec.Minio.Replicas = DefaultSize.Minio.Replicas
+	}
+	if mattermost.Spec.Minio.Servers == 0 {
+		mattermost.Spec.Minio.Servers = DefaultSize.Minio.Replicas
+	}
+	if mattermost.Spec.Minio.VolumesPerServer == 0 {
+		mattermost.Spec.Minio.VolumesPerServer = DefaultSize.Minio.VolumesPerReplica
 	}
 	if mattermost.Spec.Minio.Resources.Size() == 0 {
 		mattermost.Spec.Minio.Resources = DefaultSize.Minio.Resources
