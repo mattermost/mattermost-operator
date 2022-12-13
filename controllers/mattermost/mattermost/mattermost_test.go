@@ -125,6 +125,51 @@ func TestCheckMattermost(t *testing.T) {
 		require.NoError(t, err)
 		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
 		require.NoError(t, err)
+		err = reconciler.Client.Delete(context.TODO(), found)
+		require.NoError(t, err)
+
+		mm.Spec.FileStore.External = &mmv1beta.ExternalFileStore{
+			UseServiceAccount: true,
+		}
+		sa := &corev1.ServiceAccount{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					"eks.amazonaws.com/role-arn": "asd",
+				},
+				Name:      mmName,
+				Namespace: mmNamespace,
+			},
+		}
+		err = reconciler.Client.Create(context.TODO(), sa)
+		require.NoError(t, err)
+		err = reconciler.checkMattermostSA(mm, logger)
+		assert.NoError(t, err)
+		found = &corev1.ServiceAccount{}
+		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
+		require.NoError(t, err)
+		require.Equal(t, "asd", found.Annotations["eks.amazonaws.com/role-arn"])
+		err = reconciler.Client.Delete(context.TODO(), sa)
+		require.NoError(t, err)
+
+		mm.Spec.FileStore.External = nil
+
+		err = reconciler.checkMattermostSA(mm, logger)
+		assert.NoError(t, err)
+		found = &corev1.ServiceAccount{}
+		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
+		require.NoError(t, err)
+		err = reconciler.Client.Delete(context.TODO(), sa)
+		require.NoError(t, err)
+
+		mm.Spec.FileStore.External = &mmv1beta.ExternalFileStore{
+			UseServiceAccount: false,
+		}
+
+		err = reconciler.checkMattermostSA(mm, logger)
+		assert.NoError(t, err)
+		found = &corev1.ServiceAccount{}
+		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
+		require.NoError(t, err)
 	})
 
 	t.Run("role", func(t *testing.T) {
@@ -780,7 +825,7 @@ func TestCheckMattermostExternalDBAndFileStore(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	fileStoreInfo, err := mattermostApp.NewExternalFileStoreInfo(mm, corev1.Secret{
+	fileStoreInfo, err := mattermostApp.NewExternalFileStoreInfo(mm, &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{Name: "fileStoreSecret"},
 		Data: map[string][]byte{
 			"accesskey": []byte("my-key"),

@@ -129,6 +129,7 @@ func (r *MattermostReconciler) checkMattermostRBAC(mattermost *mmv1beta.Mattermo
 	if err != nil {
 		return errors.Wrap(err, "failed to check mattermost ServiceAccount")
 	}
+
 	err = r.checkMattermostRole(mattermost, reqLogger)
 	if err != nil {
 		return errors.Wrap(err, "failed to check mattermost Role")
@@ -142,7 +143,12 @@ func (r *MattermostReconciler) checkMattermostRBAC(mattermost *mmv1beta.Mattermo
 }
 
 func (r *MattermostReconciler) checkMattermostSA(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) error {
+	if mattermost.Spec.FileStore.External != nil && mattermost.Spec.FileStore.External.UseServiceAccount {
+		return nil
+	}
+
 	desired := mattermostApp.GenerateServiceAccountV1Beta(mattermost, mattermost.Name)
+
 	err := r.Resources.CreateServiceAccountIfNotExists(mattermost, desired, reqLogger)
 	if err != nil {
 		return err

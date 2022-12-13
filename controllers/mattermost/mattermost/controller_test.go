@@ -155,7 +155,6 @@ func TestReconcile(t *testing.T) {
 	})
 
 	t.Run("final check", func(t *testing.T) {
-
 		t.Run("replica set does not exist", func(t *testing.T) {
 			res, err = r.Reconcile(context.Background(), req)
 			require.NoError(t, err)
@@ -311,6 +310,61 @@ func TestReconcile(t *testing.T) {
 		err = c.Get(context.Background(), mmKey, mm)
 		require.NoError(t, err)
 		assert.NotEmpty(t, mm.Status.Error)
+	})
+
+	t.Run("check external file store", func(t *testing.T) {
+		logSink := blubr.InitLogger(logrus.NewEntry(logrus.New()))
+		logSink = logSink.WithName("test.opr")
+		logger := logr.New(logSink)
+
+		mm := &mmv1beta.Mattermost{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      mmName,
+				Namespace: mmNamespace,
+			},
+			Spec: mmv1beta.MattermostSpec{
+				FileStore: mmv1beta.FileStore{
+					External: &mmv1beta.ExternalFileStore{
+						UseServiceAccount: true,
+						URL:               "http://minio",
+						Bucket:            "test-bucket",
+					},
+				},
+			},
+		}
+		sa := &corev1.ServiceAccount{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      mmName,
+				Namespace: mmNamespace,
+			},
+		}
+		err = c.Delete(context.TODO(), sa)
+		require.NoError(t, err)
+		_, err := r.checkExternalFileStore(mm, logger)
+		require.Error(t, err)
+		require.Equal(t, `service account needs to be created manually if fileStore.external.useServiceAccount is true: serviceaccounts "foo" not found`, err.Error())
+
+		err = c.Create(context.TODO(), sa)
+		require.NoError(t, err)
+		_, err = r.checkExternalFileStore(mm, logger)
+		require.Error(t, err)
+		require.Equal(t, `service account does not have "eks.amazonaws.com/role-arn" annotation, which is required if fileStore.external.useServiceAccount is true`, err.Error())
+		err = c.Delete(context.TODO(), sa)
+		require.NoError(t, err)
+
+		sa = &corev1.ServiceAccount{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      mmName,
+				Namespace: mmNamespace,
+				Annotations: map[string]string{
+					"eks.amazonaws.com/role-arn": "asd",
+				},
+			},
+		}
+		err = c.Create(context.TODO(), sa)
+		require.NoError(t, err)
+		_, err = r.checkExternalFileStore(mm, logger)
+		require.NoError(t, err)
 	})
 }
 

@@ -369,6 +369,9 @@ type ExternalFileStore struct {
 	// Optionally enter the name of already existing secret.
 	// Secret should have two values: "accesskey" and "secretkey".
 	Secret string `json:"secret,omitempty"`
+
+	// Optionally use service account with IAM role to access AWS services, like S3.
+	UseServiceAccount bool `json:"useServiceAccount,omitempty"`
 }
 
 // ExternalVolumeFileStore defines the configuration of an externally managed
