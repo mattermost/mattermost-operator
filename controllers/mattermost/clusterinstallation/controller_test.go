@@ -735,7 +735,7 @@ func requestForCI(ci *mattermostv1alpha1.ClusterInstallation) reconcile.Request 
 func prepAllDependencyTestResources(client client.Client, ci *mattermostv1alpha1.ClusterInstallation) error {
 	minioService := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      ci.Name + "-minio-hl-svc",
+			Name:      ci.Name + "-minio-hl",
 			Namespace: ci.Namespace,
 		},
 		Spec: corev1.ServiceSpec{

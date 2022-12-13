@@ -520,7 +520,7 @@ func requestForCI(mattermost *mmv1beta.Mattermost) reconcile.Request {
 func prepAllDependencyTestResources(client client.Client, mattermost *mmv1beta.Mattermost) error {
 	minioService := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      mattermost.Name + "-minio-hl-svc",
+			Name:      mattermost.Name + "-minio-hl",
 			Namespace: mattermost.Namespace,
 		},
 		Spec: corev1.ServiceSpec{

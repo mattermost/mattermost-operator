@@ -197,12 +197,14 @@ func TestCalculateResourceMilliRequirements(t *testing.T) {
 				},
 			},
 		},
-		Minio: ComponentSize{
-			Replicas: 6,
-			Resources: corev1.ResourceRequirements{
-				Requests: corev1.ResourceList{
-					corev1.ResourceCPU:    resource.MustParse("100m"),
-					corev1.ResourceMemory: resource.MustParse("100k"),
+		Minio: MinioSize{
+			ComponentSize: ComponentSize{
+				Replicas: 6,
+				Resources: corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("100m"),
+						corev1.ResourceMemory: resource.MustParse("100k"),
+					},
 				},
 			},
 		},
