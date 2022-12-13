@@ -1,0 +1,14 @@
+apiVersion: installation.mattermost.com/v1beta1
+kind: Mattermost
+metadata:
+    name: mm-example-full # Chose the desired name
+    namespace: test
+spec:
+    size: 100users # Adjust to your requirements
+    ingress:
+        enabled: true
+        host: example.mattermost-example.com # Adjust to your domain
+        annotations:
+            kubernetes.io/ingress.class: nginx
+    version: 6.0.1
+    licenseSecret: "mattermost-license"
