@@ -406,6 +406,16 @@ func (in *OperatorManagedMinio) DeepCopyInto(out *OperatorManagedMinio) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.Servers != nil {
+		in, out := &in.Servers, &out.Servers
+		*out = new(int32)
+		**out = **in
+	}
+	if in.VolumesPerServer != nil {
+		in, out := &in.VolumesPerServer, &out.VolumesPerServer
+		*out = new(int32)
+		**out = **in
+	}
 	in.Resources.DeepCopyInto(&out.Resources)
 }
 
