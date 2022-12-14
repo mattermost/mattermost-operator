@@ -13,8 +13,12 @@ EOF
 kubectl apply -n mysql-operator -f "${DIR}"/../docs/mysql-operator/mysql-operator.yaml
 
 ## Create the minio operator
-KERNEL_NAME=$(uname -o  | tr '[:upper:]' '[:lower:]')
-curl https://github.com/minio/operator/releases/download/v${MINIO_OPERATOR_VERSION}/kubectl-minio_${MINIO_OPERATOR_VERSION}_${KERNEL_NAME}_$(uname -m) -L -o bin/kubectl-minio
+KERNEL_NAME=$(uname | tr '[:upper:]' '[:lower:]')
+ARCH=$(uname -m)
+if [[ "${ARCH}" == "x86_64" ]]; then
+  ARCH=amd64
+fi
+curl https://github.com/minio/operator/releases/download/v${MINIO_OPERATOR_VERSION}/kubectl-minio_${MINIO_OPERATOR_VERSION}_${KERNEL_NAME}_${ARCH} -L -o bin/kubectl-minio
 chmod +x bin/kubectl-minio
 export PATH=$(pwd)/bin:$PATH
 kubectl minio init
