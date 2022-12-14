@@ -45,7 +45,7 @@ const (
 	MattermostAppContainerName = "mattermost"
 )
 
-// SetDefaults set the missing values in the manifest to the default ones
+// SetDefaults sets the missing values in the manifest to the default ones
 func (mm *Mattermost) SetDefaults() error {
 	if mm.AWSLoadBalancerEnabled() && len(mm.Spec.AWSLoadBalancerController.Hosts) == 0 {
 		return errors.New("awsLoadBalancerController.hosts is required, but not set")
