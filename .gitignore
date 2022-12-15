@@ -83,3 +83,5 @@ tags
 /bin/*
 ### JetBrains ###
 /.idea
+# ignore locally manifest generation
+/github.com
