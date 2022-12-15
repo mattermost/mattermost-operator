@@ -12,7 +12,7 @@ import (
 
 // SetDefaults sets the missing values in FileStore to the default ones.
 func (fs *FileStore) SetDefaults() {
-	if fs.IsExternal() {
+	if fs.isAnyExceptOperatorManaged() {
 		return
 	}
 
@@ -25,9 +25,22 @@ func (fs *FileStore) IsExternal() bool {
 	return fs.External != nil && fs.External.URL != ""
 }
 
+// IsExternalVolume returns true if the filestore requested is an externally
+// managed volume.
+func (fs *FileStore) IsExternalVolume() bool {
+	return fs.ExternalVolume != nil && fs.ExternalVolume.VolumeClaimName != ""
+}
+
 // IsLocal returns true if the filestore requested is local (PVC backed).
 func (fs *FileStore) IsLocal() bool {
 	return fs.Local != nil && fs.Local.Enabled
+}
+
+// isAnyExceptOperatorManaged checks if any filestore types are configurated
+// except the operator managed type. This is generally used to see if defaults
+// should be applied.
+func (fs *FileStore) isAnyExceptOperatorManaged() bool {
+	return fs.IsExternal() || fs.IsExternalVolume() || fs.IsLocal()
 }
 
 func (fs *FileStore) ensureDefault() {
@@ -44,7 +57,7 @@ func (omm *OperatorManagedMinio) SetDefaults() {
 }
 
 func (fs *FileStore) SetDefaultReplicasAndResources() {
-	if fs.IsExternal() {
+	if fs.isAnyExceptOperatorManaged() {
 		return
 	}
 	fs.ensureDefault()
@@ -67,7 +80,7 @@ func (omm *OperatorManagedMinio) SetDefaultReplicasAndResources() {
 }
 
 func (fs *FileStore) OverrideReplicasAndResourcesFromSize(size mattermostv1alpha1.ClusterInstallationSize) {
-	if fs.IsExternal() {
+	if fs.isAnyExceptOperatorManaged() {
 		return
 	}
 	fs.ensureDefault()

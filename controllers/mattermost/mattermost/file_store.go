@@ -2,6 +2,7 @@ package mattermost
 
 import (
 	"context"
+	"fmt"
 
 	mattermostMinio "github.com/mattermost/mattermost-operator/pkg/components/minio"
 	minioOperator "github.com/minio/operator/pkg/apis/minio.min.io/v2"
@@ -11,6 +12,7 @@ import (
 	mattermostApp "github.com/mattermost/mattermost-operator/pkg/mattermost"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -23,6 +25,10 @@ func (r *MattermostReconciler) checkFileStore(mattermost *mmv1beta.Mattermost, r
 		return r.checkExternalFileStore(mattermost, reqLogger)
 	}
 
+	if mattermost.Spec.FileStore.IsExternalVolume() {
+		return r.checkExternalVolumeFileStore(mattermost, reqLogger)
+	}
+
 	if mattermost.Spec.FileStore.IsLocal() {
 		return r.checkLocalFileStore(mattermost, reqLogger)
 	}
@@ -31,6 +37,22 @@ func (r *MattermostReconciler) checkFileStore(mattermost *mmv1beta.Mattermost, r
 }
 
 func (r *MattermostReconciler) checkExternalFileStore(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) (mattermostApp.FileStoreConfig, error) {
+	if mattermost.Spec.FileStore.External.UseServiceAccount {
+		current := &corev1.ServiceAccount{}
+		err := r.Client.Get(context.TODO(), types.NamespacedName{Name: mattermost.Name, Namespace: mattermost.Namespace}, current)
+		if err != nil && k8sErrors.IsNotFound(err) {
+			return nil, errors.Wrap(err, "service account needs to be created manually if fileStore.external.useServiceAccount is true")
+		} else if err != nil {
+			return nil, errors.Wrap(err, "failed to check if service account exists")
+		}
+
+		if _, ok := current.Annotations["eks.amazonaws.com/role-arn"]; !ok {
+			return nil, fmt.Errorf(`service account does not have "eks.amazonaws.com/role-arn" annotation, which is required if fileStore.external.useServiceAccount is true`)
+		}
+
+		return mattermostApp.NewExternalFileStoreInfo(mattermost, nil)
+	}
+
 	secret := &corev1.Secret{}
 	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: mattermost.Spec.FileStore.External.Secret, Namespace: mattermost.Namespace}, secret)
 	if err != nil {
@@ -38,7 +60,32 @@ func (r *MattermostReconciler) checkExternalFileStore(mattermost *mmv1beta.Matte
 		return nil, err
 	}
 
-	return mattermostApp.NewExternalFileStoreInfo(mattermost, *secret)
+	return mattermostApp.NewExternalFileStoreInfo(mattermost, secret)
+}
+
+func (r *MattermostReconciler) checkExternalVolumeFileStore(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) (mattermostApp.FileStoreConfig, error) {
+	fsc, err := mattermostApp.NewExternalVolumeFileStoreInfo(mattermost)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create external volume FileStoreConfig")
+	}
+
+	// Ensure that the PVC exists and is in a valid state.
+	pvc := &corev1.PersistentVolumeClaim{}
+	err = r.Client.Get(context.TODO(), types.NamespacedName{
+		Name:      mattermost.Spec.FileStore.ExternalVolume.VolumeClaimName,
+		Namespace: mattermost.Namespace,
+	}, pvc)
+	if err != nil {
+		reqLogger.Error(err, "failed to get specified PVC for external volume storage")
+		return nil, err
+	}
+	if pvc.Status.Phase != corev1.ClaimBound && pvc.Status.Phase != corev1.ClaimPending {
+		err := errors.Errorf("specified PVC for external volume storage is not %s or %s (%s)", corev1.ClaimBound, corev1.ClaimPending, pvc.Status.Phase)
+		reqLogger.Error(err, "failed checking PVC status")
+		return nil, err
+	}
+
+	return fsc, nil
 }
 
 func (r *MattermostReconciler) checkLocalFileStore(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) (mattermostApp.FileStoreConfig, error) {

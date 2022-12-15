@@ -57,6 +57,12 @@ spec:
             properties:
               awsLoadBalancerController:
                 properties:
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    description: Annotations defines annotations passed to the Ingress
+                      associated with Mattermost.
+                    type: object
                   certificateARN:
                     description: Certificate arn for the ALB, required if SSL enabled
                     type: string
@@ -243,6 +249,19 @@ spec:
                         type: string
                       url:
                         description: Set to use an external MinIO deployment or S3.
+                        type: string
+                      useServiceAccount:
+                        description: Optionally use service account with IAM role
+                          to access AWS services, like S3.
+                        type: boolean
+                    type: object
+                  externalVolume:
+                    description: Defines the configuration of externally managed PVC
+                      backed storage.
+                    properties:
+                      volumeClaimName:
+                        description: The name of the matching volume claim for the
+                          externally managed volume.
                         type: string
                     type: object
                   local:

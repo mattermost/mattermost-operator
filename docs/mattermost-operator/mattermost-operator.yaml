@@ -44,13 +44,789 @@ spec:
                               of an object. Servers should convert recognized schemas to the latest
                               internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources"
                           type: string
-                      kind:
-                          description:
-                              "Kind is a string value representing the REST resource this
-                              object represents. Servers may infer this from the endpoint the client
-                              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds"
+                        type: array
+                    type: object
+                  failureThreshold:
+                    description: Minimum consecutive failures for the probe to be
+                      considered failed after having succeeded. Defaults to 3. Minimum
+                      value is 1.
+                    format: int32
+                    type: integer
+                  grpc:
+                    description: GRPC specifies an action involving a GRPC port. This
+                      is an alpha field and requires enabling GRPCContainerProbe feature
+                      gate.
+                    properties:
+                      port:
+                        description: Port number of the gRPC service. Number must
+                          be in the range 1 to 65535.
+                        format: int32
+                        type: integer
+                      service:
+                        description: "Service is the name of the service to place
+                          in the gRPC HealthCheckRequest (see https://github.com/grpc/grpc/blob/master/doc/health-checking.md).
+                          \n If this is not specified, the default behavior is defined
+                          by gRPC."
+                        type: string
+                    required:
+                    - port
+                    type: object
+                  httpGet:
+                    description: HTTPGet specifies the http request to perform.
+                    properties:
+                      host:
+                        description: Host name to connect to, defaults to the pod
+                          IP. You probably want to set "Host" in httpHeaders instead.
+                        type: string
+                      httpHeaders:
+                        description: Custom headers to set in the request. HTTP allows
+                          repeated headers.
+                        items:
+                          description: HTTPHeader describes a custom header to be
+                            used in HTTP probes
+                          properties:
+                            name:
+                              description: The header field name
+                              type: string
+                            value:
+                              description: The header field value
+                              type: string
+                          required:
+                          - name
+                          - value
+                          type: object
+                        type: array
+                      path:
+                        description: Path to access on the HTTP server.
+                        type: string
+                      port:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        description: Name or number of the port to access on the container.
+                          Number must be in the range 1 to 65535. Name must be an
+                          IANA_SVC_NAME.
+                        x-kubernetes-int-or-string: true
+                      scheme:
+                        description: Scheme to use for connecting to the host. Defaults
+                          to HTTP.
+                        type: string
+                    required:
+                    - port
+                    type: object
+                  initialDelaySeconds:
+                    description: 'Number of seconds after the container has started
+                      before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
+                    format: int32
+                    type: integer
+                  periodSeconds:
+                    description: How often (in seconds) to perform the probe. Default
+                      to 10 seconds. Minimum value is 1.
+                    format: int32
+                    type: integer
+                  successThreshold:
+                    description: Minimum consecutive successes for the probe to be
+                      considered successful after having failed. Defaults to 1. Must
+                      be 1 for liveness and startup. Minimum value is 1.
+                    format: int32
+                    type: integer
+                  tcpSocket:
+                    description: TCPSocket specifies an action involving a TCP port.
+                    properties:
+                      host:
+                        description: 'Optional: Host name to connect to, defaults
+                          to the pod IP.'
+                        type: string
+                      port:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        description: Number or name of the port to access on the container.
+                          Number must be in the range 1 to 65535. Name must be an
+                          IANA_SVC_NAME.
+                        x-kubernetes-int-or-string: true
+                    required:
+                    - port
+                    type: object
+                  terminationGracePeriodSeconds:
+                    description: Optional duration in seconds the pod needs to terminate
+                      gracefully upon probe failure. The grace period is the duration
+                      in seconds after the processes running in the pod are sent a
+                      termination signal and the time when the processes are forcibly
+                      halted with a kill signal. Set this value longer than the expected
+                      cleanup time for your process. If this value is nil, the pod's
+                      terminationGracePeriodSeconds will be used. Otherwise, this
+                      value overrides the value provided by the pod spec. Value must
+                      be non-negative integer. The value zero indicates stop immediately
+                      via the kill signal (no opportunity to shut down). This is a
+                      beta field and requires enabling ProbeTerminationGracePeriod
+                      feature gate. Minimum value is 1. spec.terminationGracePeriodSeconds
+                      is used if unset.
+                    format: int64
+                    type: integer
+                  timeoutSeconds:
+                    description: 'Number of seconds after which the probe times out.
+                      Defaults to 1 second. Minimum value is 1. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
+                    format: int32
+                    type: integer
+                type: object
+              replicas:
+                description: Replicas defines the number of replicas to use for the
+                  Mattermost app servers. Setting this will override the number of
+                  replicas set by 'Size'.
+                format: int32
+                type: integer
+              resourceLabels:
+                additionalProperties:
+                  type: string
+                type: object
+              resources:
+                description: Defines the resource requests and limits for the Mattermost
+                  app server pods.
+                properties:
+                  limits:
+                    additionalProperties:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                    description: 'Limits describes the maximum amount of compute resources
+                      allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                    type: object
+                  requests:
+                    additionalProperties:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                    description: 'Requests describes the minimum amount of compute
+                      resources required. If Requests is omitted for a container,
+                      it defaults to Limits if that is explicitly specified, otherwise
+                      to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                    type: object
+                type: object
+              serviceAnnotations:
+                additionalProperties:
+                  type: string
+                type: object
+              size:
+                description: 'Size defines the size of the ClusterInstallation. This
+                  is typically specified in number of users. This will override replica
+                  and resource requests/limits appropriately for the provided number
+                  of users. This is a write-only field - its value is erased after
+                  setting appropriate values of resources. Accepted values are: 100users,
+                  1000users, 5000users, 10000users, 250000users. If replicas and resource
+                  requests/limits are not specified, and Size is not provided the
+                  configuration for 5000users will be applied. Setting ''Replicas'',
+                  ''Resources'', ''Minio.Replicas'', ''Minio.Resource'', ''Database.Replicas'',
+                  or ''Database.Resources'' will override the values set by Size.
+                  Setting new Size will override previous values regardless if set
+                  by Size or manually.'
+                type: string
+              useIngressTLS:
+                type: boolean
+              useServiceLoadBalancer:
+                type: boolean
+              version:
+                description: Version defines the ClusterInstallation Docker image
+                  version.
+                type: string
+            required:
+            - ingressName
+            type: object
+          status:
+            description: 'Most recent observed status of the Mattermost cluster. Read-only.
+              Not included when requesting from the apiserver, only from the Mattermost
+              Operator API itself. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status'
+            properties:
+              blueName:
+                description: The name of the blue deployment in BlueGreen
+                type: string
+              endpoint:
+                description: The endpoint to access the Mattermost instance
+                type: string
+              greenName:
+                description: The name of the green deployment in BlueGreen
+                type: string
+              image:
+                description: The image running on the pods in the Mattermost instance
+                type: string
+              migration:
+                description: The status of migration to Mattermost CR.
+                properties:
+                  error:
+                    type: string
+                  status:
+                    type: string
+                type: object
+              replicas:
+                description: Total number of non-terminated pods targeted by this
+                  Mattermost deployment
+                format: int32
+                type: integer
+              state:
+                description: Represents the running state of the Mattermost instance
+                type: string
+              updatedReplicas:
+                description: Total number of non-terminated pods targeted by this
+                  Mattermost deployment that are running with the desired image.
+                format: int32
+                type: integer
+              version:
+                description: The version currently running in the Mattermost instance
+                type: string
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.7.0
+  creationTimestamp: null
+  name: mattermostrestoredbs.mattermost.com
+spec:
+  group: mattermost.com
+  names:
+    kind: MattermostRestoreDB
+    listKind: MattermostRestoreDBList
+    plural: mattermostrestoredbs
+    singular: mattermostrestoredb
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - description: State of Mattermost DB Restore
+      jsonPath: .status.state
+      name: State
+      type: string
+    - description: Original DB Replicas
+      jsonPath: .status.originalDBReplicas
+      name: Original DB Replicas
+      type: string
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: MattermostRestoreDB is the Schema for the mattermostrestoredbs
+          API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: MattermostRestoreDBSpec defines the desired state of MattermostRestoreDB
+            properties:
+              initBucketURL:
+                description: InitBucketURL defines where the DB backup file is located.
+                type: string
+              mattermostClusterName:
+                description: MattermostClusterName defines the ClusterInstallation
+                  name.
+                type: string
+              mattermostDBName:
+                description: MattermostDBName defines the database name. Need to set
+                  if different from `mattermost`.
+                type: string
+              mattermostDBPassword:
+                description: MattermostDBPassword defines the user password to access
+                  the database. Need to set if the user is different from the one
+                  created by the operator.
+                type: string
+              mattermostDBUser:
+                description: MattermostDBUser defines the user to access the database.
+                  Need to set if the user is different from `mmuser`.
+                type: string
+              restoreSecret:
+                description: RestoreSecret defines the secret that holds the credentials
+                  to MySQL Operator be able to download the DB backup file
+                type: string
+            type: object
+          status:
+            description: MattermostRestoreDBStatus defines the observed state of MattermostRestoreDB
+            properties:
+              originalDBReplicas:
+                description: The original number of database replicas. will be used
+                  to restore after applying the db restore process.
+                format: int32
+                type: integer
+              state:
+                description: Represents the state of the Mattermost restore Database.
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.7.0
+  creationTimestamp: null
+  name: mattermosts.installation.mattermost.com
+spec:
+  group: installation.mattermost.com
+  names:
+    kind: Mattermost
+    listKind: MattermostList
+    plural: mattermosts
+    shortNames:
+    - mm
+    singular: mattermost
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - description: State of Mattermost
+      jsonPath: .status.state
+      name: State
+      type: string
+    - description: Image of Mattermost
+      jsonPath: .status.image
+      name: Image
+      type: string
+    - description: Version of Mattermost
+      jsonPath: .status.version
+      name: Version
+      type: string
+    - description: Endpoint
+      jsonPath: .status.endpoint
+      name: Endpoint
+      type: string
+    name: v1beta1
+    schema:
+      openAPIV3Schema:
+        description: Mattermost is the Schema for the mattermosts API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: MattermostSpec defines the desired state of Mattermost
+            properties:
+              awsLoadBalancerController:
+                properties:
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    description: Annotations defines annotations passed to the Ingress
+                      associated with Mattermost.
+                    type: object
+                  certificateARN:
+                    description: Certificate arn for the ALB, required if SSL enabled
+                    type: string
+                  enabled:
+                    description: An AWS ALB Ingress will be created instead of nginx
+                    type: boolean
+                  hosts:
+                    description: Hosts allows specifying additional domain names for
+                      Mattermost to use.
+                    items:
+                      description: IngressHost specifies additional hosts configuration.
+                      properties:
+                        hostName:
                           type: string
-                      metadata:
+                      type: object
+                    type: array
+                  ingressClassName:
+                    description: IngressClassName for your ingress
+                    type: string
+                  internetFacing:
+                    description: Whether the Ingress will be internetfacing, default
+                      is false
+                    type: boolean
+                type: object
+              database:
+                description: External Services
+                properties:
+                  disableReadinessCheck:
+                    description: DisableReadinessCheck instructs Operator to not add
+                      init container responsible for checking DB access. Can be used
+                      to define custom init containers specified in `spec.PodExtensions.InitContainers`.
+                    type: boolean
+                  external:
+                    description: Defines the configuration of and external database.
+                    properties:
+                      secret:
+                        description: 'Secret contains data necessary to connect to
+                          the external database. The Kubernetes Secret should contain:   -
+                          Key: DB_CONNECTION_STRING | Value: Full database connection
+                          string. It can also contain optional fields, such as:   -
+                          Key: MM_SQLSETTINGS_DATASOURCEREPLICAS | Value: Connection
+                          string to read replicas of the database.   - Key: DB_CONNECTION_CHECK_URL
+                          | Value: The URL used for checking that the database is
+                          accessible.     Omitting this value in the secret will cause
+                          Operator to skip adding init container for database check.'
+                        type: string
+                    type: object
+                  operatorManaged:
+                    description: Defines the configuration of database managed by
+                      Kubernetes operator.
+                    properties:
+                      backupRemoteDeletePolicy:
+                        description: Defines the backup retention policy.
+                        type: string
+                      backupRestoreSecretName:
+                        description: Defines the secret to be used when performing
+                          a database restore.
+                        type: string
+                      backupSchedule:
+                        description: Defines the interval for backups in cron expression
+                          format.
+                        type: string
+                      backupSecretName:
+                        description: Defines the secret to be used for uploading/restoring
+                          backup.
+                        type: string
+                      backupURL:
+                        description: Defines the object storage url for uploading
+                          backups.
+                        type: string
+                      initBucketURL:
+                        description: Defines the AWS S3 bucket where the Database
+                          Backup is stored. The operator will download the file to
+                          restore the data.
+                        type: string
+                      replicas:
+                        description: Defines the number of database replicas. For
+                          redundancy use at least 2 replicas. Setting this will override
+                          the number of replicas set by 'Size'.
+                        format: int32
+                        type: integer
+                      resources:
+                        description: Defines the resource requests and limits for
+                          the database pods.
+                        properties:
+                          limits:
+                            additionalProperties:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            description: 'Limits describes the maximum amount of compute
+                              resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                            type: object
+                          requests:
+                            additionalProperties:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            description: 'Requests describes the minimum amount of
+                              compute resources required. If Requests is omitted for
+                              a container, it defaults to Limits if that is explicitly
+                              specified, otherwise to an implementation-defined value.
+                              More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                            type: object
+                        type: object
+                      storageSize:
+                        description: Defines the storage size for the database. ie
+                          50Gi
+                        pattern: ^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$
+                        type: string
+                      type:
+                        description: Defines the type of database to use for an Operator-Managed
+                          database.
+                        type: string
+                    type: object
+                type: object
+              dnsConfig:
+                description: Custom DNS configuration to use for the Mattermost Installation
+                  pods.
+                properties:
+                  nameservers:
+                    description: A list of DNS name server IP addresses. This will
+                      be appended to the base nameservers generated from DNSPolicy.
+                      Duplicated nameservers will be removed.
+                    items:
+                      type: string
+                    type: array
+                  options:
+                    description: A list of DNS resolver options. This will be merged
+                      with the base options generated from DNSPolicy. Duplicated entries
+                      will be removed. Resolution options given in Options will override
+                      those that appear in the base DNSPolicy.
+                    items:
+                      description: PodDNSConfigOption defines DNS resolver options
+                        of a pod.
+                      properties:
+                        name:
+                          description: Required.
+                          type: string
+                        value:
+                          type: string
+                      type: object
+                    type: array
+                  searches:
+                    description: A list of DNS search domains for host-name lookup.
+                      This will be appended to the base search paths generated from
+                      DNSPolicy. Duplicated search paths will be removed.
+                    items:
+                      type: string
+                    type: array
+                type: object
+              dnsPolicy:
+                description: Custom DNS policy to use for the Mattermost Installation
+                  pods.
+                type: string
+              elasticSearch:
+                description: ElasticSearch defines the ElasticSearch configuration
+                  for Mattermost.
+                properties:
+                  host:
+                    type: string
+                  password:
+                    type: string
+                  username:
+                    type: string
+                type: object
+              fileStore:
+                description: FileStore defines the file store configuration for Mattermost.
+                properties:
+                  external:
+                    description: Defines the configuration of an external file store.
+                    properties:
+                      bucket:
+                        description: Set to the bucket name of your external MinIO
+                          or S3.
+                        type: string
+                      secret:
+                        description: 'Optionally enter the name of already existing
+                          secret. Secret should have two values: "accesskey" and "secretkey".'
+                        type: string
+                      url:
+                        description: Set to use an external MinIO deployment or S3.
+                        type: string
+                      useServiceAccount:
+                        description: Optionally use service account with IAM role
+                          to access AWS services, like S3.
+                        type: boolean
+                    type: object
+                  externalVolume:
+                    description: Defines the configuration of externally managed PVC
+                      backed storage.
+                    properties:
+                      volumeClaimName:
+                        description: The name of the matching volume claim for the
+                          externally managed volume.
+                        type: string
+                    type: object
+                  local:
+                    description: Defines the configuration of PVC backed storage (local).
+                      This is NOT recommended for production environments.
+                    properties:
+                      enabled:
+                        description: Set to use local (PVC) storage, require explicit
+                          enabled to prevent accidental misconfiguration.
+                        type: boolean
+                      storageSize:
+                        description: Defines the storage size for the PVC. (default
+                          50Gi)
+                        pattern: ^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$
+                        type: string
+                    required:
+                    - enabled
+                    type: object
+                  operatorManaged:
+                    description: Defines the configuration of file store managed by
+                      Kubernetes operator.
+                    properties:
+                      replicas:
+                        description: 'Defines the number of Minio replicas. Supply
+                          1 to run Minio in standalone mode with no redundancy. Supply
+                          4 or more to run Minio in distributed mode. Note that it
+                          is not possible to upgrade Minio from standalone to distributed
+                          mode. Setting this will override the number of replicas
+                          set by ''Size''. More info: https://docs.min.io/docs/distributed-minio-quickstart-guide.html'
+                        format: int32
+                        type: integer
+                      resources:
+                        description: Defines the resource requests and limits for
+                          the Minio pods.
+                        properties:
+                          limits:
+                            additionalProperties:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            description: 'Limits describes the maximum amount of compute
+                              resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                            type: object
+                          requests:
+                            additionalProperties:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            description: 'Requests describes the minimum amount of
+                              compute resources required. If Requests is omitted for
+                              a container, it defaults to Limits if that is explicitly
+                              specified, otherwise to an implementation-defined value.
+                              More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                            type: object
+                        type: object
+                      storageSize:
+                        description: Defines the storage size for Minio. ie 50Gi
+                        pattern: ^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$
+                        type: string
+                    type: object
+                type: object
+              image:
+                description: Image defines the Mattermost Docker image.
+                type: string
+              imagePullPolicy:
+                description: Specify Mattermost deployment pull policy.
+                type: string
+              imagePullSecrets:
+                description: Specify Mattermost image pull secrets.
+                items:
+                  description: LocalObjectReference contains enough information to
+                    let you locate the referenced object inside the same namespace.
+                  properties:
+                    name:
+                      description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        TODO: Add other useful fields. apiVersion, kind, uid?'
+                      type: string
+                  type: object
+                type: array
+              ingress:
+                description: Ingress defines configuration for Ingress resource created
+                  by the Operator.
+                properties:
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    description: Annotations defines annotations passed to the Ingress
+                      associated with Mattermost.
+                    type: object
+                  enabled:
+                    description: Enabled determines whether the Operator should create
+                      Ingress resource or not. Disabling ingress on existing installation
+                      will cause Operator to remove it.
+                    type: boolean
+                  host:
+                    description: Host defines the Ingress host to be used when creating
+                      the ingress rules.
+                    type: string
+                  hosts:
+                    description: Hosts allows specifying additional domain names for
+                      Mattermost to use.
+                    items:
+                      description: IngressHost specifies additional hosts configuration.
+                      properties:
+                        hostName:
+                          type: string
+                      type: object
+                    type: array
+                  ingressClass:
+                    description: IngressClass will be set on Ingress resource to associate
+                      it with specified IngressClass resource.
+                    type: string
+                  tlsSecret:
+                    description: TLSSecret specifies secret used for configuring TLS
+                      for Ingress. If empty TLS will not be configured.
+                    type: string
+                required:
+                - enabled
+                type: object
+              ingressAnnotations:
+                additionalProperties:
+                  type: string
+                description: 'IngressAnnotations defines annotations passed to the
+                  Ingress associated with Mattermost. Deprecated: Use Spec.Ingress.Annotations.'
+                type: object
+              ingressName:
+                description: 'IngressName defines the host to be used when creating
+                  the ingress rules. Deprecated: Use Spec.Ingress.Host instead.'
+                type: string
+              licenseSecret:
+                description: LicenseSecret is the name of the secret containing a
+                  Mattermost license.
+                type: string
+              mattermostEnv:
+                description: Optional environment variables to set in the Mattermost
+                  application pods.
+                items:
+                  description: EnvVar represents an environment variable present in
+                    a Container.
+                  properties:
+                    name:
+                      description: Name of the environment variable. Must be a C_IDENTIFIER.
+                      type: string
+                    value:
+                      description: 'Variable references $(VAR_NAME) are expanded using
+                        the previously defined environment variables in the container
+                        and any service environment variables. If a variable cannot
+                        be resolved, the reference in the input string will be unchanged.
+                        Double $$ are reduced to a single $, which allows for escaping
+                        the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will produce the
+                        string literal "$(VAR_NAME)". Escaped references will never
+                        be expanded, regardless of whether the variable exists or
+                        not. Defaults to "".'
+                      type: string
+                    valueFrom:
+                      description: Source for the environment variable's value. Cannot
+                        be used if value is not empty.
+                      properties:
+                        configMapKeyRef:
+                          description: Selects a key of a ConfigMap.
+                          properties:
+                            key:
+                              description: The key to select.
+                              type: string
+                            name:
+                              description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                TODO: Add other useful fields. apiVersion, kind, uid?'
+                              type: string
+                            optional:
+                              description: Specify whether the ConfigMap or its key
+                                must be defined
+                              type: boolean
+                          required:
+                          - key
                           type: object
                       spec:
                           description:
@@ -7636,119 +8412,121 @@ metadata:
     creationTimestamp: null
     name: mattermost-operator
 rules:
-    - apiGroups:
-          - ""
-      resources:
-          - pods
-          - services
-          - configmaps
-          - secrets
-          - serviceaccounts
-          - persistentvolumeclaims
-      verbs:
-          - "*"
-    - apiGroups:
-          - coordination.k8s.io
-      resources:
-          - leases
-      verbs:
-          - "*"
-    - apiGroups:
-          - ""
-      resources:
-          - namespaces
-      verbs:
-          - get
-    - apiGroups:
-          - apps
-      resources:
-          - deployments
-      verbs:
-          - "*"
-    - apiGroups:
-          - apps
-      resourceNames:
-          - mattermost-operator
-      resources:
-          - deployments/finalizers
-      verbs:
-          - update
-    - apiGroups:
-          - apps
-      resources:
-          - replicasets
-      verbs:
-          - get
-          - list
-          - watch
-          - delete
-    - apiGroups:
-          - batch
-      resources:
-          - jobs
-      verbs:
-          - get
-          - create
-          - list
-          - delete
-          - watch
-          - update
-    - apiGroups:
-          - networking.k8s.io
-      resources:
-          - ingresses
-      verbs:
-          - "*"
-    - apiGroups:
-          - rbac.authorization.k8s.io
-      resources:
-          - rolebindings
-          - roles
-      verbs:
-          - get
-          - create
-          - list
-          - delete
-          - watch
-          - update
-    - apiGroups:
-          - mattermost.com
-      resources:
-          - "*"
-      verbs:
-          - "*"
-    - apiGroups:
-          - installation.mattermost.com
-      resources:
-          - "*"
-      verbs:
-          - "*"
-    - apiGroups:
-          - mysql.presslabs.org
-      resources:
-          - mysqlbackups
-          - mysqlclusters
-          - mysqlclusters/status
-      verbs:
-          - get
-          - list
-          - watch
-          - create
-          - update
-          - patch
-          - delete
-    - apiGroups:
-          - minio.min.io
-      resources:
-          - tenant
-      verbs:
-          - get
-          - list
-          - watch
-          - create
-          - update
-          - patch
-          - delete
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  - services
+  - configmaps
+  - secrets
+  - serviceaccounts
+  - persistentvolumeclaims
+  verbs:
+  - '*'
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - '*'
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - get
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - '*'
+- apiGroups:
+  - apps
+  resourceNames:
+  - mattermost-operator
+  resources:
+  - deployments/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - apps
+  resources:
+  - replicasets
+  verbs:
+  - get
+  - list
+  - watch
+  - delete
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - get
+  - create
+  - list
+  - delete
+  - watch
+  - update
+- apiGroups:
+  - networking.k8s.io
+  resources:
+  - ingresses
+  - ingressclasses
+  verbs:
+  - '*'
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - rolebindings
+  - roles
+  verbs:
+  - get
+  - create
+  - list
+  - delete
+  - watch
+  - update
+- apiGroups:
+  - mattermost.com
+  resources:
+  - '*'
+  verbs:
+  - '*'
+- apiGroups:
+  - installation.mattermost.com
+  resources:
+  - '*'
+  verbs:
+  - '*'
+- apiGroups:
+  - mysql.presslabs.org
+  resources:
+  - mysqlbackups
+  - mysqlclusters
+  - mysqlclusters/status
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - miniocontroller.min.io
+  resources:
+  - minioinstances
+  - minioinstances/status
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

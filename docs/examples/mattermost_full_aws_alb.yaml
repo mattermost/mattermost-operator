@@ -1,0 +1,70 @@
+# This file contains verbose example of Mattermost Custom Resource  configured to
+# run with external database, file storage and an AWS ALB (recommended for production scenario).
+# Most of the fields are optional or have a sensible defaults and do not need to be specified.
+
+apiVersion: installation.mattermost.com/v1beta1
+kind: Mattermost
+metadata:
+  name: mm-example-full-alb                       # Name of the Mattermost cluster as shown in Kubernetes.
+spec:
+  image: mattermost/mattermost-enterprise-edition # Docker image for the app servers.
+  imagePullPolicy: IfNotPresent                   # Image Pull policy used by Mattermost deployment.
+  version: 5.28.0                                 # Docker tag for the image.
+  size: 5000users                                 # Size of the Mattermost installation, typically based on the number of users. This a is write-only field - its value is erased after setting appropriate values of resources. Automatically sets the replica and resource limits for Minio, databases and app servers based on the number provided here. Accepts 100users, 1000users, 5000users, 10000users, or 25000users. Manually setting replicas or resources will override the values set by 'size'.
+  awsLoadBalancerController:
+    enabled: true                                 # If disabled Ingress will not be created by Mattermost Operator.
+    hosts: 
+      - hostName: 'example.mattermost-example.com'
+    annotations:
+      "example": "annotation"
+    certificateARN: 'arn:aws:acm:region:account:certificate/certificate_ID' # AWS ACM Certificate ARN for TLS.
+    internetFacing: true                          # If the ALB is internetfacing or not
+    ingressClassName: 'alb'                       # IngressClass to use for the Ingress resource. If empty, Mattermost Operator will create one.
+  mattermostEnv:                                  # Custom environment variables that Mattermost installation should use.
+    - name: MM_FILESETTINGS_AMAZONS3SSE
+      value: "true"
+    - name: MM_FILESETTINGS_AMAZONS3SSL
+      value: "true"
+  licenseSecret: ""                              # Name of a Kubernetes secret that contains Mattermost license. Required only for enterprise installation.
+  database:
+    external:
+      secret: db-credentials                      # Name of a Kubernetes secret that contains connection string to external database.
+  fileStore:
+    external:
+      url: s3.amazonaws.com                       # External File Storage URL.
+      bucket: my-s3-bucket                        # File Storage bucket name to use.
+      secret: file-store-credentials              # Name of a Kubernetes secret that contains credentials to external database.
+  elasticSearch:
+    host: ""                                      # Elasticsearch hostname.
+    username: ""                                  # Username to log into Elasticsearch.
+    password: ""                                  # Password to log into Elasticsearch.
+#  volumeMounts: {}                               # Volume mounts configured for Mattermost pods. Make sure to also define `volumes`.
+#  volumes: {}                                    # Volumes configured for Mattermost pods. Make sure to to also define `volumeMounts`.
+#  replicas: 1                                    # Replicas define number of Mattermost pods. If `size` is specified the field will be set according to it.
+  scheduling:
+    resources: {}                                 # See https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-requests-and-limits-of-pod-and-container.
+    nodeSelector: {}                              # See https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector.
+    affinity: {}                                  # See https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity.
+---
+# This is an example of secret containing configuration of external database.
+
+apiVersion: v1
+data:
+  DB_CONNECTION_STRING: cG9zdGdyZXM6Ly91c2VyOnN1cGVyX3NlY3JldF9wYXNzd29yZEBteS1kYXRhYmFzZS5jbHVzdGVyLWFiY2QudXMtZWFzdC0xLnJkcy5hbWF6b25hd3MuY29tOjU0MzIvbWF0dGVybW9zdD9jb25uZWN0X3RpbWVvdXQ9MTAK                    # Required.
+  DB_CONNECTION_CHECK_URL: cG9zdGdyZXM6Ly91c2VyOnN1cGVyX3NlY3JldF9wYXNzd29yZEBteS1kYXRhYmFzZS5jbHVzdGVyLWFiY2QudXMtZWFzdC0xLnJkcy5hbWF6b25hd3MuY29tOjU0MzIvbWF0dGVybW9zdD9jb25uZWN0X3RpbWVvdXQ9MTAK                 # Optional. If provided init container will be injected to Mattermost pods.
+  MM_SQLSETTINGS_DATASOURCEREPLICAS: cG9zdGdyZXM6Ly91c2VyOnN1cGVyX3NlY3JldF9wYXNzd29yZEBteS1kYXRhYmFzZS5jbHVzdGVyLXJvLWFiY2QudXMtZWFzdC0xLnJkcy5hbWF6b25hd3MuY29tOjU0MzIvbWF0dGVybW9zdD9jb25uZWN0X3RpbWVvdXQ9MTAK   # Optional. If provided the Mattermost installation will be configured to used read replicas.
+kind: Secret
+metadata:
+  name: db-credentials
+type: Opaque
+---
+# This is an example of secret containing credentials for an external file storage.
+
+apiVersion: v1
+data:
+  accesskey: QUNDRVNTX0tFWQo=
+  secretkey: U1VQRVJfU0VDUkVUX0tFWQo=
+kind: Secret
+metadata:
+  name: file-store-credentials
+type: Opaque

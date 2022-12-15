@@ -200,6 +200,10 @@ type AWSLoadBalancerController struct {
 	// IngressClassName for your ingress
 	// +optional
 	IngressClassName string `json:"ingressClassName,omitempty"`
+
+	// Annotations defines annotations passed to the Ingress associated with Mattermost.
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 // IngressHost specifies additional hosts configuration.
@@ -345,6 +349,9 @@ type FileStore struct {
 	// Defines the configuration of an external file store.
 	// +optional
 	External *ExternalFileStore `json:"external,omitempty"`
+	// Defines the configuration of externally managed PVC backed storage.
+	// +optional
+	ExternalVolume *ExternalVolumeFileStore `json:"externalVolume,omitempty"`
 	// Defines the configuration of file store managed by Kubernetes operator.
 	// +optional
 	OperatorManaged *OperatorManagedMinio `json:"operatorManaged,omitempty"`
@@ -362,6 +369,16 @@ type ExternalFileStore struct {
 	// Optionally enter the name of already existing secret.
 	// Secret should have two values: "accesskey" and "secretkey".
 	Secret string `json:"secret,omitempty"`
+
+	// Optionally use service account with IAM role to access AWS services, like S3.
+	UseServiceAccount bool `json:"useServiceAccount,omitempty"`
+}
+
+// ExternalVolumeFileStore defines the configuration of an externally managed
+// volume file store.
+type ExternalVolumeFileStore struct {
+	// The name of the matching volume claim for the externally managed volume.
+	VolumeClaimName string `json:"volumeClaimName,omitempty"`
 }
 
 // OperatorManagedMinio defines the configuration of a Minio file store managed by Kubernetes Operator.

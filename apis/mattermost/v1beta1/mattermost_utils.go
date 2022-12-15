@@ -45,7 +45,7 @@ const (
 	MattermostAppContainerName = "mattermost"
 )
 
-// SetDefaults set the missing values in the manifest to the default ones
+// SetDefaults sets the missing values in the manifest to the default ones
 func (mm *Mattermost) SetDefaults() error {
 	if mm.AWSLoadBalancerEnabled() && len(mm.Spec.AWSLoadBalancerController.Hosts) == 0 {
 		return errors.New("awsLoadBalancerController.hosts is required, but not set")
@@ -142,6 +142,11 @@ func (mm *Mattermost) GetIngresAnnotations() map[string]string {
 		return mm.Spec.IngressAnnotations
 	}
 	return mm.Spec.Ingress.Annotations
+}
+
+// GetIngresAnnotations returns Mattermost Ingress annotations.
+func (mm *Mattermost) GetAWSLoadBalancerIngressAnnotations() map[string]string {
+	return mm.Spec.AWSLoadBalancerController.Annotations
 }
 
 // GetIngressTLSSecret returns Mattermost Ingress TLS secret.
