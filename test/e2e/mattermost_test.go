@@ -76,7 +76,7 @@ func mattermostScaleTest(t *testing.T, k8sClient client.Client, k8sTypedClient k
 			Scheduling: operator.Scheduling{
 				Resources: testMattermostResources(),
 			},
-			FileStore: testFileStoreConfig(1),
+			FileStore: testFileStoreConfig(1, 4),
 			Database:  testDatabaseConfig(1),
 		},
 	}
@@ -144,7 +144,7 @@ func mattermostUpgradeTest(t *testing.T, k8sClient client.Client, k8sTypedClient
 			Scheduling: operator.Scheduling{
 				Resources: testMattermostResources(),
 			},
-			FileStore: testFileStoreConfig(1),
+			FileStore: testFileStoreConfig(1, 4),
 			Database:  testDatabaseConfig(1),
 		},
 	}
@@ -226,7 +226,7 @@ func mattermostWithMySQLReplicas(t *testing.T, client client.Client, typedClient
 			Scheduling: operator.Scheduling{
 				Resources: testMattermostResources(),
 			},
-			FileStore: testFileStoreConfig(1),
+			FileStore: testFileStoreConfig(1, 4),
 			Database:  testDatabaseConfig(2),
 		},
 	}
@@ -257,11 +257,12 @@ func testMattermostResources() corev1.ResourceRequirements {
 	}
 }
 
-func testFileStoreConfig(replicas int32) operator.FileStore {
+func testFileStoreConfig(servers, volumes int32) operator.FileStore {
 	return operator.FileStore{
 		OperatorManaged: &operator.OperatorManagedMinio{
-			StorageSize: "1Gi",
-			Replicas:    ptrUtil.NewInt32(replicas),
+			StorageSize:      "1Gi",
+			Servers:          ptrUtil.NewInt32(servers),
+			VolumesPerServer: ptrUtil.NewInt32(volumes),
 			Resources: corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
 					corev1.ResourceCPU:    resource.MustParse("100m"),
