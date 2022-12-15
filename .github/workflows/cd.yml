@@ -1,0 +1,34 @@
+name: cd
+on:
+  workflow_run:
+    workflows: ["ci"]
+    types:
+      - completed
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@dc323e67f16fb5f7663d20ff7941f27f5809e9b6 # v3.2.0
+        with:
+          fetch-depth: 0
+
+      - name: cd/build-docker
+        run: make build-image
+
+      - name: ci/push-docker
+        run: |
+          set -e
+          set -u
+          echo $DOCKERHUB_TOKEN | docker login --username $DOCKERHUB_USERNAME --password-stdin
+          docker tag mattermost/mattermost-operator:test mattermost/mattermost-operator:$TAG
+          docker push mattermost/mattermost-operator:$TAG
+        env:
+          TAG: ${GITHUB_REF_NAME}
