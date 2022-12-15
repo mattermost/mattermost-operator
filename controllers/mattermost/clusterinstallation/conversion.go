@@ -82,7 +82,7 @@ func convertToOperatorManagedMinio(ci *mattermostv1alpha1.ClusterInstallation) m
 	return mattermostv1beta1.FileStore{
 		OperatorManaged: &mattermostv1beta1.OperatorManagedMinio{
 			StorageSize: ci.Spec.Minio.StorageSize,
-			Replicas:    convertReplicas(ci.Spec.Minio.Replicas),
+			Servers:     convertReplicas(ci.Spec.Minio.Servers),
 			Resources:   ci.Spec.Minio.Resources,
 		},
 	}

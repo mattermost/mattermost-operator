@@ -21,6 +21,8 @@ type ComponentSize struct {
 
 type MinioSize struct {
 	ComponentSize
+
+	Servers           int32
 	VolumesPerReplica int32
 }
 
@@ -43,8 +45,8 @@ var size100 = ClusterInstallationSize{
 	},
 	Minio: MinioSize{
 		VolumesPerReplica: 4,
+		Servers:           1,
 		ComponentSize: ComponentSize{
-			Replicas: 1,
 			Resources: corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
 					corev1.ResourceCPU:    resource.MustParse("100m"),
@@ -83,8 +85,8 @@ var cloudSize10 = ClusterInstallationSize{
 	},
 	Minio: MinioSize{
 		VolumesPerReplica: 2,
+		Servers:           4,
 		ComponentSize: ComponentSize{
-			Replicas: 4,
 			Resources: corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
 					corev1.ResourceCPU:    resource.MustParse("100m"),
@@ -123,8 +125,8 @@ var cloudSize100 = ClusterInstallationSize{
 	},
 	Minio: MinioSize{
 		VolumesPerReplica: 2,
+		Servers:           4,
 		ComponentSize: ComponentSize{
-			Replicas: 4,
 			Resources: corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
 					corev1.ResourceCPU:    resource.MustParse("100m"),
@@ -163,8 +165,8 @@ var size1000 = ClusterInstallationSize{
 	},
 	Minio: MinioSize{
 		VolumesPerReplica: 2,
+		Servers:           4,
 		ComponentSize: ComponentSize{
-			Replicas: 4,
 			Resources: corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
 					corev1.ResourceCPU:    resource.MustParse("100m"),
@@ -203,8 +205,8 @@ var size5000 = ClusterInstallationSize{
 	},
 	Minio: MinioSize{
 		VolumesPerReplica: 2,
+		Servers:           4,
 		ComponentSize: ComponentSize{
-			Replicas: 4,
 			Resources: corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
 					corev1.ResourceCPU:    resource.MustParse("100m"),
@@ -243,8 +245,8 @@ var size10000 = ClusterInstallationSize{
 	},
 	Minio: MinioSize{
 		VolumesPerReplica: 2,
+		Servers:           4,
 		ComponentSize: ComponentSize{
-			Replicas: 4,
 			Resources: corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
 					corev1.ResourceCPU:    resource.MustParse("100m"),
@@ -283,8 +285,8 @@ var size25000 = ClusterInstallationSize{
 	},
 	Minio: MinioSize{
 		VolumesPerReplica: 2,
+		Servers:           4,
 		ComponentSize: ComponentSize{
-			Replicas: 4,
 			Resources: corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
 					corev1.ResourceCPU:    resource.MustParse("100m"),
@@ -325,8 +327,8 @@ var sizeMiniSingleton = ClusterInstallationSize{
 	},
 	Minio: MinioSize{
 		VolumesPerReplica: 4,
+		Servers:           1,
 		ComponentSize: ComponentSize{
-			Replicas: 1,
 			Resources: corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
 					corev1.ResourceCPU:    resource.MustParse("100m"),
@@ -365,8 +367,8 @@ var sizeMiniHA = ClusterInstallationSize{
 	},
 	Minio: MinioSize{
 		VolumesPerReplica: 2,
+		Servers:           4,
 		ComponentSize: ComponentSize{
-			Replicas: 4,
 			Resources: corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
 					corev1.ResourceCPU:    resource.MustParse("100m"),
@@ -477,12 +479,6 @@ func (mattermost *ClusterInstallation) setDefaultReplicasAndResources() {
 		mattermost.Spec.Resources = DefaultSize.App.Resources
 	}
 
-	if mattermost.Spec.Minio.Replicas == 0 {
-		mattermost.Spec.Minio.Replicas = DefaultSize.Minio.Replicas
-	}
-	if mattermost.Spec.Minio.Servers == 0 {
-		mattermost.Spec.Minio.Servers = DefaultSize.Minio.Replicas
-	}
 	if mattermost.Spec.Minio.VolumesPerServer == 0 {
 		mattermost.Spec.Minio.VolumesPerServer = DefaultSize.Minio.VolumesPerReplica
 	}
@@ -503,7 +499,6 @@ func (mattermost *ClusterInstallation) overrideReplicasAndResourcesFromSize(size
 
 	mattermost.Spec.Replicas = size.App.Replicas
 	mattermost.Spec.Resources = size.App.Resources
-	mattermost.Spec.Minio.Replicas = size.Minio.Replicas
 	mattermost.Spec.Minio.Resources = size.Minio.Resources
 	mattermost.Spec.Database.Replicas = size.Database.Replicas
 	mattermost.Spec.Database.Resources = size.Database.Resources

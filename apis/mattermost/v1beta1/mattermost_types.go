@@ -387,14 +387,6 @@ type OperatorManagedMinio struct {
 	// +optional
 	// +kubebuilder:validation:Pattern=^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$
 	StorageSize string `json:"storageSize,omitempty"`
-	// Defines the number of Minio replicas.
-	// Supply 1 to run Minio in standalone mode with no redundancy.
-	// Supply 4 or more to run Minio in distributed mode.
-	// Note that it is not possible to upgrade Minio from standalone to distributed mode.
-	// Setting this will override the number of replicas set by 'Size'.
-	// More info: https://docs.min.io/docs/distributed-minio-quickstart-guide.html
-	// +optional
-	Replicas *int32 `json:"replicas,omitempty"`
 	// Defines the number of servers (pods) to launch in minio. Keep in mind that the number of
 	// volumes*servers should be >=4.
 	// +optional

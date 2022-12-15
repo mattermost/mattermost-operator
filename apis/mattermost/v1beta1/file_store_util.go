@@ -65,11 +65,8 @@ func (fs *FileStore) SetDefaultReplicasAndResources() {
 }
 
 func (omm *OperatorManagedMinio) SetDefaultReplicasAndResources() {
-	if omm.Replicas == nil {
-		omm.Replicas = &mattermostv1alpha1.DefaultSize.Minio.Replicas
-		omm.Servers = &mattermostv1alpha1.DefaultSize.Minio.Replicas
-	} else {
-		omm.Servers = omm.Replicas
+	if omm.Servers == nil {
+		omm.Servers = &mattermostv1alpha1.DefaultSize.Minio.Servers
 	}
 	if omm.Resources.Size() == 0 {
 		omm.Resources = mattermostv1alpha1.DefaultSize.Minio.Resources
@@ -88,6 +85,6 @@ func (fs *FileStore) OverrideReplicasAndResourcesFromSize(size mattermostv1alpha
 }
 
 func (omm *OperatorManagedMinio) OverrideReplicasAndResourcesFromSize(size mattermostv1alpha1.ClusterInstallationSize) {
-	omm.Replicas = utils.NewInt32(size.Minio.Replicas)
+	omm.Servers = utils.NewInt32(size.Minio.Servers)
 	omm.Resources = size.Minio.Resources
 }

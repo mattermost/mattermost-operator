@@ -1348,15 +1348,6 @@ spec:
                     description: Set to use an external MinIO deployment or S3. Must
                       also set 'Secret' and 'ExternalBucket'.
                     type: string
-                  replicas:
-                    description: 'Defines the number of Minio replicas. Supply 1 to
-                      run Minio in standalone mode with no redundancy. Supply 4 or
-                      more to run Minio in distributed mode. Note that it is not possible
-                      to upgrade Minio from standalone to distributed mode. Setting
-                      this will override the number of replicas set by ''Size''. More
-                      info: https://docs.min.io/docs/distributed-minio-quickstart-guide.html'
-                    format: int32
-                    type: integer
                   resources:
                     description: Defines the resource requests and limits for the
                       Minio pods.

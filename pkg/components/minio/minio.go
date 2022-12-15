@@ -9,8 +9,8 @@ import (
 	"github.com/mattermost/mattermost-operator/pkg/components/utils"
 	mattermostApp "github.com/mattermost/mattermost-operator/pkg/mattermost"
 
+	ptrUtil "github.com/mattermost/mattermost-operator/pkg/utils"
 	minioOperator "github.com/minio/operator/pkg/apis/minio.min.io/v2"
-
 	corev1 "k8s.io/api/core/v1"
 	resource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,7 +30,7 @@ func Instance(mattermost *mattermostv1alpha1.ClusterInstallation) *minioOperator
 		mattermost.Namespace,
 		mattermostv1alpha1.ClusterInstallationResourceLabels(mattermost.Name),
 		mattermostApp.ClusterInstallationOwnerReference(mattermost),
-		mattermost.Spec.Minio.Replicas,
+		mattermost.Spec.Minio.Servers,
 		mattermost.Spec.Minio.VolumesPerServer,
 		mattermost.Spec.Minio.StorageSize,
 	)
@@ -100,6 +100,7 @@ func newMinioTenant(
 			OwnerReferences: ownerRefs,
 		},
 		Spec: minioOperator.TenantSpec{
+			RequestAutoCert: ptrUtil.NewBool(false),
 			Pools: []minioOperator.Pool{
 				{
 					Servers:          servers,
@@ -128,12 +129,21 @@ func newMinioTenant(
 }
 
 func minioSecretData() map[string][]byte {
+	accessKey := utils.New16ID()
+	secretKey := utils.New28ID()
 	// credentials can also be generated using minioOperator.GenerateCredentials() but the original
 	// method was left to allow us more control.
 	data := make(map[string][]byte, 1)
+
+	// convig.env is the way the minio operator now needs the credentials
 	data["config.env"] = []byte(minioOperator.GenerateTenantConfigurationFile(map[string]string{
-		"MINIO_ROOT_USER":     string(utils.New16ID()),
-		"MINIO_ROOT_PASSWORD": string(utils.New28ID()),
+		"MINIO_ROOT_USER":     string(accessKey),
+		"MINIO_ROOT_PASSWORD": string(secretKey),
 	}))
+
+	// we are going to store it the old way too, so we can retireve it for our purposes as well
+	data["accesskey"] = accessKey
+	data["secretkey"] = secretKey
+
 	return data
 }

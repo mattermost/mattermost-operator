@@ -23,7 +23,7 @@ func TestFileStore(t *testing.T) {
 		mattermost.Spec.FileStore = mmv1beta.FileStore{
 			OperatorManaged: &mmv1beta.OperatorManagedMinio{
 				StorageSize: "10GB",
-				Replicas:    nil,
+				Servers:     nil,
 				Resources:   corev1.ResourceRequirements{},
 			},
 		}

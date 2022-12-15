@@ -105,7 +105,7 @@ func TestConvertToMM(t *testing.T) {
 					},
 					Minio: mattermostv1alpha1.Minio{
 						StorageSize: "10Gb",
-						Replicas:    5,
+						Servers:     5,
 						Resources:   fixResources("500m", "800Mi"),
 					},
 				},
@@ -130,7 +130,7 @@ func TestConvertToMM(t *testing.T) {
 					FileStore: mattermostv1beta1.FileStore{
 						OperatorManaged: &mattermostv1beta1.OperatorManagedMinio{
 							StorageSize: "10Gb",
-							Replicas:    utils.NewInt32(5),
+							Servers:     utils.NewInt32(5),
 							Resources:   fixResources("500m", "800Mi"),
 						},
 					},
@@ -144,7 +144,7 @@ func TestConvertToMM(t *testing.T) {
 				Spec: mattermostv1alpha1.ClusterInstallationSpec{
 					Minio: mattermostv1alpha1.Minio{
 						StorageSize:    "ignored",
-						Replicas:       100,
+						Servers:        100,
 						ExternalURL:    "s3.amazon.com",
 						ExternalBucket: "my-bucket",
 						Secret:         "file-store-secret",
