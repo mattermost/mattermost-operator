@@ -18,7 +18,8 @@ ARCH=$(uname -m)
 if [[ "${ARCH}" == "x86_64" ]]; then
   ARCH=amd64
 fi
-curl https://github.com/minio/operator/releases/download/v${MINIO_OPERATOR_VERSION}/kubectl-minio_${MINIO_OPERATOR_VERSION}_${KERNEL_NAME}_${ARCH} -L -o bin/kubectl-minio
+curl "https://github.com/minio/operator/releases/download/v${MINIO_OPERATOR_VERSION}/kubectl-minio_${MINIO_OPERATOR_VERSION}_${KERNEL_NAME}_${ARCH}" -L -o bin/kubectl-minio
 chmod +x bin/kubectl-minio
-export PATH=$(pwd)/bin:$PATH
+PATH=$(pwd)/bin:$PATH
+export PATH
 kubectl minio init
