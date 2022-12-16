@@ -80,7 +80,7 @@ func SecretV1Beta(mattermost *mmv1beta.Mattermost) *corev1.Secret {
 // DefaultMinioSecretName returns the default minio secret name based on
 // the provided installation name.
 func DefaultMinioSecretName(installationName string) string {
-	return fmt.Sprintf("%s-minio", installationName)
+	return fmt.Sprintf("%s-minio-v4", installationName)
 }
 
 func newMinioTenant(
