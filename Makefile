@@ -17,7 +17,7 @@ BASE_IMAGE = gcr.io/distroless/static:nonroot
 ################################################################################
 
 GO ?= $(shell command -v go 2> /dev/null)
-PACKAGES=$(shell go list ./...)
+PACKAGES=$(shell go list ./... | grep -v vendor)
 TEST_PACKAGES=$(shell go list ./...| grep -v test/e2e)
 
 OPERATOR_IMAGE ?= mattermost/mattermost-operator:test

@@ -46,9 +46,10 @@ jobs:
 
       - name: Generate Operator Manifests
         run: |
-          make clean operator-sdk
-          mkdir -p /tmp/apis/mattermost/v1alpha1
+          make clean 
+          make operator-sdk
 
+          mkdir -p /tmp/apis/mattermost/v1alpha1
           cp -R apis/mattermost/v1alpha1/* /tmp/apis/mattermost/v1alpha1
           mkdir -p /tmp/apis/mattermost/v1beta1
           cp -R apis/mattermost/v1beta1/* /tmp/apis/mattermost/v1beta1
