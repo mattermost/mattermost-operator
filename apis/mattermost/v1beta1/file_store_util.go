@@ -72,7 +72,7 @@ func (omm *OperatorManagedMinio) SetDefaultReplicasAndResources() {
 		omm.Resources = mattermostv1alpha1.DefaultSize.Minio.Resources
 	}
 	if omm.VolumesPerServer == nil {
-		omm.VolumesPerServer = &mattermostv1alpha1.DefaultSize.Minio.VolumesPerReplica
+		omm.VolumesPerServer = &mattermostv1alpha1.DefaultSize.Minio.VolumesPerServer
 	}
 }
 

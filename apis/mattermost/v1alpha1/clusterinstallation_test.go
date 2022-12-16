@@ -94,7 +94,7 @@ func TestClusterInstallation(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, size1000.App.Replicas, tci.Spec.Replicas)
 			assert.Equal(t, size1000.App.Resources.String(), tci.Spec.Resources.String())
-			assert.Equal(t, size1000.Minio.Replicas, tci.Spec.Minio.Servers)
+			assert.Equal(t, size1000.Minio.Servers, tci.Spec.Minio.Servers)
 			assert.Equal(t, size1000.Minio.Resources.String(), tci.Spec.Minio.Resources.String())
 			assert.Equal(t, size1000.Database.Replicas, tci.Spec.Database.Replicas)
 			assert.Equal(t, size1000.Database.Resources.String(), tci.Spec.Database.Resources.String())
@@ -108,7 +108,7 @@ func TestClusterInstallation(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, DefaultSize.App.Replicas, tci.Spec.Replicas)
 			assert.Equal(t, DefaultSize.App.Resources.String(), tci.Spec.Resources.String())
-			assert.Equal(t, DefaultSize.Minio.Replicas, tci.Spec.Minio.Servers)
+			assert.Equal(t, DefaultSize.Minio.Servers, tci.Spec.Minio.Servers)
 			assert.Equal(t, DefaultSize.Minio.Resources.String(), tci.Spec.Minio.Resources.String())
 			assert.Equal(t, DefaultSize.Database.Replicas, tci.Spec.Database.Replicas)
 			assert.Equal(t, DefaultSize.Database.Resources.String(), tci.Spec.Database.Resources.String())
@@ -122,7 +122,7 @@ func TestClusterInstallation(t *testing.T) {
 			assert.Error(t, err)
 			assert.Equal(t, DefaultSize.App.Replicas, tci.Spec.Replicas)
 			assert.Equal(t, DefaultSize.App.Resources.String(), tci.Spec.Resources.String())
-			assert.Equal(t, DefaultSize.Minio.Replicas, tci.Spec.Minio.Servers)
+			assert.Equal(t, DefaultSize.Minio.Servers, tci.Spec.Minio.Servers)
 			assert.Equal(t, DefaultSize.Minio.Resources.String(), tci.Spec.Minio.Resources.String())
 			assert.Equal(t, DefaultSize.Database.Replicas, tci.Spec.Database.Replicas)
 			assert.Equal(t, DefaultSize.Database.Resources.String(), tci.Spec.Database.Resources.String())
@@ -198,8 +198,8 @@ func TestCalculateResourceMilliRequirements(t *testing.T) {
 			},
 		},
 		Minio: MinioSize{
+			Servers: 6,
 			ComponentSize: ComponentSize{
-				Replicas: 6,
 				Resources: corev1.ResourceRequirements{
 					Requests: corev1.ResourceList{
 						corev1.ResourceCPU:    resource.MustParse("100m"),
