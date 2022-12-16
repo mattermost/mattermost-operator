@@ -16,6 +16,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	MinioNameAffix = "-minio-v4"
+)
+
 // Instance returns the Minio component to deploy
 func Instance(mattermost *mattermostv1alpha1.ClusterInstallation) *minioOperator.Tenant {
 	minioName := DefaultMinioSecretName(mattermost.Name)
@@ -51,7 +55,7 @@ func Secret(mattermost *mattermostv1alpha1.ClusterInstallation) *corev1.Secret {
 
 // Instance returns the Minio component to deploy
 func InstanceV1Beta(mattermost *mmv1beta.Mattermost) *minioOperator.Tenant {
-	minioName := fmt.Sprintf("%s-minio", mattermost.Name)
+	minioName := DefaultMinioSecretName(mattermost.Name)
 
 	return newMinioTenant(
 		minioName,
@@ -80,7 +84,7 @@ func SecretV1Beta(mattermost *mmv1beta.Mattermost) *corev1.Secret {
 // DefaultMinioSecretName returns the default minio secret name based on
 // the provided installation name.
 func DefaultMinioSecretName(installationName string) string {
-	return fmt.Sprintf("%s-minio-v4", installationName)
+	return fmt.Sprintf("%s%s", installationName, MinioNameAffix)
 }
 
 func newMinioTenant(

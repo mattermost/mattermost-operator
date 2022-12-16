@@ -11,6 +11,7 @@ import (
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 
 	blubr "github.com/mattermost/blubr"
+	minioComponent "github.com/mattermost/mattermost-operator/pkg/components/minio"
 	"github.com/mattermost/mattermost-operator/pkg/components/utils"
 	operatortest "github.com/mattermost/mattermost-operator/test"
 	"github.com/stretchr/testify/assert"
@@ -101,7 +102,7 @@ func TestReconcile(t *testing.T) {
 	// cluster resources.
 	mmKey := types.NamespacedName{Name: mmName, Namespace: mmNamespace}
 	mmMysqlKey := types.NamespacedName{Name: utils.HashWithPrefix("db", mmName), Namespace: mmNamespace}
-	mmMinioKey := types.NamespacedName{Name: mmName + "-minio", Namespace: mmNamespace}
+	mmMinioKey := types.NamespacedName{Name: mmName + minioComponent.MinioNameAffix, Namespace: mmNamespace}
 
 	t.Run("observed generation updated", func(t *testing.T) {
 		var fetchedMM mmv1beta.Mattermost
@@ -574,7 +575,7 @@ func requestForCI(mattermost *mmv1beta.Mattermost) reconcile.Request {
 func prepAllDependencyTestResources(client client.Client, mattermost *mmv1beta.Mattermost) error {
 	minioService := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      mattermost.Name + "-minio-hl",
+			Name:      mattermost.Name + minioComponent.MinioNameAffix + minioOperator.MinIOHLSvcNameSuffix,
 			Namespace: mattermost.Namespace,
 		},
 		Spec: corev1.ServiceSpec{

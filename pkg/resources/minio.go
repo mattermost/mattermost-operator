@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-logr/logr"
 
+	minioComponent "github.com/mattermost/mattermost-operator/pkg/components/minio"
 	minioOperator "github.com/minio/operator/pkg/apis/minio.min.io/v2"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -75,7 +76,7 @@ func (r *ResourceHelper) createMinioSecret(owner v1.Object, desired *corev1.Secr
 }
 
 func (r *ResourceHelper) GetMinioService(mmName, mmNamespace string) (string, error) {
-	minioServiceName := fmt.Sprintf("%s-minio-hl", mmName)
+	minioServiceName := fmt.Sprintf("%s%s%s", mmName, minioComponent.MinioNameAffix, minioOperator.MinIOHLSvcNameSuffix)
 	minioService := &corev1.Service{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: minioServiceName, Namespace: mmNamespace}, minioService)
 	if err != nil {

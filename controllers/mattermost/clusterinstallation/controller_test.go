@@ -11,13 +11,21 @@ import (
 	"github.com/mattermost/mattermost-operator/pkg/resources"
 
 	blubr "github.com/mattermost/blubr"
+	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1"
+	minioComponent "github.com/mattermost/mattermost-operator/pkg/components/minio"
 	"github.com/mattermost/mattermost-operator/pkg/components/utils"
 	operatortest "github.com/mattermost/mattermost-operator/test"
+	minioOperator "github.com/minio/operator/pkg/apis/minio.min.io/v2"
+	mysqlOperator "github.com/presslabs/mysql-operator/pkg/apis/mysql/v1alpha1"
+	v1alpha1MySQL "github.com/presslabs/mysql-operator/pkg/apis/mysql/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -25,14 +33,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
-	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1"
-	minioOperator "github.com/minio/operator/pkg/apis/minio.min.io/v2"
-	mysqlOperator "github.com/presslabs/mysql-operator/pkg/apis/mysql/v1alpha1"
-	v1alpha1MySQL "github.com/presslabs/mysql-operator/pkg/apis/mysql/v1alpha1"
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestReconcile(t *testing.T) {
@@ -97,7 +97,7 @@ func TestReconcile(t *testing.T) {
 	// cluster resources.
 	ciKey := types.NamespacedName{Name: ciName, Namespace: ciNamespace}
 	ciMysqlKey := types.NamespacedName{Name: utils.HashWithPrefix("db", ciName), Namespace: ciNamespace}
-	ciMinioKey := types.NamespacedName{Name: ciName + "-minio", Namespace: ciNamespace}
+	ciMinioKey := types.NamespacedName{Name: ciName + minioComponent.MinioNameAffix, Namespace: ciNamespace}
 
 	t.Run("mysql", func(t *testing.T) {
 		t.Run("cluster", func(t *testing.T) {
@@ -735,7 +735,7 @@ func requestForCI(ci *mattermostv1alpha1.ClusterInstallation) reconcile.Request 
 func prepAllDependencyTestResources(client client.Client, ci *mattermostv1alpha1.ClusterInstallation) error {
 	minioService := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      ci.Name + "-minio-hl",
+			Name:      ci.Name + "-minio-v4" + minioOperator.MinIOHLSvcNameSuffix,
 			Namespace: ci.Namespace,
 		},
 		Spec: corev1.ServiceSpec{
