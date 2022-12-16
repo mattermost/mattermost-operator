@@ -1,0 +1,13 @@
+# This file contains a simple example for a mattermost installation that will work alongside the postgresql
+# example found in /resources
+apiVersion: installation.mattermost.com/v1beta1
+kind: Mattermost
+metadata:
+    name: mm-example-psql
+spec:
+    ingress:
+        enabled: true
+        host: example.mattermost-example.com
+    database:
+        external:
+            secret: db-credentials
