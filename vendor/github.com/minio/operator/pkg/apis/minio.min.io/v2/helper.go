@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -102,36 +103,24 @@ type hostsTemplateValues struct {
 }
 
 var (
-	once                              sync.Once
-	tenantMinIOImageOnce              sync.Once
-	tenantKesImageOnce                sync.Once
-	monitoringIntervalOnce            sync.Once
-	k8sClusterDomain                  string
-	tenantMinIOImage                  string
-	tenantKesImage                    string
-	monitoringInterval                int
-	prometheusNamespace               string
-	prometheusName                    string
-	prometheusNamespaceOnce           sync.Once
-	prometheusNameOnce                sync.Once
-	prometheusDefaultImageOnce        sync.Once
-	prometheusDefaultImage            = PrometheusImage
-	prometheusSidecarDefaultImageOnce sync.Once
-	prometheusSicecarDefaultImage     = PrometheusSideCarImage
-	prometheusInitDefaultImageOnce    sync.Once
-	prometheusInitDefaultImage        = PrometheusInitImage
-	searchDefaultImageOnce            sync.Once
-	searchDefaultImage                = DefaultLogSearchAPIImage
-	searchInitDefaultImageOnce        sync.Once
-	searchInitDefaultImage            = InitContainerImage
-	pgDefaultImageOnce                sync.Once
-	pgDefaultImage                    = LogPgImage
+	once                    sync.Once
+	tenantMinIOImageOnce    sync.Once
+	tenantKesImageOnce      sync.Once
+	monitoringIntervalOnce  sync.Once
+	k8sClusterDomain        string
+	tenantMinIOImage        string
+	tenantKesImage          string
+	monitoringInterval      int
+	prometheusNamespace     string
+	prometheusName          string
+	prometheusNamespaceOnce sync.Once
+	prometheusNameOnce      sync.Once
 )
 
 // GetPodCAFromFile assumes the operator is running inside a k8s pod and extract the
 // current ca certificate from /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
 func GetPodCAFromFile() []byte {
-	namespace, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/ca.crt")
+	namespace, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/ca.crt")
 	if err != nil {
 		return nil
 	}
@@ -141,7 +130,7 @@ func GetPodCAFromFile() []byte {
 // GetNSFromFile assumes the operator is running inside a k8s pod and extract the
 // current namespace from the /var/run/secrets/kubernetes.io/serviceaccount/namespace file
 func GetNSFromFile() string {
-	namespace, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+	namespace, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
 	if err != nil {
 		return "minio-operator"
 	}
@@ -388,26 +377,26 @@ func (t *Tenant) EnsureDefaults() *Tenant {
 
 	if t.HasPrometheusEnabled() {
 		if t.Spec.Prometheus.Image == "" {
-			t.Spec.Prometheus.Image = GetPrometheusImage()
+			t.Spec.Prometheus.Image = PrometheusImage
 		}
 		if t.Spec.Prometheus.SideCarImage == "" {
-			t.Spec.Prometheus.SideCarImage = GetPrometheusSidecarImage()
+			t.Spec.Prometheus.SideCarImage = PrometheusSideCarImage
 		}
 		if t.Spec.Prometheus.InitImage == "" {
-			t.Spec.Prometheus.InitImage = GetPrometheusInitImage()
+			t.Spec.Prometheus.InitImage = PrometheusInitImage
 		}
 	}
 
 	if t.HasLogSearchAPIEnabled() {
 		if t.Spec.Log.Image == "" {
-			t.Spec.Log.Image = GetSearchImage()
+			t.Spec.Log.Image = DefaultLogSearchAPIImage
 		}
 		if t.Spec.Log.Db != nil {
 			if t.Spec.Log.Db.Image == "" {
-				t.Spec.Log.Db.Image = GetPgImage()
+				t.Spec.Log.Db.Image = LogPgImage
 			}
 			if t.Spec.Log.Db.InitImage == "" {
-				t.Spec.Log.Db.InitImage = GetSearchInitImage()
+				t.Spec.Log.Db.InitImage = InitContainerImage
 			}
 		}
 	}
@@ -806,7 +795,7 @@ func (t *Tenant) CreateUsers(madmClnt *madmin.AdminClient, userCredentialSecrets
 // CreateBuckets creates buckets and skips if bucket already present
 func (t *Tenant) CreateBuckets(minioClient *minio.Client, buckets ...Bucket) error {
 	for _, bucket := range buckets {
-		if err := s3utils.CheckValidBucketNameStrict(bucket.Name); err != nil {
+		if err := s3utils.CheckValidBucketName(bucket.Name); err != nil {
 			return err
 		}
 		// create each bucket with a 20 seconds timeout
@@ -1241,70 +1230,4 @@ func lcp(strs []string, pre bool) string {
 		}
 	}
 	return xfix
-}
-
-// GetPrometheusImage returns the defaulted prometheus image
-func GetPrometheusImage() string {
-	// will make sure to read the env value just once
-	prometheusDefaultImageOnce.Do(func() {
-		if val, ok := os.LookupEnv("MINIO_PROMETHEUS_DEFAULT_IMAGE"); ok {
-			prometheusDefaultImage = val
-		}
-	})
-	return prometheusDefaultImage
-}
-
-// GetPrometheusSidecarImage returns the defaulted prometheus sidecar image
-func GetPrometheusSidecarImage() string {
-	// will make sure to read the env value just once
-	prometheusSidecarDefaultImageOnce.Do(func() {
-		if val, ok := os.LookupEnv("MINIO_PROMETHEUS_SIDECAR_DEFAULT_IMAGE"); ok {
-			prometheusSicecarDefaultImage = val
-		}
-	})
-	return prometheusSicecarDefaultImage
-}
-
-// GetPrometheusInitImage returns the defaulted prometheus init image
-func GetPrometheusInitImage() string {
-	// will make sure to read the env value just once
-	prometheusInitDefaultImageOnce.Do(func() {
-		if val, ok := os.LookupEnv("MINIO_PROMETHEUS_INIT_DEFAULT_IMAGE"); ok {
-			prometheusInitDefaultImage = val
-		}
-	})
-	return prometheusInitDefaultImage
-}
-
-// GetSearchImage returns the defaulted search image
-func GetSearchImage() string {
-	// will make sure to read the env value just once
-	searchDefaultImageOnce.Do(func() {
-		if val, ok := os.LookupEnv("MINIO_SEARCH_DEFAULT_IMAGE"); ok {
-			searchDefaultImage = val
-		}
-	})
-	return searchDefaultImage
-}
-
-// GetSearchInitImage returns the defaulted search image
-func GetSearchInitImage() string {
-	// will make sure to read the env value just once
-	searchInitDefaultImageOnce.Do(func() {
-		if val, ok := os.LookupEnv("MINIO_SEARCH_INIT_DEFAULT_IMAGE"); ok {
-			searchInitDefaultImage = val
-		}
-	})
-	return searchInitDefaultImage
-}
-
-// GetPgImage returns the defaulted search image
-func GetPgImage() string {
-	// will make sure to read the env value just once
-	pgDefaultImageOnce.Do(func() {
-		if val, ok := os.LookupEnv("MINIO_POSTGRES_DEFAULT_IMAGE"); ok {
-			pgDefaultImage = val
-		}
-	})
-	return pgDefaultImage
 }
