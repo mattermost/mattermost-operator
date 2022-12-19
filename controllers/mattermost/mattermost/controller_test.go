@@ -102,7 +102,7 @@ func TestReconcile(t *testing.T) {
 	// cluster resources.
 	mmKey := types.NamespacedName{Name: mmName, Namespace: mmNamespace}
 	mmMysqlKey := types.NamespacedName{Name: utils.HashWithPrefix("db", mmName), Namespace: mmNamespace}
-	mmMinioKey := types.NamespacedName{Name: mmName + minioComponent.MinioNameAffix, Namespace: mmNamespace}
+	mmMinioKey := types.NamespacedName{Name: mmName + minioComponent.MinioNameSuffix, Namespace: mmNamespace}
 
 	t.Run("observed generation updated", func(t *testing.T) {
 		var fetchedMM mmv1beta.Mattermost
@@ -575,7 +575,7 @@ func requestForCI(mattermost *mmv1beta.Mattermost) reconcile.Request {
 func prepAllDependencyTestResources(client client.Client, mattermost *mmv1beta.Mattermost) error {
 	minioService := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      mattermost.Name + minioComponent.MinioNameAffix + minioOperator.MinIOHLSvcNameSuffix,
+			Name:      mattermost.Name + minioComponent.MinioNameSuffix + minioOperator.MinIOHLSvcNameSuffix,
 			Namespace: mattermost.Namespace,
 		},
 		Spec: corev1.ServiceSpec{

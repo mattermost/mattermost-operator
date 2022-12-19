@@ -233,15 +233,15 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbIn
 			ImagePullPolicy: corev1.PullIfNotPresent,
 			Command: []string{
 				"/bin/sh", "-c",
-				fmt.Sprintf("mc config host add localminio http://%s $(accesskey) $(secretkey) && mc mb localminio/%s -q -p", minioURL, mattermost.Name),
+				fmt.Sprintf("mc config host add localminio http://%s $(MINIO_ACCESS_KEY) $(MINIO_SECRET_KEY) && mc mb localminio/%s -q -p", minioURL, mattermost.Name),
 			},
 			Env: []corev1.EnvVar{
 				{
-					Name:      "accessKey",
+					Name:      "MINIO_ACCESS_KEY",
 					ValueFrom: minioAccessEnv,
 				},
 				{
-					Name:      "secretKey",
+					Name:      "MINIO_SECRET_KEY",
 					ValueFrom: minioSecretEnv,
 				},
 			},

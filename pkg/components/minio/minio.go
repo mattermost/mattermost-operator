@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	MinioNameAffix = "-minio-v4"
+	MinioNameSuffix = "-minio-v4"
 )
 
 // Instance returns the Minio component to deploy
@@ -84,7 +84,7 @@ func SecretV1Beta(mattermost *mmv1beta.Mattermost) *corev1.Secret {
 // DefaultMinioSecretName returns the default minio secret name based on
 // the provided installation name.
 func DefaultMinioSecretName(installationName string) string {
-	return fmt.Sprintf("%s%s", installationName, MinioNameAffix)
+	return fmt.Sprintf("%s%s", installationName, MinioNameSuffix)
 }
 
 func newMinioTenant(

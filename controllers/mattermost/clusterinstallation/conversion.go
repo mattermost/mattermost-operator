@@ -81,9 +81,10 @@ func convertFileStore(ci *mattermostv1alpha1.ClusterInstallation) mattermostv1be
 func convertToOperatorManagedMinio(ci *mattermostv1alpha1.ClusterInstallation) mattermostv1beta1.FileStore {
 	return mattermostv1beta1.FileStore{
 		OperatorManaged: &mattermostv1beta1.OperatorManagedMinio{
-			StorageSize: ci.Spec.Minio.StorageSize,
-			Servers:     convertReplicas(ci.Spec.Minio.Servers),
-			Resources:   ci.Spec.Minio.Resources,
+			StorageSize:      ci.Spec.Minio.StorageSize,
+			Servers:          convertReplicas(ci.Spec.Minio.Servers),
+			VolumesPerServer: convertReplicas(ci.Spec.Minio.VolumesPerServer),
+			Resources:        ci.Spec.Minio.Resources,
 		},
 	}
 }
@@ -157,6 +158,9 @@ func convertProbes(spec mattermostv1alpha1.ClusterInstallationSpec) mattermostv1
 	}
 }
 
+// convertReplicas converts the provided setting to a pointer if there's an appropriate value, if not
+// returns null so that the appropriate setting can enforce the defaults.
+// TODO: this requires a different name, probably.
 func convertReplicas(old int32) *int32 {
 	if old < 0 {
 		return utils.NewInt32(0)

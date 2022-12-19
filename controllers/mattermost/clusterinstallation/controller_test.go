@@ -97,7 +97,7 @@ func TestReconcile(t *testing.T) {
 	// cluster resources.
 	ciKey := types.NamespacedName{Name: ciName, Namespace: ciNamespace}
 	ciMysqlKey := types.NamespacedName{Name: utils.HashWithPrefix("db", ciName), Namespace: ciNamespace}
-	ciMinioKey := types.NamespacedName{Name: ciName + minioComponent.MinioNameAffix, Namespace: ciNamespace}
+	ciMinioKey := types.NamespacedName{Name: ciName + minioComponent.MinioNameSuffix, Namespace: ciNamespace}
 
 	t.Run("mysql", func(t *testing.T) {
 		t.Run("cluster", func(t *testing.T) {

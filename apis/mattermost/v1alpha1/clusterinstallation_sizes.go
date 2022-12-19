@@ -169,8 +169,8 @@ var size1000 = ClusterInstallationSize{
 		ComponentSize: ComponentSize{
 			Resources: corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
-					corev1.ResourceCPU:    resource.MustParse("100m"),
-					corev1.ResourceMemory: resource.MustParse("256Mi"),
+					corev1.ResourceCPU:    resource.MustParse("150m"),
+					corev1.ResourceMemory: resource.MustParse("512Mi"),
 				},
 			},
 		},
@@ -209,8 +209,8 @@ var size5000 = ClusterInstallationSize{
 		ComponentSize: ComponentSize{
 			Resources: corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
-					corev1.ResourceCPU:    resource.MustParse("100m"),
-					corev1.ResourceMemory: resource.MustParse("256Mi"),
+					corev1.ResourceCPU:    resource.MustParse("200m"),
+					corev1.ResourceMemory: resource.MustParse("500Mi"),
 				},
 			},
 		},
@@ -249,8 +249,8 @@ var size10000 = ClusterInstallationSize{
 		ComponentSize: ComponentSize{
 			Resources: corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
-					corev1.ResourceCPU:    resource.MustParse("100m"),
-					corev1.ResourceMemory: resource.MustParse("256Mi"),
+					corev1.ResourceCPU:    resource.MustParse("200m"),
+					corev1.ResourceMemory: resource.MustParse("500Mi"),
 				},
 			},
 		},
@@ -289,8 +289,8 @@ var size25000 = ClusterInstallationSize{
 		ComponentSize: ComponentSize{
 			Resources: corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
-					corev1.ResourceCPU:    resource.MustParse("100m"),
-					corev1.ResourceMemory: resource.MustParse("256Mi"),
+					corev1.ResourceCPU:    resource.MustParse("200m"),
+					corev1.ResourceMemory: resource.MustParse("500Mi"),
 				},
 			},
 		},
@@ -331,8 +331,8 @@ var sizeMiniSingleton = ClusterInstallationSize{
 		ComponentSize: ComponentSize{
 			Resources: corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
-					corev1.ResourceCPU:    resource.MustParse("100m"),
-					corev1.ResourceMemory: resource.MustParse("256Mi"),
+					corev1.ResourceCPU:    resource.MustParse("200m"),
+					corev1.ResourceMemory: resource.MustParse("512Mi"),
 				},
 			},
 		},
@@ -371,8 +371,8 @@ var sizeMiniHA = ClusterInstallationSize{
 		ComponentSize: ComponentSize{
 			Resources: corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
-					corev1.ResourceCPU:    resource.MustParse("100m"),
-					corev1.ResourceMemory: resource.MustParse("256Mi"),
+					corev1.ResourceCPU:    resource.MustParse("200m"),
+					corev1.ResourceMemory: resource.MustParse("512Mi"),
 				},
 			},
 		},

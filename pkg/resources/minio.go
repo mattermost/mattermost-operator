@@ -76,7 +76,7 @@ func (r *ResourceHelper) createMinioSecret(owner v1.Object, desired *corev1.Secr
 }
 
 func (r *ResourceHelper) GetMinioService(mmName, mmNamespace string) (string, error) {
-	minioServiceName := fmt.Sprintf("%s%s%s", mmName, minioComponent.MinioNameAffix, minioOperator.MinIOHLSvcNameSuffix)
+	minioServiceName := fmt.Sprintf("%s%s%s", mmName, minioComponent.MinioNameSuffix, minioOperator.MinIOHLSvcNameSuffix)
 	minioService := &corev1.Service{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: minioServiceName, Namespace: mmNamespace}, minioService)
 	if err != nil {

@@ -86,5 +86,6 @@ func (fs *FileStore) OverrideReplicasAndResourcesFromSize(size mattermostv1alpha
 
 func (omm *OperatorManagedMinio) OverrideReplicasAndResourcesFromSize(size mattermostv1alpha1.ClusterInstallationSize) {
 	omm.Servers = utils.NewInt32(size.Minio.Servers)
+	omm.VolumesPerServer = utils.NewInt32(size.Minio.VolumesPerServer)
 	omm.Resources = size.Minio.Resources
 }
