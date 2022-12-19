@@ -55,13 +55,27 @@ func (r *ResourceHelper) CreateOrUpdateMinioSecret(owner v1.Object, desired *cor
 func (r *ResourceHelper) ValidateMinioSecret(secret *corev1.Secret, logger logr.Logger) error {
 	// Validate custom secret required fields
 	if _, ok := secret.Data["config.env"]; !ok {
-		return fmt.Errorf("custom Minio Secret %s/%s does not have an 'config.env' key", secret.Namespace, secret.Name)
+		return fmt.Errorf("custom minio Secret %s/%s does not have an 'config.env' key", secret.Namespace, secret.Name)
 	}
 
 	if len(secret.Data["config.env"]) == 0 {
-		return fmt.Errorf("custom Minio Secret %s/%s 'config.env' value is empty", secret.Namespace, secret.Name)
+		return fmt.Errorf("custom minio Secret %s/%s 'config.env' value is empty", secret.Namespace, secret.Name)
 	}
 
+	// Validate keys used to connect and run commands internally
+	if _, ok := secret.Data["accesskey"]; !ok {
+		return fmt.Errorf("custom minio Secret %s/%s 'accesskey' value is not present", secret.Namespace, secret.Name)
+	}
+	if len(secret.Data["accesskey"]) == 0 {
+		return fmt.Errorf("custom minio Secret %s/%s 'accesskey' value is empty", secret.Namespace, secret.Name)
+	}
+
+	if _, ok := secret.Data["secretkey"]; !ok {
+		return fmt.Errorf("custom minio Secret %s/%s 'secretkey' value is not present", secret.Namespace, secret.Name)
+	}
+	if len(secret.Data["secretkey"]) == 0 {
+		return fmt.Errorf("custom minio Secret %s/%s 'secretkey' value is empty", secret.Namespace, secret.Name)
+	}
 	return nil
 }
 
