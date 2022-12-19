@@ -123,15 +123,15 @@ func (e *OperatorManagedMinioConfig) InitContainers(mattermost *mmv1beta.Matterm
 			ImagePullPolicy: corev1.PullIfNotPresent,
 			Command: []string{
 				"/bin/sh", "-c",
-				fmt.Sprintf("mc config host add localminio http://%s $(accesskey) $(secretkey) && mc mb localminio/%s -q -p", e.minioURL, mattermost.Name),
+				fmt.Sprintf("mc config host add localminio http://%s $(MINIO_ACCESS_KEY) $(MINIO_SECRET_KEY) && mc mb localminio/%s -q -p", e.minioURL, mattermost.Name),
 			},
 			Env: []corev1.EnvVar{
 				{
-					Name:      "accesskey",
+					Name:      "MINIO_ACCESS_KEY",
 					ValueFrom: EnvSourceFromSecret(e.secretName, fileStoreSecretAccessKey),
 				},
 				{
-					Name:      "secretkey",
+					Name:      "MINIO_SECRET_KEY",
 					ValueFrom: EnvSourceFromSecret(e.secretName, fileStoreSecretSecretKey),
 				},
 			},
