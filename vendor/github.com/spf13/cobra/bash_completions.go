@@ -1,17 +1,3 @@
-// Copyright 2013-2022 The Cobra Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package cobra
 
 import (
@@ -38,7 +24,7 @@ func writePreamble(buf io.StringWriter, name string) {
 	WriteStringAndCheck(buf, fmt.Sprintf(`
 __%[1]s_debug()
 {
-    if [[ -n ${BASH_COMP_DEBUG_FILE:-} ]]; then
+    if [[ -n ${BASH_COMP_DEBUG_FILE} ]]; then
         echo "$*" >> "${BASH_COMP_DEBUG_FILE}"
     fi
 }
@@ -87,8 +73,7 @@ __%[1]s_handle_go_custom_completion()
     # Prepare the command to request completions for the program.
     # Calling ${words[0]} instead of directly %[1]s allows to handle aliases
     args=("${words[@]:1}")
-    # Disable ActiveHelp which is not supported for bash completion v1
-    requestComp="%[8]s=0 ${words[0]} %[2]s ${args[*]}"
+    requestComp="${words[0]} %[2]s ${args[*]}"
 
     lastParam=${words[$((${#words[@]}-1))]}
     lastChar=${lastParam:$((${#lastParam}-1)):1}
@@ -114,7 +99,7 @@ __%[1]s_handle_go_custom_completion()
         directive=0
     fi
     __%[1]s_debug "${FUNCNAME[0]}: the completion directive is: ${directive}"
-    __%[1]s_debug "${FUNCNAME[0]}: the completions are: ${out}"
+    __%[1]s_debug "${FUNCNAME[0]}: the completions are: ${out[*]}"
 
     if [ $((directive & shellCompDirectiveError)) -ne 0 ]; then
         # Error code.  No completion.
@@ -140,7 +125,7 @@ __%[1]s_handle_go_custom_completion()
         local fullFilter filter filteringCmd
         # Do not use quotes around the $out variable or else newline
         # characters will be kept.
-        for filter in ${out}; do
+        for filter in ${out[*]}; do
             fullFilter+="$filter|"
         done
 
@@ -149,9 +134,9 @@ __%[1]s_handle_go_custom_completion()
         $filteringCmd
     elif [ $((directive & shellCompDirectiveFilterDirs)) -ne 0 ]; then
         # File completion for directories only
-        local subdir
+        local subDir
         # Use printf to strip any trailing newline
-        subdir=$(printf "%%s" "${out}")
+        subdir=$(printf "%%s" "${out[0]}")
         if [ -n "$subdir" ]; then
             __%[1]s_debug "Listing directories in $subdir"
             __%[1]s_handle_subdirs_in_dir_flag "$subdir"
@@ -162,7 +147,7 @@ __%[1]s_handle_go_custom_completion()
     else
         while IFS='' read -r comp; do
             COMPREPLY+=("$comp")
-        done < <(compgen -W "${out}" -- "$cur")
+        done < <(compgen -W "${out[*]}" -- "$cur")
     fi
 }
 
@@ -202,19 +187,13 @@ __%[1]s_handle_reply()
                     PREFIX=""
                     cur="${cur#*=}"
                     ${flags_completion[${index}]}
-                    if [ -n "${ZSH_VERSION:-}" ]; then
+                    if [ -n "${ZSH_VERSION}" ]; then
                         # zsh completion needs --flag= prefix
                         eval "COMPREPLY=( \"\${COMPREPLY[@]/#/${flag}=}\" )"
                     fi
                 fi
             fi
-
-            if [[ -z "${flag_parsing_disabled}" ]]; then
-                # If flag parsing is enabled, we have completed the flags and can return.
-                # If flag parsing is disabled, we may not know all (or any) of the flags, so we fallthrough
-                # to possibly call handle_go_custom_completion.
-                return 0;
-            fi
+            return 0;
             ;;
     esac
 
@@ -253,13 +232,13 @@ __%[1]s_handle_reply()
     fi
 
     if [[ ${#COMPREPLY[@]} -eq 0 ]]; then
-        if declare -F __%[1]s_custom_func >/dev/null; then
-            # try command name qualified custom func
-            __%[1]s_custom_func
-        else
-            # otherwise fall back to unqualified for compatibility
-            declare -F __custom_func >/dev/null && __custom_func
-        fi
+		if declare -F __%[1]s_custom_func >/dev/null; then
+			# try command name qualified custom func
+			__%[1]s_custom_func
+		else
+			# otherwise fall back to unqualified for compatibility
+			declare -F __custom_func >/dev/null && __custom_func
+		fi
     fi
 
     # available in bash-completion >= 2, not always present on macOS
@@ -293,7 +272,7 @@ __%[1]s_handle_flag()
 
     # if a command required a flag, and we found it, unset must_have_one_flag()
     local flagname=${words[c]}
-    local flagvalue=""
+    local flagvalue
     # if the word contained an =
     if [[ ${words[c]} == *"="* ]]; then
         flagvalue=${flagname#*=} # take in as flagvalue after the =
@@ -312,7 +291,7 @@ __%[1]s_handle_flag()
 
     # keep flag value with flagname as flaghash
     # flaghash variable is an associative array which is only supported in bash > 3.
-    if [[ -z "${BASH_VERSION:-}" || "${BASH_VERSINFO[0]:-}" -gt 3 ]]; then
+    if [[ -z "${BASH_VERSION}" || "${BASH_VERSINFO[0]}" -gt 3 ]]; then
         if [ -n "${flagvalue}" ] ; then
             flaghash[${flagname}]=${flagvalue}
         elif [ -n "${words[ $((c+1)) ]}" ] ; then
@@ -324,7 +303,7 @@ __%[1]s_handle_flag()
 
     # skip the argument to a two word flag
     if [[ ${words[c]} != *"="* ]] && __%[1]s_contains_word "${words[c]}" "${two_word_flags[@]}"; then
-        __%[1]s_debug "${FUNCNAME[0]}: found a flag ${words[c]}, skip the next argument"
+			  __%[1]s_debug "${FUNCNAME[0]}: found a flag ${words[c]}, skip the next argument"
         c=$((c+1))
         # if we are looking for a flags value, don't show commands
         if [[ $c -eq $cword ]]; then
@@ -384,7 +363,7 @@ __%[1]s_handle_word()
         __%[1]s_handle_command
     elif __%[1]s_contains_word "${words[c]}" "${command_aliases[@]}"; then
         # aliashash variable is an associative array which is only supported in bash > 3.
-        if [[ -z "${BASH_VERSION:-}" || "${BASH_VERSINFO[0]:-}" -gt 3 ]]; then
+        if [[ -z "${BASH_VERSION}" || "${BASH_VERSINFO[0]}" -gt 3 ]]; then
             words[c]=${aliashash[${words[c]}]}
             __%[1]s_handle_command
         else
@@ -398,11 +377,11 @@ __%[1]s_handle_word()
 
 `, name, ShellCompNoDescRequestCmd,
 		ShellCompDirectiveError, ShellCompDirectiveNoSpace, ShellCompDirectiveNoFileComp,
-		ShellCompDirectiveFilterFileExt, ShellCompDirectiveFilterDirs, activeHelpEnvVar(name)))
+		ShellCompDirectiveFilterFileExt, ShellCompDirectiveFilterDirs))
 }
 
 func writePostscript(buf io.StringWriter, name string) {
-	name = strings.ReplaceAll(name, ":", "__")
+	name = strings.Replace(name, ":", "__", -1)
 	WriteStringAndCheck(buf, fmt.Sprintf("__start_%s()\n", name))
 	WriteStringAndCheck(buf, fmt.Sprintf(`{
     local cur prev words cword split
@@ -415,7 +394,6 @@ func writePostscript(buf io.StringWriter, name string) {
     fi
 
     local c=0
-    local flag_parsing_disabled=
     local flags=()
     local two_word_flags=()
     local local_nonpersistent_flags=()
@@ -425,8 +403,8 @@ func writePostscript(buf io.StringWriter, name string) {
     local command_aliases=()
     local must_have_one_flag=()
     local must_have_one_noun=()
-    local has_completion_function=""
-    local last_command=""
+    local has_completion_function
+    local last_command
     local nouns=()
     local noun_aliases=()
 
@@ -557,11 +535,6 @@ func writeFlags(buf io.StringWriter, cmd *Command) {
     flags_completion=()
 
 `)
-
-	if cmd.DisableFlagParsing {
-		WriteStringAndCheck(buf, "    flag_parsing_disabled=1\n")
-	}
-
 	localNonPersistentFlags := cmd.LocalNonPersistentFlags()
 	cmd.NonInheritedFlags().VisitAll(func(flag *pflag.Flag) {
 		if nonCompletableFlag(flag) {
@@ -636,7 +609,7 @@ func writeCmdAliases(buf io.StringWriter, cmd *Command) {
 
 	sort.Strings(cmd.Aliases)
 
-	WriteStringAndCheck(buf, fmt.Sprint(`    if [[ -z "${BASH_VERSION:-}" || "${BASH_VERSINFO[0]:-}" -gt 3 ]]; then`, "\n"))
+	WriteStringAndCheck(buf, fmt.Sprint(`    if [[ -z "${BASH_VERSION}" || "${BASH_VERSINFO[0]}" -gt 3 ]]; then`, "\n"))
 	for _, value := range cmd.Aliases {
 		WriteStringAndCheck(buf, fmt.Sprintf("        command_aliases+=(%q)\n", value))
 		WriteStringAndCheck(buf, fmt.Sprintf("        aliashash[%q]=%q\n", value, cmd.Name()))
@@ -660,8 +633,8 @@ func gen(buf io.StringWriter, cmd *Command) {
 		gen(buf, c)
 	}
 	commandName := cmd.CommandPath()
-	commandName = strings.ReplaceAll(commandName, " ", "_")
-	commandName = strings.ReplaceAll(commandName, ":", "__")
+	commandName = strings.Replace(commandName, " ", "_", -1)
+	commandName = strings.Replace(commandName, ":", "__", -1)
 
 	if cmd.Root() == cmd {
 		WriteStringAndCheck(buf, fmt.Sprintf("_%s_root_command()\n{\n", commandName))

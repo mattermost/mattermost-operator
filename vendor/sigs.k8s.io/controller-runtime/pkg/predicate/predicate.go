@@ -24,7 +24,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	logf "sigs.k8s.io/controller-runtime/pkg/internal/log"
-	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 )
 
 var log = logf.RuntimeLog.WithName("predicate").WithName("eventFilters")
@@ -176,9 +175,9 @@ func (GenerationChangedPredicate) Update(e event.UpdateEvent) bool {
 // This predicate will skip update events that have no change in the object's annotation.
 // It is intended to be used in conjunction with the GenerationChangedPredicate, as in the following example:
 //
-//	Controller.Watch(
+// Controller.Watch(
 //		&source.Kind{Type: v1.MyCustomKind},
-//		&handler.EnqueueRequestForObject{},
+// 		&handler.EnqueueRequestForObject{},
 //		predicate.Or(predicate.GenerationChangedPredicate{}, predicate.AnnotationChangedPredicate{}))
 //
 // This is mostly useful for controllers that needs to trigger both when the resource's generation is incremented
@@ -207,10 +206,9 @@ func (AnnotationChangedPredicate) Update(e event.UpdateEvent) bool {
 // It is intended to be used in conjunction with the GenerationChangedPredicate, as in the following example:
 //
 // Controller.Watch(
-//
-//	&source.Kind{Type: v1.MyCustomKind},
-//	&handler.EnqueueRequestForObject{},
-//	predicate.Or(predicate.GenerationChangedPredicate{}, predicate.LabelChangedPredicate{}))
+//		&source.Kind{Type: v1.MyCustomKind},
+// 		&handler.EnqueueRequestForObject{},
+//		predicate.Or(predicate.GenerationChangedPredicate{}, predicate.LabelChangedPredicate{}))
 //
 // This will be helpful when object's labels is carrying some extra specification information beyond object's spec,
 // and the controller will be triggered if any valid spec change (not only in spec, but also in labels) happens.
@@ -239,15 +237,6 @@ func And(predicates ...Predicate) Predicate {
 
 type and struct {
 	predicates []Predicate
-}
-
-func (a and) InjectFunc(f inject.Func) error {
-	for _, p := range a.predicates {
-		if err := f(p); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func (a and) Create(e event.CreateEvent) bool {
@@ -293,15 +282,6 @@ func Or(predicates ...Predicate) Predicate {
 
 type or struct {
 	predicates []Predicate
-}
-
-func (o or) InjectFunc(f inject.Func) error {
-	for _, p := range o.predicates {
-		if err := f(p); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func (o or) Create(e event.CreateEvent) bool {
