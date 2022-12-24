@@ -38,7 +38,7 @@ jobs:
         uses: actions/checkout@755da8c3cf115ac066823e79a1e1788f8940201b # v3.2.0
         with:
           fetch-depth: 0
-          path: src/mattermost/mattermost-operator
+          path: src/github.com/mattermost/mattermost-operator
 
       - name: Setup Go
         uses: actions/setup-go@6edd4406fa81c3da01a34fa6f6343087c207a568 # v3.5.0
@@ -47,7 +47,7 @@ jobs:
 
       - name: Generate Operator Manifests
         run: |
-          cd ${GITHUB_WORKSPACE}/src/mattermost/mattermost-operator
+          cd ${GITHUB_WORKSPACE}/src/github.com/mattermost/mattermost-operator
 
           export GOPATH=${GITHUB_WORKSPACE}
           go env -w GOPATH=${GITHUB_WORKSPACE}
@@ -73,12 +73,12 @@ jobs:
 
       - name: ci/test
         run: |
-          cd /home/runner/go/src/mattermost/mattermost-operator
+          cd /home/runner/go/src/github.com/mattermost/mattermost-operator
           make unittest goverall
 
       - name: ci/test-e2e
         run: |
-          cd /home/runner/go/src/mattermost/mattermost-operator
+          cd /home/runner/go/src/github.com/mattermost/mattermost-operator
           ./test/e2e.sh
         env:
           K8S_VERSION: v1.17.5
