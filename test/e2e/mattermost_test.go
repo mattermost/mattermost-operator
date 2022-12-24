@@ -85,7 +85,7 @@ func mattermostScaleTest(t *testing.T, k8sClient client.Client, k8sTypedClient k
 	err := k8sClient.Create(context.TODO(), exampleMattermost)
 	require.NoError(t, err)
 
-	err = waitForStatefulSet(t, k8sClient, mmNamespace, "test-mm-minio-ss-0", 4, retryInterval, timeout)
+	err = waitForStatefulSet(t, k8sClient, mmNamespace, fmt.Sprintf("%s-minio-v4-ss-0", exampleMattermost.Name), 4, retryInterval, timeout)
 	require.NoError(t, err)
 
 	err = waitForStatefulSet(t, k8sClient, mmNamespace, fmt.Sprintf("%s-mysql", utils.HashWithPrefix("db", "test-mm")), 1, retryInterval, timeout)
@@ -153,7 +153,7 @@ func mattermostUpgradeTest(t *testing.T, k8sClient client.Client, k8sTypedClient
 	err := k8sClient.Create(context.TODO(), exampleMattermost)
 	require.NoError(t, err)
 
-	err = waitForStatefulSet(t, k8sClient, mmNamespace, fmt.Sprintf("%s-minio", testName), 1, retryInterval, timeout)
+	err = waitForStatefulSet(t, k8sClient, mmNamespace, fmt.Sprintf("%s-minio-v4-ss-0", testName), 1, retryInterval, timeout)
 	require.NoError(t, err)
 
 	err = waitForStatefulSet(t, k8sClient, mmNamespace, fmt.Sprintf("%s-mysql", utils.HashWithPrefix("db", testName)), 1, retryInterval, timeout)
@@ -235,7 +235,7 @@ func mattermostWithMySQLReplicas(t *testing.T, client client.Client, typedClient
 	err := client.Create(context.TODO(), exampleMattermost)
 	require.NoError(t, err)
 
-	err = waitForStatefulSet(t, client, mmNamespace, fmt.Sprintf("%s-minio", testName), 1, retryInterval, timeout)
+	err = waitForStatefulSet(t, client, mmNamespace, fmt.Sprintf("%s-minio-v4-ss-0", testName), 1, retryInterval, timeout)
 	require.NoError(t, err)
 
 	err = waitForStatefulSet(t, client, mmNamespace, fmt.Sprintf("%s-mysql", utils.HashWithPrefix("db", testName)), 2, retryInterval, timeout)
