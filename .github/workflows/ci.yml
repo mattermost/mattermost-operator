@@ -30,7 +30,6 @@ jobs:
 
       - name: ci/check-modules
         run: make check-modules
-
   test:
     runs-on: ubuntu-latest
     steps:
@@ -38,6 +37,7 @@ jobs:
         uses: actions/checkout@755da8c3cf115ac066823e79a1e1788f8940201b # v3.2.0
         with:
           fetch-depth: 0
+          path: src/github.com/mattermost/mattermost-operator
 
       - name: Setup Go
         uses: actions/setup-go@6edd4406fa81c3da01a34fa6f6343087c207a568 # v3.5.0
@@ -46,7 +46,10 @@ jobs:
 
       - name: Generate Operator Manifests
         run: |
-          make clean 
+          cd src/github.com/mattermost/mattermost-operator
+          export GOPATH=/home/runner/work/mattermost-operator/mattermost-operator
+
+          make clean
           make operator-sdk
 
           mkdir -p /tmp/apis/mattermost/v1alpha1
@@ -62,10 +65,17 @@ jobs:
           diff /tmp/config/crd/bases config/crd/bases
 
       - name: ci/test
-        run: make unittest goverall
+        run: |
+          cd src/github.com/mattermost/mattermost-operator
+          export GOPATH=/home/runner/work/mattermost-operator/mattermost-operator
+
+          make unittest goverall
 
       - name: ci/test-e2e
-        run: ./test/e2e.sh
+        run: |
+          cd src/github.com/mattermost/mattermost-operator
+          export GOPATH=/home/runner/work/mattermost-operator/mattermost-operator
+          ./test/e2e.sh
         env:
           K8S_VERSION: v1.17.5
           IMAGE_NAME: mattermost/mattermost-operator
