@@ -48,7 +48,9 @@ jobs:
       - name: Generate Operator Manifests
         run: |
           cd ${GITHUB_WORKSPACE}/src/mattermost/mattermost-operator
+
           export GOPATH=${GITHUB_WORKSPACE}
+          go env -w GOPATH=${GITHUB_WORKSPACE}
 
           make clean
           make operator-sdk
