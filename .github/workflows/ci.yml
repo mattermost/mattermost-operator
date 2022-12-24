@@ -14,10 +14,6 @@ env:
   GOPATH: ${{ github.workspace }}
   GOBIN: ${{ github.workspace }}/bin
 
-defaults:
-  run:
-    working-directory: ${{ env.GOPATH }}/src/mattermost/mattermost-operator
-
 jobs:
   lint:
     runs-on: ubuntu-latest
@@ -35,10 +31,14 @@ jobs:
           cache: true
 
       - name: ci/check-style
-        run: make check-style
+        run: |
+          cd ${{ env.GOPATH }}/src/mattermost/mattermost-operator
+          make check-style
 
       - name: ci/check-modules
-        run: make check-modules
+        run: |
+          cd ${{ env.GOPATH }}/src/mattermost/mattermost-operator
+          make check-modules
 
   test:
     runs-on: ubuntu-latest
@@ -56,6 +56,8 @@ jobs:
 
       - name: Generate Operator Manifests
         run: |
+          cd ${{ env.GOPATH }}/src/mattermost/mattermost-operator
+
           make clean
           make operator-sdk
 
@@ -72,10 +74,14 @@ jobs:
           diff /tmp/config/crd/bases config/crd/bases
 
       - name: ci/test
-        run: make unittest goverall
+        run: |
+          cd ${{ env.GOPATH }}/src/mattermost/mattermost-operator
+          make unittest goverall
 
       - name: ci/test-e2e
-        run: ./test/e2e.sh
+        run: |
+          cd ${{ env.GOPATH }}/src/mattermost/mattermost-operator
+          ./test/e2e.sh
         env:
           K8S_VERSION: v1.17.5
           IMAGE_NAME: mattermost/mattermost-operator
@@ -95,10 +101,14 @@ jobs:
           path: ${{ env.GOPATH }}/src/mattermost/mattermost-operator
 
       - name: Set short SHA
-        run: echo "SHORT_SHA=${GITHUB_SHA:0:7}" >> $GITHUB_ENV
+        run: |
+          cd ${{ env.GOPATH }}/src/mattermost/mattermost-operator
+          echo "SHORT_SHA=${GITHUB_SHA:0:7}" >> $GITHUB_ENV
 
       - name: ci/build-docker
-        run: make build-image
+        run: |
+          cd ${{ env.GOPATH }}/src/mattermost/mattermost-operator
+          make build-image
 
       - name: ci/scan-docker-security
         uses: aquasecurity/trivy-action@9ab158e8597f3b310480b9a69402b419bc03dbd5 # v0.8.0
@@ -112,6 +122,7 @@ jobs:
 
       - name: ci/push-docker
         run: |
+          cd ${{ env.GOPATH }}/src/mattermost/mattermost-operator
           set -e
           set -u
           TAG="${GITHUB_SHA:0:7}"
