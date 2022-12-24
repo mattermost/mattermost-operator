@@ -58,6 +58,9 @@ jobs:
         run: |
           cd ${{ env.GOPATH }}/src/mattermost/mattermost-operator
 
+          echo GOPATHS
+          go env GOPATH
+
           make clean
           make operator-sdk
 
