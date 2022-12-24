@@ -27,7 +27,7 @@ var (
 	// retryInterval is an interval between check attempts
 	retryInterval = time.Second * 5
 	// timeout to wait for k8s objects to be created
-	timeout = time.Second * 900
+	timeout = time.Minute * 15
 
 	mmNamespace = "mattermost-operator"
 )
@@ -37,14 +37,16 @@ func TestMattermost(t *testing.T) {
 	k8sTypedClient, err := kubernetes.NewForConfig(cfg)
 	require.NoError(t, err)
 
-	t.Run("mysql operator ready", func(t *testing.T) {
-		err = waitForStatefulSet(t, k8sClient, "mysql-operator", "mysql-operator", 1, retryInterval, timeout)
-		require.NoError(t, err)
-	})
 	t.Run("minio operator ready", func(t *testing.T) {
 		err = waitForDeployment(t, k8sTypedClient, "minio-operator", "minio-operator", 1, retryInterval, timeout)
 		require.NoError(t, err)
 	})
+
+	t.Run("mysql operator ready", func(t *testing.T) {
+		err = waitForStatefulSet(t, k8sClient, "mysql-operator", "mysql-operator", 1, retryInterval, timeout)
+		require.NoError(t, err)
+	})
+
 	t.Run("mattermost operator ready", func(t *testing.T) {
 		err = waitForDeployment(t, k8sTypedClient, mmNamespace, "mattermost-operator", 1, retryInterval, timeout)
 		require.NoError(t, err)
@@ -76,11 +78,16 @@ func mattermostScaleTest(t *testing.T, k8sClient client.Client, k8sTypedClient k
 			Scheduling: operator.Scheduling{
 				Resources: testMattermostResources(),
 			},
-			FileStore: testFileStoreConfig(1, 4),
+			FileStore: testFileStoreConfig(4, 1),
 			Database:  testDatabaseConfig(1),
 		},
 	}
 	mmNamespaceName := types.NamespacedName{Namespace: exampleMattermost.Namespace, Name: exampleMattermost.Name}
+
+	defer func() {
+		err := k8sClient.Delete(context.TODO(), exampleMattermost)
+		require.NoError(t, err)
+	}()
 
 	err := k8sClient.Create(context.TODO(), exampleMattermost)
 	require.NoError(t, err)
@@ -123,9 +130,6 @@ func mattermostScaleTest(t *testing.T, k8sClient client.Client, k8sTypedClient k
 
 	err = WaitForMattermostStable(t, k8sClient, mmNamespaceName, timeout)
 	require.NoError(t, err)
-
-	err = k8sClient.Delete(context.TODO(), exampleMattermost)
-	require.NoError(t, err)
 }
 
 func mattermostUpgradeTest(t *testing.T, k8sClient client.Client, k8sTypedClient kubernetes.Interface) {
@@ -148,6 +152,12 @@ func mattermostUpgradeTest(t *testing.T, k8sClient client.Client, k8sTypedClient
 			Database:  testDatabaseConfig(1),
 		},
 	}
+
+	defer func() {
+		err := k8sClient.Delete(context.TODO(), exampleMattermost)
+		require.NoError(t, err)
+	}()
+
 	mmNamespaceName := types.NamespacedName{Namespace: exampleMattermost.Namespace, Name: exampleMattermost.Name}
 
 	err := k8sClient.Create(context.TODO(), exampleMattermost)
@@ -207,9 +217,6 @@ func mattermostUpgradeTest(t *testing.T, k8sClient client.Client, k8sTypedClient
 	err = k8sClient.Get(context.TODO(), types.NamespacedName{Name: testName, Namespace: mmNamespace}, &mmDeployment)
 	require.NoError(t, err)
 	require.Equal(t, "mattermost/mattermost-enterprise-edition:"+operatortest.LatestStableMattermostVersion, mmDeployment.Spec.Template.Spec.Containers[0].Image)
-
-	err = k8sClient.Delete(context.TODO(), exampleMattermost)
-	require.NoError(t, err)
 }
 
 func mattermostWithMySQLReplicas(t *testing.T, client client.Client, typedClient kubernetes.Interface) {
@@ -231,6 +238,11 @@ func mattermostWithMySQLReplicas(t *testing.T, client client.Client, typedClient
 		},
 	}
 
+	defer func() {
+		err := k8sClient.Delete(context.TODO(), exampleMattermost)
+		require.NoError(t, err)
+	}()
+
 	// use Context's create helper to create the object and add a cleanup function for the new object
 	err := client.Create(context.TODO(), exampleMattermost)
 	require.NoError(t, err)
@@ -242,9 +254,6 @@ func mattermostWithMySQLReplicas(t *testing.T, client client.Client, typedClient
 	require.NoError(t, err)
 
 	err = waitForMySQLStatusReady(t, client, mmNamespace, utils.HashWithPrefix("db", testName), 2, retryInterval, timeout)
-	require.NoError(t, err)
-
-	err = client.Delete(context.TODO(), exampleMattermost)
 	require.NoError(t, err)
 }
 

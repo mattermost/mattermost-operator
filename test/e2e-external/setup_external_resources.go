@@ -2,6 +2,8 @@ package e2e
 
 import (
 	"context"
+	"log"
+	"os/exec"
 
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	"github.com/pkg/errors"
@@ -50,12 +52,17 @@ func SetupTestEnv(k8sClient client.Client, namespace string) (TestEnv, error) {
 	}
 	cleanupFuncs = append(cleanupFuncs, cleanupPostgres)
 
-	cleanupMinio, err := CreateFromFile(ctx, k8sClient, namespace, "../../resources/minio.yaml")
-	if err != nil {
-		cleanupFuncs.Cleanup()
-		return TestEnv{}, errors.Wrap(err, "failed to apply Minio")
+	cmd := exec.Command("kubectl", "minio", "init")
+	if cmd.Err != nil {
+		return TestEnv{}, errors.Wrap(cmd.Err, "failed to init minio")
 	}
-	cleanupFuncs = append(cleanupFuncs, cleanupMinio)
+
+	cleanupFuncs = append(cleanupFuncs, func() {
+		cmd := exec.Command("kubectl", "minio", "delete")
+		if cmd.Err != nil {
+			log.Printf("error deleting minio: %s", err.Error())
+		}
+	})
 
 	cleanupSecrets, err := CreateFromFile(ctx, k8sClient, namespace, "../../resources/mm-secrets.yaml")
 	if err != nil {
