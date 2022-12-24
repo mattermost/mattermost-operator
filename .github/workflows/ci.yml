@@ -49,13 +49,6 @@ jobs:
         run: |
           cd ${GITHUB_WORKSPACE}/src/github.com/mattermost/mattermost-operator
 
-          export GOPATH=${GITHUB_WORKSPACE}
-          go env -w GOPATH=${GITHUB_WORKSPACE}
-
-          pwd
-          echo $GOPATH
-          go env GOPATH
-
           make clean
           make operator-sdk
 
@@ -66,7 +59,7 @@ jobs:
           mkdir -p /tmp/config/crd/bases
           cp -R config/crd/bases/* /tmp/config/crd/bases
 
-          make generate manifests
+          GOPATH=${GITHUB_WORKSPACE} make generate manifests
           diff /tmp/apis/mattermost/v1alpha1 apis/mattermost/v1alpha1
           diff /tmp/apis/mattermost/v1beta1 apis/mattermost/v1beta1
           diff /tmp/config/crd/bases config/crd/bases
