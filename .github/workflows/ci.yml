@@ -10,6 +10,14 @@ on:
 permissions:
   contents: read
 
+env:
+  GOPATH: ${{ github.workspace }}
+  GOBIN: ${{ github.workspace }}/bin
+
+defaults:
+  run:
+    working-directory: ${{ env.GOPATH }}/src/mattermost/mattermost-operator
+
 jobs:
   lint:
     runs-on: ubuntu-latest
@@ -18,6 +26,7 @@ jobs:
         uses: actions/checkout@755da8c3cf115ac066823e79a1e1788f8940201b # v3.2.0
         with:
           fetch-depth: 0
+          path: ${{ env.GOPATH }}/src/mattermost/mattermost-operator
 
       - name: Setup Go
         uses: actions/setup-go@6edd4406fa81c3da01a34fa6f6343087c207a568 # v3.5.0
@@ -38,6 +47,7 @@ jobs:
         uses: actions/checkout@755da8c3cf115ac066823e79a1e1788f8940201b # v3.2.0
         with:
           fetch-depth: 0
+          path: ${{ env.GOPATH }}/src/mattermost/mattermost-operator
 
       - name: Setup Go
         uses: actions/setup-go@6edd4406fa81c3da01a34fa6f6343087c207a568 # v3.5.0
@@ -46,7 +56,7 @@ jobs:
 
       - name: Generate Operator Manifests
         run: |
-          make clean 
+          make clean
           make operator-sdk
 
           mkdir -p /tmp/apis/mattermost/v1alpha1
@@ -82,6 +92,7 @@ jobs:
         uses: actions/checkout@dc323e67f16fb5f7663d20ff7941f27f5809e9b6 # v3.2.0
         with:
           fetch-depth: 0
+          path: ${{ env.GOPATH }}/src/mattermost/mattermost-operator
 
       - name: Set short SHA
         run: echo "SHORT_SHA=${GITHUB_SHA:0:7}" >> $GITHUB_ENV
