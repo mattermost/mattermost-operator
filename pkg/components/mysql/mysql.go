@@ -35,7 +35,7 @@ func Cluster(mattermost *mattermostv1alpha1.ClusterInstallation) *mysqlOperator.
 			},
 		},
 		Spec: mysqlOperator.MysqlClusterSpec{
-			MysqlVersion: "5.7.26", // If we want to change this, we need to update the mysql-versions-to-image map in the operator too.
+			MysqlVersion: "5.7",
 			Replicas:     utils.NewInt32(mattermost.Spec.Database.Replicas),
 			SecretName:   DefaultDatabaseSecretName(mattermost.Name),
 			VolumeSpec: mysqlOperator.VolumeSpec{
@@ -79,7 +79,7 @@ func ClusterV1Beta(mattermost *mmv1beta.Mattermost) *mysqlOperator.MysqlCluster 
 			OwnerReferences: mattermostApp.MattermostOwnerReference(mattermost),
 		},
 		Spec: mysqlOperator.MysqlClusterSpec{
-			MysqlVersion: "5.7.26", // If we want to change this, we need to update the mysql-versions-to-image map in the operator too.
+			MysqlVersion: "5.7",
 			Replicas:     mattermost.Spec.Database.OperatorManaged.Replicas,
 			SecretName:   DefaultDatabaseSecretName(mattermost.Name),
 			VolumeSpec: mysqlOperator.VolumeSpec{
