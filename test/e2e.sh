@@ -24,7 +24,15 @@ docker_exec() {
 run_kind() {
     KIND_VERSION="${KIND_VERSION:=v0.11.1}"
     echo "Download kind binary..."
-    curl -sSLo kind https://github.com/kubernetes-sigs/kind/releases/download/"${KIND_VERSION}"/kind-linux-amd64
+    # Borrowed from: https://github.com/helm/kind-action/blob/main/kind.sh#L59
+    local arch
+    case $(uname -m) in
+        i386)           arch="386" ;;
+        i686)           arch="386" ;;
+        x86_64)         arch="amd64" ;;
+        arm|aarch64)    dpkg --print-architecture | grep -q "arm64" && arch="arm64" || arch="arm" ;;
+    esac
+    curl -sSLo kind https://github.com/kubernetes-sigs/kind/releases/download/"${KIND_VERSION}"/kind-linux-$arch
     chmod +x kind
     sudo mv kind /usr/local/bin/kind
 
