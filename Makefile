@@ -60,7 +60,7 @@ INSTALL_YAML=docs/mattermost-operator/mattermost-operator.yaml
 GO_INSTALL = ./scripts/go_install.sh
 
 KIND_CLUSTER ?= kind
-KIND_CONFIG_FILE ?= kind-config.yaml
+KIND_CONFIG_FILE ?= kind-config-amd64.yaml
 
 # Binaries.
 TOOLS_BIN_DIR := $(abspath bin)
