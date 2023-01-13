@@ -12,6 +12,6 @@ if kind export kubeconfig --name "$KIND_CLUSTER" ; then
     echo "Using existing cluster"
 else
     echo "Creating new Kind cluster"
-    kind create cluster --name "${KIND_CLUSTER}" --config "${DIR}"/"${KIND_CONFIG_FILE}"
+    kind create cluster --name "${KIND_CLUSTER}" --config "${DIR}"/"${KIND_CONFIG_FILE}" --wait=60s
     kind export kubeconfig --name "$KIND_CLUSTER"
 fi
