@@ -44,6 +44,7 @@ jobs:
         uses: actions/setup-go@6edd4406fa81c3da01a34fa6f6343087c207a568 # v3.5.0
         with:
           go-version: "1.19"
+          cache: true
 
       - name: Generate Operator Manifests
         run: |
@@ -110,9 +111,8 @@ jobs:
         run: |
           set -e
           set -u
-          TAG="${GITHUB_SHA:0:7}"
           echo $DOCKERHUB_TOKEN | docker login --username $DOCKERHUB_USERNAME --password-stdin
           docker tag mattermost/mattermost-operator:test mattermost/mattermost-operator:$TAG
           docker push mattermost/mattermost-operator:$TAG
         env:
-          TAG: ${GITHUB_SHA:0:7}
+          TAG: ${SHORT_SHA}

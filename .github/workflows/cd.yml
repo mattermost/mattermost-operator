@@ -2,6 +2,7 @@ name: cd
 on:
   workflow_run:
     workflows: ["ci"]
+    branches-ignore: [master]
     types:
       - completed
   push:
@@ -31,4 +32,4 @@ jobs:
           docker tag mattermost/mattermost-operator:test mattermost/mattermost-operator:$TAG
           docker push mattermost/mattermost-operator:$TAG
         env:
-          TAG: ${GITHUB_REF_NAME}
+          TAG: ${{ github.ref_name }}
