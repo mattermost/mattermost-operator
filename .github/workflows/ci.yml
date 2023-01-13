@@ -77,7 +77,7 @@ jobs:
           K8S_VERSION: v1.17.5
           IMAGE_NAME: mattermost/mattermost-operator
           IMAGE_TAG: test
-          KIND_VERSION: v0.8.1
+          KIND_VERSION: v0.17.0
           SDK_VERSION: v1.0.1
 
   build:
