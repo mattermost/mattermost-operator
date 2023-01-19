@@ -45,6 +45,7 @@ jobs:
         with:
           go-version: "1.19"
           cache: true
+          cache-dependency-path: src/github.com/mattermost/mattermost-operator/go.sum
 
       - name: Generate Operator Manifests
         run: |
