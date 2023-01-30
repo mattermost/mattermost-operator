@@ -13,7 +13,7 @@ const (
 	// possible roll-back points.
 	// More details:
 	// https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#rolling-back-a-deployment
-	defaultRevHistoryLimit = 5
+	defaultRevHistoryLimit = 1
 	// defaultMaxUnavailable is the default max number of unavailable pods out
 	// of specified `Replicas` during rolling update.
 	// More details:
