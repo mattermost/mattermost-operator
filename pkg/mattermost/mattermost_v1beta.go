@@ -347,6 +347,12 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 		podSecurityContext = mattermost.Spec.PodTemplate.SecurityContext
 	}
 
+	// Deployment template
+	revisionHistoryLimit := pkgUtils.NewInt32(defaultRevHistoryLimit)
+	if mattermost.Spec.DeploymentTemplate.RevisionHistoryLimit != nil {
+		revisionHistoryLimit = mattermost.Spec.DeploymentTemplate.RevisionHistoryLimit
+	}
+
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            deploymentName,
@@ -362,7 +368,7 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 					MaxSurge:       &maxSurge,
 				},
 			},
-			RevisionHistoryLimit: pkgUtils.NewInt32(defaultRevHistoryLimit),
+			RevisionHistoryLimit: revisionHistoryLimit,
 			Replicas:             mattermost.Spec.Replicas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: mmv1beta.MattermostSelectorLabels(deploymentName),

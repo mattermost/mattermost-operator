@@ -120,6 +120,10 @@ type MattermostSpec struct {
 	// +optional
 	PodTemplate *PodTemplate `json:"podTemplate,omitempty"`
 
+	// DeploymentTemplate defines configuration for the template for Mattermost deployemnt.
+	// +optional
+	DeploymentTemplate *DeploymentTemplate `json:"deploymentTemplate,omitempty"`
+
 	// UpdateJob defines configuration for the template for the update job.
 	// +optional
 	UpdateJob *UpdateJob `json:"updateJob,omitempty"`
@@ -257,6 +261,13 @@ type PodTemplate struct {
 	// Overrides what is set in ResourceLabels, does not override default labels (app and cluster labels).
 	// +optional
 	ExtraLabels map[string]string `json:"extraLabels,omitempty"`
+}
+
+// PodTemplate defines configuration for the template for Mattermost pods.
+type DeploymentTemplate struct {
+	// Defines the revision history limit for the mattermost deployment.
+	// +optional
+	RevisionHistoryLimit *int32 `json:"revisionHistoryLimit,omitempty"`
 }
 
 // UpdateJob defines configuration for the template for the update job pod.
