@@ -349,7 +349,7 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 
 	// Deployment template
 	revisionHistoryLimit := pkgUtils.NewInt32(defaultRevHistoryLimit)
-	if mattermost.Spec.DeploymentTemplate.RevisionHistoryLimit != nil {
+	if mattermost.Spec.DeploymentTemplate != nil && mattermost.Spec.DeploymentTemplate.RevisionHistoryLimit != nil {
 		revisionHistoryLimit = mattermost.Spec.DeploymentTemplate.RevisionHistoryLimit
 	}
 
