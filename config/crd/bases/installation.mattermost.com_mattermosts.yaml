@@ -183,6 +183,16 @@ spec:
                         type: string
                     type: object
                 type: object
+              deploymentTemplate:
+                description: DeploymentTemplate defines configuration for the template
+                  for Mattermost deployemnt.
+                properties:
+                  revisionHistoryLimit:
+                    description: Defines the revision history limit for the mattermost
+                      deployment.
+                    format: int32
+                    type: integer
+                type: object
               dnsConfig:
                 description: Custom DNS configuration to use for the Mattermost Installation
                   pods.
