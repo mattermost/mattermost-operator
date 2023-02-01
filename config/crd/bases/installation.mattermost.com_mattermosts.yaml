@@ -185,7 +185,7 @@ spec:
                 type: object
               deploymentTemplate:
                 description: DeploymentTemplate defines configuration for the template
-                  for Mattermost deployemnt.
+                  for Mattermost deployment.
                 properties:
                   revisionHistoryLimit:
                     description: Defines the revision history limit for the mattermost
