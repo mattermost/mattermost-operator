@@ -120,7 +120,7 @@ type MattermostSpec struct {
 	// +optional
 	PodTemplate *PodTemplate `json:"podTemplate,omitempty"`
 
-	// DeploymentTemplate defines configuration for the template for Mattermost deployemnt.
+	// DeploymentTemplate defines configuration for the template for Mattermost deployment.
 	// +optional
 	DeploymentTemplate *DeploymentTemplate `json:"deploymentTemplate,omitempty"`
 
@@ -263,7 +263,7 @@ type PodTemplate struct {
 	ExtraLabels map[string]string `json:"extraLabels,omitempty"`
 }
 
-// PodTemplate defines configuration for the template for Mattermost pods.
+// DeploymentTemplate defines configuration for the template for Mattermost deployment.
 type DeploymentTemplate struct {
 	// Defines the revision history limit for the mattermost deployment.
 	// +optional
