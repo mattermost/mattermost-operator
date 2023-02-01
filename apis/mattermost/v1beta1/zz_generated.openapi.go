@@ -306,7 +306,7 @@ func schema_mattermost_operator_apis_mattermost_v1beta1_MattermostSpec(ref commo
 					},
 					"deploymentTemplate": {
 						SchemaProps: spec.SchemaProps{
-							Description: "DeploymentTemplate defines configuration for the template for Mattermost deployemnt.",
+							Description: "DeploymentTemplate defines configuration for the template for Mattermost deployment.",
 							Ref:         ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.DeploymentTemplate"),
 						},
 					},
