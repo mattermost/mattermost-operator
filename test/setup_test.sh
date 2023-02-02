@@ -31,4 +31,8 @@ make build-image kind-load-image
 sleep 5
 
 kubectl get pods --all-namespaces
+
+# https://github.com/mattermost/mattermost-operator/pull/332
+kubectl patch statefulset mysql-operator -n mysql-operator --type='json' -p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--mysql-versions-to-image=5.7.26=percona:5.7.26"}]'
+
 echo "Ready for testing"
