@@ -16,7 +16,7 @@ See the installation instructions at https://docs.mattermost.com/install/install
 
 ## Migrate to Mattermost Custom Resource
 
-In version `v2.0.0` of the Mattermost Operator, several breaking changes will be introduced. Some of the more significant ones are: 
+In version `v2.0.0` of the Mattermost Operator, several breaking changes will be introduced. Some of the more significant ones are:
 - The name of the Custom Resource changed from `ClusterInstallation` to `Mattermost`.
 - Support for `BlueGreen` and `Canary` deployments was dropped.
 - Layout of some fields changed.
@@ -103,6 +103,8 @@ If generation produced any unexpected changes, clean old binaries and rerun the 
 make clean generate manifests
 ```
 
+> If the manifest generation is making changes to package paths this is [a known bug](https://github.com/kubernetes/gengo/issues/147) while running the previous command outside `GOPATH` or by having the `GOPATH` flag unset. Make sure you clone the repository in the appropriate folder (see below) and that your `GOPATH` environment variable is set.
+
 ### Building mattermost-operator
 To start contributing to mattermost-operator you need to clone this repo to your local workspace.
 
@@ -122,7 +124,7 @@ Developing and testing local changes to Mattermost Operator is fairly simple. Fo
 > You don't need to push the mattermost-operator image to DockerHub or any other registry if testing with kind. You can load the image, built with `make build-image`, directly to the Kind cluster by running the following:
 > ```bash
 > kind load docker-image mattermost/mattermost-operator:test
-> ``` 
+> ```
 
 To spin up an appropriate Kind cluster and deploy dependencies, run:
 ```bash
@@ -136,7 +138,7 @@ make build-image kind-load-image deploy
 
 ### Accessing Mattermost Installation on Kind
 
-After you create Mattermost installation using Mattermost Operator on Kind cluster, 
+After you create Mattermost installation using Mattermost Operator on Kind cluster,
 port-forward the service to access it:
 ```bash
 kubectl port-forward svc/[MATTERMOST_NAME] 8065:8065
