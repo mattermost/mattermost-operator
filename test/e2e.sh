@@ -80,6 +80,9 @@ main() {
 
     source ./test/setup_test.sh
 
+    ## Github Actions hotfix
+    ## https://github.com/actions/runner-images/issues/6775
+    docker_exec git config --global --add safe.directory /go/src/github.com/mattermost/mattermost-operator
     docker_exec make deploy
 
     echo "Starting Operator Testing..."

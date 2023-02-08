@@ -85,7 +85,7 @@ jobs:
           cd ${GITHUB_WORKSPACE}/src/github.com/mattermost/mattermost-operator
           ./test/e2e.sh
         env:
-          K8S_VERSION: v1.22.0
+          K8S_VERSION: v1.22.9
           IMAGE_NAME: mattermost/mattermost-operator
           IMAGE_TAG: test
           KIND_VERSION: v0.17.0
