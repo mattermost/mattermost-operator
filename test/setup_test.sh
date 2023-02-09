@@ -8,14 +8,14 @@ set -Eeuxo pipefail
 docker pull --platform=linux/x86_64 quay.io/presslabs/mysql-operator:0.4.0
 docker pull --platform=linux/x86_64 quay.io/presslabs/mysql-operator-sidecar:0.4.0
 docker pull --platform=linux/x86_64 quay.io/presslabs/mysql-operator-orchestrator:0.4.0
-docker pull --platform=linux/x86_64 percona:5.7.26
+docker pull --platform=linux/x86_64 percona:5.7.35
 docker pull --platform=linux/x86_64 prom/mysqld-exporter:v0.11.0
 docker pull --platform=linux/x86_64 minio/k8s-operator:1.0.7
 
 kind load docker-image quay.io/presslabs/mysql-operator:0.4.0
 kind load docker-image quay.io/presslabs/mysql-operator-sidecar:0.4.0
 kind load docker-image quay.io/presslabs/mysql-operator-orchestrator:0.4.0
-kind load docker-image percona:5.7.26
+kind load docker-image percona:5.7.35
 kind load docker-image minio/k8s-operator:1.0.7
 kind load docker-image prom/mysqld-exporter:v0.11.0
 sleep 10

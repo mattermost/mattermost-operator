@@ -32,16 +32,19 @@ jobs:
         run: make check-modules
 
   test:
-    runs-on: release
+    runs-on: ubuntu-22.04
     steps:
       ### Temp session for debugging
-      # - name: Setup upterm session
-      #   uses: lhotari/action-upterm@d23c2722bdab893785c9fbeae314cbf080645bd7
-      #   with:
-      #     ## limits ssh access and adds the ssh public key for the user which triggered the workflow
-      #     limit-access-to-actor: true
-      #     ## limits ssh access and adds the ssh public keys of the listed GitHub users
-      #     limit-access-to-users: toninis
+      - name: Setup upterm session
+        uses: lhotari/action-upterm@d23c2722bdab893785c9fbeae314cbf080645bd7
+        with:
+          ## limits ssh access and adds the ssh public key for the user which triggered the workflow
+          limit-access-to-actor: true
+          # ## limits ssh access and adds the ssh public keys of the listed GitHub users
+          # limit-access-to-users: toninis
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
 
       - name: Checkout repo
         uses: actions/checkout@755da8c3cf115ac066823e79a1e1788f8940201b # v3.2.0

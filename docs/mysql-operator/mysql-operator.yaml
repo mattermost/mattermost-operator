@@ -4327,7 +4327,7 @@ spec:
             # connect to orchestrator on localhost
             - --orchestrator-uri=http://127.0.0.1:3000/api
             - --sidecar-image=quay.io/presslabs/mysql-operator-sidecar:0.4.0
-            - --mysql-versions-to-image=5.7.26=percona:5.7.26
+            - --mysql-versions-to-image=5.7.26=percona:5.7.35
         - name: orchestrator
           image: quay.io/presslabs/mysql-operator-orchestrator:0.4.0
           imagePullPolicy: IfNotPresent
