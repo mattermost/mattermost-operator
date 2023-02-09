@@ -43,11 +43,6 @@ jobs:
           # ## limits ssh access and adds the ssh public keys of the listed GitHub users
           # limit-access-to-users: toninis
 
-      - uses: helm/kind-action@v1.5.0
-        with:
-          cluster_name: kind
-          node_image: kindest/node:v1.24.7
-
       - name: Checkout repo
         uses: actions/checkout@755da8c3cf115ac066823e79a1e1788f8940201b # v3.2.0
         with:
@@ -90,8 +85,7 @@ jobs:
           cd ${GITHUB_WORKSPACE}/src/github.com/mattermost/mattermost-operator
           ./test/e2e.sh
         env:
-          KIND_CLUSTER: kind
-          K8S_VERSION: v1.24.7
+          K8S_VERSION: v1.22.9
           IMAGE_NAME: mattermost/mattermost-operator
           IMAGE_TAG: test
           KIND_VERSION: v0.17.0
