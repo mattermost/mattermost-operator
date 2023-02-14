@@ -34,15 +34,6 @@ jobs:
   test:
     runs-on: ubuntu-22.04
     steps:
-      ### Temp session for debugging
-      # - name: Setup upterm session
-      #   uses: lhotari/action-upterm@d23c2722bdab893785c9fbeae314cbf080645bd7
-      #   with:
-      #     ## limits ssh access and adds the ssh public key for the user which triggered the workflow
-      #     limit-access-to-actor: true
-      #     # ## limits ssh access and adds the ssh public keys of the listed GitHub users
-      #     # limit-access-to-users: toninis
-
       - name: Checkout repo
         uses: actions/checkout@755da8c3cf115ac066823e79a1e1788f8940201b # v3.2.0
         with:
@@ -75,10 +66,10 @@ jobs:
           diff /tmp/apis/mattermost/v1beta1 apis/mattermost/v1beta1
           diff /tmp/config/crd/bases config/crd/bases
 
-      # - name: ci/test
-      #   run: |
-      #     cd ${GITHUB_WORKSPACE}/src/github.com/mattermost/mattermost-operator
-      #     make unittest goverall
+      - name: ci/test
+        run: |
+          cd ${GITHUB_WORKSPACE}/src/github.com/mattermost/mattermost-operator
+          make unittest goverall
 
       - name: ci/test-e2e
         run: |
