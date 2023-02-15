@@ -14,12 +14,12 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repo
+      - name: ci/checkout-repo
         uses: actions/checkout@755da8c3cf115ac066823e79a1e1788f8940201b # v3.2.0
         with:
           fetch-depth: 0
 
-      - name: Setup Go
+      - name: ci/setup-go
         uses: actions/setup-go@6edd4406fa81c3da01a34fa6f6343087c207a568 # v3.5.0
         with:
           go-version: "1.19"
@@ -34,20 +34,20 @@ jobs:
   test:
     runs-on: ubuntu-22.04
     steps:
-      - name: Checkout repo
+      - name: ci/checkout-repo
         uses: actions/checkout@755da8c3cf115ac066823e79a1e1788f8940201b # v3.2.0
         with:
           fetch-depth: 0
           path: src/github.com/mattermost/mattermost-operator
 
-      - name: Setup Go
+      - name: ci/setup-go
         uses: actions/setup-go@6edd4406fa81c3da01a34fa6f6343087c207a568 # v3.5.0
         with:
           go-version: "1.19"
           cache: true
           cache-dependency-path: src/github.com/mattermost/mattermost-operator/go.sum
 
-      - name: Generate Operator Manifests
+      - name: ci/generate-operator-manifests
         run: |
           cd ${GITHUB_WORKSPACE}/src/github.com/mattermost/mattermost-operator
 
@@ -87,12 +87,12 @@ jobs:
     runs-on: ubuntu-latest
     needs: [lint, test]
     steps:
-      - name: Checkout repo
+      - name: ci/checkout-repo
         uses: actions/checkout@dc323e67f16fb5f7663d20ff7941f27f5809e9b6 # v3.2.0
         with:
           fetch-depth: 0
 
-      - name: Set short SHA
+      - name: ci/set-short-SHA
         run: echo "SHORT_SHA=${GITHUB_SHA:0:7}" >> $GITHUB_ENV
 
       - name: ci/build-docker
@@ -102,8 +102,7 @@ jobs:
         uses: aquasecurity/trivy-action@8bd2f9fbda2109502356ff8a6a89da55b1ead252 # v0.9.1
         with:
           image-ref: "mattermost/mattermost-operator"
-          format: "template"
-          template: "@/contrib/sarif.tpl"
+          format: "sarif"
           output: "trivy-results.sarif"
           exit-code: "1"
           ignore-unfixed: true
