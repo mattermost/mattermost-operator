@@ -26,8 +26,7 @@ jobs:
 
       - name: ci/push-docker
         run: |
-          set -e
-          set -u
+          set -eu
           echo $DOCKERHUB_TOKEN | docker login --username $DOCKERHUB_USERNAME --password-stdin
           docker tag mattermost/mattermost-operator:test mattermost/mattermost-operator:$TAG
           docker push mattermost/mattermost-operator:$TAG
