@@ -26,6 +26,9 @@ const (
 	DefaultStorageSize = "50Gi"
 	// DefaultPullPolicy is ifNotPresent
 	DefaultPullPolicy = corev1.PullIfNotPresent
+	// DefaultDatabaseVersion
+	// https://github.com/bitpoke/mysql-operator/blob/master/pkg/util/constants/constants.go#L87
+	DefaultDatabaseVersion = "8.0"
 
 	// ClusterLabel is the label applied across all compoments
 	ClusterLabel = "v1alpha1.mattermost.com/installation"
@@ -140,6 +143,9 @@ func (db *Database) SetDefaults() {
 	}
 	if db.StorageSize == "" {
 		db.StorageSize = DefaultStorageSize
+	}
+	if db.Version == "" {
+		db.Version = DefaultDatabaseVersion
 	}
 }
 

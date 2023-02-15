@@ -353,6 +353,9 @@ type OperatorManagedDatabase struct {
 	// Defines the secret to be used when performing a database restore.
 	// +optional
 	BackupRestoreSecretName string `json:"backupRestoreSecretName,omitempty"`
+	// Defines the cluster version for the database to use
+	// +optional
+	Version string `json:"version,omitempty"`
 }
 
 // FileStore defines the file store configuration for Mattermost.

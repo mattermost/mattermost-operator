@@ -181,6 +181,10 @@ spec:
                         description: Defines the type of database to use for an Operator-Managed
                           database.
                         type: string
+                      version:
+                        description: Defines the cluster version for the database
+                          to use
+                        type: string
                     type: object
                 type: object
               deploymentTemplate:

@@ -104,6 +104,9 @@ all: generate check-style unittest build
 unittest: ## Runs unit tests
 	$(GO) test -mod=vendor $(GO_LINKER_FLAGS) $(TEST_PACKAGES) -v -covermode=count -coverprofile=coverage.out
 
+e2e-local:
+	./test/e2e_local.sh
+
 goverall: $(GOVERALLS_GEN) ## Runs goveralls
 	$(GOVERALLS_GEN) -coverprofile=coverage.out -service=circle-ci -repotoken ${COVERALLS_REPO_TOKEN} || true
 
