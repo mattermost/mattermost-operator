@@ -112,7 +112,7 @@ jobs:
           severity: "CRITICAL,HIGH"
 
       - name: ci/create-trivy-results-report
-        if: failure()
+        # if: failure()
         uses: github/codeql-action/upload-sarif@17573ee1cc1b9d061760f3a006fc4aac4f944fd5 # v2.2.4
         with:
           sarif_file: "trivy-results.sarif"
