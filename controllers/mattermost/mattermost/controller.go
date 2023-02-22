@@ -94,14 +94,14 @@ func (r *MattermostReconciler) Reconcile(ctx context.Context, request ctrl.Reque
 		return reconcile.Result{}, err
 	}
 
-	if mattermost.Status.State != mmv1beta.Reconciling {
+	if mattermost.Status.State != mmv1beta.Reconciling && mattermost.Status.State != mmv1beta.Ready {
 		var canProcess bool
 		canProcess, err = r.startNonReconcilingMMProcessing(ctx, reqLogger)
 		if err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "failed to verify reconciliation limit")
 		}
 		if !canProcess {
-			reqLogger.Info(fmt.Sprintf("Reached limit of reconciling installations, requeuing in %s", r.RequeueOnLimitDelay.String()))
+			reqLogger.Info(fmt.Sprintf("Reached limit of reconciling+processing installations, requeuing in %s", r.RequeueOnLimitDelay.String()))
 			return reconcile.Result{RequeueAfter: r.RequeueOnLimitDelay}, nil
 		}
 		defer func() {
@@ -215,10 +215,13 @@ func (r *MattermostReconciler) startNonReconcilingMMProcessing(ctx context.Conte
 		return false, errors.Wrap(err, "failed to list Mattermosts")
 	}
 
-	reqLogger.Info("Non reconciling being processed", "processing", r.reconcilingRateLimiter.nonReconcilingBeingProcessed)
+	rCount := countReconcilingOrReady(mmListInstallations.Items)
+	reqLogger.Info("Non reconciling being processed",
+		"processing", r.reconcilingRateLimiter.nonReconcilingBeingProcessed,
+		"reconciling", rCount,
+	)
 	// Check if limit of Mattermosts reconciling at the same time is reached.
-	if countReconciling(mmListInstallations.Items)+r.reconcilingRateLimiter.nonReconcilingBeingProcessed >= r.MaxReconciling {
-		reqLogger.Info(fmt.Sprintf("Reached limit of reconciling or processing installations, requeuing in %s", r.RequeueOnLimitDelay.String()))
+	if rCount+r.reconcilingRateLimiter.nonReconcilingBeingProcessed >= r.MaxReconciling {
 		return false, nil
 	}
 
@@ -241,10 +244,10 @@ func (rl *unstableInstallationsRateLimiter) decrementProcessing() {
 	rl.nonReconcilingBeingProcessed -= 1
 }
 
-func countReconciling(mattermosts []mmv1beta.Mattermost) int {
+func countReconcilingOrReady(mattermosts []mmv1beta.Mattermost) int {
 	sum := 0
 	for _, ci := range mattermosts {
-		if ci.Status.State == mmv1beta.Reconciling {
+		if ci.Status.State == mmv1beta.Reconciling || ci.Status.State == mmv1beta.Ready {
 			sum++
 		}
 	}
