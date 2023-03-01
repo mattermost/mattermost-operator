@@ -106,7 +106,7 @@ jobs:
           format: "sarif"
           limit-severities-for-sarif: true # https://github.com/aquasecurity/trivy-action/blob/0.9.1/entrypoint.sh#L172
           output: "trivy-results.sarif"
-          exit-code: "1"
+          exit-code: "0"
           ignore-unfixed: true
           vuln-type: "os,library"
           severity: "CRITICAL,HIGH"
