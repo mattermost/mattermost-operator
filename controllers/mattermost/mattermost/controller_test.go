@@ -413,19 +413,19 @@ func TestReconcilingLimit(t *testing.T) {
 		Resources:           resources.NewResourceHelper(c, s),
 	}
 
-	assertInstallationsCount := func(t *testing.T, expectedCIs, expectedReconciling int) {
+	assertInstallationsCount := func(t *testing.T, expectedCIs, expectedReconcilingOrReady int) {
 		var mmList mmv1beta.MattermostList
 		err := c.List(context.TODO(), &mmList)
 		require.NoError(t, err)
 
 		assert.Equal(t, expectedCIs, len(mmList.Items))
-		assert.Equal(t, expectedReconciling, countReconciling(mmList.Items))
+		assert.Equal(t, expectedReconcilingOrReady, countReconcilingOrReady(mmList.Items))
 	}
 
 	err := c.Create(context.TODO(), mm1)
 	require.NoError(t, err)
 
-	mm2 := newMattermost("second", "2", mmv1beta.Reconciling)
+	mm2 := newMattermost("second", "2", mmv1beta.Ready)
 	err = c.Create(context.TODO(), mm2)
 	require.NoError(t, err)
 
@@ -452,6 +452,12 @@ func TestReconcilingLimit(t *testing.T) {
 
 	t.Run("should pick up Installation in Reconciling state even if limit reached", func(t *testing.T) {
 		req3 := requestForCI(mm3)
+		_, err = r.Reconcile(context.Background(), req3)
+		require.Error(t, err)
+	})
+
+	t.Run("should pick up Installation in Ready state even if limit reached", func(t *testing.T) {
+		req3 := requestForCI(mm2)
 		_, err = r.Reconcile(context.Background(), req3)
 		require.Error(t, err)
 	})
