@@ -271,10 +271,23 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 	volumes = append(volumes, fsVolumes...)
 	volumeMounts = append(volumeMounts, fsVmounts...)
 	initContainers = append(initContainers, fileStore.InitContainers(mattermost)...)
+	containerPorts := []corev1.ContainerPort{
+		{
+			ContainerPort: 8065,
+			Name:          "app",
+		},
+		{
+			ContainerPort: 8067,
+			Name:          "metrics",
+		},
+	}
 
 	// Extensions
 	if mattermost.Spec.PodExtensions.InitContainers != nil {
 		initContainers = append(initContainers, mattermost.Spec.PodExtensions.InitContainers...)
+	}
+	if mattermost.Spec.PodExtensions.ContainerPorts != nil {
+		containerPorts = append(containerPorts, mattermost.Spec.PodExtensions.ContainerPorts...)
 	}
 
 	// TODO: DB setup job is temporarily disabled as `mattermost version` command
@@ -389,21 +402,12 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 							TerminationMessagePolicy: corev1.TerminationMessageFallbackToLogsOnError,
 							Command:                  []string{"mattermost"},
 							Env:                      envVars,
-							Ports: []corev1.ContainerPort{
-								{
-									ContainerPort: 8065,
-									Name:          "app",
-								},
-								{
-									ContainerPort: 8067,
-									Name:          "metrics",
-								},
-							},
-							ReadinessProbe:  readiness,
-							LivenessProbe:   liveness,
-							VolumeMounts:    volumeMounts,
-							Resources:       mattermost.Spec.Scheduling.Resources,
-							SecurityContext: containerSecurityContext,
+							Ports:                    containerPorts,
+							ReadinessProbe:           readiness,
+							LivenessProbe:            liveness,
+							VolumeMounts:             volumeMounts,
+							Resources:                mattermost.Spec.Scheduling.Resources,
+							SecurityContext:          containerSecurityContext,
 						},
 					},
 					ImagePullSecrets: mattermost.Spec.ImagePullSecrets,
