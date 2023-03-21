@@ -36,6 +36,9 @@ func (omd *OperatorManagedDatabase) SetDefaults() {
 	if omd.StorageSize == "" {
 		omd.StorageSize = DefaultStorageSize
 	}
+	if omd.Version == "" {
+		omd.Version = DefaultDatabaseVersion
+	}
 }
 
 func (db *Database) SetDefaultReplicasAndResources() {

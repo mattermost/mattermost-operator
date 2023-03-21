@@ -130,6 +130,7 @@ func convertToOperatorManagedDB(ci *mattermostv1alpha1.ClusterInstallation) matt
 			BackupRemoteDeletePolicy: ci.Spec.Database.BackupRemoteDeletePolicy,
 			BackupSecretName:         ci.Spec.Database.BackupSecretName,
 			BackupRestoreSecretName:  ci.Spec.Database.BackupRestoreSecretName,
+			Version:                  ci.Spec.Database.Version,
 		},
 	}
 }

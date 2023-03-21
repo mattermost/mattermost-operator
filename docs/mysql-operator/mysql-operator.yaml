@@ -3,7 +3,6 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.5.0
-  creationTimestamp: null
   name: mysqlbackups.mysql.presslabs.org
 spec:
   group: mysql.presslabs.org
@@ -21,10 +20,10 @@ spec:
           x-kubernetes-preserve-unknown-fields: true
           properties:
             apiVersion:
-              description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+              description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources"
               type: string
             kind:
-              description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+              description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds"
               type: string
             metadata:
               type: object
@@ -98,7 +97,6 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.5.0
-  creationTimestamp: null
   name: mysqlclusters.mysql.presslabs.org
 spec:
   group: mysql.presslabs.org
@@ -131,15 +129,15 @@ spec:
           x-kubernetes-preserve-unknown-fields: true
           properties:
             apiVersion:
-              description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+              description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources"
               type: string
             kind:
-              description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+              description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds"
               type: string
             metadata:
               type: object
             spec:
-              description: 'MysqlClusterSpec defines the desired state of MysqlCluster nolint: maligned'
+              description: "MysqlClusterSpec defines the desired state of MysqlCluster nolint: maligned"
               x-kubernetes-preserve-unknown-fields: true
               properties:
                 backupCompressCommand:
@@ -204,7 +202,7 @@ spec:
                   description: A map[string]string that will be passed to my.cnf file.
                   type: object
                 mysqlVersion:
-                  description: 'Represents the MySQL version that will be run. The available version can be found here: https://github.com/presslabs/mysql-operator/blob/0fd4641ce4f756a0aab9d31c8b1f1c44ee10fcb2/pkg/util/constants/constants.go#L87 This field should be set even if the Image is set to let the operator know which mysql version is running. Based on this version the operator can take decisions which features can be used. Defaults to 5.7'
+                  description: "Represents the MySQL version that will be run. The available version can be found here: https://github.com/presslabs/mysql-operator/blob/0fd4641ce4f756a0aab9d31c8b1f1c44ee10fcb2/pkg/util/constants/constants.go#L87 This field should be set even if the Image is set to let the operator know which mysql version is running. Based on this version the operator can take decisions which features can be used. Defaults to 5.7"
                   type: string
                 podSpec:
                   description: Pod extra specification
@@ -1169,12 +1167,12 @@ spec:
                         description: A single application container that you want to run within a pod.
                         properties:
                           args:
-                            description: 'Arguments to the entrypoint. The docker image''s CMD is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container''s environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell'
+                            description: "Arguments to the entrypoint. The docker image's CMD is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container's environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell"
                             items:
                               type: string
                             type: array
                           command:
-                            description: 'Entrypoint array. Not executed within a shell. The docker image''s ENTRYPOINT is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container''s environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell'
+                            description: "Entrypoint array. Not executed within a shell. The docker image's ENTRYPOINT is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container's environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell"
                             items:
                               type: string
                             type: array
@@ -1199,7 +1197,7 @@ spec:
                                           description: The key to select.
                                           type: string
                                         name:
-                                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?'
+                                          description: "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?"
                                           type: string
                                         optional:
                                           description: Specify whether the ConfigMap or its key must be defined
@@ -1208,7 +1206,7 @@ spec:
                                         - key
                                       type: object
                                     fieldRef:
-                                      description: 'Selects a field of the pod: supports metadata.name, metadata.namespace, `metadata.labels[''<KEY>'']`, `metadata.annotations[''<KEY>'']`, spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs.'
+                                      description: "Selects a field of the pod: supports metadata.name, metadata.namespace, `metadata.labels['<KEY>']`, `metadata.annotations['<KEY>']`, spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs."
                                       properties:
                                         apiVersion:
                                           description: Version of the schema the FieldPath is written in terms of, defaults to "v1".
@@ -1220,10 +1218,10 @@ spec:
                                         - fieldPath
                                       type: object
                                     resourceFieldRef:
-                                      description: 'Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported.'
+                                      description: "Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported."
                                       properties:
                                         containerName:
-                                          description: 'Container name: required for volumes, optional for env vars'
+                                          description: "Container name: required for volumes, optional for env vars"
                                           type: string
                                         divisor:
                                           anyOf:
@@ -1233,7 +1231,7 @@ spec:
                                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                                           x-kubernetes-int-or-string: true
                                         resource:
-                                          description: 'Required: resource to select'
+                                          description: "Required: resource to select"
                                           type: string
                                       required:
                                         - resource
@@ -1245,7 +1243,7 @@ spec:
                                           description: The key of the secret to select from.  Must be a valid secret key.
                                           type: string
                                         name:
-                                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?'
+                                          description: "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?"
                                           type: string
                                         optional:
                                           description: Specify whether the Secret or its key must be defined
@@ -1267,7 +1265,7 @@ spec:
                                   description: The ConfigMap to select from
                                   properties:
                                     name:
-                                      description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?'
+                                      description: "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?"
                                       type: string
                                     optional:
                                       description: Specify whether the ConfigMap must be defined
@@ -1280,7 +1278,7 @@ spec:
                                   description: The Secret to select from
                                   properties:
                                     name:
-                                      description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?'
+                                      description: "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?"
                                       type: string
                                     optional:
                                       description: Specify whether the Secret must be defined
@@ -1289,16 +1287,16 @@ spec:
                               type: object
                             type: array
                           image:
-                            description: 'Docker image name. More info: https://kubernetes.io/docs/concepts/containers/images This field is optional to allow higher level config management to default or override container images in workload controllers like Deployments and StatefulSets.'
+                            description: "Docker image name. More info: https://kubernetes.io/docs/concepts/containers/images This field is optional to allow higher level config management to default or override container images in workload controllers like Deployments and StatefulSets."
                             type: string
                           imagePullPolicy:
-                            description: 'Image pull policy. One of Always, Never, IfNotPresent. Defaults to Always if :latest tag is specified, or IfNotPresent otherwise. Cannot be updated. More info: https://kubernetes.io/docs/concepts/containers/images#updating-images'
+                            description: "Image pull policy. One of Always, Never, IfNotPresent. Defaults to Always if :latest tag is specified, or IfNotPresent otherwise. Cannot be updated. More info: https://kubernetes.io/docs/concepts/containers/images#updating-images"
                             type: string
                           lifecycle:
                             description: Actions that the management system should take in response to container lifecycle events. Cannot be updated.
                             properties:
                               postStart:
-                                description: 'PostStart is called immediately after a container is created. If the handler fails, the container is terminated and restarted according to its restart policy. Other management of the container blocks until the hook completes. More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks'
+                                description: "PostStart is called immediately after a container is created. If the handler fails, the container is terminated and restarted according to its restart policy. Other management of the container blocks until the hook completes. More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks"
                                 properties:
                                   exec:
                                     description: One and only one of the following should be specified. Exec specifies the action to take.
@@ -1347,10 +1345,10 @@ spec:
                                       - port
                                     type: object
                                   tcpSocket:
-                                    description: 'TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported TODO: implement a realistic TCP lifecycle hook'
+                                    description: "TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported TODO: implement a realistic TCP lifecycle hook"
                                     properties:
                                       host:
-                                        description: 'Optional: Host name to connect to, defaults to the pod IP.'
+                                        description: "Optional: Host name to connect to, defaults to the pod IP."
                                         type: string
                                       port:
                                         anyOf:
@@ -1363,7 +1361,7 @@ spec:
                                     type: object
                                 type: object
                               preStop:
-                                description: 'PreStop is called immediately before a container is terminated due to an API request or management event such as liveness/startup probe failure, preemption, resource contention, etc. The handler is not called if the container crashes or exits. The reason for termination is passed to the handler. The Pod''s termination grace period countdown begins before the PreStop hooked is executed. Regardless of the outcome of the handler, the container will eventually terminate within the Pod''s termination grace period. Other management of the container blocks until the hook completes or until the termination grace period is reached. More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks'
+                                description: "PreStop is called immediately before a container is terminated due to an API request or management event such as liveness/startup probe failure, preemption, resource contention, etc. The handler is not called if the container crashes or exits. The reason for termination is passed to the handler. The Pod's termination grace period countdown begins before the PreStop hooked is executed. Regardless of the outcome of the handler, the container will eventually terminate within the Pod's termination grace period. Other management of the container blocks until the hook completes or until the termination grace period is reached. More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks"
                                 properties:
                                   exec:
                                     description: One and only one of the following should be specified. Exec specifies the action to take.
@@ -1412,10 +1410,10 @@ spec:
                                       - port
                                     type: object
                                   tcpSocket:
-                                    description: 'TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported TODO: implement a realistic TCP lifecycle hook'
+                                    description: "TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported TODO: implement a realistic TCP lifecycle hook"
                                     properties:
                                       host:
-                                        description: 'Optional: Host name to connect to, defaults to the pod IP.'
+                                        description: "Optional: Host name to connect to, defaults to the pod IP."
                                         type: string
                                       port:
                                         anyOf:
@@ -1429,7 +1427,7 @@ spec:
                                 type: object
                             type: object
                           livenessProbe:
-                            description: 'Periodic probe of container liveness. Container will be restarted if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
+                            description: "Periodic probe of container liveness. Container will be restarted if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
                             properties:
                               exec:
                                 description: One and only one of the following should be specified. Exec specifies the action to take.
@@ -1482,7 +1480,7 @@ spec:
                                   - port
                                 type: object
                               initialDelaySeconds:
-                                description: 'Number of seconds after the container has started before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
+                                description: "Number of seconds after the container has started before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
                                 format: int32
                                 type: integer
                               periodSeconds:
@@ -1494,10 +1492,10 @@ spec:
                                 format: int32
                                 type: integer
                               tcpSocket:
-                                description: 'TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported TODO: implement a realistic TCP lifecycle hook'
+                                description: "TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported TODO: implement a realistic TCP lifecycle hook"
                                 properties:
                                   host:
-                                    description: 'Optional: Host name to connect to, defaults to the pod IP.'
+                                    description: "Optional: Host name to connect to, defaults to the pod IP."
                                     type: string
                                   port:
                                     anyOf:
@@ -1513,7 +1511,7 @@ spec:
                                 format: int64
                                 type: integer
                               timeoutSeconds:
-                                description: 'Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
+                                description: "Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
                                 format: int32
                                 type: integer
                             type: object
@@ -1552,7 +1550,7 @@ spec:
                               - protocol
                             x-kubernetes-list-type: map
                           readinessProbe:
-                            description: 'Periodic probe of container service readiness. Container will be removed from service endpoints if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
+                            description: "Periodic probe of container service readiness. Container will be removed from service endpoints if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
                             properties:
                               exec:
                                 description: One and only one of the following should be specified. Exec specifies the action to take.
@@ -1605,7 +1603,7 @@ spec:
                                   - port
                                 type: object
                               initialDelaySeconds:
-                                description: 'Number of seconds after the container has started before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
+                                description: "Number of seconds after the container has started before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
                                 format: int32
                                 type: integer
                               periodSeconds:
@@ -1617,10 +1615,10 @@ spec:
                                 format: int32
                                 type: integer
                               tcpSocket:
-                                description: 'TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported TODO: implement a realistic TCP lifecycle hook'
+                                description: "TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported TODO: implement a realistic TCP lifecycle hook"
                                 properties:
                                   host:
-                                    description: 'Optional: Host name to connect to, defaults to the pod IP.'
+                                    description: "Optional: Host name to connect to, defaults to the pod IP."
                                     type: string
                                   port:
                                     anyOf:
@@ -1636,12 +1634,12 @@ spec:
                                 format: int64
                                 type: integer
                               timeoutSeconds:
-                                description: 'Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
+                                description: "Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
                                 format: int32
                                 type: integer
                             type: object
                           resources:
-                            description: 'Compute Resources required by this container. Cannot be updated. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                            description: "Compute Resources required by this container. Cannot be updated. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/"
                             properties:
                               limits:
                                 additionalProperties:
@@ -1650,7 +1648,7 @@ spec:
                                     - type: string
                                   pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                                   x-kubernetes-int-or-string: true
-                                description: 'Limits describes the maximum amount of compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                                description: "Limits describes the maximum amount of compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/"
                                 type: object
                               requests:
                                 additionalProperties:
@@ -1659,14 +1657,14 @@ spec:
                                     - type: string
                                   pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                                   x-kubernetes-int-or-string: true
-                                description: 'Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                                description: "Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/"
                                 type: object
                             type: object
                           securityContext:
-                            description: 'Security options the pod should run with. More info: https://kubernetes.io/docs/concepts/policy/security-context/ More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/'
+                            description: "Security options the pod should run with. More info: https://kubernetes.io/docs/concepts/policy/security-context/ More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/"
                             properties:
                               allowPrivilegeEscalation:
-                                description: 'AllowPrivilegeEscalation controls whether a process can gain more privileges than its parent process. This bool directly controls if the no_new_privs flag will be set on the container process. AllowPrivilegeEscalation is true always when the container is: 1) run as Privileged 2) has CAP_SYS_ADMIN'
+                                description: "AllowPrivilegeEscalation controls whether a process can gain more privileges than its parent process. This bool directly controls if the no_new_privs flag will be set on the container process. AllowPrivilegeEscalation is true always when the container is: 1) run as Privileged 2) has CAP_SYS_ADMIN"
                                 type: boolean
                               capabilities:
                                 description: The capabilities to add/drop when running containers. Defaults to the default set of capabilities granted by the container runtime.
@@ -1747,7 +1745,7 @@ spec:
                                 type: object
                             type: object
                           startupProbe:
-                            description: 'StartupProbe indicates that the Pod has successfully initialized. If specified, no other probes are executed until this completes successfully. If this probe fails, the Pod will be restarted, just as if the livenessProbe failed. This can be used to provide different probe parameters at the beginning of a Pod''s lifecycle, when it might take a long time to load data or warm a cache, than during steady-state operation. This cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
+                            description: "StartupProbe indicates that the Pod has successfully initialized. If specified, no other probes are executed until this completes successfully. If this probe fails, the Pod will be restarted, just as if the livenessProbe failed. This can be used to provide different probe parameters at the beginning of a Pod's lifecycle, when it might take a long time to load data or warm a cache, than during steady-state operation. This cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
                             properties:
                               exec:
                                 description: One and only one of the following should be specified. Exec specifies the action to take.
@@ -1800,7 +1798,7 @@ spec:
                                   - port
                                 type: object
                               initialDelaySeconds:
-                                description: 'Number of seconds after the container has started before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
+                                description: "Number of seconds after the container has started before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
                                 format: int32
                                 type: integer
                               periodSeconds:
@@ -1812,10 +1810,10 @@ spec:
                                 format: int32
                                 type: integer
                               tcpSocket:
-                                description: 'TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported TODO: implement a realistic TCP lifecycle hook'
+                                description: "TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported TODO: implement a realistic TCP lifecycle hook"
                                 properties:
                                   host:
-                                    description: 'Optional: Host name to connect to, defaults to the pod IP.'
+                                    description: "Optional: Host name to connect to, defaults to the pod IP."
                                     type: string
                                   port:
                                     anyOf:
@@ -1831,7 +1829,7 @@ spec:
                                 format: int64
                                 type: integer
                               timeoutSeconds:
-                                description: 'Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
+                                description: "Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
                                 format: int32
                                 type: integer
                             type: object
@@ -1842,7 +1840,7 @@ spec:
                             description: Whether the container runtime should close the stdin channel after it has been opened by a single attach. When stdin is true the stdin stream will remain open across multiple attach sessions. If stdinOnce is set to true, stdin is opened on container start, is empty until the first client attaches to stdin, and then remains open and accepts data until the client disconnects, at which time stdin is closed and remains closed until the container is restarted. If this flag is false, a container processes that reads from stdin will never receive an EOF. Default is false
                             type: boolean
                           terminationMessagePath:
-                            description: 'Optional: Path at which the file to which the container''s termination message will be written is mounted into the container''s filesystem. Message written is intended to be brief final status, such as an assertion failure message. Will be truncated by the node if greater than 4096 bytes. The total message length across all containers will be limited to 12kb. Defaults to /dev/termination-log. Cannot be updated.'
+                            description: "Optional: Path at which the file to which the container's termination message will be written is mounted into the container's filesystem. Message written is intended to be brief final status, such as an assertion failure message. Will be truncated by the node if greater than 4096 bytes. The total message length across all containers will be limited to 12kb. Defaults to /dev/termination-log. Cannot be updated."
                             type: string
                           terminationMessagePolicy:
                             description: Indicate how the termination message should be populated. File will use the contents of terminationMessagePath to populate the container status message on both success and failure. FallbackToLogsOnError will use the last chunk of container log output if the termination message file is empty and the container exited with an error. The log output is limited to 2048 bytes or 80 lines, whichever is smaller. Defaults to File. Cannot be updated.
@@ -1909,7 +1907,7 @@ spec:
                         description: LocalObjectReference contains enough information to let you locate the referenced object inside the same namespace.
                         properties:
                           name:
-                            description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?'
+                            description: "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?"
                             type: string
                         type: object
                       type: array
@@ -1919,12 +1917,12 @@ spec:
                         description: A single application container that you want to run within a pod.
                         properties:
                           args:
-                            description: 'Arguments to the entrypoint. The docker image''s CMD is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container''s environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell'
+                            description: "Arguments to the entrypoint. The docker image's CMD is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container's environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell"
                             items:
                               type: string
                             type: array
                           command:
-                            description: 'Entrypoint array. Not executed within a shell. The docker image''s ENTRYPOINT is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container''s environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell'
+                            description: "Entrypoint array. Not executed within a shell. The docker image's ENTRYPOINT is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container's environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell"
                             items:
                               type: string
                             type: array
@@ -1949,7 +1947,7 @@ spec:
                                           description: The key to select.
                                           type: string
                                         name:
-                                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?'
+                                          description: "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?"
                                           type: string
                                         optional:
                                           description: Specify whether the ConfigMap or its key must be defined
@@ -1958,7 +1956,7 @@ spec:
                                         - key
                                       type: object
                                     fieldRef:
-                                      description: 'Selects a field of the pod: supports metadata.name, metadata.namespace, `metadata.labels[''<KEY>'']`, `metadata.annotations[''<KEY>'']`, spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs.'
+                                      description: "Selects a field of the pod: supports metadata.name, metadata.namespace, `metadata.labels['<KEY>']`, `metadata.annotations['<KEY>']`, spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs."
                                       properties:
                                         apiVersion:
                                           description: Version of the schema the FieldPath is written in terms of, defaults to "v1".
@@ -1970,10 +1968,10 @@ spec:
                                         - fieldPath
                                       type: object
                                     resourceFieldRef:
-                                      description: 'Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported.'
+                                      description: "Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported."
                                       properties:
                                         containerName:
-                                          description: 'Container name: required for volumes, optional for env vars'
+                                          description: "Container name: required for volumes, optional for env vars"
                                           type: string
                                         divisor:
                                           anyOf:
@@ -1983,7 +1981,7 @@ spec:
                                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                                           x-kubernetes-int-or-string: true
                                         resource:
-                                          description: 'Required: resource to select'
+                                          description: "Required: resource to select"
                                           type: string
                                       required:
                                         - resource
@@ -1995,7 +1993,7 @@ spec:
                                           description: The key of the secret to select from.  Must be a valid secret key.
                                           type: string
                                         name:
-                                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?'
+                                          description: "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?"
                                           type: string
                                         optional:
                                           description: Specify whether the Secret or its key must be defined
@@ -2017,7 +2015,7 @@ spec:
                                   description: The ConfigMap to select from
                                   properties:
                                     name:
-                                      description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?'
+                                      description: "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?"
                                       type: string
                                     optional:
                                       description: Specify whether the ConfigMap must be defined
@@ -2030,7 +2028,7 @@ spec:
                                   description: The Secret to select from
                                   properties:
                                     name:
-                                      description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?'
+                                      description: "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?"
                                       type: string
                                     optional:
                                       description: Specify whether the Secret must be defined
@@ -2039,16 +2037,16 @@ spec:
                               type: object
                             type: array
                           image:
-                            description: 'Docker image name. More info: https://kubernetes.io/docs/concepts/containers/images This field is optional to allow higher level config management to default or override container images in workload controllers like Deployments and StatefulSets.'
+                            description: "Docker image name. More info: https://kubernetes.io/docs/concepts/containers/images This field is optional to allow higher level config management to default or override container images in workload controllers like Deployments and StatefulSets."
                             type: string
                           imagePullPolicy:
-                            description: 'Image pull policy. One of Always, Never, IfNotPresent. Defaults to Always if :latest tag is specified, or IfNotPresent otherwise. Cannot be updated. More info: https://kubernetes.io/docs/concepts/containers/images#updating-images'
+                            description: "Image pull policy. One of Always, Never, IfNotPresent. Defaults to Always if :latest tag is specified, or IfNotPresent otherwise. Cannot be updated. More info: https://kubernetes.io/docs/concepts/containers/images#updating-images"
                             type: string
                           lifecycle:
                             description: Actions that the management system should take in response to container lifecycle events. Cannot be updated.
                             properties:
                               postStart:
-                                description: 'PostStart is called immediately after a container is created. If the handler fails, the container is terminated and restarted according to its restart policy. Other management of the container blocks until the hook completes. More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks'
+                                description: "PostStart is called immediately after a container is created. If the handler fails, the container is terminated and restarted according to its restart policy. Other management of the container blocks until the hook completes. More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks"
                                 properties:
                                   exec:
                                     description: One and only one of the following should be specified. Exec specifies the action to take.
@@ -2097,10 +2095,10 @@ spec:
                                       - port
                                     type: object
                                   tcpSocket:
-                                    description: 'TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported TODO: implement a realistic TCP lifecycle hook'
+                                    description: "TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported TODO: implement a realistic TCP lifecycle hook"
                                     properties:
                                       host:
-                                        description: 'Optional: Host name to connect to, defaults to the pod IP.'
+                                        description: "Optional: Host name to connect to, defaults to the pod IP."
                                         type: string
                                       port:
                                         anyOf:
@@ -2113,7 +2111,7 @@ spec:
                                     type: object
                                 type: object
                               preStop:
-                                description: 'PreStop is called immediately before a container is terminated due to an API request or management event such as liveness/startup probe failure, preemption, resource contention, etc. The handler is not called if the container crashes or exits. The reason for termination is passed to the handler. The Pod''s termination grace period countdown begins before the PreStop hooked is executed. Regardless of the outcome of the handler, the container will eventually terminate within the Pod''s termination grace period. Other management of the container blocks until the hook completes or until the termination grace period is reached. More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks'
+                                description: "PreStop is called immediately before a container is terminated due to an API request or management event such as liveness/startup probe failure, preemption, resource contention, etc. The handler is not called if the container crashes or exits. The reason for termination is passed to the handler. The Pod's termination grace period countdown begins before the PreStop hooked is executed. Regardless of the outcome of the handler, the container will eventually terminate within the Pod's termination grace period. Other management of the container blocks until the hook completes or until the termination grace period is reached. More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks"
                                 properties:
                                   exec:
                                     description: One and only one of the following should be specified. Exec specifies the action to take.
@@ -2162,10 +2160,10 @@ spec:
                                       - port
                                     type: object
                                   tcpSocket:
-                                    description: 'TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported TODO: implement a realistic TCP lifecycle hook'
+                                    description: "TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported TODO: implement a realistic TCP lifecycle hook"
                                     properties:
                                       host:
-                                        description: 'Optional: Host name to connect to, defaults to the pod IP.'
+                                        description: "Optional: Host name to connect to, defaults to the pod IP."
                                         type: string
                                       port:
                                         anyOf:
@@ -2179,7 +2177,7 @@ spec:
                                 type: object
                             type: object
                           livenessProbe:
-                            description: 'Periodic probe of container liveness. Container will be restarted if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
+                            description: "Periodic probe of container liveness. Container will be restarted if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
                             properties:
                               exec:
                                 description: One and only one of the following should be specified. Exec specifies the action to take.
@@ -2232,7 +2230,7 @@ spec:
                                   - port
                                 type: object
                               initialDelaySeconds:
-                                description: 'Number of seconds after the container has started before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
+                                description: "Number of seconds after the container has started before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
                                 format: int32
                                 type: integer
                               periodSeconds:
@@ -2244,10 +2242,10 @@ spec:
                                 format: int32
                                 type: integer
                               tcpSocket:
-                                description: 'TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported TODO: implement a realistic TCP lifecycle hook'
+                                description: "TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported TODO: implement a realistic TCP lifecycle hook"
                                 properties:
                                   host:
-                                    description: 'Optional: Host name to connect to, defaults to the pod IP.'
+                                    description: "Optional: Host name to connect to, defaults to the pod IP."
                                     type: string
                                   port:
                                     anyOf:
@@ -2263,7 +2261,7 @@ spec:
                                 format: int64
                                 type: integer
                               timeoutSeconds:
-                                description: 'Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
+                                description: "Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
                                 format: int32
                                 type: integer
                             type: object
@@ -2302,7 +2300,7 @@ spec:
                               - protocol
                             x-kubernetes-list-type: map
                           readinessProbe:
-                            description: 'Periodic probe of container service readiness. Container will be removed from service endpoints if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
+                            description: "Periodic probe of container service readiness. Container will be removed from service endpoints if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
                             properties:
                               exec:
                                 description: One and only one of the following should be specified. Exec specifies the action to take.
@@ -2355,7 +2353,7 @@ spec:
                                   - port
                                 type: object
                               initialDelaySeconds:
-                                description: 'Number of seconds after the container has started before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
+                                description: "Number of seconds after the container has started before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
                                 format: int32
                                 type: integer
                               periodSeconds:
@@ -2367,10 +2365,10 @@ spec:
                                 format: int32
                                 type: integer
                               tcpSocket:
-                                description: 'TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported TODO: implement a realistic TCP lifecycle hook'
+                                description: "TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported TODO: implement a realistic TCP lifecycle hook"
                                 properties:
                                   host:
-                                    description: 'Optional: Host name to connect to, defaults to the pod IP.'
+                                    description: "Optional: Host name to connect to, defaults to the pod IP."
                                     type: string
                                   port:
                                     anyOf:
@@ -2386,12 +2384,12 @@ spec:
                                 format: int64
                                 type: integer
                               timeoutSeconds:
-                                description: 'Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
+                                description: "Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
                                 format: int32
                                 type: integer
                             type: object
                           resources:
-                            description: 'Compute Resources required by this container. Cannot be updated. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                            description: "Compute Resources required by this container. Cannot be updated. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/"
                             properties:
                               limits:
                                 additionalProperties:
@@ -2400,7 +2398,7 @@ spec:
                                     - type: string
                                   pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                                   x-kubernetes-int-or-string: true
-                                description: 'Limits describes the maximum amount of compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                                description: "Limits describes the maximum amount of compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/"
                                 type: object
                               requests:
                                 additionalProperties:
@@ -2409,14 +2407,14 @@ spec:
                                     - type: string
                                   pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                                   x-kubernetes-int-or-string: true
-                                description: 'Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                                description: "Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/"
                                 type: object
                             type: object
                           securityContext:
-                            description: 'Security options the pod should run with. More info: https://kubernetes.io/docs/concepts/policy/security-context/ More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/'
+                            description: "Security options the pod should run with. More info: https://kubernetes.io/docs/concepts/policy/security-context/ More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/"
                             properties:
                               allowPrivilegeEscalation:
-                                description: 'AllowPrivilegeEscalation controls whether a process can gain more privileges than its parent process. This bool directly controls if the no_new_privs flag will be set on the container process. AllowPrivilegeEscalation is true always when the container is: 1) run as Privileged 2) has CAP_SYS_ADMIN'
+                                description: "AllowPrivilegeEscalation controls whether a process can gain more privileges than its parent process. This bool directly controls if the no_new_privs flag will be set on the container process. AllowPrivilegeEscalation is true always when the container is: 1) run as Privileged 2) has CAP_SYS_ADMIN"
                                 type: boolean
                               capabilities:
                                 description: The capabilities to add/drop when running containers. Defaults to the default set of capabilities granted by the container runtime.
@@ -2497,7 +2495,7 @@ spec:
                                 type: object
                             type: object
                           startupProbe:
-                            description: 'StartupProbe indicates that the Pod has successfully initialized. If specified, no other probes are executed until this completes successfully. If this probe fails, the Pod will be restarted, just as if the livenessProbe failed. This can be used to provide different probe parameters at the beginning of a Pod''s lifecycle, when it might take a long time to load data or warm a cache, than during steady-state operation. This cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
+                            description: "StartupProbe indicates that the Pod has successfully initialized. If specified, no other probes are executed until this completes successfully. If this probe fails, the Pod will be restarted, just as if the livenessProbe failed. This can be used to provide different probe parameters at the beginning of a Pod's lifecycle, when it might take a long time to load data or warm a cache, than during steady-state operation. This cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
                             properties:
                               exec:
                                 description: One and only one of the following should be specified. Exec specifies the action to take.
@@ -2550,7 +2548,7 @@ spec:
                                   - port
                                 type: object
                               initialDelaySeconds:
-                                description: 'Number of seconds after the container has started before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
+                                description: "Number of seconds after the container has started before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
                                 format: int32
                                 type: integer
                               periodSeconds:
@@ -2562,10 +2560,10 @@ spec:
                                 format: int32
                                 type: integer
                               tcpSocket:
-                                description: 'TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported TODO: implement a realistic TCP lifecycle hook'
+                                description: "TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported TODO: implement a realistic TCP lifecycle hook"
                                 properties:
                                   host:
-                                    description: 'Optional: Host name to connect to, defaults to the pod IP.'
+                                    description: "Optional: Host name to connect to, defaults to the pod IP."
                                     type: string
                                   port:
                                     anyOf:
@@ -2581,7 +2579,7 @@ spec:
                                 format: int64
                                 type: integer
                               timeoutSeconds:
-                                description: 'Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
+                                description: "Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
                                 format: int32
                                 type: integer
                             type: object
@@ -2592,7 +2590,7 @@ spec:
                             description: Whether the container runtime should close the stdin channel after it has been opened by a single attach. When stdin is true the stdin stream will remain open across multiple attach sessions. If stdinOnce is set to true, stdin is opened on container start, is empty until the first client attaches to stdin, and then remains open and accepts data until the client disconnects, at which time stdin is closed and remains closed until the container is restarted. If this flag is false, a container processes that reads from stdin will never receive an EOF. Default is false
                             type: boolean
                           terminationMessagePath:
-                            description: 'Optional: Path at which the file to which the container''s termination message will be written is mounted into the container''s filesystem. Message written is intended to be brief final status, such as an assertion failure message. Will be truncated by the node if greater than 4096 bytes. The total message length across all containers will be limited to 12kb. Defaults to /dev/termination-log. Cannot be updated.'
+                            description: "Optional: Path at which the file to which the container's termination message will be written is mounted into the container's filesystem. Message written is intended to be brief final status, such as an assertion failure message. Will be truncated by the node if greater than 4096 bytes. The total message length across all containers will be limited to 12kb. Defaults to /dev/termination-log. Cannot be updated."
                             type: string
                           terminationMessagePolicy:
                             description: Indicate how the termination message should be populated. File will use the contents of terminationMessagePath to populate the container status message on both success and failure. FallbackToLogsOnError will use the last chunk of container log output if the termination message file is empty and the container exited with an error. The log output is limited to 2048 bytes or 80 lines, whichever is smaller. Defaults to File. Cannot be updated.
@@ -2665,7 +2663,7 @@ spec:
                               - type: string
                             pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                             x-kubernetes-int-or-string: true
-                          description: 'Limits describes the maximum amount of compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                          description: "Limits describes the maximum amount of compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/"
                           type: object
                         requests:
                           additionalProperties:
@@ -2674,14 +2672,14 @@ spec:
                               - type: string
                             pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                             x-kubernetes-int-or-string: true
-                          description: 'Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                          description: "Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/"
                           type: object
                       type: object
                     mysqlLifecycle:
                       description: Lifecycle describes actions that the management system should take in response to container lifecycle events. For the PostStart and PreStop lifecycle handlers, management of the container blocks until the action is complete, unless the container process fails, in which case the handler is aborted.
                       properties:
                         postStart:
-                          description: 'PostStart is called immediately after a container is created. If the handler fails, the container is terminated and restarted according to its restart policy. Other management of the container blocks until the hook completes. More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks'
+                          description: "PostStart is called immediately after a container is created. If the handler fails, the container is terminated and restarted according to its restart policy. Other management of the container blocks until the hook completes. More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks"
                           properties:
                             exec:
                               description: One and only one of the following should be specified. Exec specifies the action to take.
@@ -2730,10 +2728,10 @@ spec:
                                 - port
                               type: object
                             tcpSocket:
-                              description: 'TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported TODO: implement a realistic TCP lifecycle hook'
+                              description: "TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported TODO: implement a realistic TCP lifecycle hook"
                               properties:
                                 host:
-                                  description: 'Optional: Host name to connect to, defaults to the pod IP.'
+                                  description: "Optional: Host name to connect to, defaults to the pod IP."
                                   type: string
                                 port:
                                   anyOf:
@@ -2746,7 +2744,7 @@ spec:
                               type: object
                           type: object
                         preStop:
-                          description: 'PreStop is called immediately before a container is terminated due to an API request or management event such as liveness/startup probe failure, preemption, resource contention, etc. The handler is not called if the container crashes or exits. The reason for termination is passed to the handler. The Pod''s termination grace period countdown begins before the PreStop hooked is executed. Regardless of the outcome of the handler, the container will eventually terminate within the Pod''s termination grace period. Other management of the container blocks until the hook completes or until the termination grace period is reached. More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks'
+                          description: "PreStop is called immediately before a container is terminated due to an API request or management event such as liveness/startup probe failure, preemption, resource contention, etc. The handler is not called if the container crashes or exits. The reason for termination is passed to the handler. The Pod's termination grace period countdown begins before the PreStop hooked is executed. Regardless of the outcome of the handler, the container will eventually terminate within the Pod's termination grace period. Other management of the container blocks until the hook completes or until the termination grace period is reached. More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks"
                           properties:
                             exec:
                               description: One and only one of the following should be specified. Exec specifies the action to take.
@@ -2795,10 +2793,10 @@ spec:
                                 - port
                               type: object
                             tcpSocket:
-                              description: 'TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported TODO: implement a realistic TCP lifecycle hook'
+                              description: "TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported TODO: implement a realistic TCP lifecycle hook"
                               properties:
                                 host:
-                                  description: 'Optional: Host name to connect to, defaults to the pod IP.'
+                                  description: "Optional: Host name to connect to, defaults to the pod IP."
                                   type: string
                                 port:
                                   anyOf:
@@ -2821,7 +2819,7 @@ spec:
                               - type: string
                             pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                             x-kubernetes-int-or-string: true
-                          description: 'Limits describes the maximum amount of compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                          description: "Limits describes the maximum amount of compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/"
                           type: object
                         requests:
                           additionalProperties:
@@ -2830,7 +2828,7 @@ spec:
                               - type: string
                             pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                             x-kubernetes-int-or-string: true
-                          description: 'Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                          description: "Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/"
                           type: object
                       type: object
                     nodeSelector:
@@ -2849,7 +2847,7 @@ spec:
                               - type: string
                             pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                             x-kubernetes-int-or-string: true
-                          description: 'Limits describes the maximum amount of compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                          description: "Limits describes the maximum amount of compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/"
                           type: object
                         requests:
                           additionalProperties:
@@ -2858,7 +2856,7 @@ spec:
                               - type: string
                             pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                             x-kubernetes-int-or-string: true
-                          description: 'Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                          description: "Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/"
                           type: object
                       type: object
                     serviceAccountName:
@@ -2919,7 +2917,7 @@ spec:
                         description: Volume represents a named volume in a pod that may be accessed by any container in the pod.
                         properties:
                           awsElasticBlockStore:
-                            description: 'AWSElasticBlockStore represents an AWS Disk resource that is attached to a kubelet''s host machine and then exposed to the pod. More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore'
+                            description: "AWSElasticBlockStore represents an AWS Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore"
                             properties:
                               fsType:
                                 description: 'Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified. More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore TODO: how do we prevent errors in the filesystem from compromising the machine'
@@ -2932,7 +2930,7 @@ spec:
                                 description: 'Specify "true" to force and set the ReadOnly property in VolumeMounts to "true". If omitted, the default is "false". More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore'
                                 type: boolean
                               volumeID:
-                                description: 'Unique ID of the persistent disk resource in AWS (Amazon EBS volume). More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore'
+                                description: "Unique ID of the persistent disk resource in AWS (Amazon EBS volume). More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore"
                                 type: string
                             required:
                               - volumeID
@@ -2941,7 +2939,7 @@ spec:
                             description: AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
                             properties:
                               cachingMode:
-                                description: 'Host Caching mode: None, Read Only, Read Write.'
+                                description: "Host Caching mode: None, Read Only, Read Write."
                                 type: string
                               diskName:
                                 description: The Name of the data disk in the blob storage
@@ -2953,7 +2951,7 @@ spec:
                                 description: Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
                                 type: string
                               kind:
-                                description: 'Expected values Shared: multiple blob disks per storage account  Dedicated: single blob disk per storage account  Managed: azure managed data disk (only in managed availability set). defaults to shared'
+                                description: "Expected values Shared: multiple blob disks per storage account  Dedicated: single blob disk per storage account  Managed: azure managed data disk (only in managed availability set). defaults to shared"
                                 type: string
                               readOnly:
                                 description: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.
@@ -2982,50 +2980,50 @@ spec:
                             description: CephFS represents a Ceph FS mount on the host that shares a pod's lifetime
                             properties:
                               monitors:
-                                description: 'Required: Monitors is a collection of Ceph monitors More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it'
+                                description: "Required: Monitors is a collection of Ceph monitors More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it"
                                 items:
                                   type: string
                                 type: array
                               path:
-                                description: 'Optional: Used as the mounted root, rather than the full Ceph tree, default is /'
+                                description: "Optional: Used as the mounted root, rather than the full Ceph tree, default is /"
                                 type: string
                               readOnly:
-                                description: 'Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it'
+                                description: "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it"
                                 type: boolean
                               secretFile:
-                                description: 'Optional: SecretFile is the path to key ring for User, default is /etc/ceph/user.secret More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it'
+                                description: "Optional: SecretFile is the path to key ring for User, default is /etc/ceph/user.secret More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it"
                                 type: string
                               secretRef:
-                                description: 'Optional: SecretRef is reference to the authentication secret for User, default is empty. More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it'
+                                description: "Optional: SecretRef is reference to the authentication secret for User, default is empty. More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it"
                                 properties:
                                   name:
-                                    description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?'
+                                    description: "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?"
                                     type: string
                                 type: object
                               user:
-                                description: 'Optional: User is the rados user name, default is admin More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it'
+                                description: "Optional: User is the rados user name, default is admin More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it"
                                 type: string
                             required:
                               - monitors
                             type: object
                           cinder:
-                            description: 'Cinder represents a cinder volume attached and mounted on kubelets host machine. More info: https://examples.k8s.io/mysql-cinder-pd/README.md'
+                            description: "Cinder represents a cinder volume attached and mounted on kubelets host machine. More info: https://examples.k8s.io/mysql-cinder-pd/README.md"
                             properties:
                               fsType:
                                 description: 'Filesystem type to mount. Must be a filesystem type supported by the host operating system. Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified. More info: https://examples.k8s.io/mysql-cinder-pd/README.md'
                                 type: string
                               readOnly:
-                                description: 'Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: https://examples.k8s.io/mysql-cinder-pd/README.md'
+                                description: "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: https://examples.k8s.io/mysql-cinder-pd/README.md"
                                 type: boolean
                               secretRef:
-                                description: 'Optional: points to a secret object containing parameters used to connect to OpenStack.'
+                                description: "Optional: points to a secret object containing parameters used to connect to OpenStack."
                                 properties:
                                   name:
-                                    description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?'
+                                    description: "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?"
                                     type: string
                                 type: object
                               volumeID:
-                                description: 'volume id used to identify the volume in cinder. More info: https://examples.k8s.io/mysql-cinder-pd/README.md'
+                                description: "volume id used to identify the volume in cinder. More info: https://examples.k8s.io/mysql-cinder-pd/README.md"
                                 type: string
                             required:
                               - volumeID
@@ -3034,7 +3032,7 @@ spec:
                             description: ConfigMap represents a configMap that should populate this volume
                             properties:
                               defaultMode:
-                                description: 'Optional: mode bits used to set permissions on created files by default. Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. Defaults to 0644. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.'
+                                description: "Optional: mode bits used to set permissions on created files by default. Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. Defaults to 0644. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set."
                                 format: int32
                                 type: integer
                               items:
@@ -3046,7 +3044,7 @@ spec:
                                       description: The key to project.
                                       type: string
                                     mode:
-                                      description: 'Optional: mode bits used to set permissions on this file. Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. If not specified, the volume defaultMode will be used. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.'
+                                      description: "Optional: mode bits used to set permissions on this file. Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. If not specified, the volume defaultMode will be used. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set."
                                       format: int32
                                       type: integer
                                     path:
@@ -3058,7 +3056,7 @@ spec:
                                   type: object
                                 type: array
                               name:
-                                description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?'
+                                description: "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?"
                                 type: string
                               optional:
                                 description: Specify whether the ConfigMap or its keys must be defined
@@ -3077,7 +3075,7 @@ spec:
                                 description: NodePublishSecretRef is a reference to the secret object containing sensitive information to pass to the CSI driver to complete the CSI NodePublishVolume and NodeUnpublishVolume calls. This field is optional, and  may be empty if no secret is required. If the secret object contains more than one secret, all secret references are passed.
                                 properties:
                                   name:
-                                    description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?'
+                                    description: "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?"
                                     type: string
                                 type: object
                               readOnly:
@@ -3095,7 +3093,7 @@ spec:
                             description: DownwardAPI represents downward API about the pod that should populate this volume
                             properties:
                               defaultMode:
-                                description: 'Optional: mode bits to use on created files by default. Must be a Optional: mode bits used to set permissions on created files by default. Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. Defaults to 0644. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.'
+                                description: "Optional: mode bits to use on created files by default. Must be a Optional: mode bits used to set permissions on created files by default. Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. Defaults to 0644. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set."
                                 format: int32
                                 type: integer
                               items:
@@ -3104,7 +3102,7 @@ spec:
                                   description: DownwardAPIVolumeFile represents information to create the file containing the pod field
                                   properties:
                                     fieldRef:
-                                      description: 'Required: Selects a field of the pod: only annotations, labels, name and namespace are supported.'
+                                      description: "Required: Selects a field of the pod: only annotations, labels, name and namespace are supported."
                                       properties:
                                         apiVersion:
                                           description: Version of the schema the FieldPath is written in terms of, defaults to "v1".
@@ -3116,17 +3114,17 @@ spec:
                                         - fieldPath
                                       type: object
                                     mode:
-                                      description: 'Optional: mode bits used to set permissions on this file, must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. If not specified, the volume defaultMode will be used. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.'
+                                      description: "Optional: mode bits used to set permissions on this file, must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. If not specified, the volume defaultMode will be used. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set."
                                       format: int32
                                       type: integer
                                     path:
-                                      description: 'Required: Path is  the relative path name of the file to be created. Must not be absolute or contain the ''..'' path. Must be utf-8 encoded. The first item of the relative path must not start with ''..'''
+                                      description: "Required: Path is  the relative path name of the file to be created. Must not be absolute or contain the '..' path. Must be utf-8 encoded. The first item of the relative path must not start with '..'"
                                       type: string
                                     resourceFieldRef:
-                                      description: 'Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.'
+                                      description: "Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported."
                                       properties:
                                         containerName:
-                                          description: 'Container name: required for volumes, optional for env vars'
+                                          description: "Container name: required for volumes, optional for env vars"
                                           type: string
                                         divisor:
                                           anyOf:
@@ -3136,7 +3134,7 @@ spec:
                                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                                           x-kubernetes-int-or-string: true
                                         resource:
-                                          description: 'Required: resource to select'
+                                          description: "Required: resource to select"
                                           type: string
                                       required:
                                         - resource
@@ -3147,7 +3145,7 @@ spec:
                                 type: array
                             type: object
                           emptyDir:
-                            description: 'EmptyDir represents a temporary directory that shares a pod''s lifetime. More info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir'
+                            description: "EmptyDir represents a temporary directory that shares a pod's lifetime. More info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir"
                             properties:
                               medium:
                                 description: 'What type of storage medium should back this directory. The default is "" which means to use the node''s default medium. Must be an empty string (default) or Memory. More info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir'
@@ -3156,7 +3154,7 @@ spec:
                                 anyOf:
                                   - type: integer
                                   - type: string
-                                description: 'Total amount of local storage required for this EmptyDir volume. The size limit is also applicable for memory medium. The maximum usage on memory medium EmptyDir would be the minimum value between the SizeLimit specified here and the sum of memory limits of all containers in a pod. The default is nil which means that the limit is undefined. More info: http://kubernetes.io/docs/user-guide/volumes#emptydir'
+                                description: "Total amount of local storage required for this EmptyDir volume. The size limit is also applicable for memory medium. The maximum usage on memory medium EmptyDir would be the minimum value between the SizeLimit specified here and the sum of memory limits of all containers in a pod. The default is nil which means that the limit is undefined. More info: http://kubernetes.io/docs/user-guide/volumes#emptydir"
                                 pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                                 x-kubernetes-int-or-string: true
                             type: object
@@ -3173,12 +3171,12 @@ spec:
                                     description: The specification for the PersistentVolumeClaim. The entire content is copied unchanged into the PVC that gets created from this template. The same fields as in a PersistentVolumeClaim are also valid here.
                                     properties:
                                       accessModes:
-                                        description: 'AccessModes contains the desired access modes the volume should have. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1'
+                                        description: "AccessModes contains the desired access modes the volume should have. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1"
                                         items:
                                           type: string
                                         type: array
                                       dataSource:
-                                        description: 'This field can be used to specify either: * An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot) * An existing PVC (PersistentVolumeClaim) * An existing custom resource that implements data population (Alpha) In order to use custom resource types that implement data population, the AnyVolumeDataSource feature gate must be enabled. If the provisioner or an external controller can support the specified data source, it will create a new volume based on the contents of the specified data source.'
+                                        description: "This field can be used to specify either: * An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot) * An existing PVC (PersistentVolumeClaim) * An existing custom resource that implements data population (Alpha) In order to use custom resource types that implement data population, the AnyVolumeDataSource feature gate must be enabled. If the provisioner or an external controller can support the specified data source, it will create a new volume based on the contents of the specified data source."
                                         properties:
                                           apiGroup:
                                             description: APIGroup is the group for the resource being referenced. If APIGroup is not specified, the specified Kind must be in the core API group. For any other third-party types, APIGroup is required.
@@ -3194,7 +3192,7 @@ spec:
                                           - name
                                         type: object
                                       resources:
-                                        description: 'Resources represents the minimum resources the volume should have. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources'
+                                        description: "Resources represents the minimum resources the volume should have. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources"
                                         properties:
                                           limits:
                                             additionalProperties:
@@ -3203,7 +3201,7 @@ spec:
                                                 - type: string
                                               pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                                               x-kubernetes-int-or-string: true
-                                            description: 'Limits describes the maximum amount of compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                                            description: "Limits describes the maximum amount of compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/"
                                             type: object
                                           requests:
                                             additionalProperties:
@@ -3212,7 +3210,7 @@ spec:
                                                 - type: string
                                               pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                                               x-kubernetes-int-or-string: true
-                                            description: 'Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                                            description: "Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/"
                                             type: object
                                         type: object
                                       selector:
@@ -3246,7 +3244,7 @@ spec:
                                             type: object
                                         type: object
                                       storageClassName:
-                                        description: 'Name of the StorageClass required by the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1'
+                                        description: "Name of the StorageClass required by the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1"
                                         type: string
                                       volumeMode:
                                         description: volumeMode defines what type of volume is required by the claim. Value of Filesystem is implied when not included in claim spec.
@@ -3266,19 +3264,19 @@ spec:
                                 description: 'Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified. TODO: how do we prevent errors in the filesystem from compromising the machine'
                                 type: string
                               lun:
-                                description: 'Optional: FC target lun number'
+                                description: "Optional: FC target lun number"
                                 format: int32
                                 type: integer
                               readOnly:
-                                description: 'Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.'
+                                description: "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts."
                                 type: boolean
                               targetWWNs:
-                                description: 'Optional: FC target worldwide names (WWNs)'
+                                description: "Optional: FC target worldwide names (WWNs)"
                                 items:
                                   type: string
                                 type: array
                               wwids:
-                                description: 'Optional: FC volume world wide identifiers (wwids) Either wwids or combination of targetWWNs and lun must be set, but not both simultaneously.'
+                                description: "Optional: FC volume world wide identifiers (wwids) Either wwids or combination of targetWWNs and lun must be set, but not both simultaneously."
                                 items:
                                   type: string
                                 type: array
@@ -3295,16 +3293,16 @@ spec:
                               options:
                                 additionalProperties:
                                   type: string
-                                description: 'Optional: Extra command options if any.'
+                                description: "Optional: Extra command options if any."
                                 type: object
                               readOnly:
-                                description: 'Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.'
+                                description: "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts."
                                 type: boolean
                               secretRef:
-                                description: 'Optional: SecretRef is reference to the secret object containing sensitive information to pass to the plugin scripts. This may be empty if no secret object is specified. If the secret object contains more than one secret, all secrets are passed to the plugin scripts.'
+                                description: "Optional: SecretRef is reference to the secret object containing sensitive information to pass to the plugin scripts. This may be empty if no secret object is specified. If the secret object contains more than one secret, all secrets are passed to the plugin scripts."
                                 properties:
                                   name:
-                                    description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?'
+                                    description: "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?"
                                     type: string
                                 type: object
                             required:
@@ -3321,7 +3319,7 @@ spec:
                                 type: string
                             type: object
                           gcePersistentDisk:
-                            description: 'GCEPersistentDisk represents a GCE Disk resource that is attached to a kubelet''s host machine and then exposed to the pod. More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk'
+                            description: "GCEPersistentDisk represents a GCE Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk"
                             properties:
                               fsType:
                                 description: 'Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified. More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk TODO: how do we prevent errors in the filesystem from compromising the machine'
@@ -3331,16 +3329,16 @@ spec:
                                 format: int32
                                 type: integer
                               pdName:
-                                description: 'Unique name of the PD resource in GCE. Used to identify the disk in GCE. More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk'
+                                description: "Unique name of the PD resource in GCE. Used to identify the disk in GCE. More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk"
                                 type: string
                               readOnly:
-                                description: 'ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk'
+                                description: "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk"
                                 type: boolean
                             required:
                               - pdName
                             type: object
                           gitRepo:
-                            description: 'GitRepo represents a git repository at a particular revision. DEPRECATED: GitRepo is deprecated. To provision a container with a git repo, mount an EmptyDir into an InitContainer that clones the repo using git, then mount the EmptyDir into the Pod''s container.'
+                            description: "GitRepo represents a git repository at a particular revision. DEPRECATED: GitRepo is deprecated. To provision a container with a git repo, mount an EmptyDir into an InitContainer that clones the repo using git, then mount the EmptyDir into the Pod's container."
                             properties:
                               directory:
                                 description: Target directory name. Must not contain or start with '..'.  If '.' is supplied, the volume directory will be the git repository.  Otherwise, if specified, the volume will contain the git repository in the subdirectory with the given name.
@@ -3355,26 +3353,26 @@ spec:
                               - repository
                             type: object
                           glusterfs:
-                            description: 'Glusterfs represents a Glusterfs mount on the host that shares a pod''s lifetime. More info: https://examples.k8s.io/volumes/glusterfs/README.md'
+                            description: "Glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime. More info: https://examples.k8s.io/volumes/glusterfs/README.md"
                             properties:
                               endpoints:
-                                description: 'EndpointsName is the endpoint name that details Glusterfs topology. More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod'
+                                description: "EndpointsName is the endpoint name that details Glusterfs topology. More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod"
                                 type: string
                               path:
-                                description: 'Path is the Glusterfs volume path. More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod'
+                                description: "Path is the Glusterfs volume path. More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod"
                                 type: string
                               readOnly:
-                                description: 'ReadOnly here will force the Glusterfs volume to be mounted with read-only permissions. Defaults to false. More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod'
+                                description: "ReadOnly here will force the Glusterfs volume to be mounted with read-only permissions. Defaults to false. More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod"
                                 type: boolean
                             required:
                               - endpoints
                               - path
                             type: object
                           hostPath:
-                            description: 'HostPath represents a pre-existing file or directory on the host machine that is directly exposed to the container. This is generally used for system agents or other privileged things that are allowed to see the host machine. Most containers will NOT need this. More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath --- TODO(jonesdl) We need to restrict who can use host directory mounts and who can/can not mount host directories as read/write.'
+                            description: "HostPath represents a pre-existing file or directory on the host machine that is directly exposed to the container. This is generally used for system agents or other privileged things that are allowed to see the host machine. Most containers will NOT need this. More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath --- TODO(jonesdl) We need to restrict who can use host directory mounts and who can/can not mount host directories as read/write."
                             properties:
                               path:
-                                description: 'Path of the directory on the host. If the path is a symlink, it will follow the link to the real path. More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath'
+                                description: "Path of the directory on the host. If the path is a symlink, it will follow the link to the real path. More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath"
                                 type: string
                               type:
                                 description: 'Type for HostPath Volume Defaults to "" More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath'
@@ -3383,7 +3381,7 @@ spec:
                               - path
                             type: object
                           iscsi:
-                            description: 'ISCSI represents an ISCSI Disk resource that is attached to a kubelet''s host machine and then exposed to the pod. More info: https://examples.k8s.io/volumes/iscsi/README.md'
+                            description: "ISCSI represents an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: https://examples.k8s.io/volumes/iscsi/README.md"
                             properties:
                               chapAuthDiscovery:
                                 description: whether support iSCSI Discovery CHAP authentication
@@ -3419,7 +3417,7 @@ spec:
                                 description: CHAP Secret for iSCSI target and initiator authentication
                                 properties:
                                   name:
-                                    description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?'
+                                    description: "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?"
                                     type: string
                                 type: object
                               targetPortal:
@@ -3431,29 +3429,29 @@ spec:
                               - targetPortal
                             type: object
                           name:
-                            description: 'Volume''s name. Must be a DNS_LABEL and unique within the pod. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                            description: "Volume's name. Must be a DNS_LABEL and unique within the pod. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names"
                             type: string
                           nfs:
-                            description: 'NFS represents an NFS mount on the host that shares a pod''s lifetime More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs'
+                            description: "NFS represents an NFS mount on the host that shares a pod's lifetime More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs"
                             properties:
                               path:
-                                description: 'Path that is exported by the NFS server. More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs'
+                                description: "Path that is exported by the NFS server. More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs"
                                 type: string
                               readOnly:
-                                description: 'ReadOnly here will force the NFS export to be mounted with read-only permissions. Defaults to false. More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs'
+                                description: "ReadOnly here will force the NFS export to be mounted with read-only permissions. Defaults to false. More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs"
                                 type: boolean
                               server:
-                                description: 'Server is the hostname or IP address of the NFS server. More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs'
+                                description: "Server is the hostname or IP address of the NFS server. More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs"
                                 type: string
                             required:
                               - path
                               - server
                             type: object
                           persistentVolumeClaim:
-                            description: 'PersistentVolumeClaimVolumeSource represents a reference to a PersistentVolumeClaim in the same namespace. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims'
+                            description: "PersistentVolumeClaimVolumeSource represents a reference to a PersistentVolumeClaim in the same namespace. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims"
                             properties:
                               claimName:
-                                description: 'ClaimName is the name of a PersistentVolumeClaim in the same namespace as the pod using this volume. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims'
+                                description: "ClaimName is the name of a PersistentVolumeClaim in the same namespace as the pod using this volume. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims"
                                 type: string
                               readOnly:
                                 description: Will force the ReadOnly setting in VolumeMounts. Default false.
@@ -3512,7 +3510,7 @@ spec:
                                                 description: The key to project.
                                                 type: string
                                               mode:
-                                                description: 'Optional: mode bits used to set permissions on this file. Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. If not specified, the volume defaultMode will be used. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.'
+                                                description: "Optional: mode bits used to set permissions on this file. Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. If not specified, the volume defaultMode will be used. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set."
                                                 format: int32
                                                 type: integer
                                               path:
@@ -3524,7 +3522,7 @@ spec:
                                             type: object
                                           type: array
                                         name:
-                                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?'
+                                          description: "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?"
                                           type: string
                                         optional:
                                           description: Specify whether the ConfigMap or its keys must be defined
@@ -3539,7 +3537,7 @@ spec:
                                             description: DownwardAPIVolumeFile represents information to create the file containing the pod field
                                             properties:
                                               fieldRef:
-                                                description: 'Required: Selects a field of the pod: only annotations, labels, name and namespace are supported.'
+                                                description: "Required: Selects a field of the pod: only annotations, labels, name and namespace are supported."
                                                 properties:
                                                   apiVersion:
                                                     description: Version of the schema the FieldPath is written in terms of, defaults to "v1".
@@ -3551,17 +3549,17 @@ spec:
                                                   - fieldPath
                                                 type: object
                                               mode:
-                                                description: 'Optional: mode bits used to set permissions on this file, must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. If not specified, the volume defaultMode will be used. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.'
+                                                description: "Optional: mode bits used to set permissions on this file, must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. If not specified, the volume defaultMode will be used. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set."
                                                 format: int32
                                                 type: integer
                                               path:
-                                                description: 'Required: Path is  the relative path name of the file to be created. Must not be absolute or contain the ''..'' path. Must be utf-8 encoded. The first item of the relative path must not start with ''..'''
+                                                description: "Required: Path is  the relative path name of the file to be created. Must not be absolute or contain the '..' path. Must be utf-8 encoded. The first item of the relative path must not start with '..'"
                                                 type: string
                                               resourceFieldRef:
-                                                description: 'Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.'
+                                                description: "Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported."
                                                 properties:
                                                   containerName:
-                                                    description: 'Container name: required for volumes, optional for env vars'
+                                                    description: "Container name: required for volumes, optional for env vars"
                                                     type: string
                                                   divisor:
                                                     anyOf:
@@ -3571,7 +3569,7 @@ spec:
                                                     pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                                                     x-kubernetes-int-or-string: true
                                                   resource:
-                                                    description: 'Required: resource to select'
+                                                    description: "Required: resource to select"
                                                     type: string
                                                 required:
                                                   - resource
@@ -3593,7 +3591,7 @@ spec:
                                                 description: The key to project.
                                                 type: string
                                               mode:
-                                                description: 'Optional: mode bits used to set permissions on this file. Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. If not specified, the volume defaultMode will be used. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.'
+                                                description: "Optional: mode bits used to set permissions on this file. Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. If not specified, the volume defaultMode will be used. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set."
                                                 format: int32
                                                 type: integer
                                               path:
@@ -3605,7 +3603,7 @@ spec:
                                             type: object
                                           type: array
                                         name:
-                                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?'
+                                          description: "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?"
                                           type: string
                                         optional:
                                           description: Specify whether the Secret or its key must be defined
@@ -3656,37 +3654,37 @@ spec:
                               - volume
                             type: object
                           rbd:
-                            description: 'RBD represents a Rados Block Device mount on the host that shares a pod''s lifetime. More info: https://examples.k8s.io/volumes/rbd/README.md'
+                            description: "RBD represents a Rados Block Device mount on the host that shares a pod's lifetime. More info: https://examples.k8s.io/volumes/rbd/README.md"
                             properties:
                               fsType:
                                 description: 'Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified. More info: https://kubernetes.io/docs/concepts/storage/volumes#rbd TODO: how do we prevent errors in the filesystem from compromising the machine'
                                 type: string
                               image:
-                                description: 'The rados image name. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it'
+                                description: "The rados image name. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it"
                                 type: string
                               keyring:
-                                description: 'Keyring is the path to key ring for RBDUser. Default is /etc/ceph/keyring. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it'
+                                description: "Keyring is the path to key ring for RBDUser. Default is /etc/ceph/keyring. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it"
                                 type: string
                               monitors:
-                                description: 'A collection of Ceph monitors. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it'
+                                description: "A collection of Ceph monitors. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it"
                                 items:
                                   type: string
                                 type: array
                               pool:
-                                description: 'The rados pool name. Default is rbd. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it'
+                                description: "The rados pool name. Default is rbd. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it"
                                 type: string
                               readOnly:
-                                description: 'ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it'
+                                description: "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it"
                                 type: boolean
                               secretRef:
-                                description: 'SecretRef is name of the authentication secret for RBDUser. If provided overrides keyring. Default is nil. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it'
+                                description: "SecretRef is name of the authentication secret for RBDUser. If provided overrides keyring. Default is nil. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it"
                                 properties:
                                   name:
-                                    description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?'
+                                    description: "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?"
                                     type: string
                                 type: object
                               user:
-                                description: 'The rados user name. Default is admin. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it'
+                                description: "The rados user name. Default is admin. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it"
                                 type: string
                             required:
                               - image
@@ -3711,7 +3709,7 @@ spec:
                                 description: SecretRef references to the secret for ScaleIO user and other sensitive information. If this is not provided, Login operation will fail.
                                 properties:
                                   name:
-                                    description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?'
+                                    description: "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?"
                                     type: string
                                 type: object
                               sslEnabled:
@@ -3735,10 +3733,10 @@ spec:
                               - system
                             type: object
                           secret:
-                            description: 'Secret represents a secret that should populate this volume. More info: https://kubernetes.io/docs/concepts/storage/volumes#secret'
+                            description: "Secret represents a secret that should populate this volume. More info: https://kubernetes.io/docs/concepts/storage/volumes#secret"
                             properties:
                               defaultMode:
-                                description: 'Optional: mode bits used to set permissions on created files by default. Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. Defaults to 0644. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.'
+                                description: "Optional: mode bits used to set permissions on created files by default. Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. Defaults to 0644. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set."
                                 format: int32
                                 type: integer
                               items:
@@ -3750,7 +3748,7 @@ spec:
                                       description: The key to project.
                                       type: string
                                     mode:
-                                      description: 'Optional: mode bits used to set permissions on this file. Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. If not specified, the volume defaultMode will be used. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.'
+                                      description: "Optional: mode bits used to set permissions on this file. Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511. YAML accepts both octal and decimal values, JSON requires decimal values for mode bits. If not specified, the volume defaultMode will be used. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set."
                                       format: int32
                                       type: integer
                                     path:
@@ -3765,7 +3763,7 @@ spec:
                                 description: Specify whether the Secret or its keys must be defined
                                 type: boolean
                               secretName:
-                                description: 'Name of the secret in the pod''s namespace to use. More info: https://kubernetes.io/docs/concepts/storage/volumes#secret'
+                                description: "Name of the secret in the pod's namespace to use. More info: https://kubernetes.io/docs/concepts/storage/volumes#secret"
                                 type: string
                             type: object
                           storageos:
@@ -3781,7 +3779,7 @@ spec:
                                 description: SecretRef specifies the secret to use for obtaining the StorageOS API credentials.  If not specified, default values will be attempted.
                                 properties:
                                   name:
-                                    description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?'
+                                    description: "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?"
                                     type: string
                                 type: object
                               volumeName:
@@ -3836,7 +3834,7 @@ spec:
                       description: Kill represents the mode of which the matching queries in each class will be killed, (the --victims flag). Can be one of oldest|all|all-but-oldest. By default, the matching query with the highest Time value is killed (the oldest query.
                       type: string
                     killMode:
-                      description: 'KillMode can be: `connection` or `query`, when it''s used `connection` means that when a query is matched the connection is killed (using --kill flag) and if it''s used `query` means that the query is killed (using --kill-query flag)'
+                      description: "KillMode can be: `connection` or `query`, when it's used `connection` means that when a query is matched the connection is killed (using --kill flag) and if it's used `query` means that the query is killed (using --kill-query flag)"
                       type: string
                     maxIdleTime:
                       description: MaxIdleTime match queries that have been idle for longer then this time, in seconds. (--idle-time flag)
@@ -3871,7 +3869,7 @@ spec:
                   anyOf:
                     - type: integer
                     - type: string
-                  description: 'TmpfsSize if specified, mounts a tmpfs of this size into /tmp DEPRECATED: use instead PodSpec.Volumes and PodSpec.VolumeMounts'
+                  description: "TmpfsSize if specified, mounts a tmpfs of this size into /tmp DEPRECATED: use instead PodSpec.Volumes and PodSpec.VolumeMounts"
                   pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                   x-kubernetes-int-or-string: true
                 volumeSpec:
@@ -3887,7 +3885,7 @@ spec:
                           anyOf:
                             - type: integer
                             - type: string
-                          description: 'Total amount of local storage required for this EmptyDir volume. The size limit is also applicable for memory medium. The maximum usage on memory medium EmptyDir would be the minimum value between the SizeLimit specified here and the sum of memory limits of all containers in a pod. The default is nil which means that the limit is undefined. More info: http://kubernetes.io/docs/user-guide/volumes#emptydir'
+                          description: "Total amount of local storage required for this EmptyDir volume. The size limit is also applicable for memory medium. The maximum usage on memory medium EmptyDir would be the minimum value between the SizeLimit specified here and the sum of memory limits of all containers in a pod. The default is nil which means that the limit is undefined. More info: http://kubernetes.io/docs/user-guide/volumes#emptydir"
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
                       type: object
@@ -3895,7 +3893,7 @@ spec:
                       description: HostPath to use as data volume for mysql. HostPath represents a pre-existing file or directory on the host machine that is directly exposed to the container.
                       properties:
                         path:
-                          description: 'Path of the directory on the host. If the path is a symlink, it will follow the link to the real path. More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath'
+                          description: "Path of the directory on the host. If the path is a symlink, it will follow the link to the real path. More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath"
                           type: string
                         type:
                           description: 'Type for HostPath Volume Defaults to "" More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath'
@@ -3907,12 +3905,12 @@ spec:
                       description: PersistentVolumeClaim to specify PVC spec for the volume for mysql data. It has the highest level of precedence, followed by HostPath and EmptyDir. And represents the PVC specification.
                       properties:
                         accessModes:
-                          description: 'AccessModes contains the desired access modes the volume should have. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1'
+                          description: "AccessModes contains the desired access modes the volume should have. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1"
                           items:
                             type: string
                           type: array
                         dataSource:
-                          description: 'This field can be used to specify either: * An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot) * An existing PVC (PersistentVolumeClaim) * An existing custom resource that implements data population (Alpha) In order to use custom resource types that implement data population, the AnyVolumeDataSource feature gate must be enabled. If the provisioner or an external controller can support the specified data source, it will create a new volume based on the contents of the specified data source.'
+                          description: "This field can be used to specify either: * An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot) * An existing PVC (PersistentVolumeClaim) * An existing custom resource that implements data population (Alpha) In order to use custom resource types that implement data population, the AnyVolumeDataSource feature gate must be enabled. If the provisioner or an external controller can support the specified data source, it will create a new volume based on the contents of the specified data source."
                           properties:
                             apiGroup:
                               description: APIGroup is the group for the resource being referenced. If APIGroup is not specified, the specified Kind must be in the core API group. For any other third-party types, APIGroup is required.
@@ -3928,7 +3926,7 @@ spec:
                             - name
                           type: object
                         resources:
-                          description: 'Resources represents the minimum resources the volume should have. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources'
+                          description: "Resources represents the minimum resources the volume should have. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources"
                           properties:
                             limits:
                               additionalProperties:
@@ -3937,7 +3935,7 @@ spec:
                                   - type: string
                                 pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                                 x-kubernetes-int-or-string: true
-                              description: 'Limits describes the maximum amount of compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                              description: "Limits describes the maximum amount of compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/"
                               type: object
                             requests:
                               additionalProperties:
@@ -3946,7 +3944,7 @@ spec:
                                   - type: string
                                 pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                                 x-kubernetes-int-or-string: true
-                              description: 'Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                              description: "Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/"
                               type: object
                           type: object
                         selector:
@@ -3980,7 +3978,7 @@ spec:
                               type: object
                           type: object
                         storageClassName:
-                          description: 'Name of the StorageClass required by the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1'
+                          description: "Name of the StorageClass required by the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1"
                           type: string
                         volumeMode:
                           description: volumeMode defines what type of volume is required by the claim. Value of Filesystem is implied when not included in claim spec.
@@ -4131,101 +4129,101 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
-    app: 'mysql-operator'
-    release: 'mysql-operator'
-  name: 'mysql-operator'
+    app: "mysql-operator"
+    release: "mysql-operator"
+  name: "mysql-operator"
 rules:
-- apiGroups:
-  - batch
-  resources:
-  - jobs
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - mysql.presslabs.org
-  resources:
-  - mysqlbackups
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - apps
-  resources:
-  - statefulsets
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - ""
-  resources:
-  - configmaps
-  - secrets
-  - services
-  - events
-  - jobs
-  - pods
-  - persistentvolumeclaims
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - mysql.presslabs.org
-  resources:
-  - mysqlclusters
-  - mysqlclusters/status
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - policy
-  resources:
-  - poddisruptionbudgets
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - ""
-  resources:
-  - pods/status
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
+  - apiGroups:
+      - batch
+    resources:
+      - jobs
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - mysql.presslabs.org
+    resources:
+      - mysqlbackups
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - apps
+    resources:
+      - statefulsets
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+      - secrets
+      - services
+      - events
+      - jobs
+      - pods
+      - persistentvolumeclaims
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - mysql.presslabs.org
+    resources:
+      - mysqlclusters
+      - mysqlclusters/status
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - policy
+    resources:
+      - poddisruptionbudgets
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - ""
+    resources:
+      - pods/status
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -4256,12 +4254,12 @@ metadata:
 spec:
   type: ClusterIP
   ports:
-  - name: web
-    port: 80
-    targetPort: 3000
-  - name: raft
-    port: 10008
-    targetPort: 10008
+    - name: web
+      port: 80
+      targetPort: 3000
+    - name: raft
+      port: 10008
+      targetPort: 10008
   selector:
     statefulset.kubernetes.io/pod-name: mysql-operator-0
 ---
@@ -4278,10 +4276,10 @@ spec:
   selector:
     app: mysql-operator
   ports:
-  - name: http
-    port: 80
-    protocol: TCP
-    targetPort: 3000
+    - name: http
+      port: 80
+      protocol: TCP
+      targetPort: 3000
 ---
 apiVersion: apps/v1
 kind: StatefulSet
@@ -4329,6 +4327,7 @@ spec:
             # connect to orchestrator on localhost
             - --orchestrator-uri=http://127.0.0.1:3000/api
             - --sidecar-image=quay.io/presslabs/mysql-operator-sidecar:0.4.0
+            - --mysql-versions-to-image=5.7.26=percona:5.7.35
         - name: orchestrator
           image: quay.io/presslabs/mysql-operator-orchestrator:0.4.0
           imagePullPolicy: IfNotPresent
@@ -4376,7 +4375,7 @@ spec:
     - metadata:
         name: data
       spec:
-        accessModes: [ ReadWriteOnce ]
+        accessModes: [ReadWriteOnce]
         resources:
           requests:
-            storage: 10Gi
+            storage: 1Gi

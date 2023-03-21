@@ -32,6 +32,8 @@ const (
 	DefaultPullPolicy = corev1.PullIfNotPresent
 	// DefaultLocalFilePath is the default file path used with local (PVC) storage
 	DefaultLocalFilePath = "/mattermost/data"
+	// DefaultDatabaseVersion
+	DefaultDatabaseVersion = "8.0"
 
 	// ClusterLabel is the label applied across all components
 	ClusterLabel = "installation.mattermost.com/installation"

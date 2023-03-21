@@ -17,7 +17,7 @@ BASE_IMAGE = gcr.io/distroless/static:nonroot
 ################################################################################
 
 GO ?= $(shell command -v go 2> /dev/null)
-PACKAGES=$(shell go list ./...)
+PACKAGES=$(shell go list ./... | grep -v vendor)
 TEST_PACKAGES=$(shell go list ./...| grep -v test/e2e)
 
 OPERATOR_IMAGE ?= mattermost/mattermost-operator:test
@@ -103,6 +103,9 @@ all: generate check-style unittest build
 
 unittest: ## Runs unit tests
 	$(GO) test -mod=vendor $(GO_LINKER_FLAGS) $(TEST_PACKAGES) -v -covermode=count -coverprofile=coverage.out
+
+e2e-local:
+	./test/e2e_local.sh
 
 goverall: $(GOVERALLS_GEN) ## Runs goveralls
 	$(GOVERALLS_GEN) -coverprofile=coverage.out -service=circle-ci -repotoken ${COVERALLS_REPO_TOKEN} || true

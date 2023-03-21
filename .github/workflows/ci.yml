@@ -1,0 +1,132 @@
+name: ci
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: ci/checkout-repo
+        uses: actions/checkout@755da8c3cf115ac066823e79a1e1788f8940201b # v3.2.0
+        with:
+          fetch-depth: 0
+
+      - name: ci/setup-go
+        uses: actions/setup-go@6edd4406fa81c3da01a34fa6f6343087c207a568 # v3.5.0
+        with:
+          go-version: "1.19"
+          cache: true
+
+      - name: ci/check-style
+        run: make check-style
+
+      - name: ci/check-modules
+        run: make check-modules
+
+  test:
+    runs-on: ubuntu-latest-4-cores
+    steps:
+      - name: ci/checkout-repo
+        uses: actions/checkout@755da8c3cf115ac066823e79a1e1788f8940201b # v3.2.0
+        with:
+          fetch-depth: 0
+          path: src/github.com/mattermost/mattermost-operator
+
+      - name: ci/setup-go
+        uses: actions/setup-go@6edd4406fa81c3da01a34fa6f6343087c207a568 # v3.5.0
+        with:
+          go-version: "1.19"
+          cache: true
+          cache-dependency-path: src/github.com/mattermost/mattermost-operator/go.sum
+
+      - name: ci/generate-operator-manifests
+        run: |
+          cd ${GITHUB_WORKSPACE}/src/github.com/mattermost/mattermost-operator
+
+          make clean
+          make operator-sdk
+
+          mkdir -p /tmp/apis/mattermost/v1alpha1
+          cp -R apis/mattermost/v1alpha1/* /tmp/apis/mattermost/v1alpha1
+          mkdir -p /tmp/apis/mattermost/v1beta1
+          cp -R apis/mattermost/v1beta1/* /tmp/apis/mattermost/v1beta1
+          mkdir -p /tmp/config/crd/bases
+          cp -R config/crd/bases/* /tmp/config/crd/bases
+
+          GOPATH=${GITHUB_WORKSPACE} make generate manifests
+          diff /tmp/apis/mattermost/v1alpha1 apis/mattermost/v1alpha1
+          diff /tmp/apis/mattermost/v1beta1 apis/mattermost/v1beta1
+          diff /tmp/config/crd/bases config/crd/bases
+
+      - name: ci/test
+        run: |
+          cd ${GITHUB_WORKSPACE}/src/github.com/mattermost/mattermost-operator
+          make unittest goverall
+
+      - name: ci/test-e2e
+        run: |
+          cd ${GITHUB_WORKSPACE}/src/github.com/mattermost/mattermost-operator
+          ./test/e2e.sh
+        env:
+          K8S_VERSION: v1.22.9
+          IMAGE_NAME: mattermost/mattermost-operator
+          IMAGE_TAG: test
+          KIND_VERSION: v0.17.0
+          SDK_VERSION: v1.0.1
+
+  build:
+    if: ${{ github.event_name == 'pull_request' || github.ref_name  == 'master' }}
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    steps:
+      - name: ci/checkout-repo
+        uses: actions/checkout@dc323e67f16fb5f7663d20ff7941f27f5809e9b6 # v3.2.0
+        with:
+          fetch-depth: 0
+
+      - name: ci/set-short-SHA
+        run: echo "SHORT_SHA=${GITHUB_SHA:0:7}" >> $GITHUB_ENV
+
+      - name: ci/build-docker
+        run: make build-image
+
+      - name: ci/scan-docker-security
+        uses: aquasecurity/trivy-action@8bd2f9fbda2109502356ff8a6a89da55b1ead252 # v0.9.1
+        continue-on-error: true
+        with:
+          image-ref: "mattermost/mattermost-operator:test"
+          format: "sarif"
+          limit-severities-for-sarif: true # https://github.com/aquasecurity/trivy-action/blob/0.9.1/entrypoint.sh#L172
+          output: "trivy-results.sarif"
+          exit-code: "0"
+          ignore-unfixed: true
+          vuln-type: "os,library"
+          severity: "CRITICAL,HIGH"
+
+      - name: ci/create-trivy-results-report
+        # if: failure()
+        uses: github/codeql-action/upload-sarif@17573ee1cc1b9d061760f3a006fc4aac4f944fd5 # v2.2.4
+        with:
+          sarif_file: "trivy-results.sarif"
+
+      - name: ci/docker-login
+        uses: docker/login-action@f4ef78c080cd8ba55a85445d5b36e214a81df20a # v2.1.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: ci/docker-push
+        env:
+          TAG: ${{ env.SHORT_SHA }}
+        run: |
+          set -eu
+          docker tag mattermost/mattermost-operator:test mattermost/mattermost-operator:$TAG
+          docker push mattermost/mattermost-operator:$TAG
