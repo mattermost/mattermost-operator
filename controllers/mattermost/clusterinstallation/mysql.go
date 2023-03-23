@@ -7,8 +7,8 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/mattermost/mattermost-operator/pkg/database"
+	mysqlv1alpha1 "github.com/mattermost/mattermost-operator/pkg/database/mysql_operator/v1alpha1"
 	"github.com/pkg/errors"
-	mysqlOperator "github.com/presslabs/mysql-operator/pkg/apis/mysql/v1alpha1"
 	"k8s.io/apimachinery/pkg/types"
 
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1"
@@ -24,7 +24,7 @@ func (r *ClusterInstallationReconciler) checkMySQLCluster(mattermost *mattermost
 		return err
 	}
 
-	current := &mysqlOperator.MysqlCluster{}
+	current := &mysqlv1alpha1.MysqlCluster{}
 	if err := r.Client.Get(context.TODO(), types.NamespacedName{Name: desired.Name, Namespace: desired.Namespace}, current); err != nil {
 		return err
 	}

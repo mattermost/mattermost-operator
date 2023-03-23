@@ -19,6 +19,7 @@ BASE_IMAGE = gcr.io/distroless/static:nonroot
 GO ?= $(shell command -v go 2> /dev/null)
 PACKAGES=$(shell go list ./... | grep -v vendor)
 TEST_PACKAGES=$(shell go list ./...| grep -v test/e2e)
+TEST_FLAGS ?= -v
 
 OPERATOR_IMAGE ?= mattermost/mattermost-operator:test
 MACHINE = $(shell uname -m)
@@ -102,7 +103,7 @@ KUSTOMIZE := $(TOOLS_BIN_DIR)/$(KUSTOMIZE_BIN)
 all: generate check-style unittest build
 
 unittest: ## Runs unit tests
-	$(GO) test -mod=vendor $(GO_LINKER_FLAGS) $(TEST_PACKAGES) -v -covermode=count -coverprofile=coverage.out
+	$(GO) test -mod=vendor $(GO_LINKER_FLAGS) $(TEST_PACKAGES) ${TEST_FLAGS} -covermode=count -coverprofile=coverage.out
 
 e2e-local:
 	./test/e2e_local.sh
@@ -182,7 +183,7 @@ mysql-minio-operators: ## Deploys MinIO and MySQL Operators to the active cluste
 	./scripts/install-mysql-minio.sh
 
 manifests: $(CONTROLLER_GEN) ## Runs CRD generator
-	$(CONTROLLER_GEN) $(CRD_OPTIONS) paths="./..." output:crd:artifacts:config=config/crd/bases
+	$(CONTROLLER_GEN) $(CRD_OPTIONS) paths="./apis/..." output:crd:artifacts:config=config/crd/bases
 
 fmt: ## Run go fmt against code
 	go fmt ./...

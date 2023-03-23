@@ -17,5 +17,4 @@ limitations under the License.
 // Package v1alpha1 contains API Schema definitions for the mysql v1alpha1 API group
 // +kubebuilder:object:generate:=true
 // +groupName=mysql.presslabs.org
-//
 package v1alpha1

@@ -94,7 +94,6 @@ type MysqlBackupStatus struct {
 
 // MysqlBackup is the Schema for the mysqlbackups API
 // +kubebuilder:object:root=true
-//
 type MysqlBackup struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -105,7 +104,6 @@ type MysqlBackup struct {
 
 // MysqlBackupList contains a list of MysqlBackup
 // +kubebuilder:object:root=true
-//
 type MysqlBackupList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

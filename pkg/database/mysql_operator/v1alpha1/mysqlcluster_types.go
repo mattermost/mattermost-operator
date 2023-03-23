@@ -363,7 +363,6 @@ type MysqlClusterStatus struct {
 // +kubebuilder:printcolumn:name="Replicas",type="integer",JSONPath=".spec.replicas",description="The number of desired nodes"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:resource:shortName=mysql
-//
 type MysqlCluster struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -374,7 +373,6 @@ type MysqlCluster struct {
 
 // MysqlClusterList contains a list of MysqlCluster
 // +kubebuilder:object:root=true
-//
 type MysqlClusterList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

@@ -5,16 +5,16 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/mattermost/mattermost-operator/pkg/components/utils"
+	mysqlv1alpha1 "github.com/mattermost/mattermost-operator/pkg/database/mysql_operator/v1alpha1"
 	"github.com/pkg/errors"
-	mysqlOperator "github.com/presslabs/mysql-operator/pkg/apis/mysql/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func (r *ResourceHelper) CreateMySQLClusterIfNotExists(owner v1.Object, cluster *mysqlOperator.MysqlCluster, reqLogger logr.Logger) error {
-	foundCluster := &mysqlOperator.MysqlCluster{}
+func (r *ResourceHelper) CreateMySQLClusterIfNotExists(owner v1.Object, cluster *mysqlv1alpha1.MysqlCluster, reqLogger logr.Logger) error {
+	foundCluster := &mysqlv1alpha1.MysqlCluster{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: cluster.Name, Namespace: cluster.Namespace}, foundCluster)
 	if err != nil && k8sErrors.IsNotFound(err) {
 		reqLogger.Info("Creating mysql cluster")

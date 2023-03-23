@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	mysqlv1alpha1 "github.com/mattermost/mattermost-operator/pkg/database/mysql_operator/v1alpha1"
 	"github.com/mattermost/mattermost-operator/pkg/resources"
 	"github.com/sirupsen/logrus"
 
@@ -27,8 +28,6 @@ import (
 
 	minioOperator "github.com/minio/minio-operator/pkg/apis/miniocontroller/v1beta1"
 	v1beta1Minio "github.com/minio/minio-operator/pkg/apis/miniocontroller/v1beta1"
-	mysqlOperator "github.com/presslabs/mysql-operator/pkg/apis/mysql/v1alpha1"
-	v1alpha1MySQL "github.com/presslabs/mysql-operator/pkg/apis/mysql/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -113,7 +112,7 @@ func TestReconcile(t *testing.T) {
 
 	t.Run("mysql", func(t *testing.T) {
 		t.Run("cluster", func(t *testing.T) {
-			mysql := &mysqlOperator.MysqlCluster{}
+			mysql := &mysqlv1alpha1.MysqlCluster{}
 			err = c.Get(context.TODO(), mmMysqlKey, mysql)
 			require.NoError(t, err)
 		})
@@ -598,7 +597,7 @@ func prepareSchema(t *testing.T, scheme *runtime.Scheme) *runtime.Scheme {
 	require.NoError(t, err)
 	err = v1beta1Minio.AddToScheme(scheme)
 	require.NoError(t, err)
-	err = v1alpha1MySQL.SchemeBuilder.AddToScheme(scheme)
+	err = mysqlv1alpha1.SchemeBuilder.AddToScheme(scheme)
 	require.NoError(t, err)
 
 	return scheme

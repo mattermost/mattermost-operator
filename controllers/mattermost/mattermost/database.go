@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	mattermostmysql "github.com/mattermost/mattermost-operator/pkg/components/mysql"
-	mysqlOperator "github.com/presslabs/mysql-operator/pkg/apis/mysql/v1alpha1"
+	mysqlv1alpha1 "github.com/mattermost/mattermost-operator/pkg/database/mysql_operator/v1alpha1"
 
 	"github.com/go-logr/logr"
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
@@ -78,7 +78,7 @@ func (r *MattermostReconciler) checkMySQLCluster(mattermost *mmv1beta.Mattermost
 		return err
 	}
 
-	current := &mysqlOperator.MysqlCluster{}
+	current := &mysqlv1alpha1.MysqlCluster{}
 	if err := r.Client.Get(context.TODO(), types.NamespacedName{Name: desired.Name, Namespace: desired.Namespace}, current); err != nil {
 		return err
 	}
