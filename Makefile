@@ -197,6 +197,9 @@ vet: ## Run go vet against against all packages.
 generate: $(OPENAPI_GEN) $(CONTROLLER_GEN) ## Runs the kubernetes code-generators and openapi
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
+	# Revert any modification to the mysql-operator files
+	git checkout pkg/database/mysql_operator/*
+
 	## Grant permissions to execute generation script
 	chmod +x vendor/k8s.io/code-generator/generate-groups.sh
 
