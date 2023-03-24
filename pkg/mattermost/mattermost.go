@@ -507,15 +507,3 @@ func newService(mattermost *mattermostv1alpha1.ClusterInstallation, serviceName,
 		},
 	}
 }
-
-func waitForSetupJobContainer() corev1.Container {
-	return corev1.Container{
-		Name:            WaitForDBSetupContainerName,
-		Image:           "bitnami/kubectl:1.17",
-		ImagePullPolicy: corev1.PullIfNotPresent,
-		Command: []string{
-			"sh", "-c",
-			fmt.Sprintf("kubectl wait --for=condition=complete --timeout 5m job/%s", SetupJobName),
-		},
-	}
-}

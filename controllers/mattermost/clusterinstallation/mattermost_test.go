@@ -55,7 +55,7 @@ func TestCheckMattermost(t *testing.T) {
 
 	s := prepareSchema(t, scheme.Scheme)
 	s.AddKnownTypes(mattermostv1alpha1.GroupVersion, ci)
-	c := fake.NewFakeClient()
+	c := fake.NewClientBuilder().Build()
 	r := &ClusterInstallationReconciler{
 		Client:         c,
 		Scheme:         s,
@@ -381,7 +381,7 @@ func TestCheckMattermostExternalDB(t *testing.T) {
 
 	s := prepareSchema(t, scheme.Scheme)
 	s.AddKnownTypes(mattermostv1alpha1.GroupVersion, ci)
-	c := fake.NewFakeClient()
+	c := fake.NewClientBuilder().Build()
 	r := &ClusterInstallationReconciler{
 		Client:              c,
 		Log:                 logger,

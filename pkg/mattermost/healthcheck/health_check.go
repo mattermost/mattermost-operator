@@ -3,6 +3,7 @@ package healthcheck
 import (
 	"context"
 	"fmt"
+
 	v1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 
 	"github.com/go-logr/logr"
@@ -184,10 +185,7 @@ func (hc *HealthChecker) CheckIngressLoadBalancer() (string, error) {
 func isPodReady(pod corev1.Pod) bool {
 	for _, condition := range pod.Status.Conditions {
 		if condition.Type == corev1.PodReady {
-			if condition.Status == corev1.ConditionTrue {
-				return true
-			}
-			return false
+			return condition.Status == corev1.ConditionTrue
 		}
 	}
 	return false

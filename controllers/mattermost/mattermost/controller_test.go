@@ -67,7 +67,7 @@ func TestReconcile(t *testing.T) {
 	s := prepareSchema(t, scheme.Scheme)
 	s.AddKnownTypes(mmv1beta.GroupVersion, mm)
 	// Create a fake client to mock API calls.
-	c := fake.NewFakeClient()
+	c := fake.NewClientBuilder().Build()
 	// Create a ReconcileMattermost object with the scheme and fake
 	// client.
 	r := &MattermostReconciler{
@@ -401,7 +401,7 @@ func TestReconcilingLimit(t *testing.T) {
 	s := prepareSchema(t, scheme.Scheme)
 	s.AddKnownTypes(mmv1beta.GroupVersion, mm1)
 	// Create a fake client to mock API calls.
-	c := fake.NewFakeClient()
+	c := fake.NewClientBuilder().Build()
 	// Create a ReconcileMattermost object with the scheme and fake client.
 	r := &MattermostReconciler{
 		Client:              c,

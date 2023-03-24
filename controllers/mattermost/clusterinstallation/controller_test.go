@@ -63,7 +63,7 @@ func TestReconcile(t *testing.T) {
 	s := prepareSchema(t, scheme.Scheme)
 	s.AddKnownTypes(mattermostv1alpha1.GroupVersion, ci)
 	// Create a fake client to mock API calls.
-	c := fake.NewFakeClient()
+	c := fake.NewClientBuilder().Build()
 	// Create a ReconcileClusterInstallation object with the scheme and fake
 	// client.
 	r := &ClusterInstallationReconciler{
@@ -443,7 +443,7 @@ func TestReconcilingLimit(t *testing.T) {
 	s := prepareSchema(t, scheme.Scheme)
 	s.AddKnownTypes(mattermostv1alpha1.GroupVersion, ci1)
 	// Create a fake client to mock API calls.
-	c := fake.NewFakeClient()
+	c := fake.NewClientBuilder().Build()
 	// Create a ReconcileClusterInstallation object with the scheme and fake client.
 	r := &ClusterInstallationReconciler{
 		Client:              c,
@@ -611,7 +611,7 @@ func TestMigration(t *testing.T) {
 	s.AddKnownTypes(mattermostv1alpha1.GroupVersion, ci1)
 	s.AddKnownTypes(mmv1beta.GroupVersion, &mmv1beta.Mattermost{})
 	// Create a fake client to mock API calls.
-	c := fake.NewFakeClient()
+	c := fake.NewClientBuilder().Build()
 	// Create a ReconcileClusterInstallation object with the scheme and fake client.
 	r := &ClusterInstallationReconciler{
 		Client:              c,

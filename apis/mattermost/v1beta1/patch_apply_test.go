@@ -5,13 +5,14 @@ package v1beta1
 
 import (
 	"fmt"
+	"os"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"io/ioutil"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"testing"
 )
 
 // TODO: tests can be extended to common patches and requests.
@@ -337,7 +338,7 @@ func Test_SetPatchStatus(t *testing.T) {
 }
 
 func loadFile(t *testing.T, path string) string {
-	b, err := ioutil.ReadFile(path)
+	b, err := os.ReadFile(path)
 	require.NoError(t, err)
 	return string(b)
 }

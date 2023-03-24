@@ -20,7 +20,7 @@ func TestConvertToMM(t *testing.T) {
 
 	s := prepareSchema(t, scheme.Scheme)
 	// Create a fake client to mock API calls.
-	c := fake.NewFakeClient()
+	c := fake.NewClientBuilder().Build()
 	// Create a ReconcileClusterInstallation object with the scheme and fake
 	// client.
 	reconciler := &ClusterInstallationReconciler{

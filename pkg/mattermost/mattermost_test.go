@@ -391,5 +391,4 @@ func assertEnvVarNotExist(t *testing.T, name string, env []corev1.EnvVar) {
 			assert.Fail(t, fmt.Sprintf("found env var that should not exist: %s", name))
 		}
 	}
-	return
 }

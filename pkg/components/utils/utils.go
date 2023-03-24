@@ -15,7 +15,7 @@ var encoding = base32.NewEncoding("ybndrfg8ejkmcpqxot1uwisza345h769")
 func New16ID() []byte {
 	var b bytes.Buffer
 	encoder := base32.NewEncoder(encoding, &b)
-	encoder.Write(uuid.NewRandom())
+	_, _ = encoder.Write(uuid.NewRandom())
 	encoder.Close()
 	b.Truncate(16) // removes the '==' padding
 	return b.Bytes()
@@ -27,7 +27,7 @@ func New16ID() []byte {
 func New28ID() []byte {
 	var b bytes.Buffer
 	encoder := base32.NewEncoder(encoding, &b)
-	encoder.Write(uuid.NewRandom())
+	_, _ = encoder.Write(uuid.NewRandom())
 	encoder.Close()
 	b.Truncate(28) // removes the '==' padding
 	return b.Bytes()

@@ -1381,7 +1381,7 @@ func setupTestDeps(t *testing.T) (logr.Logger, client.Client, *MattermostReconci
 
 	s := prepareSchema(t, scheme.Scheme)
 	s.AddKnownTypes(mmv1beta.GroupVersion, &mmv1beta.Mattermost{})
-	c := fake.NewFakeClient()
+	c := fake.NewClientBuilder().Build()
 	r := &MattermostReconciler{
 		Client:         c,
 		Scheme:         s,
