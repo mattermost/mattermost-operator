@@ -337,6 +337,37 @@ func Test_SetPatchStatus(t *testing.T) {
 	})
 }
 
+func TestPatch(t *testing.T) {
+	t.Run("replace type=NodePort", func(t *testing.T) {
+		p := Patch{
+			Disable: false,
+			Patch:   `[{"op":"replace","path":"/spec/type", "value": "NodePort"}]`,
+		}
+
+		obj1 := &corev1.Service{}
+		obj2 := &corev1.Service{}
+		gvk := obj1.GroupVersionKind()
+		err := p.applyPatch(obj1, obj2, &gvk)
+		assert.NoError(t, err)
+		assert.NotEqual(t, &obj1, &obj2)
+		assert.NotEqual(t, obj1.Spec.Type, obj2.Spec.Type)
+	})
+
+	t.Run("empty patch, replace pointer", func(t *testing.T) {
+		p := Patch{
+			Disable: true,
+		}
+
+		obj1 := &corev1.Service{}
+		obj2 := &corev1.Service{}
+		gvk := obj1.GroupVersionKind()
+		err := p.applyPatch(obj1, obj2, &gvk)
+		assert.NoError(t, err)
+		assert.Equal(t, obj1.Spec.Type, obj2.Spec.Type)
+		assert.Equal(t, &obj1, &obj2)
+	})
+}
+
 func loadFile(t *testing.T, path string) string {
 	b, err := os.ReadFile(path)
 	require.NoError(t, err)
