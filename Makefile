@@ -20,7 +20,9 @@ GO ?= $(shell command -v go 2> /dev/null)
 PACKAGES=$(shell go list ./... | grep -v vendor)
 TEST_PACKAGES=$(shell go list ./...| grep -v test/e2e)
 
-OPERATOR_IMAGE ?= mattermost/mattermost-operator:test
+OPERATOR_IMAGE_NAME ?= mattermost/mattermost-operator
+OPERATOR_IMAGE_TAG ?= test
+OPERATOR_IMAGE ?= $(OPERATOR_IMAGE_NAME):$(OPERATOR_IMAGE_TAG)
 MACHINE = $(shell uname -m)
 GOFLAGS ?= $(GOFLAGS:) -mod=vendor
 BUILD_TIME := $(shell date -u +%Y%m%d.%H%M%S)
@@ -115,13 +117,9 @@ build: ## Build the mattermost-operator
 	GO111MODULE=on GOOS=linux GOARCH=amd64 CGO_ENABLED=0 $(GO) build $(GOFLAGS) -gcflags all=-trimpath=$(GOPATH) -asmflags all=-trimpath=$(GOPATH) -a -installsuffix cgo -o build/_output/bin/mattermost-operator $(GO_LINKER_FLAGS) ./main.go
 
 .PHONE: build-image
-buildx-image:  ## Build the docker image for mattermost-operator
+buildx-image:  ## Builds and pushes the docker image for mattermost-operator
 	@echo Building Mattermost-operator Docker Image
 	BUILD_IMAGE=$(BUILD_IMAGE) BASE_IMAGE=$(BASE_IMAGE) OPERATOR_IMAGE=$(OPERATOR_IMAGE) ./scripts/build_image.sh buildx
-
-.PHONY: push-image-buildx
-push-image-buildx: ## Push the docker image using buildx
-	OPERATOR_IMAGE=$(OPERATOR_IMAGE) ./scripts/push_image.sh buildx
 
 .PHONE: build-image
 build-image:  ## Build the docker image for mattermost-operator
@@ -130,7 +128,7 @@ build-image:  ## Build the docker image for mattermost-operator
 
 .PHONY: push-image
 push-image: ## Push the docker image using base docker (for local development)
-	OPERATOR_IMAGE=$(OPERATOR_IMAGE) ./scripts/push_image.sh local
+	docker push $(OPERATOR_IMAGE)
 
 check-style: $(SHADOW_GEN) gofmt vet ## Runs go vet, gofmt
 

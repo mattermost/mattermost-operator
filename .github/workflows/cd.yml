@@ -26,9 +26,6 @@ jobs:
         with:
           version: v0.7.1
 
-      - name: cd/build-docker
-        run: make buildx-image
-
       - name: ci/docker-login
         uses: docker/login-action@f4ef78c080cd8ba55a85445d5b36e214a81df20a # v2.1.0
         with:
@@ -36,8 +33,6 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: ci/push-docker
-        run: |
-          docker tag mattermost/mattermost-operator:test mattermost/mattermost-operator:$TAG
-          docker push mattermost/mattermost-operator:$TAG
+        run: make buildx-image
         env:
-          TAG: ${{ github.ref_name }}
+          OPERATOR_IMAGE_TAG: ${{ github.ref_name }}

@@ -12,6 +12,11 @@ if [[ $(docker buildx ls | grep -c operator-builder) -eq 0 ]]; then
     docker buildx create --use --name operator-builder
 fi
 
+# if the PUSH_TAG environment variable is provided, tag the image with it as well.
+if [[ -n "${PUSH_TAG:-}" ]]; then
+    EXTRA_FLAGS+=("-t ${OPERATOR_IMAGE}:${PUSH_TAG}")
+fi
+
 # If the image is going to be built locally (first argument is "local")
 if [[ "$1" == "local" ]]; then
     DOCKER_COMMAND=("build")

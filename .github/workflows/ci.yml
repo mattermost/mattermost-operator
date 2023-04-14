@@ -132,8 +132,5 @@ jobs:
 
       - name: ci/docker-push
         env:
-          TAG: ${{ env.SHORT_SHA }}
-        run: |
-          set -eu
-          docker tag mattermost/mattermost-operator:test mattermost/mattermost-operator:$TAG
-          docker push mattermost/mattermost-operator:$TAG
+          OPERATOR_IMAGE_TAG: ${{ env.SHORT_SHA }}
+        run: make buildx-image
