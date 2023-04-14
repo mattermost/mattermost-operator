@@ -114,13 +114,23 @@ build: ## Build the mattermost-operator
 	@echo Building Mattermost-operator
 	GO111MODULE=on GOOS=linux GOARCH=amd64 CGO_ENABLED=0 $(GO) build $(GOFLAGS) -gcflags all=-trimpath=$(GOPATH) -asmflags all=-trimpath=$(GOPATH) -a -installsuffix cgo -o build/_output/bin/mattermost-operator $(GO_LINKER_FLAGS) ./main.go
 
+.PHONE: build-image
+buildx-image:  ## Build the docker image for mattermost-operator
+	@echo Building Mattermost-operator Docker Image
+	BUILD_IMAGE=$(BUILD_IMAGE) BASE_IMAGE=$(BASE_IMAGE) OPERATOR_IMAGE=$(OPERATOR_IMAGE) ./scripts/build_image.sh buildx
+
+.PHONY: push-image-buildx
+push-image-buildx: ## Push the docker image using buildx
+	OPERATOR_IMAGE=$(OPERATOR_IMAGE) ./scripts/push_image.sh buildx
+
+.PHONE: build-image
 build-image:  ## Build the docker image for mattermost-operator
 	@echo Building Mattermost-operator Docker Image
-	docker build \
-	--build-arg BUILD_IMAGE=$(BUILD_IMAGE) \
-	--build-arg BASE_IMAGE=$(BASE_IMAGE) \
-	. -f Dockerfile -t $(OPERATOR_IMAGE) \
-	--no-cache
+	BUILD_IMAGE=$(BUILD_IMAGE) BASE_IMAGE=$(BASE_IMAGE) OPERATOR_IMAGE=$(OPERATOR_IMAGE) ./scripts/build_image.sh local
+
+.PHONY: push-image
+push-image: ## Push the docker image using base docker (for local development)
+	OPERATOR_IMAGE=$(OPERATOR_IMAGE) ./scripts/push_image.sh local
 
 check-style: $(SHADOW_GEN) gofmt vet ## Runs go vet, gofmt
 
@@ -212,13 +222,11 @@ generate: $(OPENAPI_GEN) $(CONTROLLER_GEN) ## Runs the kubernetes code-generator
 	vendor/k8s.io/code-generator/generate-groups.sh lister github.com/mattermost/mattermost-operator/pkg/client/v1beta1 github.com/mattermost/mattermost-operator/apis "mattermost:v1beta1" -h ./hack/boilerplate.go.txt
 	vendor/k8s.io/code-generator/generate-groups.sh informer github.com/mattermost/mattermost-operator/pkg/client/v1beta1 github.com/mattermost/mattermost-operator/apis "mattermost:v1beta1" -h ./hack/boilerplate.go.txt
 
-docker-push: ## Push the docker image
-	docker push ${OPERATOR_IMAGE}
-
 kind-start: ## Setup Kind cluster capable of running Mattermost Operator
 	KIND_CLUSTER="${KIND_CLUSTER}" KIND_CONFIG_FILE=${KIND_CONFIG_FILE} ./scripts/setup_kind.sh
 
 kind-load-image: ## Loads Mattermost Operator image to Kind cluster
+	docker push $(OPERATOR_IMAGE)
 	kind load --name "${KIND_CLUSTER}" docker-image $(OPERATOR_IMAGE)
 
 kind-destroy: ## Destroy Kind cluster
