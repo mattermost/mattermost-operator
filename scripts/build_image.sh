@@ -8,11 +8,6 @@ set -o xtrace   # print each command before executing it
 DOCKER_COMMAND=("build")
 EXTRA_FLAGS=("--no-cache")
 
-# if the PUSH_TAG environment variable is provided, tag the image with it as well.
-if [[ -n "${PUSH_TAG:-}" ]]; then
-    EXTRA_FLAGS+=("-t ${OPERATOR_IMAGE}:${PUSH_TAG}")
-fi
-
 # If the image is going to be built using buildx
 if [[ "$1" == "buildx" ]]; then
     DOCKER_COMMAND=("buildx" "build")
