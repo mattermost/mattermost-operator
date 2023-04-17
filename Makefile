@@ -116,7 +116,7 @@ build: ## Build the mattermost-operator
 	@echo Building Mattermost-operator
 	GO111MODULE=on GOOS=linux GOARCH=amd64 CGO_ENABLED=0 $(GO) build $(GOFLAGS) -gcflags all=-trimpath=$(GOPATH) -asmflags all=-trimpath=$(GOPATH) -a -installsuffix cgo -o build/_output/bin/mattermost-operator $(GO_LINKER_FLAGS) ./main.go
 
-.PHONE: build-image
+.PHONE: buildx-image
 buildx-image:  ## Builds and pushes the docker image for mattermost-operator
 	@echo Building Mattermost-operator Docker Image
 	BUILD_IMAGE=$(BUILD_IMAGE) BASE_IMAGE=$(BASE_IMAGE) OPERATOR_IMAGE=$(OPERATOR_IMAGE) ./scripts/build_image.sh buildx
@@ -224,7 +224,6 @@ kind-start: ## Setup Kind cluster capable of running Mattermost Operator
 	KIND_CLUSTER="${KIND_CLUSTER}" KIND_CONFIG_FILE=${KIND_CONFIG_FILE} ./scripts/setup_kind.sh
 
 kind-load-image: ## Loads Mattermost Operator image to Kind cluster
-	docker push $(OPERATOR_IMAGE)
 	kind load --name "${KIND_CLUSTER}" docker-image $(OPERATOR_IMAGE)
 
 kind-destroy: ## Destroy Kind cluster
