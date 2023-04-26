@@ -5,7 +5,7 @@ on:
       - master
       - "release-.*"
     tags:
-      - "v.*"
+      - "v**"
   pull_request:
 
 permissions:
