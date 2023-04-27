@@ -127,7 +127,7 @@ func PrepareMattermostJobTemplate(name, namespace string, baseDeployment *appsv1
 		job.Spec.Template.Spec.Containers[i].ReadinessProbe = nil
 
 		// We don't want the full server to start so we print the version and exit
-		job.Spec.Template.Spec.Containers[i].Args = []string{"version"}
+		job.Spec.Template.Spec.Containers[i].Args = []string{"db", "migrate"}
 	}
 
 	// Override values for job-specific behavior.
