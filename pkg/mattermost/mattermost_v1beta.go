@@ -37,6 +37,7 @@ type FileStoreConfig interface {
 func GenerateServiceV1Beta(mattermost *mmv1beta.Mattermost) *corev1.Service {
 	baseAnnotations := map[string]string{
 		"service.alpha.kubernetes.io/tolerate-unready-endpoints": "true",
+		"service.kubernetes.io/topology-aware-hints":             "auto",
 	}
 
 	if mattermost.AWSLoadBalancerEnabled() {
@@ -418,6 +419,16 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 					NodeSelector:     mattermost.Spec.Scheduling.NodeSelector,
 					Tolerations:      mattermost.Spec.Scheduling.Tolerations,
 					SecurityContext:  podSecurityContext,
+					TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
+						{
+							MaxSkew:           1,
+							TopologyKey:       "topology.kubernetes.io/zone",
+							WhenUnsatisfiable: corev1.ScheduleAnyway,
+							LabelSelector: &metav1.LabelSelector{
+								MatchLabels: mmv1beta.MattermostSelectorLabels(deploymentName),
+							},
+						},
+					},
 				},
 			},
 		},
