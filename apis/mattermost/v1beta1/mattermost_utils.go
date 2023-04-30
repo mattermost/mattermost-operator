@@ -87,6 +87,15 @@ func (mm *Mattermost) AWSLoadBalancerEnabled() bool {
 	return false
 }
 
+func (mm *Mattermost) IsTopologyAwareRoutingEnabled() bool {
+	for _, constraint := range mm.Spec.Scheduling.TopologySpreadConstraints {
+		if constraint.TopologyKey == "topology.kubernetes.io/zone" {
+			return true
+		}
+	}
+	return false
+}
+
 // GetIngressHost returns Mattermost primary Ingress host.
 func (mm *Mattermost) GetIngressHost() string {
 	if mm.Spec.Ingress == nil {

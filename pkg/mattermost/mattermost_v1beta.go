@@ -37,7 +37,13 @@ type FileStoreConfig interface {
 func GenerateServiceV1Beta(mattermost *mmv1beta.Mattermost) *corev1.Service {
 	baseAnnotations := map[string]string{
 		"service.alpha.kubernetes.io/tolerate-unready-endpoints": "true",
-		"service.kubernetes.io/topology-aware-hints":             "auto",
+	}
+
+	if mattermost.IsTopologyAwareRoutingEnabled() {
+		// Topology Aware Routing adjusts routing behavior to prefer keeping traffic in the zone it originated from.
+		// More info: https://kubernetes.io/docs/concepts/services-networking/service-topology/
+		// This annotation works prior to Kubernetes 1.27,
+		baseAnnotations["service.kubernetes.io/topology-aware-hints"] = "auto"
 	}
 
 	if mattermost.AWSLoadBalancerEnabled() {
@@ -411,24 +417,15 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 							SecurityContext:          containerSecurityContext,
 						},
 					},
-					ImagePullSecrets: mattermost.Spec.ImagePullSecrets,
-					Volumes:          volumes,
-					DNSConfig:        mattermost.Spec.DNSConfig,
-					DNSPolicy:        mattermost.Spec.DNSPolicy,
-					Affinity:         mattermost.Spec.Scheduling.Affinity,
-					NodeSelector:     mattermost.Spec.Scheduling.NodeSelector,
-					Tolerations:      mattermost.Spec.Scheduling.Tolerations,
-					SecurityContext:  podSecurityContext,
-					TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
-						{
-							MaxSkew:           1,
-							TopologyKey:       "topology.kubernetes.io/zone",
-							WhenUnsatisfiable: corev1.ScheduleAnyway,
-							LabelSelector: &metav1.LabelSelector{
-								MatchLabels: mmv1beta.MattermostSelectorLabels(deploymentName),
-							},
-						},
-					},
+					ImagePullSecrets:          mattermost.Spec.ImagePullSecrets,
+					Volumes:                   volumes,
+					DNSConfig:                 mattermost.Spec.DNSConfig,
+					DNSPolicy:                 mattermost.Spec.DNSPolicy,
+					Affinity:                  mattermost.Spec.Scheduling.Affinity,
+					NodeSelector:              mattermost.Spec.Scheduling.NodeSelector,
+					Tolerations:               mattermost.Spec.Scheduling.Tolerations,
+					SecurityContext:           podSecurityContext,
+					TopologySpreadConstraints: mattermost.Spec.Scheduling.TopologySpreadConstraints,
 				},
 			},
 		},

@@ -233,6 +233,10 @@ type Scheduling struct {
 	// More info: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
 	// +optional
 	Tolerations []v1.Toleration `json:"tolerations,omitempty"`
+	// TopologySpreadConstraint specifies how to spread matching pods among the given topology.
+	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/
+	// +optional
+	TopologySpreadConstraints []v1.TopologySpreadConstraint `json:"topologySpreadConstraints,omitempty"`
 }
 
 // Probes defines configuration of liveness and readiness probe for Mattermost pods.
