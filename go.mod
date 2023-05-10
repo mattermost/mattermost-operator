@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/banzaicloud/k8s-objectmatcher v1.8.0
 	github.com/evanphx/json-patch v5.6.0+incompatible
-	github.com/go-logr/logr v1.2.3
+	github.com/go-logr/logr v1.2.4
 	github.com/mattermost/blubr v0.0.0-20220302140450-2f38b057ee02
 	github.com/mattn/goveralls v0.0.11
 	github.com/mikefarah/yq/v3 v3.0.0-20201202084205-8846255d1c37
