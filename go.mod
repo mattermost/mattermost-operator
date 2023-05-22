@@ -12,7 +12,7 @@ require (
 	github.com/minio/minio-operator v0.0.0-20200214142425-158e343f1f19
 	github.com/pborman/uuid v1.2.1
 	github.com/pkg/errors v0.9.1
-	github.com/sirupsen/logrus v1.9.0
+	github.com/sirupsen/logrus v1.9.2
 	github.com/stretchr/testify v1.8.2
 	github.com/vrischmann/envconfig v1.3.0
 	golang.org/x/net v0.10.0
