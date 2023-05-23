@@ -9,8 +9,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	operator "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
+	mysqlv1alpha1 "github.com/mattermost/mattermost-operator/pkg/database/mysql_operator/v1alpha1"
 
-	mysqlOperator "github.com/presslabs/mysql-operator/pkg/apis/mysql/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -19,7 +19,7 @@ import (
 )
 
 func waitForMySQLStatusReady(t *testing.T, dynclient client.Client, namespace, name string, replicas int, retryInterval, timeout time.Duration) error {
-	mysql := &mysqlOperator.MysqlCluster{}
+	mysql := &mysqlv1alpha1.MysqlCluster{}
 	err := wait.Poll(retryInterval, timeout, func() (done bool, err error) {
 		errClient := dynclient.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, mysql)
 		if errClient != nil {

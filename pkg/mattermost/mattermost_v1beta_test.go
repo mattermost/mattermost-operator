@@ -68,18 +68,17 @@ func TestGenerateService_V1Beta(t *testing.T) {
 		if mmspec.ResourceLabels != nil {
 			for k, v := range mmspec.ResourceLabels {
 				if service.Labels[k] != v {
-					assert.Fail(t, fmt.Sprint("Resource labels not found on service"))
+					assert.Fail(t, "Resource labels not found on service")
 				}
 			}
 		}
 		if mmspec.PodTemplate.ExtraLabels != nil {
 			for k, v := range mmspec.PodTemplate.ExtraLabels {
 				if service.Labels[k] == v {
-					assert.Fail(t, fmt.Sprint("Pod labels should not be applied to service"))
+					assert.Fail(t, "Pod labels should not be applied to service")
 				}
 			}
 		}
-		return
 	}
 
 	for _, tt := range tests {

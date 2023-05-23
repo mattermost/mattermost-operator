@@ -235,23 +235,6 @@ func (r *ClusterInstallationReconciler) checkMattermostDeployment(mattermost *ma
 	return nil
 }
 
-func (r *ClusterInstallationReconciler) checkMattermostDBSetupJob(mattermost *mattermostv1alpha1.ClusterInstallation, deployment *appsv1.Deployment, reqLogger logr.Logger) error {
-	desiredJob := resources.PrepareMattermostJobTemplate(mattermostApp.SetupJobName, mattermost.Namespace, deployment, nil)
-	desiredJob.OwnerReferences = mattermostApp.ClusterInstallationOwnerReference(mattermost)
-
-	currentJob := &batchv1.Job{}
-	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: desiredJob.Name, Namespace: desiredJob.Namespace}, currentJob)
-	if err != nil {
-		if k8sErrors.IsNotFound(err) {
-			reqLogger.Info("Creating DB setup job", "name", desiredJob.Name)
-			return r.Resources.Create(mattermost, desiredJob, reqLogger)
-		}
-		return errors.Wrap(err, "failed to get current db setup job")
-	}
-	// For now, there is no need to perform job update, so just return.
-	return nil
-}
-
 func (r *ClusterInstallationReconciler) deleteAllMattermostComponents(mattermost *mattermostv1alpha1.ClusterInstallation, resourceName string, reqLogger logr.Logger) error {
 	err := r.deleteMattermostDeployment(mattermost, resourceName, reqLogger)
 	if err != nil {
@@ -459,6 +442,10 @@ func (r *ClusterInstallationReconciler) cleanupUpdateJob(job *batchv1.Job, reqLo
 	}
 
 	err = r.Client.List(context.Background(), podList, listOptions...)
+	if err != nil {
+		reqLogger.Error(err, fmt.Sprintf("Problem getting pods %s/{app=%s}", job.GetNamespace(), updateJobName))
+	}
+
 	reqLogger.Info(fmt.Sprintf("Deleting %d pods", len(podList.Items)))
 	for _, pod := range podList.Items {
 		reqLogger.Info(fmt.Sprintf("Deleting pod %s/%s", pod.Namespace, pod.Name))

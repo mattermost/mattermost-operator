@@ -19,6 +19,7 @@ BASE_IMAGE = gcr.io/distroless/static:nonroot
 GO ?= $(shell command -v go 2> /dev/null)
 PACKAGES=$(shell go list ./... | grep -v vendor)
 TEST_PACKAGES=$(shell go list ./...| grep -v test/e2e)
+TEST_FLAGS ?= -v
 
 OPERATOR_IMAGE_NAME ?= mattermost/mattermost-operator
 OPERATOR_IMAGE_TAG ?= test
@@ -30,6 +31,10 @@ BUILD_HASH := $(shell git rev-parse HEAD)
 
 BUNDLE_IMG ?= controller-bundle:$(VERSION) # Default bundle image tag
 CRD_OPTIONS ?= "crd" # Image URL to use all building/pushing image targets
+
+TRIVY_SEVERITY := CRITICAL
+TRIVY_EXIT_CODE := 1
+TRIVY_VULN_TYPE := os,library
 
 ################################################################################
 
@@ -104,7 +109,7 @@ KUSTOMIZE := $(TOOLS_BIN_DIR)/$(KUSTOMIZE_BIN)
 all: generate check-style unittest build
 
 unittest: ## Runs unit tests
-	$(GO) test -mod=vendor $(GO_LINKER_FLAGS) $(TEST_PACKAGES) -v -covermode=count -coverprofile=coverage.out
+	$(GO) test -mod=vendor $(GO_LINKER_FLAGS) $(TEST_PACKAGES) ${TEST_FLAGS} -covermode=count -coverprofile=coverage.out
 
 e2e-local:
 	./test/e2e_local.sh
@@ -190,7 +195,7 @@ mysql-minio-operators: ## Deploys MinIO and MySQL Operators to the active cluste
 	./scripts/install-mysql-minio.sh
 
 manifests: $(CONTROLLER_GEN) ## Runs CRD generator
-	$(CONTROLLER_GEN) $(CRD_OPTIONS) paths="./..." output:crd:artifacts:config=config/crd/bases
+	$(CONTROLLER_GEN) $(CRD_OPTIONS) paths="./apis/..." output:crd:artifacts:config=config/crd/bases
 
 fmt: ## Run go fmt against code
 	go fmt ./...
@@ -203,6 +208,9 @@ vet: ## Run go vet against against all packages.
 
 generate: $(OPENAPI_GEN) $(CONTROLLER_GEN) ## Runs the kubernetes code-generators and openapi
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+
+	# Revert any modification to the mysql-operator files
+	git checkout pkg/database/mysql_operator/*
 
 	## Grant permissions to execute generation script
 	chmod +x vendor/k8s.io/code-generator/generate-groups.sh
@@ -242,6 +250,10 @@ bundle: operator-sdk manifests ## Generate bundle manifests and metadata, then v
 bundle-build: ## Build the bundle image.
 	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
 
+## Checks for vulnerabilities
+trivy: build-image
+	@echo running trivy
+	@trivy image --format table --exit-code $(TRIVY_EXIT_CODE) --ignore-unfixed --vuln-type $(TRIVY_VULN_TYPE) --severity $(TRIVY_SEVERITY) $(OPERATOR_IMAGE)
 
 ## --------------------------------------
 ## Tooling Binaries

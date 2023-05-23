@@ -62,7 +62,11 @@ func (r *ResourceHelper) Create(owner v1.Object, desired Object, reqLogger logr.
 }
 
 func (r *ResourceHelper) Update(current, desired Object, reqLogger logr.Logger) error {
-	patchResult, err := objectMatcher.NewPatchMaker(defaultAnnotator).Calculate(current, desired)
+	patchResult, err := objectMatcher.NewPatchMaker(
+		defaultAnnotator,
+		&objectMatcher.K8sStrategicMergePatcher{},
+		&objectMatcher.BaseJSONMergePatcher{},
+	).Calculate(current, desired)
 	if err != nil {
 		return errors.Wrap(err, "failed to determine if resources differ")
 	}

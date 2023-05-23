@@ -4,11 +4,11 @@ import (
 	"fmt"
 
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
+	mysqlv1alpha1 "github.com/mattermost/mattermost-operator/pkg/database/mysql_operator/v1alpha1"
 	mattermostApp "github.com/mattermost/mattermost-operator/pkg/mattermost"
 
 	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1"
 	"github.com/mattermost/mattermost-operator/pkg/utils"
-	mysqlOperator "github.com/presslabs/mysql-operator/pkg/apis/mysql/v1alpha1"
 
 	componentUtils "github.com/mattermost/mattermost-operator/pkg/components/utils"
 
@@ -20,8 +20,8 @@ import (
 )
 
 // Cluster returns the MySQL cluster to deploy
-func Cluster(mattermost *mattermostv1alpha1.ClusterInstallation) *mysqlOperator.MysqlCluster {
-	mysql := &mysqlOperator.MysqlCluster{
+func Cluster(mattermost *mattermostv1alpha1.ClusterInstallation) *mysqlv1alpha1.MysqlCluster {
+	mysql := &mysqlv1alpha1.MysqlCluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      componentUtils.HashWithPrefix("db", mattermost.Name),
 			Namespace: mattermost.Namespace,
@@ -34,11 +34,11 @@ func Cluster(mattermost *mattermostv1alpha1.ClusterInstallation) *mysqlOperator.
 				}),
 			},
 		},
-		Spec: mysqlOperator.MysqlClusterSpec{
+		Spec: mysqlv1alpha1.MysqlClusterSpec{
 			MysqlVersion: mattermost.Spec.Database.Version,
 			Replicas:     utils.NewInt32(mattermost.Spec.Database.Replicas),
 			SecretName:   DefaultDatabaseSecretName(mattermost.Name),
-			VolumeSpec: mysqlOperator.VolumeSpec{
+			VolumeSpec: mysqlv1alpha1.VolumeSpec{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimSpec{
 					AccessModes: []corev1.PersistentVolumeAccessMode{
 						"ReadWriteOnce",
@@ -53,7 +53,7 @@ func Cluster(mattermost *mattermostv1alpha1.ClusterInstallation) *mysqlOperator.
 			BackupSchedule:           mattermost.Spec.Database.BackupSchedule,
 			BackupURL:                mattermost.Spec.Database.BackupURL,
 			BackupSecretName:         mattermost.Spec.Database.BackupRestoreSecretName,
-			BackupRemoteDeletePolicy: mysqlOperator.DeletePolicy(mattermost.Spec.Database.BackupRemoteDeletePolicy),
+			BackupRemoteDeletePolicy: mysqlv1alpha1.DeletePolicy(mattermost.Spec.Database.BackupRemoteDeletePolicy),
 		},
 	}
 
@@ -70,19 +70,19 @@ func Cluster(mattermost *mattermostv1alpha1.ClusterInstallation) *mysqlOperator.
 }
 
 // Cluster returns the MySQL cluster to deploy
-func ClusterV1Beta(mattermost *mmv1beta.Mattermost) *mysqlOperator.MysqlCluster {
-	mysql := &mysqlOperator.MysqlCluster{
+func ClusterV1Beta(mattermost *mmv1beta.Mattermost) *mysqlv1alpha1.MysqlCluster {
+	mysql := &mysqlv1alpha1.MysqlCluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            componentUtils.HashWithPrefix("db", mattermost.Name),
 			Namespace:       mattermost.Namespace,
 			Labels:          mmv1beta.MattermostResourceLabels(mattermost.Name),
 			OwnerReferences: mattermostApp.MattermostOwnerReference(mattermost),
 		},
-		Spec: mysqlOperator.MysqlClusterSpec{
+		Spec: mysqlv1alpha1.MysqlClusterSpec{
 			MysqlVersion: mattermost.Spec.Database.OperatorManaged.Version,
 			Replicas:     mattermost.Spec.Database.OperatorManaged.Replicas,
 			SecretName:   DefaultDatabaseSecretName(mattermost.Name),
-			VolumeSpec: mysqlOperator.VolumeSpec{
+			VolumeSpec: mysqlv1alpha1.VolumeSpec{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimSpec{
 					AccessModes: []corev1.PersistentVolumeAccessMode{
 						"ReadWriteOnce",
@@ -97,7 +97,7 @@ func ClusterV1Beta(mattermost *mmv1beta.Mattermost) *mysqlOperator.MysqlCluster 
 			BackupSchedule:           mattermost.Spec.Database.OperatorManaged.BackupSchedule,
 			BackupURL:                mattermost.Spec.Database.OperatorManaged.BackupURL,
 			BackupSecretName:         mattermost.Spec.Database.OperatorManaged.BackupRestoreSecretName,
-			BackupRemoteDeletePolicy: mysqlOperator.DeletePolicy(mattermost.Spec.Database.OperatorManaged.BackupRemoteDeletePolicy),
+			BackupRemoteDeletePolicy: mysqlv1alpha1.DeletePolicy(mattermost.Spec.Database.OperatorManaged.BackupRemoteDeletePolicy),
 		},
 	}
 

@@ -5,13 +5,14 @@ package v1beta1
 
 import (
 	"fmt"
+	"os"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"io/ioutil"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"testing"
 )
 
 // TODO: tests can be extended to common patches and requests.
@@ -336,8 +337,39 @@ func Test_SetPatchStatus(t *testing.T) {
 	})
 }
 
+func TestPatch(t *testing.T) {
+	t.Run("replace type=NodePort", func(t *testing.T) {
+		p := Patch{
+			Disable: false,
+			Patch:   `[{"op":"replace","path":"/spec/type", "value": "NodePort"}]`,
+		}
+
+		obj1 := &corev1.Service{}
+		obj2 := &corev1.Service{}
+		gvk := obj1.GroupVersionKind()
+		err := p.applyPatch(obj1, obj2, &gvk)
+		assert.NoError(t, err)
+		assert.NotEqual(t, &obj1, &obj2)
+		assert.NotEqual(t, obj1.Spec.Type, obj2.Spec.Type)
+	})
+
+	t.Run("empty patch, replace pointer", func(t *testing.T) {
+		p := Patch{
+			Disable: true,
+		}
+
+		obj1 := &corev1.Service{}
+		obj2 := &corev1.Service{}
+		gvk := obj1.GroupVersionKind()
+		err := p.applyPatch(obj1, obj2, &gvk)
+		assert.NoError(t, err)
+		assert.Equal(t, obj1.Spec.Type, obj2.Spec.Type)
+		assert.Equal(t, &obj1, &obj2)
+	})
+}
+
 func loadFile(t *testing.T, path string) string {
-	b, err := ioutil.ReadFile(path)
+	b, err := os.ReadFile(path)
 	require.NoError(t, err)
 	return string(b)
 }

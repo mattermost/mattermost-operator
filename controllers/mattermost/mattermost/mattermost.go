@@ -33,9 +33,6 @@ func (r *MattermostReconciler) checkMattermost(
 	status *mmv1beta.MattermostStatus,
 	reqLogger logr.Logger) (reconcileStatus, error) {
 	reqLogger = reqLogger.WithValues("Reconcile", "mattermost")
-	recStatus := reconcileStatus{
-		ResourcesReady: true,
-	}
 
 	err := r.checkLicence(mattermost)
 	if err != nil {
@@ -64,12 +61,7 @@ func (r *MattermostReconciler) checkMattermost(
 		}
 	}
 
-	recStatus, err = r.checkMattermostDeployment(mattermost, dbInfo, fsConfig, status, reqLogger)
-	if err != nil {
-		return reconcileStatus{}, err
-	}
-
-	return recStatus, nil
+	return r.checkMattermostDeployment(mattermost, dbInfo, fsConfig, status, reqLogger)
 }
 
 func (r *MattermostReconciler) checkLicence(mattermost *mmv1beta.Mattermost) error {
@@ -265,10 +257,6 @@ func (r *MattermostReconciler) checkMattermostDeployment(
 		mattermost.GetImageName(),
 	)
 
-	recStatus := reconcileStatus{
-		ResourcesReady: true,
-	}
-
 	patchedObj, applied, err := mattermost.Spec.ResourcePatch.ApplyToDeployment(desired)
 	if err != nil {
 		reqLogger.Error(err, "Failed to patch deployment")
@@ -300,29 +288,12 @@ func (r *MattermostReconciler) checkMattermostDeployment(
 		return reconcileStatus{}, errors.Wrap(err, "failed to get mattermost deployment")
 	}
 
-	recStatus, err = r.updateMattermostDeployment(mattermost, current, desired, reqLogger)
+	recStatus, err := r.updateMattermostDeployment(mattermost, current, desired, reqLogger)
 	if err != nil {
 		return reconcileStatus{}, errors.Wrap(err, "failed to update mattermost deployment")
 	}
 
 	return recStatus, nil
-}
-
-func (r *MattermostReconciler) checkMattermostDBSetupJob(mattermost *mmv1beta.Mattermost, deployment *appsv1.Deployment, reqLogger logr.Logger) error {
-	desiredJob := resources.PrepareMattermostJobTemplate(mattermostApp.SetupJobName, mattermost.Namespace, deployment, mattermost.Spec.UpdateJob)
-	desiredJob.OwnerReferences = mattermostApp.MattermostOwnerReference(mattermost)
-
-	currentJob := &batchv1.Job{}
-	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: desiredJob.Name, Namespace: desiredJob.Namespace}, currentJob)
-	if err != nil {
-		if k8sErrors.IsNotFound(err) {
-			reqLogger.Info("Creating DB setup job", "name", desiredJob.Name)
-			return r.Resources.Create(mattermost, desiredJob, reqLogger)
-		}
-		return errors.Wrap(err, "failed to get current db setup job")
-	}
-	// For now, there is no need to perform job update, so just return.
-	return nil
 }
 
 // isMainDeploymentContainerImageSame checks whether main containers of specified deployments are the same or not.

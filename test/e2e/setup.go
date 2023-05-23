@@ -4,8 +4,8 @@ import (
 	"path/filepath"
 
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
+	mysqlv1alpha1 "github.com/mattermost/mattermost-operator/pkg/database/mysql_operator/v1alpha1"
 	v1beta1Minio "github.com/minio/minio-operator/pkg/apis/miniocontroller/v1beta1"
-	v1alpha1MySQL "github.com/presslabs/mysql-operator/pkg/apis/mysql/v1alpha1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -42,7 +42,7 @@ func SetupTest() (TestEnvironment, error) {
 		return TestEnvironment{}, err
 	}
 
-	err = v1alpha1MySQL.SchemeBuilder.AddToScheme(scheme.Scheme)
+	err = mysqlv1alpha1.SchemeBuilder.AddToScheme(scheme.Scheme)
 	if err != nil {
 		return TestEnvironment{}, err
 	}

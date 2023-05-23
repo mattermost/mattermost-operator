@@ -5,6 +5,7 @@ package v1beta1
 
 import (
 	"bytes"
+
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
@@ -93,12 +94,9 @@ func (s *MattermostStatus) ClearServicePatchStatus() {
 	s.ResourcePatch.ServicePatch = nil
 }
 
-func (p Patch) applyPatch(resource runtime.Object,
-	destination runtime.Object,
-	gvk *schema.GroupVersionKind) error {
-
+func (p Patch) applyPatch(resource, destination runtime.Object, gvk *schema.GroupVersionKind) error {
 	if p.Disable || len(p.Patch) == 0 {
-		destination = resource
+		destination = resource //nolint:staticcheck,ineffassign
 		return nil
 	}
 

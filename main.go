@@ -12,9 +12,9 @@ import (
 	"github.com/mattermost/mattermost-operator/controllers/mattermost/clusterinstallation"
 	"github.com/mattermost/mattermost-operator/controllers/mattermost/mattermost"
 	"github.com/mattermost/mattermost-operator/controllers/mattermost/mattermostrestoredb"
+	mysqlv1alpha1 "github.com/mattermost/mattermost-operator/pkg/database/mysql_operator/v1alpha1"
 	"github.com/mattermost/mattermost-operator/pkg/resources"
 	v1beta1Minio "github.com/minio/minio-operator/pkg/apis/miniocontroller/v1beta1"
-	v1alpha1MySQL "github.com/presslabs/mysql-operator/pkg/apis/mysql/v1alpha1"
 	"github.com/sirupsen/logrus"
 	"github.com/vrischmann/envconfig"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
@@ -50,7 +50,7 @@ func init() {
 	// +kubebuilder:scaffold:scheme
 
 	utilruntime.Must(v1beta1Minio.AddToScheme(scheme))
-	utilruntime.Must(v1alpha1MySQL.SchemeBuilder.AddToScheme(scheme))
+	utilruntime.Must(mysqlv1alpha1.SchemeBuilder.AddToScheme(scheme))
 }
 
 type Config struct {
