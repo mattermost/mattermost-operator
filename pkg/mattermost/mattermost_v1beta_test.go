@@ -795,7 +795,7 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 				Name:            "init-check-database",
 				Image:           "postgres:13",
 				ImagePullPolicy: corev1.PullIfNotPresent,
-				Command:         []string{"sh", "-c", "until pg_isready --dbname=\"$DB_CONNECTION_CHECK_URL\"; do echo waiting for database; sleep 5; done;"},
+				Command:         []string{"sh", "-c", "until pg_isready -h $DB_CONNECTION_CHECK_URL; do echo waiting for database; sleep 5; done;"},
 				Env:             []corev1.EnvVar{{Name: "DB_CONNECTION_CHECK_URL", Value: "", ValueFrom: EnvSourceFromSecret("secret", "DB_CONNECTION_CHECK_URL")}},
 			},
 		}

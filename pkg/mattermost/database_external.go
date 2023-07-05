@@ -110,7 +110,7 @@ func getDBCheckInitContainer(secretName, dbType string) *corev1.Container {
 			Env:             envVars,
 			Command: []string{
 				"sh", "-c",
-				"until pg_isready --dbname=\"$DB_CONNECTION_CHECK_URL\"; do echo waiting for database; sleep 5; done;",
+				"until pg_isready -h $DB_CONNECTION_CHECK_URL; do echo waiting for database; sleep 5; done;",
 			},
 		}
 	}
