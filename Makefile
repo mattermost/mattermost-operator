@@ -28,6 +28,8 @@ MACHINE = $(shell uname -m)
 GOFLAGS ?= $(GOFLAGS:) -mod=vendor
 BUILD_TIME := $(shell date -u +%Y%m%d.%H%M%S)
 BUILD_HASH := $(shell git rev-parse HEAD)
+TARGET_OS ?= linux
+TARGET_ARCH ?= amd64
 
 BUNDLE_IMG ?= controller-bundle:$(VERSION) # Default bundle image tag
 CRD_OPTIONS ?= "crd" # Image URL to use all building/pushing image targets
@@ -119,7 +121,7 @@ goverall: $(GOVERALLS_GEN) ## Runs goveralls
 
 build: ## Build the mattermost-operator
 	@echo Building Mattermost-operator
-	GO111MODULE=on GOOS=linux GOARCH=amd64 CGO_ENABLED=0 $(GO) build $(GOFLAGS) -gcflags all=-trimpath=$(GOPATH) -asmflags all=-trimpath=$(GOPATH) -a -installsuffix cgo -o build/_output/bin/mattermost-operator $(GO_LINKER_FLAGS) ./main.go
+	GO111MODULE=on GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) CGO_ENABLED=0 $(GO) build $(GOFLAGS) -gcflags all=-trimpath=$(GOPATH) -asmflags all=-trimpath=$(GOPATH) -a -installsuffix cgo -o build/_output/bin/mattermost-operator $(GO_LINKER_FLAGS) ./main.go
 
 .PHONE: buildx-image
 buildx-image:  ## Builds and pushes the docker image for mattermost-operator

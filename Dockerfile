@@ -4,6 +4,9 @@ ARG BASE_IMAGE=gcr.io/distroless/static:nonroot
 
 FROM ${BUILD_IMAGE} as builder
 
+ARG TARGETARCH
+ARG TARGETOS
+
 WORKDIR /workspace
 COPY . .
 
@@ -11,7 +14,7 @@ RUN mkdir -p licenses
 COPY LICENSE /workspace/licenses
 
 # Build
-RUN make build
+RUN make build TARGET_OS=$TARGETOS TARGET_ARCH=$TARGETARCH
 
 FROM ${BASE_IMAGE}
 
