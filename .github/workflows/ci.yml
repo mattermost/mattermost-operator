@@ -16,14 +16,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: ci/checkout-repo
-        uses: actions/checkout@24cb9080177205b6e8c946b17badbe402adc938f # v3.4.0
+        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
         with:
           fetch-depth: 0
 
       - name: ci/setup-go
         uses: actions/setup-go@6edd4406fa81c3da01a34fa6f6343087c207a568 # v3.5.0
         with:
-          go-version: "1.21"
+          go-version-file: go.mod
           cache: true
 
       - name: ci/check-style
@@ -36,7 +36,7 @@ jobs:
     runs-on: ubuntu-latest-4-cores
     steps:
       - name: ci/checkout-repo
-        uses: actions/checkout@24cb9080177205b6e8c946b17badbe402adc938f # v3.4.0
+        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
         with:
           fetch-depth: 0
           path: src/github.com/mattermost/mattermost-operator
@@ -44,9 +44,9 @@ jobs:
       - name: ci/setup-go
         uses: actions/setup-go@6edd4406fa81c3da01a34fa6f6343087c207a568 # v3.5.0
         with:
-          go-version: "1.21"
-          cache: true
+          go-version-file: src/github.com/mattermost/mattermost-operator/go.mod
           cache-dependency-path: src/github.com/mattermost/mattermost-operator/go.sum
+          cache: true
 
       - name: ci/generate-operator-manifests
         run: |
@@ -91,7 +91,7 @@ jobs:
     needs: [lint, test]
     steps:
       - name: ci/checkout-repo
-        uses: actions/checkout@24cb9080177205b6e8c946b17badbe402adc938f # v3.4.0
+        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
         with:
           fetch-depth: 0
 
