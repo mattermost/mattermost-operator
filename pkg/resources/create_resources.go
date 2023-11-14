@@ -16,6 +16,7 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -210,17 +211,21 @@ func (r *ResourceHelper) CreatePvcIfNotExists(owner v1.Object, pvc *corev1.Persi
 	return nil
 }
 
-func (r *ResourceHelper) DeleteIngress(key types.NamespacedName, reqLogger logr.Logger) error {
-	foundIngress := &networkingv1.Ingress{}
-	err := r.client.Get(context.TODO(), key, foundIngress)
-	if err != nil && k8sErrors.IsNotFound(err) {
+func (r *ResourceHelper) DeleteIngress(nameSpace string, labelSet map[string]string, reqLogger logr.Logger) error {
+	foundIngresses := &v1.PartialObjectMetadataList{}
+
+	err := r.client.List(context.TODO(), foundIngresses, client.InNamespace(nameSpace), &client.ListOptions{
+		LabelSelector: labels.SelectorFromSet(labelSet),
+	})
+
+	if err != nil && len(foundIngresses.Items) > 0 {
 		return nil
 	} else if err != nil {
 		return errors.Wrap(err, "failed to check if ingress exists")
 	}
 
-	reqLogger.Info("Deleting ingress", "name", foundIngress.Name)
-	err = r.client.Delete(context.TODO(), foundIngress)
+	reqLogger.Info("Deleting ingress", "name", foundIngresses.Items[0].Name)
+	err = r.client.Delete(context.TODO(), &foundIngresses.DeepCopy().Items[0])
 	if err != nil {
 		return errors.Wrap(err, "failed to delete ingress")
 	}
