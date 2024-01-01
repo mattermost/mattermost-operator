@@ -366,6 +366,28 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 		revisionHistoryLimit = mattermost.Spec.DeploymentTemplate.RevisionHistoryLimit
 	}
 
+	containers := []corev1.Container{
+		{
+			Name:                     mattermostv1alpha1.MattermostAppContainerName,
+			Image:                    containerImage,
+			ImagePullPolicy:          mattermost.Spec.ImagePullPolicy,
+			TerminationMessagePolicy: corev1.TerminationMessageFallbackToLogsOnError,
+			Command:                  []string{"mattermost"},
+			Env:                      envVars,
+			Ports:                    containerPorts,
+			ReadinessProbe:           readiness,
+			LivenessProbe:            liveness,
+			VolumeMounts:             volumeMounts,
+			Resources:                mattermost.Spec.Scheduling.Resources,
+			SecurityContext:          containerSecurityContext,
+		},
+	}
+
+	// Final container extensions
+	if mattermost.Spec.PodExtensions.SidecarContainers != nil {
+		containers = append(containers, mattermost.Spec.PodExtensions.SidecarContainers...)
+	}
+
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            deploymentName,
@@ -394,30 +416,15 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 				Spec: corev1.PodSpec{
 					ServiceAccountName: serviceAccountName,
 					InitContainers:     initContainers,
-					Containers: []corev1.Container{
-						{
-							Name:                     mattermostv1alpha1.MattermostAppContainerName,
-							Image:                    containerImage,
-							ImagePullPolicy:          mattermost.Spec.ImagePullPolicy,
-							TerminationMessagePolicy: corev1.TerminationMessageFallbackToLogsOnError,
-							Command:                  []string{"mattermost"},
-							Env:                      envVars,
-							Ports:                    containerPorts,
-							ReadinessProbe:           readiness,
-							LivenessProbe:            liveness,
-							VolumeMounts:             volumeMounts,
-							Resources:                mattermost.Spec.Scheduling.Resources,
-							SecurityContext:          containerSecurityContext,
-						},
-					},
-					ImagePullSecrets: mattermost.Spec.ImagePullSecrets,
-					Volumes:          volumes,
-					DNSConfig:        mattermost.Spec.DNSConfig,
-					DNSPolicy:        mattermost.Spec.DNSPolicy,
-					Affinity:         mattermost.Spec.Scheduling.Affinity,
-					NodeSelector:     mattermost.Spec.Scheduling.NodeSelector,
-					Tolerations:      mattermost.Spec.Scheduling.Tolerations,
-					SecurityContext:  podSecurityContext,
+					Containers:         containers,
+					ImagePullSecrets:   mattermost.Spec.ImagePullSecrets,
+					Volumes:            volumes,
+					DNSConfig:          mattermost.Spec.DNSConfig,
+					DNSPolicy:          mattermost.Spec.DNSPolicy,
+					Affinity:           mattermost.Spec.Scheduling.Affinity,
+					NodeSelector:       mattermost.Spec.Scheduling.NodeSelector,
+					Tolerations:        mattermost.Spec.Scheduling.Tolerations,
+					SecurityContext:    podSecurityContext,
 				},
 			},
 		},

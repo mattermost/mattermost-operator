@@ -804,7 +804,6 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 			description            string
 			mmSpec                 mmv1beta.MattermostSpec
 			dbConfig               DatabaseConfig
-			fileStoreConfig        FileStoreConfig
 			expectedInitContainers []corev1.Container
 		}{
 			{
@@ -883,6 +882,50 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 				}
 				deployment := GenerateDeploymentV1Beta(mattermost, testCase.dbConfig, &ExternalFileStore{}, "", "", "", "image")
 				assert.Equal(t, testCase.expectedInitContainers, deployment.Spec.Template.Spec.InitContainers)
+			})
+		}
+	})
+
+	t.Run("custom sidecar container pod extension", func(t *testing.T) {
+		dbConfig := &ExternalDBConfig{dbType: database.PostgreSQLDatabase, hasDBCheckURL: false}
+		customSideBarContainers := []corev1.Container{
+			{Image: "my-log-exporter-image", Name: "log-exporter"},
+			{Image: "my-audit-image", Name: "audit"},
+		}
+
+		for _, testCase := range []struct {
+			description               string
+			mmSpec                    mmv1beta.MattermostSpec
+			expectedSidecarContainers []corev1.Container
+		}{
+			{
+				description: "no custom sidebar containers",
+				mmSpec: mmv1beta.MattermostSpec{
+					PodExtensions: mmv1beta.PodExtensions{
+						SidecarContainers: nil,
+					},
+				},
+				expectedSidecarContainers: nil,
+			},
+			{
+				description: "custom sidebar containers",
+				mmSpec: mmv1beta.MattermostSpec{
+					PodExtensions: mmv1beta.PodExtensions{
+						SidecarContainers: customSideBarContainers,
+					},
+				},
+				expectedSidecarContainers: customSideBarContainers,
+			},
+		} {
+			t.Run(testCase.description, func(t *testing.T) {
+				mattermost := &mmv1beta.Mattermost{
+					Spec: testCase.mmSpec,
+				}
+				deployment := GenerateDeploymentV1Beta(mattermost, dbConfig, &ExternalFileStore{}, "", "", "", "image")
+				require.Equal(t, len(testCase.expectedSidecarContainers), len(deployment.Spec.Template.Spec.Containers)-1)
+				if testCase.mmSpec.PodExtensions.SidecarContainers != nil {
+					assert.Equal(t, testCase.expectedSidecarContainers, deployment.Spec.Template.Spec.Containers[1:])
+				}
 			})
 		}
 	})

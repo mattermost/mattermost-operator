@@ -511,6 +511,13 @@ func (in *PodExtensions) DeepCopyInto(out *PodExtensions) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.SidecarContainers != nil {
+		in, out := &in.SidecarContainers, &out.SidecarContainers
+		*out = make([]v1.Container, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	if in.ContainerPorts != nil {
 		in, out := &in.ContainerPorts, &out.ContainerPorts
 		*out = make([]v1.ContainerPort, len(*in))
