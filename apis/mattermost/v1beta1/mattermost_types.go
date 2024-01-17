@@ -286,11 +286,19 @@ type UpdateJob struct {
 
 // PodExtensions specify customized extensions for a pod.
 type PodExtensions struct {
-	// Additional InitContainers injected to pods.
+	// Additional InitContainers injected into pods.
 	// The setting does not override InitContainers defined by the Operator.
 	InitContainers []v1.Container `json:"initContainers,omitempty"`
 
-	// Additional Container Ports injected to pod's main container.
+	// Additional sidecar containers injected into pods.
+	// The setting does not override any sidecar containers defined by the Operator.
+	// Note that sidecars are injected as standard pod containers alongside the
+	// Mattermost application server. In the future, this may be migrated to
+	// use the currently-feature-gated init container method introduced in k8s v1.28:
+	// https://kubernetes.io/blog/2023/08/25/native-sidecar-containers/
+	SidecarContainers []v1.Container `json:"sidecarContainers,omitempty"`
+
+	// Additional Container Ports injected into pod's main container.
 	// The setting does not override ContainerPorts defined by the Operator.
 	ContainerPorts []v1.ContainerPort `json:"containerPorts,omitempty"`
 }
