@@ -17,7 +17,7 @@ BASE_IMAGE = gcr.io/distroless/static:nonroot
 ################################################################################
 
 GO ?= $(shell command -v go 2> /dev/null)
-PACKAGES=$(shell go list ./... | grep -v vendor)
+PACKAGES=$(shell go list ./...)
 TEST_PACKAGES=$(shell go list ./...| grep -v test/e2e)
 TEST_FLAGS ?= -v
 
@@ -25,7 +25,7 @@ OPERATOR_IMAGE_NAME ?= mattermost/mattermost-operator
 OPERATOR_IMAGE_TAG ?= test
 OPERATOR_IMAGE ?= $(OPERATOR_IMAGE_NAME):$(OPERATOR_IMAGE_TAG)
 MACHINE = $(shell uname -m)
-GOFLAGS ?= $(GOFLAGS:) -mod=vendor
+GOFLAGS ?= $(GOFLAGS:)
 BUILD_TIME := $(shell date -u +%Y%m%d.%H%M%S)
 BUILD_HASH := $(shell git rev-parse HEAD)
 TARGET_OS ?= linux
@@ -111,7 +111,7 @@ KUSTOMIZE := $(TOOLS_BIN_DIR)/$(KUSTOMIZE_BIN)
 all: generate check-style unittest build
 
 unittest: ## Runs unit tests
-	$(GO) test -mod=vendor $(GO_LINKER_FLAGS) $(TEST_PACKAGES) ${TEST_FLAGS} -covermode=count -coverprofile=coverage.out
+	$(GO) test $(GO_LINKER_FLAGS) $(TEST_PACKAGES) ${TEST_FLAGS} -covermode=count -coverprofile=coverage.out
 
 e2e-local:
 	./test/e2e_local.sh
@@ -215,20 +215,20 @@ generate: $(OPENAPI_GEN) $(CONTROLLER_GEN) ## Runs the kubernetes code-generator
 	git checkout pkg/database/mysql_operator/*
 
 	## Grant permissions to execute generation script
-	chmod +x vendor/k8s.io/code-generator/generate-groups.sh
+	chmod +x scripts/k8s.io/code-generator/generate-groups.sh
 
 	GOROOT=$(GOROOT) $(OPENAPI_GEN) --logtostderr=true -o "" -i ./apis/mattermost/v1alpha1 -O zz_generated.openapi -p ./apis/mattermost/v1alpha1 -h ./hack/boilerplate.go.txt -r "-"
 
 	## Do not generate deepcopy as it is handled by controller-gen
-	vendor/k8s.io/code-generator/generate-groups.sh client github.com/mattermost/mattermost-operator/pkg/client github.com/mattermost/mattermost-operator/apis "mattermost:v1alpha1" -h ./hack/boilerplate.go.txt
-	vendor/k8s.io/code-generator/generate-groups.sh lister github.com/mattermost/mattermost-operator/pkg/client github.com/mattermost/mattermost-operator/apis "mattermost:v1alpha1" -h ./hack/boilerplate.go.txt
-	vendor/k8s.io/code-generator/generate-groups.sh informer github.com/mattermost/mattermost-operator/pkg/client github.com/mattermost/mattermost-operator/apis "mattermost:v1alpha1" -h ./hack/boilerplate.go.txt
+	scripts/k8s.io/code-generator/generate-groups.sh client github.com/mattermost/mattermost-operator/pkg/client github.com/mattermost/mattermost-operator/apis "mattermost:v1alpha1" -h ./hack/boilerplate.go.txt
+	scripts/k8s.io/code-generator/generate-groups.sh lister github.com/mattermost/mattermost-operator/pkg/client github.com/mattermost/mattermost-operator/apis "mattermost:v1alpha1" -h ./hack/boilerplate.go.txt
+	scripts/k8s.io/code-generator/generate-groups.sh informer github.com/mattermost/mattermost-operator/pkg/client github.com/mattermost/mattermost-operator/apis "mattermost:v1alpha1" -h ./hack/boilerplate.go.txt
 
 	GOROOT=$(GOROOT) $(OPENAPI_GEN) --logtostderr=true -o "" -i ./apis/mattermost/v1beta1 -O zz_generated.openapi -p ./apis/mattermost/v1beta1 -h ./hack/boilerplate.go.txt -r "-"
 
-	vendor/k8s.io/code-generator/generate-groups.sh client github.com/mattermost/mattermost-operator/pkg/client/v1beta1 github.com/mattermost/mattermost-operator/apis "mattermost:v1beta1" -h ./hack/boilerplate.go.txt
-	vendor/k8s.io/code-generator/generate-groups.sh lister github.com/mattermost/mattermost-operator/pkg/client/v1beta1 github.com/mattermost/mattermost-operator/apis "mattermost:v1beta1" -h ./hack/boilerplate.go.txt
-	vendor/k8s.io/code-generator/generate-groups.sh informer github.com/mattermost/mattermost-operator/pkg/client/v1beta1 github.com/mattermost/mattermost-operator/apis "mattermost:v1beta1" -h ./hack/boilerplate.go.txt
+	scripts/k8s.io/code-generator/generate-groups.sh client github.com/mattermost/mattermost-operator/pkg/client/v1beta1 github.com/mattermost/mattermost-operator/apis "mattermost:v1beta1" -h ./hack/boilerplate.go.txt
+	scripts/k8s.io/code-generator/generate-groups.sh lister github.com/mattermost/mattermost-operator/pkg/client/v1beta1 github.com/mattermost/mattermost-operator/apis "mattermost:v1beta1" -h ./hack/boilerplate.go.txt
+	scripts/k8s.io/code-generator/generate-groups.sh informer github.com/mattermost/mattermost-operator/pkg/client/v1beta1 github.com/mattermost/mattermost-operator/apis "mattermost:v1beta1" -h ./hack/boilerplate.go.txt
 
 kind-start: ## Setup Kind cluster capable of running Mattermost Operator
 	KIND_CLUSTER="${KIND_CLUSTER}" KIND_CONFIG_FILE=${KIND_CONFIG_FILE} ./scripts/setup_kind.sh
