@@ -102,6 +102,8 @@ func TestGenerateService_V1Beta(t *testing.T) {
 			if mattermost.Spec.ResourceLabels != nil || (mattermost.Spec.PodTemplate != nil && mattermost.Spec.PodTemplate.ExtraLabels != nil) {
 				expectLabels(t, service, mattermost.Spec)
 			}
+
+			assert.True(t, service.Spec.PublishNotReadyAddresses)
 		})
 	}
 }
