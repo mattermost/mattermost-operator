@@ -35,9 +35,7 @@ type FileStoreConfig interface {
 
 // GenerateServiceV1Beta returns the service for the Mattermost app.
 func GenerateServiceV1Beta(mattermost *mmv1beta.Mattermost) *corev1.Service {
-	baseAnnotations := map[string]string{
-		"service.alpha.kubernetes.io/tolerate-unready-endpoints": "true",
-	}
+	baseAnnotations := make(map[string]string)
 
 	if mattermost.AWSLoadBalancerEnabled() {
 		// Create a NodePort service because the ALB requires it
@@ -515,7 +513,8 @@ func newServiceV1Beta(mattermost *mmv1beta.Mattermost, annotations map[string]st
 			Annotations:     annotations,
 		},
 		Spec: corev1.ServiceSpec{
-			Selector: mmv1beta.MattermostSelectorLabels(mattermost.Name),
+			Selector:                 mmv1beta.MattermostSelectorLabels(mattermost.Name),
+			PublishNotReadyAddresses: true,
 		},
 	}
 }

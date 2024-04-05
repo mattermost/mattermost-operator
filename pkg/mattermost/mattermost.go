@@ -29,9 +29,7 @@ var defaultIngressPathType = networkingv1.PathTypeImplementationSpecific
 
 // GenerateService returns the service for the Mattermost app.
 func GenerateService(mattermost *mattermostv1alpha1.ClusterInstallation, serviceName, selectorName string) *corev1.Service {
-	baseAnnotations := map[string]string{
-		"service.alpha.kubernetes.io/tolerate-unready-endpoints": "true",
-	}
+	baseAnnotations := make(map[string]string)
 
 	if mattermost.Spec.UseServiceLoadBalancer {
 		// Create a LoadBalancer service with additional annotations provided in
@@ -503,7 +501,8 @@ func newService(mattermost *mattermostv1alpha1.ClusterInstallation, serviceName,
 			Annotations: annotations,
 		},
 		Spec: corev1.ServiceSpec{
-			Selector: mattermostv1alpha1.ClusterInstallationSelectorLabels(selectorName),
+			Selector:                 mattermostv1alpha1.ClusterInstallationSelectorLabels(selectorName),
+			PublishNotReadyAddresses: true,
 		},
 	}
 }

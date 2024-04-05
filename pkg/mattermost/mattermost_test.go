@@ -14,7 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -67,6 +66,8 @@ func TestGenerateService(t *testing.T) {
 				expectPort(t, service, 8065)
 				expectPort(t, service, 8067)
 			}
+
+			assert.True(t, service.Spec.PublishNotReadyAddresses)
 		})
 	}
 }
@@ -169,8 +170,8 @@ func TestGenerateDeployment(t *testing.T) {
 			},
 			want: &appsv1.Deployment{
 				Spec: appsv1.DeploymentSpec{
-					Template: v1.PodTemplateSpec{
-						Spec: v1.PodSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
 							NodeSelector: map[string]string{"type": "compute"},
 						},
 					},
@@ -184,8 +185,8 @@ func TestGenerateDeployment(t *testing.T) {
 			},
 			want: &appsv1.Deployment{
 				Spec: appsv1.DeploymentSpec{
-					Template: v1.PodTemplateSpec{
-						Spec: v1.PodSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
 							NodeSelector: map[string]string{"type": "compute", "size": "big", "region": "iceland"},
 						},
 					},
@@ -199,8 +200,8 @@ func TestGenerateDeployment(t *testing.T) {
 			},
 			want: &appsv1.Deployment{
 				Spec: appsv1.DeploymentSpec{
-					Template: v1.PodTemplateSpec{
-						Spec: v1.PodSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
 							NodeSelector: nil,
 						},
 					},
@@ -210,9 +211,9 @@ func TestGenerateDeployment(t *testing.T) {
 		{
 			name: "affinity 1",
 			spec: mattermostv1alpha1.ClusterInstallationSpec{
-				Affinity: &v1.Affinity{
-					PodAffinity: &v1.PodAffinity{
-						RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+				Affinity: &corev1.Affinity{
+					PodAffinity: &corev1.PodAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
 							{
 								LabelSelector: &metav1.LabelSelector{
 									MatchLabels: map[string]string{"key": "value"},
@@ -224,11 +225,11 @@ func TestGenerateDeployment(t *testing.T) {
 			},
 			want: &appsv1.Deployment{
 				Spec: appsv1.DeploymentSpec{
-					Template: v1.PodTemplateSpec{
-						Spec: v1.PodSpec{
-							Affinity: &v1.Affinity{
-								PodAffinity: &v1.PodAffinity{
-									RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Affinity: &corev1.Affinity{
+								PodAffinity: &corev1.PodAffinity{
+									RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
 										{
 											LabelSelector: &metav1.LabelSelector{
 												MatchLabels: map[string]string{"key": "value"},
@@ -249,8 +250,8 @@ func TestGenerateDeployment(t *testing.T) {
 			},
 			want: &appsv1.Deployment{
 				Spec: appsv1.DeploymentSpec{
-					Template: v1.PodTemplateSpec{
-						Spec: v1.PodSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
 							Affinity: nil,
 						},
 					},
