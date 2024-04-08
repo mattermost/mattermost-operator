@@ -23,4 +23,5 @@ package tools
 import (
 	_ "github.com/mattn/goveralls"
 	_ "github.com/mikefarah/yq/v3"
+	_ "k8s.io/code-generator"
 )
