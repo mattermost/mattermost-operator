@@ -13,9 +13,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// TestMattermostIngress Check that setting custom values in the mattermost ingress are set on the k8s
+// mattermostIngressTest checks that setting custom values in the mattermost ingress are set on the k8s
 // ingress and that disabling it and updating the instance removes the k8s ingress from the cluster
-func TestMattermostIngress(t *testing.T) {
+func mattermostIngressTest(t *testing.T) {
 	namespace := "e2e-test-custom-ingress"
 	name := "test-mm"
 

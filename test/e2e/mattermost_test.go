@@ -212,7 +212,7 @@ func mattermostUpgradeTest(t *testing.T, k8sClient client.Client, k8sTypedClient
 	require.NoError(t, err)
 }
 
-func mattermostWithMySQLReplicas(t *testing.T, client client.Client, typedClient kubernetes.Interface) {
+func mattermostWithMySQLReplicas(t *testing.T, client client.Client, _ kubernetes.Interface) {
 	testName := "test-mm3"
 
 	exampleMattermost := &operator.Mattermost{

@@ -2,13 +2,14 @@ package e2e
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 
-	operator "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
+	mmv1beta1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	mysqlv1alpha1 "github.com/mattermost/mattermost-operator/pkg/database/mysql_operator/v1alpha1"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -40,45 +41,34 @@ func waitForMySQLStatusReady(t *testing.T, dynclient client.Client, namespace, n
 }
 
 func WaitForMattermostStable(t *testing.T, k8sClient client.Client, mmKey types.NamespacedName, timeout time.Duration) error {
-	newMattermost := &operator.Mattermost{}
-	err := wait.Poll(3*time.Second, timeout, func() (done bool, err error) {
-		errClient := k8sClient.Get(context.TODO(), mmKey, newMattermost)
+	mattermost := &mmv1beta1.Mattermost{}
+	err := wait.Poll(5*time.Second, timeout, func() (done bool, err error) {
+		errClient := k8sClient.Get(context.TODO(), mmKey, mattermost)
 		if errClient != nil {
 			return false, errClient
 		}
 
-		if newMattermost.Status.State == operator.Stable {
+		if mattermost.Status.State == mmv1beta1.Stable && mattermost.Generation == mattermost.Status.ObservedGeneration {
 			return true, nil
 		}
-		t.Logf("Waiting for Reconcilication finish (Status:%s)\n", newMattermost.Status.State)
+		t.Logf("Waiting for reconcilication (%s)", prettyPrintStatus(mattermost.Status))
 		return false, nil
 	})
 	if err != nil {
 		return err
 	}
-	t.Logf("Reconcilication completed (%s)\n", newMattermost.Status.State)
+
+	t.Logf("Reconcilication finished (%s)", prettyPrintStatus(mattermost.Status))
 	return nil
 }
 
-func WaitForMattermostToReconcile(t *testing.T, k8sClient client.Client, mmKey types.NamespacedName, timeout time.Duration) error {
-	newMattermost := &operator.Mattermost{}
-	err := wait.Poll(3*time.Second, timeout, func() (done bool, err error) {
-		errClient := k8sClient.Get(context.TODO(), mmKey, newMattermost)
-		if errClient != nil {
-			return false, errClient
-		}
-
-		if newMattermost.Status.State == operator.Reconciling {
-			return true, nil
-		}
-		t.Logf("Waiting for Reconcilication to start (Status:%s)\n", newMattermost.Status.State)
-		return false, nil
-	})
-	if err != nil {
-		return err
-	}
-	t.Logf("Reconcilication started (%s)\n", newMattermost.Status.State)
-	return nil
+func prettyPrintStatus(status mmv1beta1.MattermostStatus) string {
+	return fmt.Sprintf("State:%s, UpdatedReplicas:%d, Version:%s, ObservedGeneration:%d",
+		status.State,
+		status.UpdatedReplicas,
+		status.Version,
+		status.ObservedGeneration,
+	)
 }
 
 func waitForStatefulSet(t *testing.T, dynclient client.Client, namespace, name string, replicas int, retryInterval, timeout time.Duration) error {

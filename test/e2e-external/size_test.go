@@ -12,8 +12,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-// TestMattermostSize checks defaulting & updating replicas & resources from size.
-func TestMattermostSize(t *testing.T) {
+// mattermostSizeTest checks defaulting & updating replicas & resources from size.
+func mattermostSizeTest(t *testing.T) {
 	namespace := "e2e-test-size"
 	name := "test-mm"
 	mmNamespaceName := types.NamespacedName{Namespace: namespace, Name: name}
