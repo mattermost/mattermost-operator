@@ -36,6 +36,45 @@ func TestGenerateService_V1Beta(t *testing.T) {
 			},
 		},
 		{
+			name: "type aws controller",
+			spec: mmv1beta.MattermostSpec{
+				AWSLoadBalancerController: &mmv1beta.AWSLoadBalancerController{
+					Enabled: true,
+				},
+			},
+		},
+		{
+			name: "type headless, has annotations",
+			spec: mmv1beta.MattermostSpec{
+				ServiceAnnotations: map[string]string{
+					"custom":       "1",
+					"other-custom": "2",
+				},
+			},
+		},
+		{
+			name: "type load-balancer, has annotations",
+			spec: mmv1beta.MattermostSpec{
+				UseServiceLoadBalancer: true,
+				ServiceAnnotations: map[string]string{
+					"custom":       "1",
+					"other-custom": "2",
+				},
+			},
+		},
+		{
+			name: "type aws controller, has annotations",
+			spec: mmv1beta.MattermostSpec{
+				AWSLoadBalancerController: &mmv1beta.AWSLoadBalancerController{
+					Enabled: true,
+				},
+				ServiceAnnotations: map[string]string{
+					"custom":       "1",
+					"other-custom": "2",
+				},
+			},
+		},
+		{
 			name: "has labels",
 			spec: mmv1beta.MattermostSpec{
 				ResourceLabels: map[string]string{
@@ -68,14 +107,25 @@ func TestGenerateService_V1Beta(t *testing.T) {
 		if mmspec.ResourceLabels != nil {
 			for k, v := range mmspec.ResourceLabels {
 				if service.Labels[k] != v {
-					assert.Fail(t, "Resource labels not found on service")
+					assert.Fail(t, "Resource labels not found on service", fmt.Sprintf("%s=%s", k, v))
 				}
 			}
 		}
-		if mmspec.PodTemplate.ExtraLabels != nil {
+		if mmspec.PodTemplate != nil && mmspec.PodTemplate.ExtraLabels != nil {
 			for k, v := range mmspec.PodTemplate.ExtraLabels {
 				if service.Labels[k] == v {
-					assert.Fail(t, "Pod labels should not be applied to service")
+					assert.Fail(t, "Pod labels should not be applied to service", fmt.Sprintf("%s=%s", k, v))
+				}
+			}
+		}
+	}
+
+	expectAnnotations := func(t *testing.T, service *corev1.Service, mmspec mmv1beta.MattermostSpec) {
+		t.Helper()
+		if mmspec.ServiceAnnotations != nil {
+			for k, v := range mmspec.ServiceAnnotations {
+				if service.Annotations[k] != v {
+					assert.Fail(t, "Resource annotation not found on service", fmt.Sprintf("%s=%s", k, v))
 				}
 			}
 		}
@@ -99,9 +149,8 @@ func TestGenerateService_V1Beta(t *testing.T) {
 				expectPort(t, service, 8067, utils.NewString("http"))
 			}
 
-			if mattermost.Spec.ResourceLabels != nil || (mattermost.Spec.PodTemplate != nil && mattermost.Spec.PodTemplate.ExtraLabels != nil) {
-				expectLabels(t, service, mattermost.Spec)
-			}
+			expectLabels(t, service, mattermost.Spec)
+			expectAnnotations(t, service, mattermost.Spec)
 
 			assert.True(t, service.Spec.PublishNotReadyAddresses)
 		})
