@@ -35,11 +35,11 @@ type FileStoreConfig interface {
 
 // GenerateServiceV1Beta returns the service for the Mattermost app.
 func GenerateServiceV1Beta(mattermost *mmv1beta.Mattermost) *corev1.Service {
-	baseAnnotations := make(map[string]string)
+	annotations := mergeStringMaps(nil, mattermost.Spec.ServiceAnnotations)
 
 	if mattermost.AWSLoadBalancerEnabled() {
 		// Create a NodePort service because the ALB requires it
-		service := newServiceV1Beta(mattermost, mergeStringMaps(baseAnnotations, mattermost.Spec.ServiceAnnotations))
+		service := newServiceV1Beta(mattermost, annotations)
 		return configureMattermostServiceNodePort(service)
 	}
 
@@ -47,13 +47,13 @@ func GenerateServiceV1Beta(mattermost *mmv1beta.Mattermost) *corev1.Service {
 		// Create a LoadBalancer service with additional annotations provided in
 		// the Mattermost Spec. The LoadBalancer is directly accessible from
 		// outside the cluster thus exposes ports 80 and 443.
-		service := newServiceV1Beta(mattermost, mergeStringMaps(baseAnnotations, mattermost.Spec.ServiceAnnotations))
+		service := newServiceV1Beta(mattermost, annotations)
 		return configureMattermostLoadBalancerService(service)
 	}
 
 	// Create a headless service which is not directly accessible from outside
 	// the cluster and thus exposes a custom port.
-	service := newServiceV1Beta(mattermost, baseAnnotations)
+	service := newServiceV1Beta(mattermost, annotations)
 	return configureMattermostService(service)
 }
 
