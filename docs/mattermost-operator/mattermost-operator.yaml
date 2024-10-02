@@ -8527,7 +8527,7 @@ spec:
           value: 20s
         - name: MAX_RECONCILE_CONCURRENCY
           value: "10"
-        image: mattermost/mattermost-operator:latest
+        image: mattermost/mattermost-operator:v1.22.1
         imagePullPolicy: IfNotPresent
         name: mattermost-operator
         ports:
