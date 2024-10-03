@@ -195,7 +195,7 @@ func (r *MattermostReconciler) checkMattermostIngress(mattermost *mmv1beta.Matte
 	}
 
 	if !mattermost.IngressEnabled() && !mattermost.AWSLoadBalancerEnabled() {
-		err := r.Resources.DeleteIngress(types.NamespacedName{Namespace: desired.Namespace, Name: desired.Name}, reqLogger)
+		err := r.Resources.DeleteIngress(desired.Namespace, desired.Labels, reqLogger)
 		if err != nil {
 			return errors.Wrap(err, "failed to delete disabled ingress")
 		}
