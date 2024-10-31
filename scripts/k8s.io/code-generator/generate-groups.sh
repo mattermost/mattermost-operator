@@ -102,7 +102,6 @@ if [ "${GENS}" = "all" ] || grep -qw "lister" <<<"${GENS}"; then
       "$@"
 fi
 
-
 if [ "${GENS}" = "all" ] || grep -qw "informer" <<<"${GENS}"; then
   echo "Generating informers for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/informers"
   TEMP_DIR=$(mktemp -d)

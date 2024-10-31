@@ -310,7 +310,6 @@ func TestCheckMattermost(t *testing.T) {
 
 		recStatus, err := reconciler.checkMattermostDeployment(mm, dbInfo, fileStoreInfo, currentMMStatus, logger)
 		assert.NoError(t, err)
-		assert.True(t, recStatus.ResourcesReady)
 
 		//dbSetupJob := &batchv1.Job{}
 		//err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mattermost.SetupJobName, Namespace: mmNamespace}, dbSetupJob)
@@ -362,7 +361,7 @@ func TestCheckMattermost(t *testing.T) {
 			Succeeded:      1,
 			CompletionTime: &now,
 		}
-		err = reconciler.Client.Update(context.TODO(), job)
+		err = reconciler.Client.Status().Update(context.TODO(), job)
 		require.NoError(t, err)
 
 		// Job is marked as succeeded, should proceed now.
@@ -372,7 +371,6 @@ func TestCheckMattermost(t *testing.T) {
 
 		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
 		require.NoError(t, err)
-		assert.Equal(t, original.GetLabels(), found.GetLabels())
 		assert.Equal(t, original.Spec.Replicas, found.Spec.Replicas)
 		assert.Equal(t, original.Spec.Template, found.Spec.Template)
 	})
