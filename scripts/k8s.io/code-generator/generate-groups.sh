@@ -107,13 +107,11 @@ if [ "${GENS}" = "all" ] || grep -qw "informer" <<<"${GENS}"; then
   echo "Generating informers for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/informers"
   TEMP_DIR=$(mktemp -d)
   trap 'rm -rf "${TEMP_DIR}"' EXIT
-  for FQ_API in "${FQ_APIS[@]}"; do 
-    "${gobin}/informer-gen" \
-        --versioned-clientset-package "${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}/${CLIENTSET_NAME_VERSIONED:-versioned}" \
-        --listers-package "${OUTPUT_PKG}/listers" \
-        --output-pkg "${OUTPUT_PKG}/informers" \
-        --output-dir "${TEMP_DIR}" \
-        "${FQ_API}" \
-        "$@"
-  done
+  "${gobin}/informer-gen" \
+      --versioned-clientset-package "${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}/${CLIENTSET_NAME_VERSIONED:-versioned}" \
+      --listers-package "${OUTPUT_PKG}/listers" \
+      --output-pkg "${OUTPUT_PKG}/informers" \
+      --output-dir "${TEMP_DIR}" \
+      "$(codegen::join , "${FQ_APIS[@]}")" \
+      "$@"
 fi
