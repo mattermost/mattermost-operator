@@ -91,6 +91,10 @@ func setProbes(customLiveness, customReadiness corev1.Probe) (*corev1.Probe, *co
 		liveness.PeriodSeconds = customLiveness.PeriodSeconds
 	}
 
+	if customLiveness.TimeoutSeconds != 0 {
+		liveness.TimeoutSeconds = customLiveness.TimeoutSeconds
+	}
+
 	if customLiveness.FailureThreshold != 0 {
 		liveness.FailureThreshold = customLiveness.FailureThreshold
 	}
