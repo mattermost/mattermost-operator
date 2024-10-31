@@ -65,6 +65,7 @@ for GVs in ${GROUPS_WITH_VERSIONS}; do
 
   # enumerate versions
   for V in ${Vs//,/ }; do
+    V=$(echo "$V" | tr -d '\n\r')
     FQ_APIS+=("${APIS_PKG}/${G}/${V}")
   done
 done
@@ -72,8 +73,8 @@ done
 if [ "${GENS}" = "all" ] || grep -qw "deepcopy" <<<"${GENS}"; then
   echo "Generating deepcopy funcs"
   "${gobin}/deepcopy-gen" \
-      --input-dirs "$(codegen::join , "${FQ_APIS[@]}")" \
       -O zz_generated.deepcopy \
+      "$(codegen::join , "${FQ_APIS[@]}")" \
       "$@"
 fi
 
@@ -83,24 +84,49 @@ if [ "${GENS}" = "all" ] || grep -qw "client" <<<"${GENS}"; then
       --clientset-name "${CLIENTSET_NAME_VERSIONED:-versioned}" \
       --input-base "" \
       --input "$(codegen::join , "${FQ_APIS[@]}")" \
-      --output-package "${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}" \
+      --output-pkg "${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}" \
+      --output-dir "${OUTPUT_PKG}" \
       "$@"
 fi
 
 if [ "${GENS}" = "all" ] || grep -qw "lister" <<<"${GENS}"; then
   echo "Generating listers for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/listers"
   "${gobin}/lister-gen" \
-      --input-dirs "$(codegen::join , "${FQ_APIS[@]}")" \
-      --output-package "${OUTPUT_PKG}/listers" \
+      --output-pkg "${OUTPUT_PKG}/listers" \
+      --output-dir "${OUTPUT_PKG}" \
+      "$(codegen::join , "${FQ_APIS[@]}")" \
       "$@"
 fi
 
+
 if [ "${GENS}" = "all" ] || grep -qw "informer" <<<"${GENS}"; then
   echo "Generating informers for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/informers"
-  "${gobin}/informer-gen" \
-      --input-dirs "$(codegen::join , "${FQ_APIS[@]}")" \
-      --versioned-clientset-package "${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}/${CLIENTSET_NAME_VERSIONED:-versioned}" \
-      --listers-package "${OUTPUT_PKG}/listers" \
-      --output-package "${OUTPUT_PKG}/informers" \
-      "$@"
+  for FQ_API in "${FQ_APIS[@]}"; do 
+    echo "Processing: ${FQ_API}" # Add this for debugging
+    echo "/${gobin}/informer-gen \
+        --versioned-clientset-package "${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}/${CLIENTSET_NAME_VERSIONED:-versioned}" \
+        --listers-package "${OUTPUT_PKG}/listers" \
+        --output-pkg "${OUTPUT_PKG}/informers" \
+        --output-dir "${OUTPUT_PKG}" \
+        "${FQ_API}" \
+        "$@"/"
+    "${gobin}/informer-gen" \
+        --versioned-clientset-package "${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}/${CLIENTSET_NAME_VERSIONED:-versioned}" \
+        --listers-package "${OUTPUT_PKG}/listers" \
+        --output-pkg "${OUTPUT_PKG}/informers" \
+        --output-dir "${OUTPUT_PKG}" \
+        "${FQ_API}" \
+        "$@"
+  done
 fi
+# if [ "${GENS}" = "all" ] || grep -qw "informer" <<<"${GENS}"; then
+#   echo "Generating informers for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/informers"
+#   echo "FQ_APIS: ${FQ_APIS[@]}"
+#   "${gobin}/informer-gen" \
+#       --versioned-clientset-package "${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}/${CLIENTSET_NAME_VERSIONED:-versioned}" \
+#       --listers-package "${OUTPUT_PKG}/listers" \
+#       --output-pkg "${OUTPUT_PKG}/informers" \
+#       --output-dir "${OUTPUT_PKG}" \
+#       "$(codegen::join , "${FQ_APIS[@]}")" \ 
+#       "$@"
+# fi
