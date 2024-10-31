@@ -102,14 +102,6 @@ fi
 if [ "${GENS}" = "all" ] || grep -qw "informer" <<<"${GENS}"; then
   echo "Generating informers for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/informers"
   for FQ_API in "${FQ_APIS[@]}"; do 
-    echo "Processing: ${FQ_API}" # Add this for debugging
-    echo "/${gobin}/informer-gen \
-        --versioned-clientset-package "${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}/${CLIENTSET_NAME_VERSIONED:-versioned}" \
-        --listers-package "${OUTPUT_PKG}/listers" \
-        --output-pkg "${OUTPUT_PKG}/informers" \
-        --output-dir "${OUTPUT_PKG}" \
-        "${FQ_API}" \
-        "$@"/"
     "${gobin}/informer-gen" \
         --versioned-clientset-package "${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}/${CLIENTSET_NAME_VERSIONED:-versioned}" \
         --listers-package "${OUTPUT_PKG}/listers" \
@@ -119,14 +111,3 @@ if [ "${GENS}" = "all" ] || grep -qw "informer" <<<"${GENS}"; then
         "$@"
   done
 fi
-# if [ "${GENS}" = "all" ] || grep -qw "informer" <<<"${GENS}"; then
-#   echo "Generating informers for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/informers"
-#   echo "FQ_APIS: ${FQ_APIS[@]}"
-#   "${gobin}/informer-gen" \
-#       --versioned-clientset-package "${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}/${CLIENTSET_NAME_VERSIONED:-versioned}" \
-#       --listers-package "${OUTPUT_PKG}/listers" \
-#       --output-pkg "${OUTPUT_PKG}/informers" \
-#       --output-dir "${OUTPUT_PKG}" \
-#       "$(codegen::join , "${FQ_APIS[@]}")" \ 
-#       "$@"
-# fi
