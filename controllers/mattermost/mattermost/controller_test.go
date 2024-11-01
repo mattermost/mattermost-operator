@@ -403,12 +403,11 @@ func TestReconcilingLimit(t *testing.T) {
 
 	mm1 := newMattermost("first", "1", mmv1beta.Reconciling)
 
-	// Register operator types with the runtime scheme.
 	s := prepareSchema(t, scheme.Scheme)
 	s.AddKnownTypes(mmv1beta.GroupVersion, mm1)
+	s.AddKnownTypes(appsv1.SchemeGroupVersion, &appsv1.ReplicaSet{}, &appsv1.Deployment{})
 	// Create a fake client to mock API calls.
-	c := fake.NewClientBuilder().Build()
-	// Create a ReconcileMattermost object with the scheme and fake client.
+	c := fake.NewClientBuilder().WithScheme(s).WithStatusSubresource(&mmv1beta.Mattermost{}, &appsv1.ReplicaSet{}, &appsv1.Deployment{}).Build()
 	r := &MattermostReconciler{
 		Client:              c,
 		Scheme:              s,
