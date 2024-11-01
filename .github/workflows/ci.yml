@@ -44,9 +44,7 @@ jobs:
       - name: ci/setup-go
         uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v3.5.0
         with:
-          go-version-file: src/github.com/mattermost/mattermost-operator/go.mod
-          cache-dependency-path: src/github.com/mattermost/mattermost-operator/go.sum
-          cache: true
+          go-version-file: go.mod
 
       - name: ci/generate-operator-manifests
         run: |
