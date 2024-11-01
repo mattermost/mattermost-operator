@@ -65,6 +65,7 @@ for GVs in ${GROUPS_WITH_VERSIONS}; do
 
   # enumerate versions
   for V in ${Vs//,/ }; do
+    V=$(echo "$V" | tr -d '\n\r')
     FQ_APIS+=("${APIS_PKG}/${G}/${V}")
   done
 done
@@ -72,35 +73,44 @@ done
 if [ "${GENS}" = "all" ] || grep -qw "deepcopy" <<<"${GENS}"; then
   echo "Generating deepcopy funcs"
   "${gobin}/deepcopy-gen" \
-      --input-dirs "$(codegen::join , "${FQ_APIS[@]}")" \
       -O zz_generated.deepcopy \
+      "$(codegen::join , "${FQ_APIS[@]}")" \
       "$@"
 fi
 
 if [ "${GENS}" = "all" ] || grep -qw "client" <<<"${GENS}"; then
   echo "Generating clientset for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}"
+  TEMP_DIR=$(mktemp -d)
+  trap 'rm -rf "${TEMP_DIR}"' EXIT
   "${gobin}/client-gen" \
       --clientset-name "${CLIENTSET_NAME_VERSIONED:-versioned}" \
       --input-base "" \
       --input "$(codegen::join , "${FQ_APIS[@]}")" \
-      --output-package "${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}" \
+      --output-pkg "${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}" \
+      --output-dir "${TEMP_DIR}" \
       "$@"
 fi
 
 if [ "${GENS}" = "all" ] || grep -qw "lister" <<<"${GENS}"; then
   echo "Generating listers for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/listers"
+  TEMP_DIR=$(mktemp -d)
+  trap 'rm -rf "${TEMP_DIR}"' EXIT
   "${gobin}/lister-gen" \
-      --input-dirs "$(codegen::join , "${FQ_APIS[@]}")" \
-      --output-package "${OUTPUT_PKG}/listers" \
+      --output-pkg "${OUTPUT_PKG}/listers" \
+      --output-dir "${TEMP_DIR}" \
+      "$(codegen::join , "${FQ_APIS[@]}")" \
       "$@"
 fi
 
 if [ "${GENS}" = "all" ] || grep -qw "informer" <<<"${GENS}"; then
   echo "Generating informers for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/informers"
+  TEMP_DIR=$(mktemp -d)
+  trap 'rm -rf "${TEMP_DIR}"' EXIT
   "${gobin}/informer-gen" \
-      --input-dirs "$(codegen::join , "${FQ_APIS[@]}")" \
       --versioned-clientset-package "${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}/${CLIENTSET_NAME_VERSIONED:-versioned}" \
       --listers-package "${OUTPUT_PKG}/listers" \
-      --output-package "${OUTPUT_PKG}/informers" \
+      --output-pkg "${OUTPUT_PKG}/informers" \
+      --output-dir "${TEMP_DIR}" \
+      "$(codegen::join , "${FQ_APIS[@]}")" \
       "$@"
 fi

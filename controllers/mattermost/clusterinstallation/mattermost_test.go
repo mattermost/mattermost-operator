@@ -342,7 +342,7 @@ func TestCheckMattermost(t *testing.T) {
 			CompletionTime: &now,
 		}
 
-		err = r.Client.Update(context.TODO(), &restartedUpdateJob)
+		err = r.Client.Status().Update(context.TODO(), &restartedUpdateJob)
 		require.NoError(t, err)
 
 		// should succeed now

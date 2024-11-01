@@ -104,7 +104,7 @@ func (c *MysqlCluster) setVolumeSpecDefaults(spec *corev1.PersistentVolumeClaimS
 		}
 	}
 	if len(spec.Resources.Requests) == 0 {
-		spec.Resources = corev1.ResourceRequirements{
+		spec.Resources = corev1.VolumeResourceRequirements{
 			Requests: corev1.ResourceList{
 				corev1.ResourceStorage: resourceStorage,
 			},
