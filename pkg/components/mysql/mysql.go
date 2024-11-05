@@ -43,7 +43,7 @@ func Cluster(mattermost *mattermostv1alpha1.ClusterInstallation) *mysqlv1alpha1.
 					AccessModes: []corev1.PersistentVolumeAccessMode{
 						"ReadWriteOnce",
 					},
-					Resources: corev1.ResourceRequirements{
+					Resources: corev1.VolumeResourceRequirements{
 						Requests: corev1.ResourceList{
 							corev1.ResourceStorage: resource.MustParse(mattermost.Spec.Database.StorageSize),
 						},
@@ -87,7 +87,7 @@ func ClusterV1Beta(mattermost *mmv1beta.Mattermost) *mysqlv1alpha1.MysqlCluster 
 					AccessModes: []corev1.PersistentVolumeAccessMode{
 						"ReadWriteOnce",
 					},
-					Resources: corev1.ResourceRequirements{
+					Resources: corev1.VolumeResourceRequirements{
 						Requests: corev1.ResourceList{
 							corev1.ResourceStorage: resource.MustParse(mattermost.Spec.Database.OperatorManaged.StorageSize),
 						},

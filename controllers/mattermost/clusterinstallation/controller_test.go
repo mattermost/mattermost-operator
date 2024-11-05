@@ -62,8 +62,9 @@ func TestReconcile(t *testing.T) {
 	// Register operator types with the runtime scheme.
 	s := prepareSchema(t, scheme.Scheme)
 	s.AddKnownTypes(mattermostv1alpha1.GroupVersion, ci)
+	s.AddKnownTypes(appsv1.SchemeGroupVersion, &appsv1.Deployment{}, &appsv1.ReplicaSet{})
 	// Create a fake client to mock API calls.
-	c := fake.NewClientBuilder().Build()
+	c := fake.NewClientBuilder().WithScheme(s).WithStatusSubresource(&mattermostv1alpha1.ClusterInstallation{}, &appsv1.ReplicaSet{}, &appsv1.Deployment{}).Build()
 	// Create a ReconcileClusterInstallation object with the scheme and fake
 	// client.
 	r := &ClusterInstallationReconciler{
@@ -159,7 +160,7 @@ func TestReconcile(t *testing.T) {
 			require.Equal(t, res, reconcile.Result{RequeueAfter: 6 * time.Second})
 		})
 		replicaSet.Status.ObservedGeneration = 1
-		err = c.Update(context.TODO(), replicaSet)
+		err = c.Status().Update(context.TODO(), replicaSet)
 		require.NoError(t, err)
 
 		// Update Deployment status - Replicas created
@@ -168,7 +169,7 @@ func TestReconcile(t *testing.T) {
 		require.NoError(t, err)
 		deployment.Status.Replicas = replicas
 
-		err = r.Update(context.TODO(), &deployment)
+		err = r.Status().Update(context.TODO(), &deployment)
 		require.NoError(t, err)
 
 		t.Run("pods not ready", func(t *testing.T) {
@@ -179,7 +180,7 @@ func TestReconcile(t *testing.T) {
 
 		// Update ReplicaSet status - Replicas Available
 		replicaSet.Status.AvailableReplicas = replicas
-		err = r.Update(context.TODO(), replicaSet)
+		err = r.Status().Update(context.TODO(), replicaSet)
 		require.NoError(t, err)
 
 		t.Run("no reconcile errors", func(t *testing.T) {
@@ -190,7 +191,7 @@ func TestReconcile(t *testing.T) {
 
 		// Update ReplicaSet status - Replicas not available
 		replicaSet.Status.AvailableReplicas = 0
-		err = r.Update(context.TODO(), replicaSet)
+		err = r.Status().Update(context.TODO(), replicaSet)
 		require.NoError(t, err)
 
 		t.Run("pods not running", func(t *testing.T) {
@@ -201,7 +202,7 @@ func TestReconcile(t *testing.T) {
 
 		// Update ReplicaSet status - Replicas Available
 		replicaSet.Status.AvailableReplicas = replicas
-		err = r.Update(context.TODO(), replicaSet)
+		err = r.Status().Update(context.TODO(), replicaSet)
 		require.NoError(t, err)
 
 		t.Run("no reconcile errors", func(t *testing.T) {
@@ -221,6 +222,9 @@ func TestReconcile(t *testing.T) {
 	})
 
 	t.Run("bluegreen", func(t *testing.T) {
+		err = c.Get(context.TODO(), ciKey, ci)
+		require.NoError(t, err)
+
 		ci.Spec.BlueGreen = mattermostv1alpha1.BlueGreen{
 			Enable:               true,
 			ProductionDeployment: mattermostv1alpha1.BlueName,
@@ -275,14 +279,14 @@ func TestReconcile(t *testing.T) {
 			err = r.Get(context.TODO(), types.NamespacedName{Name: ci.Spec.BlueGreen.Blue.Name, Namespace: ci.Namespace}, &blueDeployment)
 			require.NoError(t, err)
 			blueDeployment.Status.Replicas = replicas
-			err = r.Update(context.TODO(), &blueDeployment)
+			err = r.Status().Update(context.TODO(), &blueDeployment)
 			require.NoError(t, err)
 
 			var greenDeployment appsv1.Deployment
 			err = r.Get(context.TODO(), types.NamespacedName{Name: ci.Spec.BlueGreen.Green.Name, Namespace: ci.Namespace}, &greenDeployment)
 			require.NoError(t, err)
 			greenDeployment.Status.Replicas = replicas
-			err = r.Update(context.TODO(), &greenDeployment)
+			err = r.Status().Update(context.TODO(), &greenDeployment)
 			require.NoError(t, err)
 
 			t.Run("no reconcile errors", func(t *testing.T) {
@@ -369,7 +373,7 @@ func TestReconcile(t *testing.T) {
 			err = r.Get(context.TODO(), ciKey, &deployment)
 			require.NoError(t, err)
 			deployment.Status.Replicas = replicas
-			err = r.Update(context.TODO(), &deployment)
+			err = r.Status().Update(context.TODO(), &deployment)
 			require.NoError(t, err)
 
 			t.Run("no reconcile errors", func(t *testing.T) {
@@ -443,7 +447,7 @@ func TestReconcilingLimit(t *testing.T) {
 	s := prepareSchema(t, scheme.Scheme)
 	s.AddKnownTypes(mattermostv1alpha1.GroupVersion, ci1)
 	// Create a fake client to mock API calls.
-	c := fake.NewClientBuilder().Build()
+	c := fake.NewClientBuilder().WithScheme(s).WithStatusSubresource(&mattermostv1alpha1.ClusterInstallation{}).Build()
 	// Create a ReconcileClusterInstallation object with the scheme and fake client.
 	r := &ClusterInstallationReconciler{
 		Client:              c,
@@ -611,7 +615,7 @@ func TestMigration(t *testing.T) {
 	s.AddKnownTypes(mattermostv1alpha1.GroupVersion, ci1)
 	s.AddKnownTypes(mmv1beta.GroupVersion, &mmv1beta.Mattermost{})
 	// Create a fake client to mock API calls.
-	c := fake.NewClientBuilder().Build()
+	c := fake.NewClientBuilder().WithScheme(s).WithStatusSubresource(&mattermostv1alpha1.ClusterInstallation{}).Build()
 	// Create a ReconcileClusterInstallation object with the scheme and fake client.
 	r := &ClusterInstallationReconciler{
 		Client:              c,

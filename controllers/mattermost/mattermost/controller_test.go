@@ -66,8 +66,9 @@ func TestReconcile(t *testing.T) {
 	// Register operator types with the runtime scheme.
 	s := prepareSchema(t, scheme.Scheme)
 	s.AddKnownTypes(mmv1beta.GroupVersion, mm)
+	s.AddKnownTypes(appsv1.SchemeGroupVersion, &appsv1.ReplicaSet{}, &appsv1.Deployment{})
 	// Create a fake client to mock API calls.
-	c := fake.NewClientBuilder().Build()
+	c := fake.NewClientBuilder().WithScheme(s).WithStatusSubresource(&mmv1beta.Mattermost{}, &appsv1.ReplicaSet{}, &appsv1.Deployment{}).Build()
 	// Create a ReconcileMattermost object with the scheme and fake
 	// client.
 	r := &MattermostReconciler{
@@ -177,7 +178,7 @@ func TestReconcile(t *testing.T) {
 			require.Equal(t, res, reconcile.Result{RequeueAfter: 6 * time.Second})
 		})
 		replicaSet.Status.ObservedGeneration = 1
-		err = c.Update(context.TODO(), replicaSet)
+		err = c.Status().Update(context.TODO(), replicaSet)
 		require.NoError(t, err)
 
 		t.Run("succeed if 0 replicas expected", func(t *testing.T) {
@@ -185,7 +186,13 @@ func TestReconcile(t *testing.T) {
 			replicasZero := int32(0)
 			mm.Spec.Replicas = &replicasZero
 
-			err = c.Update(context.TODO(), mm)
+			var fetchedMM mmv1beta.Mattermost
+			err = c.Get(context.Background(), mmKey, &fetchedMM)
+			require.NoError(t, err)
+
+			fetchedMM.Spec.Replicas = &replicasZero
+
+			err = c.Update(context.TODO(), &fetchedMM)
 			require.NoError(t, err)
 			// Revert changes for purpose of other tests
 			defer func() {
@@ -209,7 +216,7 @@ func TestReconcile(t *testing.T) {
 		err = r.Get(context.TODO(), mmKey, &deployment)
 		require.NoError(t, err)
 		deployment.Status.Replicas = replicas
-		err = r.Update(context.TODO(), &deployment)
+		err = r.Status().Update(context.TODO(), &deployment)
 		require.NoError(t, err)
 
 		t.Run("pods not ready", func(t *testing.T) {
@@ -222,11 +229,11 @@ func TestReconcile(t *testing.T) {
 		err = r.Get(context.TODO(), mmKey, &deployment)
 		require.NoError(t, err)
 		deployment.Status.Replicas = replicas
-		err = r.Update(context.TODO(), &deployment)
+		err = r.Status().Update(context.TODO(), &deployment)
 		require.NoError(t, err)
 
 		replicaSet.Status.AvailableReplicas = replicas
-		err = r.Update(context.TODO(), replicaSet)
+		err = r.Status().Update(context.TODO(), replicaSet)
 		require.NoError(t, err)
 
 		t.Run("no reconcile errors", func(t *testing.T) {
@@ -237,7 +244,7 @@ func TestReconcile(t *testing.T) {
 
 		// Update ReplicaSet status - Replicas not available
 		replicaSet.Status.AvailableReplicas = 0
-		err = r.Update(context.TODO(), replicaSet)
+		err = r.Status().Update(context.TODO(), replicaSet)
 		require.NoError(t, err)
 
 		t.Run("pods not running", func(t *testing.T) {
@@ -248,7 +255,7 @@ func TestReconcile(t *testing.T) {
 
 		// Update ReplicaSet status - One pod available - ready state
 		replicaSet.Status.AvailableReplicas = 1
-		err = r.Update(context.TODO(), replicaSet)
+		err = r.Status().Update(context.TODO(), replicaSet)
 		require.NoError(t, err)
 
 		t.Run("one pod running - ready state", func(t *testing.T) {
@@ -263,7 +270,7 @@ func TestReconcile(t *testing.T) {
 
 		// Update ReplicaSet status - Replicas Available
 		replicaSet.Status.AvailableReplicas = replicas
-		err = r.Update(context.TODO(), replicaSet)
+		err = r.Status().Update(context.TODO(), replicaSet)
 		require.NoError(t, err)
 
 		t.Run("no reconcile errors", func(t *testing.T) {
@@ -397,12 +404,11 @@ func TestReconcilingLimit(t *testing.T) {
 
 	mm1 := newMattermost("first", "1", mmv1beta.Reconciling)
 
-	// Register operator types with the runtime scheme.
 	s := prepareSchema(t, scheme.Scheme)
 	s.AddKnownTypes(mmv1beta.GroupVersion, mm1)
+	s.AddKnownTypes(appsv1.SchemeGroupVersion, &appsv1.ReplicaSet{}, &appsv1.Deployment{})
 	// Create a fake client to mock API calls.
-	c := fake.NewClientBuilder().Build()
-	// Create a ReconcileMattermost object with the scheme and fake client.
+	c := fake.NewClientBuilder().WithScheme(s).WithStatusSubresource(&mmv1beta.Mattermost{}, &appsv1.ReplicaSet{}, &appsv1.Deployment{}).Build()
 	r := &MattermostReconciler{
 		Client:              c,
 		Scheme:              s,
