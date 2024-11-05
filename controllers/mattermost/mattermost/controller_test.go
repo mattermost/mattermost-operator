@@ -188,6 +188,7 @@ func TestReconcile(t *testing.T) {
 
 			var fetchedMM mmv1beta.Mattermost
 			err = c.Get(context.Background(), mmKey, &fetchedMM)
+			require.NoError(t, err)
 
 			fetchedMM.Spec.Replicas = &replicasZero
 
