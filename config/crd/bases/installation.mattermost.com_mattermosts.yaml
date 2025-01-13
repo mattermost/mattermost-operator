@@ -494,6 +494,18 @@ spec:
                   IngressName defines the host to be used when creating the ingress rules.
                   Deprecated: Use Spec.Ingress.Host instead.
                 type: string
+              jobServer:
+                description: JobServer defines configuration for the Mattermost job
+                  server.
+                properties:
+                  dedicatedJobServer:
+                    description: |-
+                      Determines whether to create a dedicated Mattermost server deployment
+                      which is configured to run scheduled jobs. This deployment will recieve
+                      no user traffic and the primary Mattermost deployment will no longer be
+                      configured to run jobs.
+                    type: boolean
+                type: object
               licenseSecret:
                 description: LicenseSecret is the name of the secret containing a
                   Mattermost license.

@@ -179,6 +179,37 @@ func (r *ResourceHelper) CreateRoleIfNotExists(owner v1.Object, role *rbacv1.Rol
 	return nil
 }
 
+func (r *ResourceHelper) CreatePvcIfNotExists(owner v1.Object, pvc *corev1.PersistentVolumeClaim, reqLogger logr.Logger) error {
+	foundPvc := &corev1.PersistentVolumeClaim{}
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: pvc.Name, Namespace: pvc.Namespace}, foundPvc)
+	if err != nil && k8sErrors.IsNotFound(err) {
+		reqLogger.Info("Creating pvc", "name", pvc.Name)
+		return r.Create(owner, pvc, reqLogger)
+	} else if err != nil {
+		return errors.Wrap(err, "failed to check if pvc exists")
+	}
+
+	return nil
+}
+
+func (r *ResourceHelper) DeleteDeployment(key types.NamespacedName, reqLogger logr.Logger) error {
+	foundDeployment := &appsv1.Deployment{}
+	err := r.client.Get(context.TODO(), key, foundDeployment)
+	if err != nil && k8sErrors.IsNotFound(err) {
+		return nil
+	} else if err != nil {
+		return errors.Wrap(err, "failed to check if deployment exists")
+	}
+
+	reqLogger.Info("Deleting deployment", "name", foundDeployment.Name)
+	err = r.client.Delete(context.TODO(), foundDeployment)
+	if err != nil {
+		return errors.Wrap(err, "failed to delete deployment")
+	}
+
+	return nil
+}
+
 func (r *ResourceHelper) DeleteIngressClass(key types.NamespacedName, reqLogger logr.Logger) error {
 	foundIngressClass := &networkingv1.IngressClass{}
 	err := r.client.Get(context.TODO(), key, foundIngressClass)
@@ -192,19 +223,6 @@ func (r *ResourceHelper) DeleteIngressClass(key types.NamespacedName, reqLogger 
 	err = r.client.Delete(context.TODO(), foundIngressClass)
 	if err != nil {
 		return errors.Wrap(err, "failed to delete ingressClass")
-	}
-
-	return nil
-}
-
-func (r *ResourceHelper) CreatePvcIfNotExists(owner v1.Object, pvc *corev1.PersistentVolumeClaim, reqLogger logr.Logger) error {
-	foundPvc := &corev1.PersistentVolumeClaim{}
-	err := r.client.Get(context.TODO(), types.NamespacedName{Name: pvc.Name, Namespace: pvc.Namespace}, foundPvc)
-	if err != nil && k8sErrors.IsNotFound(err) {
-		reqLogger.Info("Creating pvc", "name", pvc.Name)
-		return r.Create(owner, pvc, reqLogger)
-	} else if err != nil {
-		return errors.Wrap(err, "failed to check if pvc exists")
 	}
 
 	return nil
@@ -224,6 +242,7 @@ func (r *ResourceHelper) DeleteIngress(key types.NamespacedName, reqLogger logr.
 	if err != nil {
 		return errors.Wrap(err, "failed to delete ingress")
 	}
+
 	return nil
 }
 
@@ -241,5 +260,6 @@ func (r *ResourceHelper) DeleteService(key types.NamespacedName, reqLogger logr.
 	if err != nil {
 		return errors.Wrap(err, "failed to delete service")
 	}
+
 	return nil
 }

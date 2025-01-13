@@ -241,6 +241,68 @@ func (r *MattermostReconciler) checkMattermostIngressClass(mattermost *mmv1beta.
 	return r.Resources.Update(current, desired, reqLogger)
 }
 
+func (r *MattermostReconciler) checkMattermostJobServer(
+	mattermost *mmv1beta.Mattermost,
+	dbInfo mattermostApp.DatabaseConfig,
+	fsConfig mattermostApp.FileStoreConfig,
+	status *mmv1beta.MattermostStatus,
+	reqLogger logr.Logger) error {
+	reqLogger = reqLogger.WithValues("Reconcile", "mattermost-jobserver")
+
+	return r.checkMattermostJobServerDeployment(mattermost, dbInfo, fsConfig, status, reqLogger)
+}
+
+func (r *MattermostReconciler) checkMattermostJobServerDeployment(
+	mattermost *mmv1beta.Mattermost,
+	dbConfig mattermostApp.DatabaseConfig,
+	fsConfig mattermostApp.FileStoreConfig,
+	status *mmv1beta.MattermostStatus,
+	reqLogger logr.Logger) error {
+	desired := mattermostApp.GenerateJobServerDeploymentV1Beta(
+		mattermost,
+		dbConfig,
+		fsConfig,
+		mattermost.Name,
+		mattermost.GetIngressHost(),
+		mattermost.Name,
+		mattermost.GetImageName(),
+	)
+
+	if mattermost.Spec.JobServer == nil || !mattermost.Spec.JobServer.DedicatedJobServer {
+		// Ensure any existing dedicated job server deployments are removed.
+		err := r.Resources.DeleteDeployment(types.NamespacedName{Namespace: desired.Namespace, Name: desired.Name}, reqLogger)
+		if err != nil {
+			return errors.Wrap(err, "failed to delete job server deployment")
+		}
+		return nil
+	}
+
+	patchedObj, applied, err := mattermost.Spec.ResourcePatch.ApplyToDeployment(desired)
+	if err != nil {
+		reqLogger.Error(err, "Failed to patch deployment", "patch", mattermost.Status.ResourcePatch)
+		status.SetDeploymentPatchStatus(false, errors.Wrap(err, "failed to apply patch to Deployment"))
+	} else if applied {
+		reqLogger.Info("Applied patch to deployment")
+		desired = patchedObj
+		status.SetDeploymentPatchStatus(true, nil)
+	} else {
+		status.ClearDeploymentPatchStatus()
+	}
+
+	err = r.Resources.CreateDeploymentIfNotExists(mattermost, desired, reqLogger)
+	if err != nil {
+		return errors.Wrap(err, "failed to create mattermost job server deployment")
+	}
+
+	current := &appsv1.Deployment{}
+	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: desired.Name, Namespace: desired.Namespace}, current)
+	if err != nil {
+		return errors.Wrap(err, "failed to get mattermost job server deployment")
+	}
+
+	return r.Resources.Update(current, desired, reqLogger)
+}
+
 func (r *MattermostReconciler) checkMattermostDeployment(
 	mattermost *mmv1beta.Mattermost,
 	dbConfig mattermostApp.DatabaseConfig,

@@ -1,6 +1,7 @@
 package mattermost
 
 import (
+	"fmt"
 	"strconv"
 
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
@@ -316,6 +317,18 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 		Value: bodySize,
 	})
 
+	// Apply optional job server settings
+	if mattermost.Spec.JobServer != nil && mattermost.Spec.JobServer.DedicatedJobServer {
+		envVarGeneral = append(envVarGeneral, corev1.EnvVar{
+			Name:  "MM_JOBSETTINGS_RUNSCHEDULER",
+			Value: "false",
+		})
+		envVarGeneral = append(envVarGeneral, corev1.EnvVar{
+			Name:  "MM_JOBSETTINGS_RUNJOBS",
+			Value: "false",
+		})
+	}
+
 	// Prepare annotations
 	podAnnotations := map[string]string{}
 
@@ -427,6 +440,39 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 			},
 		},
 	}
+}
+
+// GenerateJobServerDeploymentV1Beta returns the deployment for Mattermost app dedicated job server.
+func GenerateJobServerDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig, fileStore FileStoreConfig, deploymentName, ingressHost, serviceAccountName, containerImage string) *appsv1.Deployment {
+	deployment := GenerateDeploymentV1Beta(
+		mattermost,
+		db,
+		fileStore,
+		mattermost.Name,
+		mattermost.GetIngressHost(),
+		mattermost.Name,
+		mattermost.GetImageName(),
+	)
+
+	// Apply metadata overrides for dedicated job server configuration.
+	deployment.Name = fmt.Sprintf("%s-jobserver", deploymentName)
+	replicas := int32(1)
+	deployment.Spec.Replicas = &replicas
+	deployment.Spec.Template.ObjectMeta.Labels = mattermost.MattermostJobServerPodLabels(deploymentName)
+	deployment.Spec.Selector.MatchLabels = mattermost.MattermostJobServerPodLabels(deploymentName)
+
+	// Apply dedicated job server container configuration to existing
+	// Mattermost container configuration.
+	mattermostContainer := deployment.Spec.Template.Spec.Containers[0]
+	mattermostContainer.Name = mmv1beta.MattermostJobServerContainerName
+	mattermostContainer.Command = []string{"mattermost", "jobserver"}
+	mattermostContainer.Ports = nil
+	mattermostContainer.LivenessProbe = nil
+	mattermostContainer.ReadinessProbe = nil
+
+	deployment.Spec.Template.Spec.Containers = []corev1.Container{mattermostContainer}
+
+	return deployment
 }
 
 // GenerateSecretV1Beta returns the secret for Mattermost

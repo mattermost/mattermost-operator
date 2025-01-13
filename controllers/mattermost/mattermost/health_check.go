@@ -87,8 +87,43 @@ func (r *MattermostReconciler) checkMattermostHealth(mattermost *mmv1beta.Matter
 		return status, fmt.Errorf("found %d pods, but wanted %d", podsStatus.Replicas, replicas)
 	}
 
+	if mattermost.Spec.JobServer != nil && mattermost.Spec.JobServer.DedicatedJobServer {
+		err = r.checkMattermostJobServerHealth(mattermost, logger)
+		if err != nil {
+			return status, errors.Wrap(err, "failed to check job server health")
+		}
+	}
+
 	// Everything checks out. The installation is stable.
 	status.State = mmv1beta.Stable
 
 	return status, nil
+}
+
+func (r *MattermostReconciler) checkMattermostJobServerHealth(mattermost *mmv1beta.Mattermost, logger logr.Logger) error {
+	labels := mattermost.MattermostJobServerPodLabels(mattermost.Name)
+	listOptions := []client.ListOption{
+		client.InNamespace(mattermost.Namespace),
+		client.MatchingLabels(labels),
+	}
+
+	healthChecker := healthcheck.NewHealthChecker(r.NonCachedAPIReader, listOptions, logger)
+
+	jobServerPodsStatus, err := healthChecker.CheckReplicaSetRollout(mattermost.DedicatedJobServerName(), mattermost.Namespace)
+	if err != nil {
+		return errors.Wrap(err, "job server pod rollout not yet started")
+	}
+
+	if jobServerPodsStatus.UpdatedReplicas == 0 {
+		return errors.New("mattermost job server pods not yet updated")
+	}
+
+	if jobServerPodsStatus.UpdatedReplicas != 1 {
+		return fmt.Errorf("found %d updated job server replicas, but wanted 1", jobServerPodsStatus.UpdatedReplicas)
+	}
+	if jobServerPodsStatus.Replicas != 1 {
+		return fmt.Errorf("found job server %d pods, but wanted 1", jobServerPodsStatus.Replicas)
+	}
+
+	return nil
 }
