@@ -343,6 +343,44 @@ func TestGenerateIngress_V1Beta(t *testing.T) {
 	}
 }
 
+func TestGenerateJobServerDeployment_V1Beta(t *testing.T) {
+	replicas := int32(3)
+	mattermost := &mmv1beta.Mattermost{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test",
+		},
+		Spec: mmv1beta.MattermostSpec{
+			Replicas:      &replicas,
+			LicenseSecret: "license-secret",
+		},
+	}
+	databaseConfig := &ExternalDBConfig{
+		secretName:    "database-secret",
+		hasDBCheckURL: true,
+		dbType:        database.PostgreSQLDatabase,
+	}
+	fileStoreInfo := &ExternalFileStore{
+		fsInfo: FileStoreInfo{
+			secretName: "file-store-secret",
+			bucketName: "file-store-bucket",
+			url:        "s3.amazon.com",
+			useS3SSL:   true,
+		},
+	}
+
+	jobServerdeployment := GenerateJobServerDeploymentV1Beta(mattermost, databaseConfig, fileStoreInfo, mattermost.Name, "", "service-account", "")
+	require.NotNil(t, jobServerdeployment)
+
+	assert.Equal(t, "test-jobserver", jobServerdeployment.Name)
+	assert.Equal(t, mattermost.MattermostJobServerPodLabels(mattermost.Name), jobServerdeployment.Spec.Template.Labels)
+	assert.Equal(t, mattermost.MattermostJobServerPodLabels(mattermost.Name), jobServerdeployment.Spec.Selector.MatchLabels)
+
+	assert.Equal(t, *jobServerdeployment.Spec.Replicas, int32(1))
+	require.Len(t, jobServerdeployment.Spec.Template.Spec.Containers, 1)
+	assert.Nil(t, jobServerdeployment.Spec.Template.Spec.Containers[0].ReadinessProbe)
+	assert.Nil(t, jobServerdeployment.Spec.Template.Spec.Containers[0].LivenessProbe)
+}
+
 func TestGenerateDeployment_V1Beta(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -743,6 +781,19 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 				},
 			},
 			requiredEnvVals: map[string]string{"MM_SERVICESETTINGS_LICENSEFILELOCATION": "/mattermost-license/license"},
+		},
+		{
+			name: "dedicated job server",
+			spec: mmv1beta.MattermostSpec{
+				JobServer: &mmv1beta.JobServer{
+					DedicatedJobServer: true,
+				},
+			},
+			want: &appsv1.Deployment{},
+			requiredEnvVals: map[string]string{
+				"MM_JOBSETTINGS_RUNSCHEDULER": "false",
+				"MM_JOBSETTINGS_RUNJOBS":      "false",
+			},
 		},
 	}
 

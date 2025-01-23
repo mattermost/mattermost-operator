@@ -316,6 +316,12 @@ func schema_mattermost_operator_apis_mattermost_v1beta1_MattermostSpec(ref commo
 							Ref:         ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.UpdateJob"),
 						},
 					},
+					"jobServer": {
+						SchemaProps: spec.SchemaProps{
+							Description: "JobServer defines configuration for the Mattermost job server.",
+							Ref:         ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.JobServer"),
+						},
+					},
 					"podExtensions": {
 						SchemaProps: spec.SchemaProps{
 							Description: "PodExtensions specify custom extensions for Mattermost pods. This can be used for custom readiness checks etc. These settings generally don't need to be changed.",
@@ -333,6 +339,6 @@ func schema_mattermost_operator_apis_mattermost_v1beta1_MattermostSpec(ref commo
 			},
 		},
 		Dependencies: []string{
-			"github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.AWSLoadBalancerController", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.Database", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.DeploymentTemplate", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.ElasticSearch", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.FileStore", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.Ingress", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.PodExtensions", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.PodTemplate", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.Probes", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.ResourcePatch", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.Scheduling", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.UpdateJob", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.LocalObjectReference", "k8s.io/api/core/v1.PodDNSConfig", "k8s.io/api/core/v1.Volume", "k8s.io/api/core/v1.VolumeMount"},
+			"github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.AWSLoadBalancerController", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.Database", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.DeploymentTemplate", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.ElasticSearch", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.FileStore", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.Ingress", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.JobServer", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.PodExtensions", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.PodTemplate", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.Probes", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.ResourcePatch", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.Scheduling", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.UpdateJob", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.LocalObjectReference", "k8s.io/api/core/v1.PodDNSConfig", "k8s.io/api/core/v1.Volume", "k8s.io/api/core/v1.VolumeMount"},
 	}
 }

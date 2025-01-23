@@ -45,6 +45,10 @@ const (
 	// MattermostAppContainerName is the name of the container which runs the
 	// Mattermost application
 	MattermostAppContainerName = "mattermost"
+
+	// MattermostJobServerContainerName is the name of the container which runs
+	// an optional dedicated Mattermost job server.
+	MattermostJobServerContainerName = MattermostAppContainerName + "-jobserver"
 )
 
 // SetDefaults sets the missing values in the manifest to the default ones
@@ -272,9 +276,39 @@ func (mm *Mattermost) MattermostPodLabels(name string) map[string]string {
 	return l
 }
 
+// MattermostJobServerPodLabels returns the labels for selecting
+// the pods belonging to the given mattermost dedicated job server.
+func (mm *Mattermost) MattermostJobServerPodLabels(name string) map[string]string {
+	l := map[string]string{}
+	// Set resourceLabels ("global") as the initial labels
+	if mm.Spec.ResourceLabels != nil {
+		l = mm.Spec.ResourceLabels
+	}
+	if mm.Spec.PodTemplate != nil {
+		// Overwrite with pod specific labels
+		for k, v := range mm.Spec.PodTemplate.ExtraLabels {
+			l[k] = v
+		}
+	}
+	// Overwrite with default labels
+	for k, v := range MattermostResourceLabels(name) {
+		l[k] = v
+	}
+	l[ClusterLabel] = name
+	l["app"] = MattermostJobServerContainerName
+
+	return l
+}
+
 // MattermostResourceLabels returns the labels for selecting a given
 // Mattermost as well as any external dependency resources that were
 // created for the installation.
 func MattermostResourceLabels(name string) map[string]string {
 	return map[string]string{ClusterResourceLabel: name}
+}
+
+// DedicatedJobServerName returns the standard name for the optional
+// dedicated Mattermost job server.
+func (mm *Mattermost) DedicatedJobServerName() string {
+	return mm.Name + "-jobserver"
 }

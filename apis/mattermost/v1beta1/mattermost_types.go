@@ -128,6 +128,10 @@ type MattermostSpec struct {
 	// +optional
 	UpdateJob *UpdateJob `json:"updateJob,omitempty"`
 
+	// JobServer defines configuration for the Mattermost job server.
+	// +optional
+	JobServer *JobServer `json:"jobServer,omitempty"`
+
 	// PodExtensions specify custom extensions for Mattermost pods.
 	// This can be used for custom readiness checks etc.
 	// These settings generally don't need to be changed.
@@ -282,6 +286,16 @@ type UpdateJob struct {
 	// Overrides what is set in ResourceLabels, does not override default label (app label).
 	// +optional
 	ExtraLabels map[string]string `json:"extraLabels,omitempty"`
+}
+
+// JobServer defines configuration for the Mattermost job server.
+type JobServer struct {
+	// Determines whether to create a dedicated Mattermost server deployment
+	// which is configured to run scheduled jobs. This deployment will recieve
+	// no user traffic and the primary Mattermost deployment will no longer be
+	// configured to run jobs.
+	// +optional
+	DedicatedJobServer bool `json:"dedicatedJobServer,omitempty"`
 }
 
 // PodExtensions specify customized extensions for a pod.
