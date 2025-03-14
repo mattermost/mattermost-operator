@@ -791,8 +791,7 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 			},
 			want: &appsv1.Deployment{},
 			requiredEnvVals: map[string]string{
-				"MM_JOBSETTINGS_RUNSCHEDULER": "false",
-				"MM_JOBSETTINGS_RUNJOBS":      "false",
+				"MM_JOBSETTINGS_RUNJOBS": "false",
 			},
 		},
 	}
