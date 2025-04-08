@@ -320,10 +320,6 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 	// Apply optional job server settings
 	if mattermost.Spec.JobServer != nil && mattermost.Spec.JobServer.DedicatedJobServer {
 		envVarGeneral = append(envVarGeneral, corev1.EnvVar{
-			Name:  "MM_JOBSETTINGS_RUNSCHEDULER",
-			Value: "false",
-		})
-		envVarGeneral = append(envVarGeneral, corev1.EnvVar{
 			Name:  "MM_JOBSETTINGS_RUNJOBS",
 			Value: "false",
 		})
