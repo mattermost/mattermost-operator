@@ -163,6 +163,13 @@ func TestClusterInstallation(t *testing.T) {
 		assert.Contains(t, ci.GetImageName(), ci.Spec.Version)
 		assert.Equal(t, ci.GetImageName(), fmt.Sprintf("%s@%s", ci.Spec.Image, ci.Spec.Version))
 	})
+
+	t.Run("using tag and digest", func(t *testing.T) {
+		ci.Spec.Version = "10.6.1@sha256:dd15a51ac7dafd213744d1ef23394e7532f71a90f477c969b94600e46da5a0cf"
+		assert.Contains(t, ci.GetImageName(), ci.Spec.Image)
+		assert.Contains(t, ci.GetImageName(), ci.Spec.Version)
+		assert.Equal(t, ci.GetImageName(), fmt.Sprintf("%s:%s", ci.Spec.Image, ci.Spec.Version))
+	})
 }
 
 func TestGetDeploymentImageName(t *testing.T) {
