@@ -251,6 +251,10 @@ type Probes struct {
 
 // PodTemplate defines configuration for the template for Mattermost pods.
 type PodTemplate struct {
+	// Defines a command override for Mattermost app server pods.
+	// The default command is "mattermost".
+	// +optional
+	Command []string `json:"command,omitempty"`
 	// Defines the security context for the Mattermost app server pods.
 	// +optional
 	SecurityContext *v1.PodSecurityContext `json:"securityContext,omitempty"`
