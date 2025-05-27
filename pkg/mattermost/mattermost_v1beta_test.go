@@ -352,6 +352,7 @@ func TestGenerateJobServerDeployment_V1Beta(t *testing.T) {
 		Spec: mmv1beta.MattermostSpec{
 			Replicas:      &replicas,
 			LicenseSecret: "license-secret",
+			PodTemplate:   &mmv1beta.PodTemplate{},
 		},
 	}
 	databaseConfig := &ExternalDBConfig{
@@ -375,10 +376,16 @@ func TestGenerateJobServerDeployment_V1Beta(t *testing.T) {
 	assert.Equal(t, mattermost.MattermostJobServerPodLabels(mattermost.Name), jobServerdeployment.Spec.Template.Labels)
 	assert.Equal(t, mattermost.MattermostJobServerPodLabels(mattermost.Name), jobServerdeployment.Spec.Selector.MatchLabels)
 
+	assert.Equal(t, []string{"mattermost", "jobserver"}, jobServerdeployment.Spec.Template.Spec.Containers[0].Command)
 	assert.Equal(t, *jobServerdeployment.Spec.Replicas, int32(1))
 	require.Len(t, jobServerdeployment.Spec.Template.Spec.Containers, 1)
 	assert.Nil(t, jobServerdeployment.Spec.Template.Spec.Containers[0].ReadinessProbe)
 	assert.Nil(t, jobServerdeployment.Spec.Template.Spec.Containers[0].LivenessProbe)
+
+	mattermost.Spec.PodTemplate.Command = []string{"mattermost", "custom-command"}
+	jobServerdeployment = GenerateJobServerDeploymentV1Beta(mattermost, databaseConfig, fileStoreInfo, mattermost.Name, "", "service-account", "")
+	require.NotNil(t, jobServerdeployment)
+	assert.Equal(t, []string{"mattermost", "jobserver"}, jobServerdeployment.Spec.Template.Spec.Containers[0].Command)
 }
 
 func TestGenerateDeployment_V1Beta(t *testing.T) {
@@ -794,6 +801,15 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 				"MM_JOBSETTINGS_RUNJOBS": "false",
 			},
 		},
+		{
+			name: "custom command",
+			spec: mmv1beta.MattermostSpec{
+				PodTemplate: &mmv1beta.PodTemplate{
+					Command: []string{"mattermost", "custom-command"},
+				},
+			},
+			want: &appsv1.Deployment{},
+		},
 	}
 
 	for _, tt := range tests {
@@ -821,6 +837,9 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 
 			mattermostAppContainer := mmv1beta.GetMattermostAppContainerFromDeployment(deployment)
 			require.NotNil(t, mattermostAppContainer)
+			if mattermost.Spec.PodTemplate != nil && mattermost.Spec.PodTemplate.Command != nil {
+				assert.Equal(t, mattermost.Spec.PodTemplate.Command, mattermostAppContainer.Command)
+			}
 
 			if mattermost.Spec.ImagePullPolicy != "" {
 				assert.Equal(t, mattermost.Spec.ImagePullPolicy, mattermostAppContainer.ImagePullPolicy)

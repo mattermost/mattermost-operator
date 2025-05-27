@@ -373,13 +373,19 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 		revisionHistoryLimit = mattermost.Spec.DeploymentTemplate.RevisionHistoryLimit
 	}
 
+	// Custom container command
+	command := []string{"mattermost"}
+	if mattermost.Spec.PodTemplate != nil && mattermost.Spec.PodTemplate.Command != nil {
+		command = mattermost.Spec.PodTemplate.Command
+	}
+
 	containers := []corev1.Container{
 		{
 			Name:                     mattermostv1alpha1.MattermostAppContainerName,
 			Image:                    containerImage,
 			ImagePullPolicy:          mattermost.Spec.ImagePullPolicy,
 			TerminationMessagePolicy: corev1.TerminationMessageFallbackToLogsOnError,
-			Command:                  []string{"mattermost"},
+			Command:                  command,
 			Env:                      envVars,
 			Ports:                    containerPorts,
 			ReadinessProbe:           readiness,
