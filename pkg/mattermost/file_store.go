@@ -119,7 +119,7 @@ func (e *OperatorManagedMinioConfig) InitContainers(mattermost *mmv1beta.Matterm
 		// Create the init container to create the MinIO bucket
 		{
 			Name:            "create-minio-bucket",
-			Image:           "minio/mc:latest",
+			Image:           "minio/mc:RELEASE.2025-04-16T18-13-26Z",
 			ImagePullPolicy: corev1.PullIfNotPresent,
 			Command: []string{
 				"/bin/sh", "-c",
