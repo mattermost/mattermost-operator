@@ -227,7 +227,7 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbIn
 		// Create the init container to create the MinIO bucker
 		initContainers = append(initContainers, corev1.Container{
 			Name:            "create-minio-bucket",
-			Image:           "minio/mc:latest",
+			Image:           "minio/mc:RELEASE.2025-04-16T18-13-26Z",
 			ImagePullPolicy: corev1.PullIfNotPresent,
 			Command: []string{
 				"/bin/sh", "-c",
