@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
 ## Run e2e tests on local machine
-## Requirement:
-## - kind 0.11.0
+## Requirements:
+## - kind 0.29.0
 ## - kustomize
 
 set -Eeuxo pipefail
@@ -13,6 +13,8 @@ export KIND_CLUSTER="kind"
 
 CLUSTER_NAME=${CLUSTER_NAME:-kind}
 
+kind version
+
 echo "Creating Kind cluster"
 make kind-start
 
@@ -22,7 +24,7 @@ source "${DIR}"/setup_test.sh
 # Deploy Mattermost Operator
 make deploy
 
-echo "Running operators e2e..."
+echo "Running operator e2e tests..."
 go test ./test/e2e --timeout 45m -v
 
 echo "Running external DB and File Store e2e..."

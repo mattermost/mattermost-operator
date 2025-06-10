@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/mattermost/mattermost-operator/test/e2e"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -13,6 +14,11 @@ import (
 
 var k8sClient client.Client
 var testEnv *envtest.Environment
+
+var mattermostOperatorNamespacedName = types.NamespacedName{
+	Namespace: "mattermost-operator",
+	Name:      "mattermost-operator",
+}
 
 func TestMain(m *testing.M) {
 	log := zap.New()
