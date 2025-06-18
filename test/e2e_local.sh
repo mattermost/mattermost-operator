@@ -25,7 +25,7 @@ source "${DIR}"/setup_test.sh
 make deploy
 
 echo "Running operator e2e tests..."
-go test ./test/e2e --timeout 45m -v
+go test ./test/e2e -count=1 --timeout 45m -v
 
 echo "Running external DB and File Store e2e..."
-go test ./test/e2e-external --timeout 15m -v
+go test ./test/e2e-external -count=1 --timeout 15m -v

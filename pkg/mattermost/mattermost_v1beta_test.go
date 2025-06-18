@@ -874,6 +874,7 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 					if externalDB.dbType == database.MySQLDatabase ||
 						externalDB.dbType == database.PostgreSQLDatabase {
 						expectedInitContainers++
+						assertEnvVarExists(t, "MM_SQLSETTINGS_DATASOURCE", mattermostAppContainer.Env)
 					}
 				}
 			} else {

@@ -52,6 +52,10 @@ func (e *ExternalDBConfig) EnvVars(_ *mmv1beta.Mattermost) []corev1.EnvVar {
 			Name:      "MM_CONFIG",
 			ValueFrom: EnvSourceFromSecret(e.secretName, "DB_CONNECTION_STRING"),
 		},
+		{
+			Name:      "MM_SQLSETTINGS_DATASOURCE",
+			ValueFrom: EnvSourceFromSecret(e.secretName, "DB_CONNECTION_STRING"),
+		},
 	}
 
 	if e.hasReaderEndpoints {

@@ -36,7 +36,7 @@ func TestNewExternalDBInfo(t *testing.T) {
 		assert.False(t, config.hasReaderEndpoints)
 
 		envs := config.EnvVars(mattermost)
-		assert.Equal(t, 1, len(envs))
+		assert.Equal(t, 2, len(envs))
 
 		initContainers := config.InitContainers(mattermost)
 		assert.Equal(t, 0, len(initContainers))
@@ -54,7 +54,7 @@ func TestNewExternalDBInfo(t *testing.T) {
 		assert.True(t, config.hasReaderEndpoints)
 
 		envs := config.EnvVars(mattermost)
-		assert.Equal(t, 2, len(envs))
+		assert.Equal(t, 3, len(envs))
 
 		initContainers := config.InitContainers(mattermost)
 		assert.Equal(t, 1, len(initContainers))
