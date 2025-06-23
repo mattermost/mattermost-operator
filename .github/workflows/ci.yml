@@ -84,7 +84,7 @@ jobs:
           IMAGE_TAG: test
 
   build:
-    if: ${{ github.event_name == 'pull_request' || github.ref_name  == 'master' }}
+    if: ${{ (github.event_name == 'pull_request' || github.ref_name  == 'master') && github.actor != 'dependabot[bot]' }}
     permissions:
       security-events: write
     runs-on: ubuntu-latest
