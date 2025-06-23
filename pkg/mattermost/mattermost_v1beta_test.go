@@ -810,6 +810,36 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 			},
 			want: &appsv1.Deployment{},
 		},
+		{
+			name: "deployment strategy recreate",
+			spec: mmv1beta.MattermostSpec{
+				DeploymentTemplate: &mmv1beta.DeploymentTemplate{
+					DeploymentStrategyType: appsv1.RecreateDeploymentStrategyType,
+				},
+			},
+			want: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Strategy: appsv1.DeploymentStrategy{
+						Type: appsv1.RecreateDeploymentStrategyType,
+					},
+				},
+			},
+		},
+		{
+			name: "deployment strategy invalid defaults to rolling update",
+			spec: mmv1beta.MattermostSpec{
+				DeploymentTemplate: &mmv1beta.DeploymentTemplate{
+					DeploymentStrategyType: "InvalidStrategy",
+				},
+			},
+			want: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Strategy: appsv1.DeploymentStrategy{
+						Type: appsv1.RollingUpdateDeploymentStrategyType,
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -834,6 +864,11 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 			assert.Equal(t, tt.want.Spec.Template.Spec.Affinity, deployment.Spec.Template.Spec.Affinity)
 			assert.Equal(t, tt.want.Spec.Template.Spec.Volumes, deployment.Spec.Template.Spec.Volumes)
 			assert.Equal(t, len(tt.want.Spec.Template.Spec.Volumes), len(deployment.Spec.Template.Spec.Containers[0].VolumeMounts))
+
+			// Check deployment strategy if specified in test case
+			if tt.want.Spec.Strategy.Type != "" {
+				assert.Equal(t, tt.want.Spec.Strategy.Type, deployment.Spec.Strategy.Type)
+			}
 
 			mattermostAppContainer := mmv1beta.GetMattermostAppContainerFromDeployment(deployment)
 			require.NotNil(t, mattermostAppContainer)
