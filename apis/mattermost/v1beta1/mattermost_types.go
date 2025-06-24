@@ -4,6 +4,7 @@
 package v1beta1
 
 import (
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -273,6 +274,10 @@ type PodTemplate struct {
 
 // DeploymentTemplate defines configuration for the template for Mattermost deployment.
 type DeploymentTemplate struct {
+	// Defines the deployment strategy type for the mattermost deployment.
+	// Accepted values are: "Recreate" or "RollingUpdate". Default is RollingUpdate.
+	// +optional
+	DeploymentStrategyType appsv1.DeploymentStrategyType `json:"deploymentStrategyType,omitempty"`
 	// Defines the revision history limit for the mattermost deployment.
 	// +optional
 	RevisionHistoryLimit *int32 `json:"revisionHistoryLimit,omitempty"`
