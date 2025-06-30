@@ -14,6 +14,10 @@ The Mattermost server source code is available at https://github.com/mattermost/
 
 See the installation instructions at https://docs.mattermost.com/install/install-kubernetes.html.
 
+## Custom Resource Documentation
+
+You can review the full list of CRD configuration options [here](./docs/mattermost_v1beta1_crd.md).
+
 ## Migrate to Mattermost Custom Resource
 
 In version `v2.0.0` of the Mattermost Operator, several breaking changes will be introduced. Some of the more significant ones are:
