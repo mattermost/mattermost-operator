@@ -1,0 +1,42 @@
+# Build the mattermost operator (FIPS version)
+ARG BUILD_IMAGE=cgr.dev/mattermost.com/go-msft-fips:1.24.5.1
+ARG BASE_IMAGE=cgr.dev/mattermost.com/glibc-openssl-fips:15.1.0
+
+FROM ${BUILD_IMAGE} as builder
+
+ARG TARGETARCH
+ARG TARGETOS
+
+WORKDIR /workspace
+COPY . .
+
+RUN mkdir -p licenses
+COPY LICENSE /workspace/licenses
+
+# Build with FIPS-compliant settings
+ENV CGO_ENABLED=1
+ENV GOFIPS=1
+ENV GOEXPERIMENT=systemcrypto
+RUN make _build-fips-internal TARGET_OS=$TARGETOS TARGET_ARCH=$TARGETARCH
+
+FROM ${BASE_IMAGE}
+
+LABEL name="Mattermost Operator (FIPS)" \
+  maintainer="dev-ops@mattermost.com" \
+  vendor="Mattermost" \
+  distribution-scope="public" \
+  architecture="x86_64" \
+  url="https://mattermost.dev" \
+  io.k8s.description="Mattermost Operator creates, configures and helps manage Mattermost installations on Kubernetes (FIPS-compliant)" \
+  io.k8s.display-name="Mattermost Operator (FIPS)" \
+  io.openshift.tags="mattermost,collaboration,operator,fips" \
+  summary="Quick and easy Mattermost setup (FIPS-compliant)" \
+  description="Mattermost operator deploys and configures Mattermost installations, and assists with maintenance/upgrade operations. This is a FIPS-compliant version."
+
+WORKDIR /
+COPY --from=builder /workspace/licenses .
+COPY --from=builder /workspace/build/_output/bin/mattermost-operator .
+
+USER 65532
+
+ENTRYPOINT ["/mattermost-operator"] 
