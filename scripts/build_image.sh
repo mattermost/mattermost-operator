@@ -7,6 +7,12 @@ set -o xtrace   # print each command before executing it
 
 DOCKER_COMMAND=("build")
 EXTRA_FLAGS=("--no-cache")
+DOCKERFILE="Dockerfile"
+
+# Check if this is a FIPS build (second parameter)
+if [[ "${2:-}" == "fips" ]]; then
+    DOCKERFILE="Dockerfile.fips"
+fi
 
 # If the image is going to be built using buildx
 if [[ "$1" == "buildx" ]]; then
@@ -22,6 +28,6 @@ fi
 docker "${DOCKER_COMMAND[@]}" \
     --build-arg BUILD_IMAGE="${BUILD_IMAGE}" \
     --build-arg BASE_IMAGE="${BASE_IMAGE}" \
-    . -f Dockerfile \
+    . -f "${DOCKERFILE}" \
     -t "${OPERATOR_IMAGE}" \
     "${EXTRA_FLAGS[@]}"
