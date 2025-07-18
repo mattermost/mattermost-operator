@@ -4,6 +4,9 @@ on:
     tags:
       - "v**"
 
+env:
+  ENABLE_FIPS_BUILDS: true # Set to false to disable FIPS builds
+
 permissions:
   contents: read
 
@@ -33,7 +36,8 @@ jobs:
           OPERATOR_IMAGE_TAG: ${{ github.ref_name }}
 
   build-fips:
-    if: ${{ vars.ENABLE_FIPS_BUILDS == 'true' }}
+    if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
+    continue-on-error: true
     runs-on: ubuntu-latest
     steps:
       - name: cd/checkout-repo

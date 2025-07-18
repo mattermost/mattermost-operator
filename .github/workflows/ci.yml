@@ -8,6 +8,9 @@ on:
       - "v**"
   pull_request:
 
+env:
+  ENABLE_FIPS_BUILDS: true # Set to false to disable FIPS builds
+
 permissions:
   contents: read
 
@@ -137,7 +140,8 @@ jobs:
         run: make buildx-image
 
   build-fips:
-    if: ${{ (github.event_name == 'pull_request' || github.ref_name  == 'master') && github.actor != 'dependabot[bot]' && vars.ENABLE_FIPS_BUILDS == 'true' }}
+    if: ${{ (github.event_name == 'pull_request' || github.ref_name  == 'master') && github.actor != 'dependabot[bot]' && env.ENABLE_FIPS_BUILDS == 'true' }}
+    continue-on-error: true
     permissions:
       security-events: write
     runs-on: ubuntu-latest
@@ -155,8 +159,8 @@ jobs:
         uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
         with:
           registry: cgr.dev
-          username: ${{ secrets.CHAINGUARD_USERNAME }}
-          password: ${{ secrets.CHAINGUARD_TOKEN }}
+          username: ${{ secrets.CHAINGUARD_DEV_USERNAME }}
+          password: ${{ secrets.CHAINGUARD_DEV_TOKEN }}
 
       - name: ci/build-docker-fips
         run: make build-image-fips
