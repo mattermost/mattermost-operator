@@ -50,8 +50,8 @@ jobs:
         uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
         with:
           registry: cgr.dev
-          username: ${{ secrets.CHAINGUARD_USERNAME }}
-          password: ${{ secrets.CHAINGUARD_TOKEN }}
+          username: ${{ secrets.CHAINGUARD_DEV_USERNAME }}
+          password: ${{ secrets.CHAINGUARD_DEV_TOKEN }}
 
       - name: cd/docker-login
         uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
