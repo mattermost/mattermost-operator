@@ -36,21 +36,23 @@ jobs:
           OPERATOR_IMAGE_TAG: ${{ github.ref_name }}
 
   build-fips:
-    if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
     continue-on-error: true
     runs-on: ubuntu-latest
     steps:
       - name: cd/checkout-repo
+        if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
 
       - name: cd/setup-buildx
+        if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
         with:
           version: v0.7.1
 
       - name: cd/docker-login-chainguard
+        if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
         uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
         with:
           registry: cgr.dev
@@ -58,12 +60,14 @@ jobs:
           password: ${{ secrets.CHAINGUARD_DEV_TOKEN }}
 
       - name: cd/docker-login
+        if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
         uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: cd/push-docker-fips
+        if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
         run: make buildx-image-fips
         env:
           OPERATOR_IMAGE_TAG_FIPS: ${{ github.ref_name }}

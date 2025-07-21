@@ -140,7 +140,7 @@ jobs:
         run: make buildx-image
 
   build-fips:
-    if: ${{ (github.event_name == 'pull_request' || github.ref_name  == 'master') && github.actor != 'dependabot[bot]' && env.ENABLE_FIPS_BUILDS == 'true' }}
+    if: ${{ (github.event_name == 'pull_request' || github.ref_name  == 'master') && github.actor != 'dependabot[bot]' }}
     continue-on-error: true
     permissions:
       security-events: write
@@ -148,14 +148,17 @@ jobs:
     needs: [lint, test]
     steps:
       - name: ci/checkout-repo
+        if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
 
       - name: ci/set-short-SHA
+        if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
         run: echo "SHORT_SHA=${GITHUB_SHA:0:7}" >> $GITHUB_ENV
 
       - name: ci/docker-login-chainguard
+        if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
         uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
         with:
           registry: cgr.dev
@@ -163,9 +166,11 @@ jobs:
           password: ${{ secrets.CHAINGUARD_DEV_TOKEN }}
 
       - name: ci/build-docker-fips
+        if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
         run: make build-image-fips
 
       - name: ci/scan-docker-security-fips
+        if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
         uses: aquasecurity/trivy-action@dc5a429b52fcf669ce959baa2c2dd26090d2a6c4 # v0.32.0
         continue-on-error: true
         with:
@@ -179,22 +184,26 @@ jobs:
           severity: "CRITICAL,HIGH"
 
       - name: ci/create-trivy-results-report-fips
+        if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
         uses: github/codeql-action/upload-sarif@181d5eefc20863364f96762470ba6f862bdef56b # v3.29.2
         with:
           sarif_file: "trivy-results-fips.sarif"
 
       - name: ci/setup-buildx
+        if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
         with:
           version: v0.7.1
 
       - name: ci/docker-login
+        if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
         uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: ci/docker-push-fips
+        if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
         env:
           OPERATOR_IMAGE_TAG_FIPS: ${{ env.SHORT_SHA }}
         run: make buildx-image-fips
