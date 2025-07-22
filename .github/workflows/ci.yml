@@ -144,6 +144,7 @@ jobs:
     continue-on-error: true
     permissions:
       security-events: write
+      id-token: write
     runs-on: ubuntu-latest
     needs: [lint, test]
     steps:
@@ -157,13 +158,11 @@ jobs:
         if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
         run: echo "SHORT_SHA=${GITHUB_SHA:0:7}" >> $GITHUB_ENV
 
-      - name: ci/docker-login-chainguard
+      - name: ci/setup-chainctl
         if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
-        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+        uses: chainguard-dev/setup-chainctl@v0.3.2
         with:
-          registry: cgr.dev
-          username: ${{ secrets.CHAINGUARD_DEV_USERNAME }}
-          password: ${{ secrets.CHAINGUARD_DEV_TOKEN }}
+          identity: ee399b4c72dd4e58e3d617f78fc47b74733c9557/0439801bd43520ae
 
       - name: ci/build-docker-fips
         if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
