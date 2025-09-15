@@ -119,7 +119,7 @@ jobs:
 
       - name: ci/create-trivy-results-report
         # if: failure()
-        uses: github/codeql-action/upload-sarif@f1f6e5f6af878fb37288ce1c627459e94dbf7d01 # v3.29.5
+        uses: github/codeql-action/upload-sarif@192325c86100d080feab897ff886c34abd4c83a3 # v3.29.5
         with:
           sarif_file: "trivy-results.sarif"
 
@@ -184,7 +184,7 @@ jobs:
 
       - name: ci/create-trivy-results-report-fips
         if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
-        uses: github/codeql-action/upload-sarif@f1f6e5f6af878fb37288ce1c627459e94dbf7d01 # v3.29.5
+        uses: github/codeql-action/upload-sarif@192325c86100d080feab897ff886c34abd4c83a3 # v3.29.5
         with:
           sarif_file: "trivy-results-fips.sarif"
 
