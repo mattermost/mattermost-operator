@@ -16,6 +16,11 @@ import (
 func TestMattermostExternalServices(t *testing.T) {
 	t.Log("Running tests with external Mattermost Services")
 
+	t.Run("mattermost operator ready", func(t *testing.T) {
+		err := waitForDeploymentWithDefaultTimes(t, k8sClient, mattermostOperatorNamespacedName, 1)
+		require.NoError(t, err)
+	})
+
 	t.Run("mattermost base test", func(t *testing.T) {
 		mattermostBaseTest(t)
 	})

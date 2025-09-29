@@ -4,6 +4,7 @@
 package v1beta1
 
 import (
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -251,6 +252,10 @@ type Probes struct {
 
 // PodTemplate defines configuration for the template for Mattermost pods.
 type PodTemplate struct {
+	// Defines a command override for Mattermost app server pods.
+	// The default command is "mattermost".
+	// +optional
+	Command []string `json:"command,omitempty"`
 	// Defines the security context for the Mattermost app server pods.
 	// +optional
 	SecurityContext *v1.PodSecurityContext `json:"securityContext,omitempty"`
@@ -269,6 +274,10 @@ type PodTemplate struct {
 
 // DeploymentTemplate defines configuration for the template for Mattermost deployment.
 type DeploymentTemplate struct {
+	// Defines the deployment strategy type for the mattermost deployment.
+	// Accepted values are: "Recreate" or "RollingUpdate". Default is RollingUpdate.
+	// +optional
+	DeploymentStrategyType appsv1.DeploymentStrategyType `json:"deploymentStrategyType,omitempty"`
 	// Defines the revision history limit for the mattermost deployment.
 	// +optional
 	RevisionHistoryLimit *int32 `json:"revisionHistoryLimit,omitempty"`

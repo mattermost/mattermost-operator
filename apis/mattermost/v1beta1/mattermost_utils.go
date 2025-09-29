@@ -19,7 +19,7 @@ const (
 	// DefaultMattermostImage is the default Mattermost docker image
 	DefaultMattermostImage = "mattermost/mattermost-enterprise-edition"
 	// DefaultMattermostVersion is the default Mattermost docker tag
-	DefaultMattermostVersion = "9.7.3"
+	DefaultMattermostVersion = "10.8.1"
 	// DefaultMattermostSize is the default number of users
 	DefaultMattermostSize = "5000users"
 	// DefaultMattermostDatabaseType is the default Mattermost database
@@ -210,10 +210,10 @@ func getContainerByName(containers []corev1.Container, containerName string) *co
 // GetImageName returns the container image name that matches the spec of the
 // ClusterInstallation.
 func (mm *Mattermost) GetImageName() string {
-	// if user set the version using the Digest instead of tag like
+	// if user set the version using only the Digest instead of tag or tag@digest like
 	// sha256:dd15a51ac7dafd213744d1ef23394e7532f71a90f477c969b94600e46da5a0cf
 	// we need to set the @ instead of : to split the image name and "tag"
-	if strings.Contains(mm.Spec.Version, "sha256:") {
+	if strings.HasPrefix(mm.Spec.Version, "sha256:") {
 		return fmt.Sprintf("%s@%s", mm.Spec.Image, mm.Spec.Version)
 	}
 	return fmt.Sprintf("%s:%s", mm.Spec.Image, mm.Spec.Version)

@@ -352,6 +352,7 @@ func TestGenerateJobServerDeployment_V1Beta(t *testing.T) {
 		Spec: mmv1beta.MattermostSpec{
 			Replicas:      &replicas,
 			LicenseSecret: "license-secret",
+			PodTemplate:   &mmv1beta.PodTemplate{},
 		},
 	}
 	databaseConfig := &ExternalDBConfig{
@@ -375,10 +376,16 @@ func TestGenerateJobServerDeployment_V1Beta(t *testing.T) {
 	assert.Equal(t, mattermost.MattermostJobServerPodLabels(mattermost.Name), jobServerdeployment.Spec.Template.Labels)
 	assert.Equal(t, mattermost.MattermostJobServerPodLabels(mattermost.Name), jobServerdeployment.Spec.Selector.MatchLabels)
 
+	assert.Equal(t, []string{"mattermost", "jobserver"}, jobServerdeployment.Spec.Template.Spec.Containers[0].Command)
 	assert.Equal(t, *jobServerdeployment.Spec.Replicas, int32(1))
 	require.Len(t, jobServerdeployment.Spec.Template.Spec.Containers, 1)
 	assert.Nil(t, jobServerdeployment.Spec.Template.Spec.Containers[0].ReadinessProbe)
 	assert.Nil(t, jobServerdeployment.Spec.Template.Spec.Containers[0].LivenessProbe)
+
+	mattermost.Spec.PodTemplate.Command = []string{"mattermost", "custom-command"}
+	jobServerdeployment = GenerateJobServerDeploymentV1Beta(mattermost, databaseConfig, fileStoreInfo, mattermost.Name, "", "service-account", "")
+	require.NotNil(t, jobServerdeployment)
+	assert.Equal(t, []string{"mattermost", "jobserver"}, jobServerdeployment.Spec.Template.Spec.Containers[0].Command)
 }
 
 func TestGenerateDeployment_V1Beta(t *testing.T) {
@@ -791,8 +798,46 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 			},
 			want: &appsv1.Deployment{},
 			requiredEnvVals: map[string]string{
-				"MM_JOBSETTINGS_RUNSCHEDULER": "false",
-				"MM_JOBSETTINGS_RUNJOBS":      "false",
+				"MM_JOBSETTINGS_RUNJOBS": "false",
+			},
+		},
+		{
+			name: "custom command",
+			spec: mmv1beta.MattermostSpec{
+				PodTemplate: &mmv1beta.PodTemplate{
+					Command: []string{"mattermost", "custom-command"},
+				},
+			},
+			want: &appsv1.Deployment{},
+		},
+		{
+			name: "deployment strategy recreate",
+			spec: mmv1beta.MattermostSpec{
+				DeploymentTemplate: &mmv1beta.DeploymentTemplate{
+					DeploymentStrategyType: appsv1.RecreateDeploymentStrategyType,
+				},
+			},
+			want: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Strategy: appsv1.DeploymentStrategy{
+						Type: appsv1.RecreateDeploymentStrategyType,
+					},
+				},
+			},
+		},
+		{
+			name: "deployment strategy invalid defaults to rolling update",
+			spec: mmv1beta.MattermostSpec{
+				DeploymentTemplate: &mmv1beta.DeploymentTemplate{
+					DeploymentStrategyType: "InvalidStrategy",
+				},
+			},
+			want: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Strategy: appsv1.DeploymentStrategy{
+						Type: appsv1.RollingUpdateDeploymentStrategyType,
+					},
+				},
 			},
 		},
 	}
@@ -820,8 +865,16 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 			assert.Equal(t, tt.want.Spec.Template.Spec.Volumes, deployment.Spec.Template.Spec.Volumes)
 			assert.Equal(t, len(tt.want.Spec.Template.Spec.Volumes), len(deployment.Spec.Template.Spec.Containers[0].VolumeMounts))
 
+			// Check deployment strategy if specified in test case
+			if tt.want.Spec.Strategy.Type != "" {
+				assert.Equal(t, tt.want.Spec.Strategy.Type, deployment.Spec.Strategy.Type)
+			}
+
 			mattermostAppContainer := mmv1beta.GetMattermostAppContainerFromDeployment(deployment)
 			require.NotNil(t, mattermostAppContainer)
+			if mattermost.Spec.PodTemplate != nil && mattermost.Spec.PodTemplate.Command != nil {
+				assert.Equal(t, mattermost.Spec.PodTemplate.Command, mattermostAppContainer.Command)
+			}
 
 			if mattermost.Spec.ImagePullPolicy != "" {
 				assert.Equal(t, mattermost.Spec.ImagePullPolicy, mattermostAppContainer.ImagePullPolicy)
@@ -856,6 +909,7 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 					if externalDB.dbType == database.MySQLDatabase ||
 						externalDB.dbType == database.PostgreSQLDatabase {
 						expectedInitContainers++
+						assertEnvVarExists(t, "MM_SQLSETTINGS_DATASOURCE", mattermostAppContainer.Env)
 					}
 				}
 			} else {

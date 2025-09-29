@@ -14,6 +14,10 @@ SDK_VERSION = v1.0.1
 BUILD_IMAGE = golang:$(GOLANG_VERSION)
 BASE_IMAGE = gcr.io/distroless/static:nonroot
 
+## FIPS Docker Build Versions
+BUILD_IMAGE_FIPS = cgr.dev/mattermost.com/go-msft-fips:1.24
+BASE_IMAGE_FIPS = cgr.dev/mattermost.com/glibc-openssl-fips:15.1
+
 ################################################################################
 
 GO ?= $(shell command -v go 2> /dev/null)
@@ -24,6 +28,12 @@ TEST_FLAGS ?= -v
 OPERATOR_IMAGE_NAME ?= mattermost/mattermost-operator
 OPERATOR_IMAGE_TAG ?= test
 OPERATOR_IMAGE ?= $(OPERATOR_IMAGE_NAME):$(OPERATOR_IMAGE_TAG)
+
+## FIPS Operator Image
+OPERATOR_IMAGE_NAME_FIPS ?= mattermost/mattermost-operator-fips
+OPERATOR_IMAGE_TAG_FIPS ?= $(OPERATOR_IMAGE_TAG)
+OPERATOR_IMAGE_FIPS ?= $(OPERATOR_IMAGE_NAME_FIPS):$(OPERATOR_IMAGE_TAG_FIPS)
+
 MACHINE = $(shell uname -m)
 GOFLAGS ?= $(GOFLAGS:)
 BUILD_TIME := $(shell date -u +%Y%m%d.%H%M%S)
@@ -123,12 +133,12 @@ build: ## Build the mattermost-operator
 	@echo Building Mattermost-operator
 	GO111MODULE=on GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) CGO_ENABLED=0 $(GO) build $(GOFLAGS) -gcflags all=-trimpath=$(GOPATH) -asmflags all=-trimpath=$(GOPATH) -a -installsuffix cgo -o build/_output/bin/mattermost-operator $(GO_LINKER_FLAGS) ./main.go
 
-.PHONE: buildx-image
+.PHONY: buildx-image
 buildx-image:  ## Builds and pushes the docker image for mattermost-operator
 	@echo Building Mattermost-operator Docker Image
 	BUILD_IMAGE=$(BUILD_IMAGE) BASE_IMAGE=$(BASE_IMAGE) OPERATOR_IMAGE=$(OPERATOR_IMAGE) ./scripts/build_image.sh buildx
 
-.PHONE: build-image
+.PHONY: build-image
 build-image:  ## Build the docker image for mattermost-operator
 	@echo Building Mattermost-operator Docker Image
 	BUILD_IMAGE=$(BUILD_IMAGE) BASE_IMAGE=$(BASE_IMAGE) OPERATOR_IMAGE=$(OPERATOR_IMAGE) ./scripts/build_image.sh local
@@ -136,6 +146,44 @@ build-image:  ## Build the docker image for mattermost-operator
 .PHONY: push-image
 push-image: ## Push the docker image using base docker (for local development)
 	docker push $(OPERATOR_IMAGE)
+
+## --------------------------------------
+## FIPS Build Targets
+## --------------------------------------
+
+_build-fips-internal: ## Internal FIPS build target (used by Dockerfile.fips and build-fips)
+	@echo "Building Mattermost-operator (FIPS)"
+	@mkdir -p build/_output/bin
+	GO111MODULE=on GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) CGO_ENABLED=1 $(GO) build -tags=requirefips $(GOFLAGS) -gcflags all=-trimpath=$(GOPATH) -asmflags all=-trimpath=$(GOPATH) -a -o build/_output/bin/mattermost-operator $(GO_LINKER_FLAGS) ./main.go
+
+.PHONY: build-fips
+build-fips: ## Build the mattermost-operator with FIPS-compliant settings using containerized build
+	@echo "Building Mattermost-operator (FIPS - containerized)"
+	docker run --rm -v $(shell pwd):/workspace -w /workspace \
+		--entrypoint="" \
+		-e TARGET_OS=$(TARGET_OS) \
+		-e TARGET_ARCH=$(TARGET_ARCH) \
+		-e CGO_ENABLED=1 \
+		-e GOFIPS=1 \
+		-e GOEXPERIMENT=systemcrypto \
+		-e HOST_UID=$(shell id -u) \
+		-e HOST_GID=$(shell id -g) \
+		$(BUILD_IMAGE_FIPS) \
+		sh -c "make _build-fips-internal TARGET_OS=\$$TARGET_OS TARGET_ARCH=\$$TARGET_ARCH && mv build/_output/bin/mattermost-operator build/_output/bin/mattermost-operator-fips && chown \$$HOST_UID:\$$HOST_GID build/_output/bin/mattermost-operator-fips"
+
+.PHONY: buildx-image-fips
+buildx-image-fips:  ## Builds and pushes the FIPS docker image for mattermost-operator
+	@echo Building Mattermost-operator FIPS Docker Image
+	BUILD_IMAGE=$(BUILD_IMAGE_FIPS) BASE_IMAGE=$(BASE_IMAGE_FIPS) OPERATOR_IMAGE=$(OPERATOR_IMAGE_FIPS) ./scripts/build_image.sh buildx fips
+
+.PHONY: build-image-fips
+build-image-fips:  ## Build the FIPS docker image for mattermost-operator
+	@echo Building Mattermost-operator FIPS Docker Image
+	BUILD_IMAGE=$(BUILD_IMAGE_FIPS) BASE_IMAGE=$(BASE_IMAGE_FIPS) OPERATOR_IMAGE=$(OPERATOR_IMAGE_FIPS) ./scripts/build_image.sh local fips
+
+.PHONY: push-image-fips
+push-image-fips: ## Push the FIPS docker image using base docker (for local development)
+	docker push $(OPERATOR_IMAGE_FIPS)
 
 check-style: $(SHADOW_GEN) gofmt vet ## Runs go vet, gofmt
 
@@ -291,4 +339,4 @@ check-modules: $(OUTDATED_GEN) ## Check outdated modules
 
 ## Help documentatin à la https://marmelab.com/blog/2016/02/29/auto-documented-makefile.html
 help:
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' ./Makefile | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z-][a-zA-Z_-]+:.*?## .*$$' ./Makefile | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'

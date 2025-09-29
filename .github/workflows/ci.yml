@@ -8,6 +8,9 @@ on:
       - "v**"
   pull_request:
 
+env:
+  ENABLE_FIPS_BUILDS: true # Set to false to disable FIPS builds
+
 permissions:
   contents: read
 
@@ -16,12 +19,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: ci/checkout-repo
-        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           fetch-depth: 0
 
       - name: ci/setup-go
-        uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5.1.0
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
         with:
           go-version-file: go.mod
           cache: true
@@ -33,16 +36,16 @@ jobs:
         run: make check-modules
 
   test:
-    runs-on: ubuntu-latest-4-cores
+    runs-on: ubuntu-latest-8-cores
     steps:
       - name: ci/checkout-repo
-        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           fetch-depth: 0
           path: src/github.com/mattermost/mattermost-operator
 
       - name: ci/setup-go
-        uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5.1.0
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
         with:
           go-version-file: src/github.com/mattermost/mattermost-operator/go.mod
           cache-dependency-path: src/github.com/mattermost/mattermost-operator/go.sum
@@ -78,20 +81,20 @@ jobs:
           ./test/e2e.sh
         env:
           K8S_VERSION: v1.22.9
-          KIND_VERSION: v0.22.0
+          KIND_VERSION: v0.29.0
           SDK_VERSION: v1.0.1
           IMAGE_NAME: mattermost/mattermost-operator
           IMAGE_TAG: test
 
   build:
-    if: ${{ github.event_name == 'pull_request' || github.ref_name  == 'master' }}
+    if: ${{ (github.event_name == 'pull_request' || github.ref_name  == 'master') && github.actor != 'dependabot[bot]' }}
     permissions:
       security-events: write
     runs-on: ubuntu-latest
     needs: [lint, test]
     steps:
       - name: ci/checkout-repo
-        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           fetch-depth: 0
 
@@ -102,7 +105,7 @@ jobs:
         run: make build-image
 
       - name: ci/scan-docker-security
-        uses: aquasecurity/trivy-action@8bd2f9fbda2109502356ff8a6a89da55b1ead252 # v0.9.1
+        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # v0.33.1
         continue-on-error: true
         with:
           image-ref: "mattermost/mattermost-operator:test"
@@ -116,17 +119,17 @@ jobs:
 
       - name: ci/create-trivy-results-report
         # if: failure()
-        uses: github/codeql-action/upload-sarif@17573ee1cc1b9d061760f3a006fc4aac4f944fd5 # v2.2.4
+        uses: github/codeql-action/upload-sarif@192325c86100d080feab897ff886c34abd4c83a3 # v3.29.5
         with:
           sarif_file: "trivy-results.sarif"
 
       - name: ci/setup-buildx
-        uses: docker/setup-buildx-action@15c905b16b06416d2086efa066dd8e3a35cc7f98 # v2.4.0
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
         with:
           version: v0.7.1
 
       - name: ci/docker-login
-        uses: docker/login-action@f4ef78c080cd8ba55a85445d5b36e214a81df20a # v2.1.0
+        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.5.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -135,3 +138,71 @@ jobs:
         env:
           OPERATOR_IMAGE_TAG: ${{ env.SHORT_SHA }}
         run: make buildx-image
+
+  build-fips:
+    if: ${{ (github.event_name == 'pull_request' || github.ref_name  == 'master') && github.actor != 'dependabot[bot]' }}
+    continue-on-error: true
+    permissions:
+      security-events: write
+      id-token: write
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    steps:
+      - name: ci/checkout-repo
+        if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 0
+
+      - name: ci/set-short-SHA
+        if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
+        run: echo "SHORT_SHA=${GITHUB_SHA:0:7}" >> $GITHUB_ENV
+
+      - name: ci/setup-chainctl
+        if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
+        uses: chainguard-dev/setup-chainctl@v0.4.0
+        with:
+          identity: ee399b4c72dd4e58e3d617f78fc47b74733c9557/0439801bd43520ae
+
+      - name: ci/build-docker-fips
+        if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
+        run: make build-image-fips
+
+      - name: ci/scan-docker-security-fips
+        if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
+        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # v0.33.1
+        continue-on-error: true
+        with:
+          image-ref: "mattermost/mattermost-operator-fips:test"
+          format: "sarif"
+          limit-severities-for-sarif: true
+          output: "trivy-results-fips.sarif"
+          exit-code: "0"
+          ignore-unfixed: true
+          vuln-type: "os,library"
+          severity: "CRITICAL,HIGH"
+
+      - name: ci/create-trivy-results-report-fips
+        if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
+        uses: github/codeql-action/upload-sarif@192325c86100d080feab897ff886c34abd4c83a3 # v3.29.5
+        with:
+          sarif_file: "trivy-results-fips.sarif"
+
+      - name: ci/setup-buildx
+        if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+        with:
+          version: v0.7.1
+
+      - name: ci/docker-login
+        if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
+        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.5.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: ci/docker-push-fips
+        if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
+        env:
+          OPERATOR_IMAGE_TAG_FIPS: ${{ env.SHORT_SHA }}
+        run: make buildx-image-fips

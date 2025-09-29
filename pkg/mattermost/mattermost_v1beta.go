@@ -320,10 +320,6 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 	// Apply optional job server settings
 	if mattermost.Spec.JobServer != nil && mattermost.Spec.JobServer.DedicatedJobServer {
 		envVarGeneral = append(envVarGeneral, corev1.EnvVar{
-			Name:  "MM_JOBSETTINGS_RUNSCHEDULER",
-			Value: "false",
-		})
-		envVarGeneral = append(envVarGeneral, corev1.EnvVar{
 			Name:  "MM_JOBSETTINGS_RUNJOBS",
 			Value: "false",
 		})
@@ -377,13 +373,39 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 		revisionHistoryLimit = mattermost.Spec.DeploymentTemplate.RevisionHistoryLimit
 	}
 
+	// Default deployment strategy
+	deploymentStrategy := appsv1.DeploymentStrategy{
+		Type: appsv1.RollingUpdateDeploymentStrategyType,
+		RollingUpdate: &appsv1.RollingUpdateDeployment{
+			MaxUnavailable: &maxUnavailable,
+			MaxSurge:       &maxSurge,
+		},
+	}
+
+	// Override if the deployment type is not RollingUpdate and the strategy
+	// type is valid.
+	if mattermost.Spec.DeploymentTemplate != nil && mattermost.Spec.DeploymentTemplate.DeploymentStrategyType != "" {
+		switch mattermost.Spec.DeploymentTemplate.DeploymentStrategyType {
+		case appsv1.RecreateDeploymentStrategyType:
+			deploymentStrategy = appsv1.DeploymentStrategy{
+				Type: appsv1.RecreateDeploymentStrategyType,
+			}
+		}
+	}
+
+	// Custom container command
+	command := []string{"mattermost"}
+	if mattermost.Spec.PodTemplate != nil && mattermost.Spec.PodTemplate.Command != nil {
+		command = mattermost.Spec.PodTemplate.Command
+	}
+
 	containers := []corev1.Container{
 		{
 			Name:                     mattermostv1alpha1.MattermostAppContainerName,
 			Image:                    containerImage,
 			ImagePullPolicy:          mattermost.Spec.ImagePullPolicy,
 			TerminationMessagePolicy: corev1.TerminationMessageFallbackToLogsOnError,
-			Command:                  []string{"mattermost"},
+			Command:                  command,
 			Env:                      envVars,
 			Ports:                    containerPorts,
 			ReadinessProbe:           readiness,
@@ -407,13 +429,7 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 			OwnerReferences: MattermostOwnerReference(mattermost),
 		},
 		Spec: appsv1.DeploymentSpec{
-			Strategy: appsv1.DeploymentStrategy{
-				Type: appsv1.RollingUpdateDeploymentStrategyType,
-				RollingUpdate: &appsv1.RollingUpdateDeployment{
-					MaxUnavailable: &maxUnavailable,
-					MaxSurge:       &maxSurge,
-				},
-			},
+			Strategy:             deploymentStrategy,
 			RevisionHistoryLimit: revisionHistoryLimit,
 			Replicas:             mattermost.Spec.Replicas,
 			Selector: &metav1.LabelSelector{

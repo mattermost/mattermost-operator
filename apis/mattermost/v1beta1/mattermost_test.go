@@ -157,6 +157,13 @@ func TestMattermost(t *testing.T) {
 		assert.Contains(t, mm.GetImageName(), mm.Spec.Version)
 		assert.Equal(t, mm.GetImageName(), fmt.Sprintf("%s@%s", mm.Spec.Image, mm.Spec.Version))
 	})
+
+	t.Run("using tag and digest", func(t *testing.T) {
+		mm.Spec.Version = "10.6.1@sha256:dd15a51ac7dafd213744d1ef23394e7532f71a90f477c969b94600e46da5a0cf"
+		assert.Contains(t, mm.GetImageName(), mm.Spec.Image)
+		assert.Contains(t, mm.GetImageName(), mm.Spec.Version)
+		assert.Equal(t, mm.GetImageName(), fmt.Sprintf("%s:%s", mm.Spec.Image, mm.Spec.Version))
+	})
 }
 
 func TestOtherUtils(t *testing.T) {
