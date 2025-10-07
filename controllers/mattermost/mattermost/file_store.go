@@ -160,7 +160,7 @@ func (r *MattermostReconciler) determineAccessModes(mattermost *mmv1beta.Matterm
 
 	// For backwards compatibility: if PVC already exists, preserve its current access modes
 	if pvcExists {
-		reqLogger.Info("Preserving existing PVC access modes for backwards compatibility", "accessModes", currentPVC.Spec.AccessModes)
+		reqLogger.Info("WARNING: Preserving existing PVC access modes for backwards compatibility. Please manually migrate your storage to ReadWriteMany (RWM) for optimal performance and multi-pod support", "accessModes", currentPVC.Spec.AccessModes)
 		return currentPVC.Spec.AccessModes
 	}
 
