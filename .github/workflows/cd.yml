@@ -72,7 +72,6 @@ jobs:
         env:
           OPERATOR_IMAGE_TAG_FIPS: ${{ github.ref_name }}
 
-
   anchore-scan:
     runs-on: ubuntu-latest
     needs: [build]
