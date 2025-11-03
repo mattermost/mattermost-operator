@@ -189,8 +189,41 @@ To run you can issue the following command:
 
 ```bash
 ./scripts/release.sh --tag=<DESIRED_TAG>
-````
+```
 
 where:
+- `<DESIRED_TAG>` can be 1.10.1 for example
 
-- <DESIRED_TAG> can be 1.10.1 for example
+## Why the Mattermost Operator Uses a ClusterRole
+
+The Mattermost Operator is designed to manage and orchestrate multiple Mattermost installations within a Kubernetes cluster.  
+To enable this, it requires **cluster-wide permissions**, which are granted through a `ClusterRole`.
+
+### Design Philosophy
+
+The operator follows a **high-privilege controller model** built around the **principle of least privilege for managed applications**.
+
+- The operator itself requires elevated privileges at the cluster level to create and manage resources across namespaces.  
+- Each Mattermost installation it provisions is isolated using its own **`ServiceAccount`** and **namespace-scoped `Role`**, ensuring that each deployment operates with minimal privileges.
+
+This approach balances **security** and **convenience** — administrators do not need to manually create RBAC policies for each Mattermost instance.
+
+This allows the operator to:
+
+1. **Multi-Namespace Deployments**  
+   The operator supports multiple Mattermost instances deployed across different namespaces (e.g., `dev`, `staging`, `prod`) using a single operator instance.  
+   This enables platform teams to offer *Mattermost-as-a-Service* to multiple internal teams.
+
+2. **Cluster-Scoped Resources**  
+   Some Kubernetes resources managed by the operator (such as `IngressClass`) are **cluster-scoped** and cannot be managed with namespace-limited roles.
+
+3. **Cross-Namespace Integrations**  
+   The operator can provision and manage external dependencies — such as **MySQL clusters** or **MinIO instances** — that may reside in different namespaces.  
+   Managing these cross-namespace resources requires cluster-level permissions.
+
+4. **Namespace Metadata Access**  
+   The operator needs to read and interact with namespace metadata to properly configure DNS names, routing, and service discovery across installations.
+
+5. **Operational Flexibility**  
+   Operating at the cluster level simplifies management workflows.  
+   Platform administrators can deploy, update, and monitor multiple Mattermost instances without deploying a separate operator in each namespace.
