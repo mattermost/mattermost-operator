@@ -83,7 +83,7 @@ jobs:
 
       - name: security/anchore-scan
         id: anchore-operator
-        uses: mattermost/actions/delivery/anchore-scan@main
+        uses: mattermost/actions/delivery/anchore-scan@003fac68730de6e3e2dc31939e7f2c460f2a8ba0
         with:
           image_name: mattermost/mattermost-operator:${{ github.ref_name }}
           dockerfile_path: ./Dockerfile
@@ -96,7 +96,7 @@ jobs:
 
       - name: security/anchore-scan-fips
         id: anchore-operator-fips
-        uses: mattermost/actions/delivery/anchore-scan@main
+        uses: mattermost/actions/delivery/anchore-scan@003fac68730de6e3e2dc31939e7f2c460f2a8ba0
         with:
           image_name: mattermost/mattermost-operator-fips:${{ github.ref_name }}
           dockerfile_path: ./Dockerfile.fips
