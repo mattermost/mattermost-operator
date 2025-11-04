@@ -71,3 +71,38 @@ jobs:
         run: make buildx-image-fips
         env:
           OPERATOR_IMAGE_TAG_FIPS: ${{ github.ref_name }}
+
+  anchore-scan:
+    runs-on: ubuntu-latest
+    needs: [build, build-fips]
+    steps:
+      - name: cd/checkout-repo
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 0
+
+      - name: security/anchore-scan
+        id: anchore-operator
+        uses: mattermost/actions/delivery/anchore-scan@003fac68730de6e3e2dc31939e7f2c460f2a8ba0
+        with:
+          image_name: mattermost/mattermost-operator:${{ github.ref_name }}
+          dockerfile_path: ./Dockerfile
+          show_vulnerabilities: 'false'
+          anchorectl_url: ${{ secrets.ANCHORECTL_URL }}
+          anchorectl_username: ${{ secrets.ANCHORECTL_USERNAME }}
+          anchorectl_password: ${{ secrets.ANCHORECTL_PASSWORD }}
+          ts_oauth_client_id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          ts_oauth_secret: ${{ secrets.TS_OAUTH_SECRET }}
+
+      - name: security/anchore-scan-fips
+        id: anchore-operator-fips
+        uses: mattermost/actions/delivery/anchore-scan@003fac68730de6e3e2dc31939e7f2c460f2a8ba0
+        with:
+          image_name: mattermost/mattermost-operator-fips:${{ github.ref_name }}
+          dockerfile_path: ./Dockerfile.fips
+          show_vulnerabilities: 'false'
+          anchorectl_url: ${{ secrets.ANCHORECTL_URL }}
+          anchorectl_username: ${{ secrets.ANCHORECTL_USERNAME }}
+          anchorectl_password: ${{ secrets.ANCHORECTL_PASSWORD }}
+          ts_oauth_client_id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          ts_oauth_secret: ${{ secrets.TS_OAUTH_SECRET }}
