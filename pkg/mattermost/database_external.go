@@ -9,10 +9,11 @@ import (
 )
 
 type ExternalDBConfig struct {
-	secretName         string
-	dbType             string
-	hasReaderEndpoints bool
-	hasDBCheckURL      bool
+	secretName               string
+	dbType                   string
+	hasReaderEndpoints       bool
+	hasDBCheckURL            bool
+	hasSeparateDatasourceKey bool
 }
 
 func NewExternalDBConfig(mattermost *mmv1beta.Mattermost, secret corev1.Secret) (*ExternalDBConfig, error) {
@@ -42,6 +43,9 @@ func NewExternalDBConfig(mattermost *mmv1beta.Mattermost, secret corev1.Secret) 
 	if _, ok := secret.Data["DB_CONNECTION_CHECK_URL"]; ok {
 		externalDB.hasDBCheckURL = true
 	}
+	if _, ok := secret.Data["MM_SQLSETTINGS_DATASOURCE"]; ok {
+		externalDB.hasSeparateDatasourceKey = true
+	}
 
 	return externalDB, nil
 }
@@ -52,11 +56,19 @@ func (e *ExternalDBConfig) EnvVars(_ *mmv1beta.Mattermost) []corev1.EnvVar {
 			Name:      "MM_CONFIG",
 			ValueFrom: EnvSourceFromSecret(e.secretName, "DB_CONNECTION_STRING"),
 		},
-		{
-			Name:      "MM_SQLSETTINGS_DATASOURCE",
-			ValueFrom: EnvSourceFromSecret(e.secretName, "DB_CONNECTION_STRING"),
-		},
 	}
+
+	// If the secret has a separate MM_SQLSETTINGS_DATASOURCE key (without protocol prefix),
+	// use it. Otherwise fall back to DB_CONNECTION_STRING for backward compatibility.
+	datasourceKey := "DB_CONNECTION_STRING"
+	if e.hasSeparateDatasourceKey {
+		datasourceKey = "MM_SQLSETTINGS_DATASOURCE"
+	}
+
+	dbEnvVars = append(dbEnvVars, corev1.EnvVar{
+		Name:      "MM_SQLSETTINGS_DATASOURCE",
+		ValueFrom: EnvSourceFromSecret(e.secretName, datasourceKey),
+	})
 
 	if e.hasReaderEndpoints {
 		dbEnvVars = append(dbEnvVars, corev1.EnvVar{
