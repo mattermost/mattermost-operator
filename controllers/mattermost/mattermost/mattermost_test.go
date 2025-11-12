@@ -1141,6 +1141,124 @@ func TestCheckMattermostLocalFileStore(t *testing.T) {
 
 		assert.Equal(t, expectedStorage, *actualStorage)
 	})
+
+	t.Run("default access modes for new PVC", func(t *testing.T) {
+		// Create a new Mattermost instance with a different name to test fresh PVC creation
+		newMMName := "foo-new"
+		newMM := &mmv1beta.Mattermost{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      newMMName,
+				Namespace: mmNamespace,
+				UID:       types.UID("test-new"),
+			},
+			Spec: mmv1beta.MattermostSpec{
+				Replicas:    &replicas,
+				Image:       "mattermost/mattermost-enterprise-edition",
+				Version:     operatortest.LatestStableMattermostVersion,
+				IngressName: "foo-new.mattermost.dev",
+				FileStore: mmv1beta.FileStore{
+					Local: &mmv1beta.LocalFileStore{
+						Enabled:     true,
+						StorageSize: "1Gi",
+						// No AccessModes specified - should default to ReadWriteMany
+					},
+				},
+			},
+		}
+
+		_, err := reconciler.checkLocalFileStore(newMM, logger)
+		require.NoError(t, err)
+
+		foundPvc := &corev1.PersistentVolumeClaim{}
+		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: newMMName, Namespace: mmNamespace}, foundPvc)
+		require.NoError(t, err)
+		require.NotNil(t, foundPvc)
+
+		// Verify that new PVC gets ReadWriteMany by default
+		assert.Equal(t, []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany}, foundPvc.Spec.AccessModes)
+	})
+
+	t.Run("explicit access modes", func(t *testing.T) {
+		// Create a new Mattermost instance with explicit access modes
+		explicitMMName := "foo-explicit"
+		explicitMM := &mmv1beta.Mattermost{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      explicitMMName,
+				Namespace: mmNamespace,
+				UID:       types.UID("test-explicit"),
+			},
+			Spec: mmv1beta.MattermostSpec{
+				Replicas:    &replicas,
+				Image:       "mattermost/mattermost-enterprise-edition",
+				Version:     operatortest.LatestStableMattermostVersion,
+				IngressName: "foo-explicit.mattermost.dev",
+				FileStore: mmv1beta.FileStore{
+					Local: &mmv1beta.LocalFileStore{
+						Enabled:     true,
+						StorageSize: "1Gi",
+						AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce, corev1.ReadOnlyMany},
+					},
+				},
+			},
+		}
+
+		_, err := reconciler.checkLocalFileStore(explicitMM, logger)
+		require.NoError(t, err)
+
+		foundPvc := &corev1.PersistentVolumeClaim{}
+		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: explicitMMName, Namespace: mmNamespace}, foundPvc)
+		require.NoError(t, err)
+		require.NotNil(t, foundPvc)
+
+		// Verify that explicit access modes are used
+		expectedAccessModes := []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce, corev1.ReadOnlyMany}
+		assert.ElementsMatch(t, expectedAccessModes, foundPvc.Spec.AccessModes)
+	})
+
+	t.Run("backwards compatibility - preserve existing ReadWriteOnce", func(t *testing.T) {
+		// The original PVC from the first test should still have ReadWriteMany (since it was created as new)
+		// But let's test backwards compatibility by getting the existing PVC and checking its access modes
+		foundPvc := &corev1.PersistentVolumeClaim{}
+		err := reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, foundPvc)
+		require.NoError(t, err)
+		require.NotNil(t, foundPvc)
+
+		// Save the current access modes
+		originalAccessModes := foundPvc.Spec.AccessModes
+
+		// Run checkLocalFileStore again without specifying AccessModes
+		mm.Spec.FileStore.Local.AccessModes = nil
+		_, err = reconciler.checkLocalFileStore(mm, logger)
+		require.NoError(t, err)
+
+		// Get the PVC again and verify access modes were preserved
+		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, foundPvc)
+		require.NoError(t, err)
+
+		// Should preserve the original access modes for backwards compatibility
+		assert.Equal(t, originalAccessModes, foundPvc.Spec.AccessModes)
+	})
+
+	t.Run("error when trying to change existing PVC access modes", func(t *testing.T) {
+		// Get current PVC to check its access modes
+		foundPvc := &corev1.PersistentVolumeClaim{}
+		err := reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, foundPvc)
+		require.NoError(t, err)
+
+		// Try to specify different access modes - should return an error
+		originalAccessModes := foundPvc.Spec.AccessModes
+		var differentAccessModes []corev1.PersistentVolumeAccessMode
+		if len(originalAccessModes) > 0 && originalAccessModes[0] == corev1.ReadWriteMany {
+			differentAccessModes = []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}
+		} else {
+			differentAccessModes = []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany}
+		}
+
+		mm.Spec.FileStore.Local.AccessModes = differentAccessModes
+		_, err = reconciler.checkLocalFileStore(mm, logger)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot change PVC access modes")
+	})
 }
 
 func TestSpecialCases(t *testing.T) {

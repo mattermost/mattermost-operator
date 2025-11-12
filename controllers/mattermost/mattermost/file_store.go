@@ -3,6 +3,7 @@ package mattermost
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	mattermostMinio "github.com/mattermost/mattermost-operator/pkg/components/minio"
 	minioOperator "github.com/minio/minio-operator/pkg/apis/miniocontroller/v1beta1"
@@ -93,6 +94,15 @@ func (r *MattermostReconciler) checkLocalFileStore(mattermost *mmv1beta.Mattermo
 	if mattermost.Spec.FileStore.Local.StorageSize != "" {
 		storageSize = mattermost.Spec.FileStore.Local.StorageSize
 	}
+
+	// Check if PVC already exists to handle backwards compatibility
+	current := &corev1.PersistentVolumeClaim{}
+	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: mattermost.Name, Namespace: mattermost.Namespace}, current)
+	pvcExists := err == nil
+
+	// Determine access modes based on configuration and backwards compatibility
+	accessModes := r.determineAccessModes(mattermost, current, pvcExists, reqLogger)
+
 	pvc := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      mattermost.Name,
@@ -100,9 +110,7 @@ func (r *MattermostReconciler) checkLocalFileStore(mattermost *mmv1beta.Mattermo
 			Labels:    mattermost.MattermostLabels(mattermost.Name),
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{
-			AccessModes: []corev1.PersistentVolumeAccessMode{
-				"ReadWriteOnce",
-			},
+			AccessModes: accessModes,
 			Resources: corev1.VolumeResourceRequirements{
 				Requests: corev1.ResourceList{
 					corev1.ResourceStorage: resource.MustParse(storageSize),
@@ -112,28 +120,69 @@ func (r *MattermostReconciler) checkLocalFileStore(mattermost *mmv1beta.Mattermo
 	}
 
 	// Create PVC if it doesn't exist
-	err := r.Resources.CreatePvcIfNotExists(mattermost, pvc, reqLogger)
-	if err != nil {
-		reqLogger.Error(err, "failed to create PVC for local storage")
-		return nil, err
-	}
+	if !pvcExists {
+		err = r.Resources.CreatePvcIfNotExists(mattermost, pvc, reqLogger)
+		if err != nil {
+			reqLogger.Error(err, "failed to create PVC for local storage")
+			return nil, err
+		}
 
-	// Get existing PVC to ensure it now exists
-	current := &corev1.PersistentVolumeClaim{}
-	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: pvc.Name, Namespace: pvc.Namespace}, current)
-	if err != nil {
-		reqLogger.Error(err, "failed to get existing PVC for local storage")
-		return nil, err
-	}
+		// Get the newly created PVC
+		err = r.Client.Get(context.TODO(), types.NamespacedName{Name: pvc.Name, Namespace: pvc.Namespace}, current)
+		if err != nil {
+			reqLogger.Error(err, "failed to get existing PVC for local storage")
+			return nil, err
+		}
+	} else {
+		// Check if user is trying to change access modes - this is not supported
+		if len(mattermost.Spec.FileStore.Local.AccessModes) > 0 && !r.accessModesEqual(current.Spec.AccessModes, accessModes) {
+			return nil, fmt.Errorf("cannot change PVC access modes from %v to %v as this requires PVC recreation which may cause data loss. Please manually migrate data and recreate the PVC with a different name if you need to change access modes",
+				current.Spec.AccessModes, accessModes)
+		}
 
-	// Update PVC to ensure we match the current spec
-	err = r.Resources.Update(current, pvc, reqLogger)
-	if err != nil {
-		reqLogger.Error(err, "failed to update PVC for local storage")
-		return nil, err
+		// Update PVC to ensure we match the current spec (e.g., storage size changes)
+		err = r.Resources.Update(current, pvc, reqLogger)
+		if err != nil {
+			reqLogger.Error(err, "failed to update PVC for local storage")
+			return nil, err
+		}
 	}
 
 	return mattermostApp.NewLocalFileStoreInfo(), nil
+}
+
+// determineAccessModes determines the appropriate access modes for the PVC based on configuration and backwards compatibility
+func (r *MattermostReconciler) determineAccessModes(mattermost *mmv1beta.Mattermost, currentPVC *corev1.PersistentVolumeClaim, pvcExists bool, reqLogger logr.Logger) []corev1.PersistentVolumeAccessMode {
+	// If user explicitly specified access modes, use them
+	if len(mattermost.Spec.FileStore.Local.AccessModes) > 0 {
+		return mattermost.Spec.FileStore.Local.AccessModes
+	}
+
+	// For backwards compatibility: if PVC already exists, preserve its current access modes
+	if pvcExists {
+		reqLogger.Info("WARNING: Preserving existing PVC access modes for backwards compatibility. Please manually migrate your storage to ReadWriteMany (RWM) for optimal performance and multi-pod support", "accessModes", currentPVC.Spec.AccessModes)
+		return currentPVC.Spec.AccessModes
+	}
+
+	// For new installations, default to ReadWriteMany
+	reqLogger.Info("Using default access mode ReadWriteMany for new PVC")
+	return []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany}
+}
+
+// accessModesEqual compares two slices of access modes for equality
+func (r *MattermostReconciler) accessModesEqual(a, b []corev1.PersistentVolumeAccessMode) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	// Check if every element in 'a' exists in 'b'
+	for _, mode := range a {
+		if !slices.Contains(b, mode) {
+			return false
+		}
+	}
+
+	return true
 }
 
 func (r *MattermostReconciler) checkOperatorManagedMinio(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) (mattermostApp.FileStoreConfig, error) {
