@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: cd/checkout-repo
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
         with:
           fetch-depth: 0
 
@@ -43,7 +43,7 @@ jobs:
     steps:
       - name: cd/checkout-repo
         if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
         with:
           fetch-depth: 0
 
@@ -77,13 +77,13 @@ jobs:
     needs: [build, build-fips]
     steps:
       - name: cd/checkout-repo
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
         with:
           fetch-depth: 0
 
       - name: security/anchore-scan
         id: anchore-operator
-        uses: mattermost/actions/delivery/anchore-scan@003fac68730de6e3e2dc31939e7f2c460f2a8ba0
+        uses: mattermost/actions/delivery/anchore-scan@0c9abef1aec10e633f677d19e461af4d76503741
         with:
           image_name: mattermost/mattermost-operator:${{ github.ref_name }}
           dockerfile_path: ./Dockerfile
@@ -96,7 +96,7 @@ jobs:
 
       - name: security/anchore-scan-fips
         id: anchore-operator-fips
-        uses: mattermost/actions/delivery/anchore-scan@003fac68730de6e3e2dc31939e7f2c460f2a8ba0
+        uses: mattermost/actions/delivery/anchore-scan@0c9abef1aec10e633f677d19e461af4d76503741
         with:
           image_name: mattermost/mattermost-operator-fips:${{ github.ref_name }}
           dockerfile_path: ./Dockerfile.fips
