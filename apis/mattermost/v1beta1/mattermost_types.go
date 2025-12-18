@@ -457,6 +457,10 @@ type LocalFileStore struct {
 	// +optional
 	// +kubebuilder:validation:Pattern=^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$
 	StorageSize string `json:"storageSize,omitempty"`
+	// Defines the access modes for the PVC. If not specified, defaults to ReadWriteMany for new installations.
+	// For backwards compatibility, existing PVCs with ReadWriteOnce will be preserved until explicitly changed.
+	// +optional
+	AccessModes []v1.PersistentVolumeAccessMode `json:"accessModes,omitempty"`
 }
 
 // ElasticSearch defines the ElasticSearch configuration for Mattermost.

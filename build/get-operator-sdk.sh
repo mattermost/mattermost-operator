@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -xe
 
 BASE_URL="https://github.com/operator-framework/operator-sdk/releases/download"
 
@@ -25,7 +25,21 @@ URL="$BASE_URL/$VERSION/operator-sdk-$VERSION-$(uname -m)-linux-gnu"
 
 if [[ "$OSTYPE" == "darwin"* ]]
 then
-	URL="${URL%-linux-gnu}-apple-darwin"
+	ARCH=$(uname -m)
+	# For darwin arm64 and versions < v1.23.0, use x86_64 since arm64 binaries don't exist
+	if [[ "$ARCH" == "arm64" ]]; then
+		# Compare version with v1.23.0 (remove 'v' prefix if present)
+		VERSION_NUM="${VERSION#v}"
+		if printf '%s\n%s\n' "1.23.0" "$VERSION_NUM" | sort -V | head -n1 | grep -q "1.23.0"; then
+			# Version is >= 1.23.0, keep arm64
+			URL="$BASE_URL/$VERSION/operator-sdk-$VERSION-arm64-apple-darwin"
+		else
+			# Version is < 1.23.0, use x86_64
+			URL="$BASE_URL/$VERSION/operator-sdk-$VERSION-x86_64-apple-darwin"
+		fi
+	else
+		URL="${URL%-linux-gnu}-apple-darwin"
+	fi
 fi
 
 # Fetch the binary
