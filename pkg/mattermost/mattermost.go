@@ -381,8 +381,9 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbIn
 					Annotations: podAnnotations,
 				},
 				Spec: corev1.PodSpec{
-					ServiceAccountName: serviceAccountName,
-					InitContainers:     initContainers,
+					ServiceAccountName:                 serviceAccountName,
+					TerminationGracePeriodSeconds:      mattermost.Spec.PodTerminationGracePeriodSeconds,
+					InitContainers:                     initContainers,
 					Containers: []corev1.Container{
 						{
 							Name:                     mattermostv1alpha1.MattermostAppContainerName,
@@ -407,9 +408,9 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbIn
 							Resources:      mattermost.Spec.Resources,
 						},
 					},
-					Volumes:      volumeLicense,
-					Affinity:     mattermost.Spec.Affinity,
-					NodeSelector: mattermost.Spec.NodeSelector,
+					Volumes:                        volumeLicense,
+					Affinity:                       mattermost.Spec.Affinity,
+					NodeSelector:                   mattermost.Spec.NodeSelector,
 				},
 			},
 		},
@@ -486,6 +487,12 @@ func ClusterInstallationOwnerReference(mattermost *mattermostv1alpha1.ClusterIns
 // newService returns semi-finished service with common parts filled.
 // Returned service is expected to be completed by the caller.
 func newService(mattermost *mattermostv1alpha1.ClusterInstallation, serviceName, selectorName string, annotations map[string]string) *corev1.Service {
+	// Default to false if not specified
+	publishNotReady := false
+	if mattermost.Spec.PublishNotReadyAddresses != nil {
+		publishNotReady = *mattermost.Spec.PublishNotReadyAddresses
+	}
+
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:    mattermost.ClusterInstallationLabels(serviceName),
@@ -502,7 +509,7 @@ func newService(mattermost *mattermostv1alpha1.ClusterInstallation, serviceName,
 		},
 		Spec: corev1.ServiceSpec{
 			Selector:                 mattermostv1alpha1.ClusterInstallationSelectorLabels(selectorName),
-			PublishNotReadyAddresses: true,
+			PublishNotReadyAddresses: publishNotReady,
 		},
 	}
 }
