@@ -381,9 +381,9 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbIn
 					Annotations: podAnnotations,
 				},
 				Spec: corev1.PodSpec{
-					ServiceAccountName:                 serviceAccountName,
-					TerminationGracePeriodSeconds:      mattermost.Spec.PodTerminationGracePeriodSeconds,
-					InitContainers:                     initContainers,
+					ServiceAccountName:            serviceAccountName,
+					TerminationGracePeriodSeconds: mattermost.Spec.PodTerminationGracePeriodSeconds,
+					InitContainers:                initContainers,
 					Containers: []corev1.Container{
 						{
 							Name:                     mattermostv1alpha1.MattermostAppContainerName,
@@ -408,9 +408,9 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbIn
 							Resources:      mattermost.Spec.Resources,
 						},
 					},
-					Volumes:                        volumeLicense,
-					Affinity:                       mattermost.Spec.Affinity,
-					NodeSelector:                   mattermost.Spec.NodeSelector,
+					Volumes:      volumeLicense,
+					Affinity:     mattermost.Spec.Affinity,
+					NodeSelector: mattermost.Spec.NodeSelector,
 				},
 			},
 		},
