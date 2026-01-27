@@ -129,12 +129,14 @@ jobs:
           version: v0.7.1
 
       - name: ci/docker-login
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: ci/docker-push
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         env:
           OPERATOR_IMAGE_TAG: ${{ env.SHORT_SHA }}
         run: make buildx-image
@@ -195,14 +197,14 @@ jobs:
           version: v0.7.1
 
       - name: ci/docker-login
-        if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
+        if: ${{ env.ENABLE_FIPS_BUILDS == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
         uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: ci/docker-push-fips
-        if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
+        if: ${{ env.ENABLE_FIPS_BUILDS == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
         env:
           OPERATOR_IMAGE_TAG_FIPS: ${{ env.SHORT_SHA }}
         run: make buildx-image-fips
