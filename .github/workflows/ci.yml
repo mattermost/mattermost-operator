@@ -19,12 +19,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: ci/checkout-repo
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
 
       - name: ci/setup-go
-        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
         with:
           go-version-file: go.mod
           cache: true
@@ -39,13 +39,13 @@ jobs:
     runs-on: ubuntu-latest-8-cores
     steps:
       - name: ci/checkout-repo
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
           path: src/github.com/mattermost/mattermost-operator
 
       - name: ci/setup-go
-        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
         with:
           go-version-file: src/github.com/mattermost/mattermost-operator/go.mod
           cache-dependency-path: src/github.com/mattermost/mattermost-operator/go.sum
@@ -94,7 +94,7 @@ jobs:
     needs: [lint, test]
     steps:
       - name: ci/checkout-repo
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
 
@@ -105,7 +105,7 @@ jobs:
         run: make build-image
 
       - name: ci/scan-docker-security
-        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # v0.33.1
+        uses: aquasecurity/trivy-action@c1824fd6edce30d7ab345a9989de00bbd46ef284 # v0.34.0
         continue-on-error: true
         with:
           image-ref: "mattermost/mattermost-operator:test"
@@ -119,18 +119,18 @@ jobs:
 
       - name: ci/create-trivy-results-report
         # if: failure()
-        uses: github/codeql-action/upload-sarif@64d10c13136e1c5bce3e5fbde8d4906eeaafc885 # v3.29.5
+        uses: github/codeql-action/upload-sarif@9e907b5e64f6b83e7804b09294d44122997950d6 # v3.29.5
         with:
           sarif_file: "trivy-results.sarif"
 
       - name: ci/setup-buildx
-        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
         with:
           version: v0.19.3
 
       - name: ci/docker-login
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -152,7 +152,7 @@ jobs:
     steps:
       - name: ci/checkout-repo
         if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
 
@@ -162,7 +162,7 @@ jobs:
 
       - name: ci/setup-chainctl
         if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
-        uses: chainguard-dev/setup-chainctl@v0.4.0
+        uses: chainguard-dev/setup-chainctl@v0.5.0
         with:
           identity: ee399b4c72dd4e58e3d617f78fc47b74733c9557/0439801bd43520ae
 
@@ -172,7 +172,7 @@ jobs:
 
       - name: ci/scan-docker-security-fips
         if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
-        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # v0.33.1
+        uses: aquasecurity/trivy-action@c1824fd6edce30d7ab345a9989de00bbd46ef284 # v0.34.0
         continue-on-error: true
         with:
           image-ref: "mattermost/mattermost-operator-fips:test"
@@ -186,19 +186,19 @@ jobs:
 
       - name: ci/create-trivy-results-report-fips
         if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
-        uses: github/codeql-action/upload-sarif@64d10c13136e1c5bce3e5fbde8d4906eeaafc885 # v3.29.5
+        uses: github/codeql-action/upload-sarif@9e907b5e64f6b83e7804b09294d44122997950d6 # v3.29.5
         with:
           sarif_file: "trivy-results-fips.sarif"
 
       - name: ci/setup-buildx
         if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
-        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
         with:
           version: v0.19.3
 
       - name: ci/docker-login
         if: ${{ env.ENABLE_FIPS_BUILDS == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
-        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
