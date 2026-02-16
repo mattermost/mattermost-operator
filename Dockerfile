@@ -1,5 +1,5 @@
 # Build the mattermost operator
-ARG BUILD_IMAGE=golang:1.24
+ARG BUILD_IMAGE=mattermost/golang-bullseye:1.24.13@sha256:d9d9a35369413840836f677db08beb0aec784a966fe2a1ba1e60dc9baa64e881
 ARG BASE_IMAGE=gcr.io/distroless/static:nonroot
 
 FROM ${BUILD_IMAGE} as builder
