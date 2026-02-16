@@ -22,7 +22,7 @@ jobs:
       - name: cd/setup-buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
         with:
-          version: v0.7.1
+          version: v0.19.3
 
       - name: cd/docker-login
         uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
@@ -51,7 +51,7 @@ jobs:
         if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
         with:
-          version: v0.7.1
+          version: v0.19.3
 
       - name: cd/setup-chainctl
         if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
