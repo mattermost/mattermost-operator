@@ -85,7 +85,7 @@ KIND_CONFIG_FILE ?= kind-config-amd64.yaml
 TOOLS_BIN_DIR := $(abspath bin)
 
 SHADOW_BIN := shadow
-SHADOW_VER := master
+SHADOW_VER := v0.33.0
 SHADOW_GEN := $(TOOLS_BIN_DIR)/$(SHADOW_BIN)
 
 OPENAPI_VER := release-1.22

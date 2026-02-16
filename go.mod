@@ -1,6 +1,6 @@
 module github.com/mattermost/mattermost-operator
 
-go 1.24.7
+go 1.24.13
 
 
 require (

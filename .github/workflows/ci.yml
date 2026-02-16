@@ -126,7 +126,7 @@ jobs:
       - name: ci/setup-buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
         with:
-          version: v0.7.1
+          version: v0.19.3
 
       - name: ci/docker-login
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
@@ -194,7 +194,7 @@ jobs:
         if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
         with:
-          version: v0.7.1
+          version: v0.19.3
 
       - name: ci/docker-login
         if: ${{ env.ENABLE_FIPS_BUILDS == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}

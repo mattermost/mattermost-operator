@@ -1,5 +1,5 @@
 # Build the mattermost operator (FIPS version)
-ARG BUILD_IMAGE=cgr.dev/mattermost.com/go-msft-fips:1.24
+ARG BUILD_IMAGE=cgr.dev/mattermost.com/go-msft-fips:1.24.13@sha256:4ddb471a06569e7df7ced9c349ea41dd5aeb393a52bbfe1efb7c6bc88fe7e4ff
 ARG BASE_IMAGE=cgr.dev/mattermost.com/glibc-openssl-fips:15.1
 
 FROM ${BUILD_IMAGE} as builder
