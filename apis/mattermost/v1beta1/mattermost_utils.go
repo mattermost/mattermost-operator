@@ -73,6 +73,25 @@ func (mm *Mattermost) SetDefaults() error {
 	mm.Spec.FileStore.SetDefaults()
 	mm.Spec.Database.SetDefaults()
 
+	if err := validateVolumes(mm.Spec.Volumes); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// validateVolumes checks that no dangerous volume types are specified.
+// Only known-safe volume sources are permitted: ConfigMap, Secret, EmptyDir,
+// PersistentVolumeClaim, Projected, DownwardAPI, and CSI.
+// HostPath volumes are explicitly rejected as they allow mounting arbitrary
+// host filesystem paths into pods.
+func validateVolumes(volumes []corev1.Volume) error {
+	for _, vol := range volumes {
+		if vol.VolumeSource.HostPath != nil {
+			return fmt.Errorf("volume %q uses HostPath source which is not allowed: "+
+				"HostPath volumes can expose the host filesystem and are a security risk", vol.Name)
+		}
+	}
 	return nil
 }
 
@@ -217,6 +236,40 @@ func (mm *Mattermost) GetImageName() string {
 		return fmt.Sprintf("%s@%s", mm.Spec.Image, mm.Spec.Version)
 	}
 	return fmt.Sprintf("%s:%s", mm.Spec.Image, mm.Spec.Version)
+}
+
+// mutableImageTags is the set of well-known mutable tags that should be avoided
+// for reproducible deployments.
+var mutableImageTags = map[string]bool{
+	"latest":  true,
+	"master":  true,
+	"main":    true,
+	"nightly": true,
+	"edge":    true,
+}
+
+// ImageTagWarnings returns a list of warnings about the image reference
+// configuration. It warns when mutable tags are used and recommends
+// digest-pinned references for supply-chain safety.
+// The GetImageName() method already supports digest format (image@sha256:...)
+// which is the recommended approach for production deployments.
+func (mm *Mattermost) ImageTagWarnings() []string {
+	var warnings []string
+
+	version := mm.Spec.Version
+	if version == "" {
+		version = DefaultMattermostVersion
+	}
+
+	// Check for well-known mutable tags
+	if mutableImageTags[strings.ToLower(version)] {
+		warnings = append(warnings, fmt.Sprintf(
+			"image version %q is a mutable tag; consider using a digest reference (image@sha256:...) for reproducible deployments",
+			version,
+		))
+	}
+
+	return warnings
 }
 
 // GetProductionDeploymentName returns the name of the deployment that is

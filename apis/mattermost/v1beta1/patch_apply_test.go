@@ -88,7 +88,7 @@ func TestResourcePatch_ApplyToDeployment(t *testing.T) {
 									Image: "my-image-2",
 								},
 							},
-							ServiceAccountName: "newSA",
+							ServiceAccountName: "initialSA",
 						},
 					},
 				},
@@ -366,6 +366,154 @@ func TestPatch(t *testing.T) {
 		assert.Equal(t, obj1.Spec.Type, obj2.Spec.Type)
 		assert.Equal(t, &obj1, &obj2)
 	})
+}
+
+func TestValidateDeploymentPatch_ForbiddenPaths(t *testing.T) {
+	deploy := &appsv1.Deployment{
+		Spec: appsv1.DeploymentSpec{
+			Replicas: int32Ptr(1),
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: "app", Image: "img"},
+					},
+				},
+			},
+		},
+	}
+
+	forbiddenPatches := []struct {
+		description string
+		patch       string
+	}{
+		{
+			description: "hostNetwork",
+			patch:       `[{"op":"add","path":"/spec/template/spec/hostNetwork","value":true}]`,
+		},
+		{
+			description: "hostPID",
+			patch:       `[{"op":"add","path":"/spec/template/spec/hostPID","value":true}]`,
+		},
+		{
+			description: "hostIPC",
+			patch:       `[{"op":"add","path":"/spec/template/spec/hostIPC","value":true}]`,
+		},
+		{
+			description: "privileged securityContext",
+			patch:       `[{"op":"add","path":"/spec/template/spec/containers/0/securityContext/privileged","value":true}]`,
+		},
+		{
+			description: "allowPrivilegeEscalation",
+			patch:       `[{"op":"add","path":"/spec/template/spec/containers/0/securityContext/allowPrivilegeEscalation","value":true}]`,
+		},
+		{
+			description: "capabilities",
+			patch:       `[{"op":"add","path":"/spec/template/spec/containers/0/securityContext/capabilities","value":{"add":["SYS_ADMIN"]}}]`,
+		},
+		{
+			description: "volumes",
+			patch:       `[{"op":"add","path":"/spec/template/spec/volumes","value":[{"name":"host","hostPath":{"path":"/"}}]}]`,
+		},
+		{
+			description: "volumes subpath",
+			patch:       `[{"op":"add","path":"/spec/template/spec/volumes/0","value":{"name":"host","hostPath":{"path":"/"}}}]`,
+		},
+		{
+			description: "serviceAccountName",
+			patch:       `[{"op":"replace","path":"/spec/template/spec/serviceAccountName","value":"cluster-admin"}]`,
+		},
+		{
+			description: "serviceAccount (legacy)",
+			patch:       `[{"op":"replace","path":"/spec/template/spec/serviceAccount","value":"cluster-admin"}]`,
+		},
+		{
+			description: "nodeSelector",
+			patch:       `[{"op":"add","path":"/spec/template/spec/nodeSelector","value":{"target":"master"}}]`,
+		},
+		{
+			description: "nodeName",
+			patch:       `[{"op":"add","path":"/spec/template/spec/nodeName","value":"master-0"}]`,
+		},
+		{
+			description: "initContainers",
+			patch:       `[{"op":"add","path":"/spec/template/spec/initContainers","value":[{"name":"evil","image":"evil"}]}]`,
+		},
+		{
+			description: "runAsUser in securityContext",
+			patch:       `[{"op":"add","path":"/spec/template/spec/containers/0/securityContext/runAsUser","value":0}]`,
+		},
+	}
+
+	for _, tc := range forbiddenPatches {
+		t.Run("should block "+tc.description, func(t *testing.T) {
+			resPatch := ResourcePatch{
+				Deployment: &Patch{Patch: tc.patch},
+			}
+			_, applied, err := resPatch.ApplyToDeployment(deploy)
+			require.Error(t, err)
+			assert.False(t, applied)
+			assert.Contains(t, err.Error(), "forbidden path")
+		})
+	}
+
+	deployWithLabels := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{"existing": "val"},
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: int32Ptr(1),
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: "app", Image: "img"},
+					},
+				},
+			},
+		},
+	}
+
+	allowedPatches := []struct {
+		description string
+		patch       string
+		deploy      *appsv1.Deployment
+	}{
+		{
+			description: "labels",
+			patch:       `[{"op":"add","path":"/metadata/labels/foo","value":"bar"}]`,
+			deploy:      deployWithLabels,
+		},
+		{
+			description: "annotations",
+			patch:       `[{"op":"add","path":"/metadata/annotations","value":{"key":"val"}}]`,
+			deploy:      deploy,
+		},
+		{
+			description: "container image",
+			patch:       `[{"op":"replace","path":"/spec/template/spec/containers/0/image","value":"new-img"}]`,
+			deploy:      deploy,
+		},
+		{
+			description: "container env",
+			patch:       `[{"op":"add","path":"/spec/template/spec/containers/0/env","value":[{"name":"FOO","value":"bar"}]}]`,
+			deploy:      deploy,
+		},
+		{
+			description: "replicas",
+			patch:       `[{"op":"replace","path":"/spec/replicas","value":3}]`,
+			deploy:      deploy,
+		},
+	}
+
+	for _, tc := range allowedPatches {
+		t.Run("should allow "+tc.description, func(t *testing.T) {
+			resPatch := ResourcePatch{
+				Deployment: &Patch{Patch: tc.patch},
+			}
+			_, applied, err := resPatch.ApplyToDeployment(tc.deploy)
+			require.NoError(t, err)
+			assert.True(t, applied)
+		})
+	}
 }
 
 func loadFile(t *testing.T, path string) string {

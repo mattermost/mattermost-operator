@@ -3,6 +3,7 @@ package mattermost
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	pkgUtils "github.com/mattermost/mattermost-operator/pkg/utils"
@@ -22,6 +23,26 @@ import (
 const (
 	ingressClassAnnotation = "kubernetes.io/ingress.class"
 )
+
+// sanitizeIngressAnnotations filters out annotations that could allow arbitrary
+// nginx/ingress controller config injection via snippet directives.
+func sanitizeIngressAnnotations(annotations map[string]string) map[string]string {
+	if annotations == nil {
+		return nil
+	}
+	safe := make(map[string]string, len(annotations))
+	for k, v := range annotations {
+		lower := strings.ToLower(k)
+		if strings.Contains(lower, "snippet") {
+			continue
+		}
+		if strings.ContainsAny(v, "\r\n") {
+			continue
+		}
+		safe[k] = v
+	}
+	return safe
+}
 
 type DatabaseConfig interface {
 	EnvVars(mattermost *mmv1beta.Mattermost) []corev1.EnvVar
@@ -128,7 +149,7 @@ func GenerateIngressV1Beta(mattermost *mmv1beta.Mattermost) *networkingv1.Ingres
 		ingressAnnotations[ingressClassAnnotation] = "nginx"
 	}
 
-	for k, v := range mattermost.GetIngresAnnotations() {
+	for k, v := range sanitizeIngressAnnotations(mattermost.GetIngresAnnotations()) {
 		ingressAnnotations[k] = v
 	}
 
@@ -196,7 +217,7 @@ func GenerateALBIngressV1Beta(mattermost *mmv1beta.Mattermost) *networkingv1.Ing
 		ingressAnnotations["alb.ingress.kubernetes.io/listen-ports"] = `[{"HTTP": 8065}]`
 	}
 
-	for k, v := range mattermost.GetAWSLoadBalancerIngressAnnotations() {
+	for k, v := range sanitizeIngressAnnotations(mattermost.GetAWSLoadBalancerIngressAnnotations()) {
 		ingressAnnotations[k] = v
 	}
 

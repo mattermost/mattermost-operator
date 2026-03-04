@@ -2,6 +2,10 @@ package mattermost
 
 import (
 	"errors"
+	"fmt"
+	"net"
+	"net/url"
+	"strings"
 
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	"github.com/mattermost/mattermost-operator/pkg/database"
@@ -40,7 +44,10 @@ func NewExternalDBConfig(mattermost *mmv1beta.Mattermost, secret corev1.Secret) 
 	if _, ok := secret.Data["MM_SQLSETTINGS_DATASOURCEREPLICAS"]; ok {
 		externalDB.hasReaderEndpoints = true
 	}
-	if _, ok := secret.Data["DB_CONNECTION_CHECK_URL"]; ok {
+	if checkURL, ok := secret.Data["DB_CONNECTION_CHECK_URL"]; ok {
+		if err := validateDBCheckURL(string(checkURL)); err != nil {
+			return nil, fmt.Errorf("invalid DB_CONNECTION_CHECK_URL: %w", err)
+		}
 		externalDB.hasDBCheckURL = true
 	}
 	if _, ok := secret.Data["MM_SQLSETTINGS_DATASOURCE"]; ok {
@@ -115,7 +122,7 @@ func getDBCheckInitContainer(secretName, dbType string) *corev1.Container {
 			Env:             envVars,
 			Command: []string{
 				"sh", "-c",
-				"until curl --max-time 5 $DB_CONNECTION_CHECK_URL; do echo waiting for database; sleep 5; done;",
+				`until curl --max-time 5 "$DB_CONNECTION_CHECK_URL"; do echo waiting for database; sleep 5; done;`,
 			},
 		}
 	case database.PostgreSQLDatabase:
@@ -126,8 +133,65 @@ func getDBCheckInitContainer(secretName, dbType string) *corev1.Container {
 			Env:             envVars,
 			Command: []string{
 				"sh", "-c",
-				"until pg_isready --dbname=\"$DB_CONNECTION_CHECK_URL\"; do echo waiting for database; sleep 5; done;",
+				`until pg_isready --dbname="$DB_CONNECTION_CHECK_URL"; do echo waiting for database; sleep 5; done;`,
 			},
+		}
+	}
+
+	return nil
+}
+
+// allowedDBCheckSchemes defines the URL schemes permitted for database connection check URLs.
+var allowedDBCheckSchemes = map[string]bool{
+	"http":     true,
+	"https":    true,
+	"mysql":    true,
+	"postgres": true,
+}
+
+// metadataIPBlocks contains IP ranges commonly used for cloud metadata services.
+var metadataIPBlocks []*net.IPNet
+
+func init() {
+	for _, cidr := range []string{
+		"169.254.169.254/32", // AWS, GCP, Azure metadata
+		"100.100.100.200/32", // Alibaba metadata
+		"fd00:ec2::254/128",  // AWS IPv6 metadata
+	} {
+		_, block, _ := net.ParseCIDR(cidr)
+		metadataIPBlocks = append(metadataIPBlocks, block)
+	}
+}
+
+// validateDBCheckURL validates that a DB connection check URL uses an allowed
+// scheme and does not target cloud metadata endpoints.
+func validateDBCheckURL(rawURL string) error {
+	rawURL = strings.TrimSpace(rawURL)
+	if rawURL == "" {
+		return errors.New("URL is empty")
+	}
+
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return fmt.Errorf("failed to parse URL: %w", err)
+	}
+
+	scheme := strings.ToLower(parsed.Scheme)
+	if !allowedDBCheckSchemes[scheme] {
+		return fmt.Errorf("scheme %q is not allowed; permitted schemes: http, https, mysql, postgres", scheme)
+	}
+
+	hostname := parsed.Hostname()
+	if hostname == "" {
+		return errors.New("URL must contain a hostname")
+	}
+
+	// Check if the hostname resolves to a metadata IP.
+	if ip := net.ParseIP(hostname); ip != nil {
+		for _, block := range metadataIPBlocks {
+			if block.Contains(ip) {
+				return fmt.Errorf("URL targets a blocked metadata IP range: %s", hostname)
+			}
 		}
 	}
 

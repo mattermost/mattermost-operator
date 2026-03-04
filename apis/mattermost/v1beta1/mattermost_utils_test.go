@@ -6,6 +6,7 @@ import (
 	pkgUtils "github.com/mattermost/mattermost-operator/pkg/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	v1 "k8s.io/api/core/v1"
 )
 
 func TestMattermost_SetDefaults(t *testing.T) {
@@ -63,6 +64,121 @@ func TestMattermost_SetDefaults(t *testing.T) {
 		})
 	})
 
+}
+
+func TestValidateVolumes(t *testing.T) {
+	baseSpec := func() MattermostSpec {
+		return MattermostSpec{
+			Ingress: &Ingress{Enabled: false},
+		}
+	}
+
+	t.Run("allow safe volume types", func(t *testing.T) {
+		mm := &Mattermost{Spec: baseSpec()}
+		mm.Spec.Volumes = []v1.Volume{
+			{Name: "config", VolumeSource: v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: "my-config"}}}},
+			{Name: "secret", VolumeSource: v1.VolumeSource{Secret: &v1.SecretVolumeSource{SecretName: "my-secret"}}},
+			{Name: "tmp", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}},
+			{Name: "data", VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: "my-pvc"}}},
+		}
+		err := mm.SetDefaults()
+		require.NoError(t, err)
+	})
+
+	t.Run("reject HostPath volume", func(t *testing.T) {
+		mm := &Mattermost{Spec: baseSpec()}
+		mm.Spec.Volumes = []v1.Volume{
+			{Name: "host-mount", VolumeSource: v1.VolumeSource{HostPath: &v1.HostPathVolumeSource{Path: "/etc"}}},
+		}
+		err := mm.SetDefaults()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "HostPath")
+		assert.Contains(t, err.Error(), "host-mount")
+	})
+
+	t.Run("reject HostPath mixed with safe volumes", func(t *testing.T) {
+		mm := &Mattermost{Spec: baseSpec()}
+		mm.Spec.Volumes = []v1.Volume{
+			{Name: "config", VolumeSource: v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: "my-config"}}}},
+			{Name: "bad-vol", VolumeSource: v1.VolumeSource{HostPath: &v1.HostPathVolumeSource{Path: "/var/run/docker.sock"}}},
+		}
+		err := mm.SetDefaults()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "bad-vol")
+	})
+
+	t.Run("allow empty volumes list", func(t *testing.T) {
+		mm := &Mattermost{Spec: baseSpec()}
+		err := mm.SetDefaults()
+		require.NoError(t, err)
+	})
+}
+
+func TestMattermost_ImageTagWarnings(t *testing.T) {
+	for _, tc := range []struct {
+		description    string
+		version        string
+		expectWarnings bool
+	}{
+		{
+			description:    "no warning for specific version tag",
+			version:        "10.8.1",
+			expectWarnings: false,
+		},
+		{
+			description:    "no warning for digest reference",
+			version:        "sha256:dd15a51ac7dafd213744d1ef23394e7532f71a90f477c969b94600e46da5a0cf",
+			expectWarnings: false,
+		},
+		{
+			description:    "warn for latest tag",
+			version:        "latest",
+			expectWarnings: true,
+		},
+		{
+			description:    "warn for Latest tag (case insensitive)",
+			version:        "Latest",
+			expectWarnings: true,
+		},
+		{
+			description:    "warn for master tag",
+			version:        "master",
+			expectWarnings: true,
+		},
+		{
+			description:    "warn for main tag",
+			version:        "main",
+			expectWarnings: true,
+		},
+		{
+			description:    "warn for nightly tag",
+			version:        "nightly",
+			expectWarnings: true,
+		},
+		{
+			description:    "warn for edge tag",
+			version:        "edge",
+			expectWarnings: true,
+		},
+		{
+			description:    "no warning for empty version (uses default)",
+			version:        "",
+			expectWarnings: false,
+		},
+	} {
+		t.Run(tc.description, func(t *testing.T) {
+			mm := &Mattermost{Spec: MattermostSpec{
+				Version: tc.version,
+			}}
+			warnings := mm.ImageTagWarnings()
+			if tc.expectWarnings {
+				assert.NotEmpty(t, warnings)
+				assert.Contains(t, warnings[0], "mutable tag")
+			} else {
+				assert.Empty(t, warnings)
+			}
+		})
+	}
 }
 
 func TestMattermost_IngressAccessors(t *testing.T) {

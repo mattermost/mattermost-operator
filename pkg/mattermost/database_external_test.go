@@ -187,6 +187,104 @@ func TestExternalDBConfig_SeparateDatasourceKey(t *testing.T) {
 	})
 }
 
+func TestValidateDBCheckURL(t *testing.T) {
+	t.Run("valid URLs", func(t *testing.T) {
+		validURLs := []string{
+			"http://my-db:3306",
+			"https://my-db:3306",
+			"mysql://my-db:3306/mydb",
+			"postgres://my-db:5432/mydb",
+			"http://10.0.0.1:3306",
+		}
+		for _, u := range validURLs {
+			assert.NoError(t, validateDBCheckURL(u), "expected valid: %s", u)
+		}
+	})
+
+	t.Run("blocked schemes", func(t *testing.T) {
+		blockedURLs := []string{
+			"file:///etc/passwd",
+			"gopher://evil.com",
+			"ftp://my-db:21/file",
+			"javascript:alert(1)",
+		}
+		for _, u := range blockedURLs {
+			err := validateDBCheckURL(u)
+			assert.Error(t, err, "expected blocked: %s", u)
+			assert.Contains(t, err.Error(), "not allowed")
+		}
+	})
+
+	t.Run("blocked metadata IPs", func(t *testing.T) {
+		metadataURLs := []string{
+			"http://169.254.169.254/latest/meta-data",
+			"http://100.100.100.200/metadata",
+		}
+		for _, u := range metadataURLs {
+			err := validateDBCheckURL(u)
+			assert.Error(t, err, "expected blocked: %s", u)
+			assert.Contains(t, err.Error(), "blocked metadata")
+		}
+	})
+
+	t.Run("empty and invalid", func(t *testing.T) {
+		assert.Error(t, validateDBCheckURL(""))
+		assert.Error(t, validateDBCheckURL("://no-scheme"))
+	})
+}
+
+func TestNewExternalDBConfig_InvalidCheckURL(t *testing.T) {
+	mattermost := &mmv1beta.Mattermost{
+		ObjectMeta: metav1.ObjectMeta{Name: "mm-test"},
+		Spec: mmv1beta.MattermostSpec{
+			Database: mmv1beta.Database{
+				External: &mmv1beta.ExternalDatabase{Secret: "secret"},
+			},
+		},
+	}
+
+	t.Run("rejects metadata URL", func(t *testing.T) {
+		secret := corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: "secret"},
+			Data: map[string][]byte{
+				"DB_CONNECTION_STRING":    []byte("postgres://my-postgres"),
+				"DB_CONNECTION_CHECK_URL": []byte("http://169.254.169.254/latest/meta-data"),
+			},
+		}
+		_, err := NewExternalDBConfig(mattermost, secret)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid DB_CONNECTION_CHECK_URL")
+	})
+
+	t.Run("rejects disallowed scheme", func(t *testing.T) {
+		secret := corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: "secret"},
+			Data: map[string][]byte{
+				"DB_CONNECTION_STRING":    []byte("postgres://my-postgres"),
+				"DB_CONNECTION_CHECK_URL": []byte("file:///etc/passwd"),
+			},
+		}
+		_, err := NewExternalDBConfig(mattermost, secret)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid DB_CONNECTION_CHECK_URL")
+	})
+}
+
+func TestGetDBCheckInitContainer_QuotedURL(t *testing.T) {
+	t.Run("mysql container quotes URL variable", func(t *testing.T) {
+		container := getDBCheckInitContainer("secret", "mysql")
+		require.NotNil(t, container)
+		// Verify the command uses double-quoted variable to prevent shell injection
+		assert.Contains(t, container.Command[2], `"$DB_CONNECTION_CHECK_URL"`)
+	})
+
+	t.Run("postgres container quotes URL variable", func(t *testing.T) {
+		container := getDBCheckInitContainer("secret", "postgres")
+		require.NotNil(t, container)
+		assert.Contains(t, container.Command[2], `"$DB_CONNECTION_CHECK_URL"`)
+	})
+}
+
 // Helper function to find an environment variable by name
 func findEnvVar(envs []corev1.EnvVar, name string) *corev1.EnvVar {
 	for i := range envs {
