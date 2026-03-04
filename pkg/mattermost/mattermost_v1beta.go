@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/go-logr/logr"
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	pkgUtils "github.com/mattermost/mattermost-operator/pkg/utils"
 
@@ -26,7 +27,8 @@ const (
 
 // sanitizeIngressAnnotations filters out annotations that could allow arbitrary
 // nginx/ingress controller config injection via snippet directives.
-func sanitizeIngressAnnotations(annotations map[string]string) map[string]string {
+// Dropped keys are logged via logger when provided.
+func sanitizeIngressAnnotations(annotations map[string]string, logger logr.Logger) map[string]string {
 	if annotations == nil {
 		return nil
 	}
@@ -34,9 +36,11 @@ func sanitizeIngressAnnotations(annotations map[string]string) map[string]string
 	for k, v := range annotations {
 		lower := strings.ToLower(k)
 		if strings.Contains(lower, "snippet") {
+			logger.Info("dropped unsafe ingress annotation", "key", k, "reason", "contains snippet")
 			continue
 		}
 		if strings.ContainsAny(v, "\r\n") {
+			logger.Info("dropped unsafe ingress annotation", "key", k, "reason", "value contains newline")
 			continue
 		}
 		safe[k] = v
@@ -134,7 +138,7 @@ func configureMattermostServicePorts(service *corev1.Service) *corev1.Service {
 }
 
 // GenerateIngressV1Beta returns the ingress for the Mattermost app.
-func GenerateIngressV1Beta(mattermost *mmv1beta.Mattermost) *networkingv1.Ingress {
+func GenerateIngressV1Beta(mattermost *mmv1beta.Mattermost, logger logr.Logger) *networkingv1.Ingress {
 	ingressAnnotations := map[string]string{
 		"nginx.ingress.kubernetes.io/proxy-body-size": "1000M",
 	}
@@ -149,7 +153,7 @@ func GenerateIngressV1Beta(mattermost *mmv1beta.Mattermost) *networkingv1.Ingres
 		ingressAnnotations[ingressClassAnnotation] = "nginx"
 	}
 
-	for k, v := range sanitizeIngressAnnotations(mattermost.GetIngresAnnotations()) {
+	for k, v := range sanitizeIngressAnnotations(mattermost.GetIngresAnnotations(), logger) {
 		ingressAnnotations[k] = v
 	}
 
@@ -200,7 +204,7 @@ func GenerateALBIngressClassV1Beta(mattermost *mmv1beta.Mattermost) *networkingv
 }
 
 // GenerateIngressALBIngressV1Beta returns the AWS ALB ingress for the Mattermost app.
-func GenerateALBIngressV1Beta(mattermost *mmv1beta.Mattermost) *networkingv1.Ingress {
+func GenerateALBIngressV1Beta(mattermost *mmv1beta.Mattermost, logger logr.Logger) *networkingv1.Ingress {
 	ingressAnnotations := map[string]string{}
 
 	if mattermost.Spec.AWSLoadBalancerController.InternetFacing {
@@ -217,7 +221,7 @@ func GenerateALBIngressV1Beta(mattermost *mmv1beta.Mattermost) *networkingv1.Ing
 		ingressAnnotations["alb.ingress.kubernetes.io/listen-ports"] = `[{"HTTP": 8065}]`
 	}
 
-	for k, v := range sanitizeIngressAnnotations(mattermost.GetAWSLoadBalancerIngressAnnotations()) {
+	for k, v := range sanitizeIngressAnnotations(mattermost.GetAWSLoadBalancerIngressAnnotations(), logger) {
 		ingressAnnotations[k] = v
 	}
 

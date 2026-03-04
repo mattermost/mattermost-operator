@@ -1,9 +1,11 @@
 package mattermost
 
 import (
+	"strings"
 	"testing"
 
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
+	"github.com/mattermost/mattermost-operator/pkg/database"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -188,17 +190,34 @@ func TestExternalDBConfig_SeparateDatasourceKey(t *testing.T) {
 }
 
 func TestValidateDBCheckURL(t *testing.T) {
-	t.Run("valid URLs", func(t *testing.T) {
+	t.Run("valid URLs for MySQL", func(t *testing.T) {
 		validURLs := []string{
 			"http://my-db:3306",
 			"https://my-db:3306",
-			"mysql://my-db:3306/mydb",
-			"postgres://my-db:5432/mydb",
 			"http://10.0.0.1:3306",
 		}
 		for _, u := range validURLs {
-			assert.NoError(t, validateDBCheckURL(u), "expected valid: %s", u)
+			assert.NoError(t, validateDBCheckURL(u, database.MySQLDatabase), "expected valid: %s", u)
 		}
+	})
+
+	t.Run("valid URLs for PostgreSQL", func(t *testing.T) {
+		validURLs := []string{
+			"http://my-db:5432",
+			"https://my-db:5432",
+			"postgres://my-db:5432/mydb",
+			"http://10.0.0.1:5432",
+		}
+		for _, u := range validURLs {
+			assert.NoError(t, validateDBCheckURL(u, database.PostgreSQLDatabase), "expected valid: %s", u)
+		}
+	})
+
+	t.Run("MySQL rejects mysql scheme", func(t *testing.T) {
+		err := validateDBCheckURL("mysql://my-db:3306/mydb", database.MySQLDatabase)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "not allowed")
+		assert.Contains(t, err.Error(), "mysql")
 	})
 
 	t.Run("blocked schemes", func(t *testing.T) {
@@ -209,7 +228,7 @@ func TestValidateDBCheckURL(t *testing.T) {
 			"javascript:alert(1)",
 		}
 		for _, u := range blockedURLs {
-			err := validateDBCheckURL(u)
+			err := validateDBCheckURL(u, database.MySQLDatabase)
 			assert.Error(t, err, "expected blocked: %s", u)
 			assert.Contains(t, err.Error(), "not allowed")
 		}
@@ -221,15 +240,25 @@ func TestValidateDBCheckURL(t *testing.T) {
 			"http://100.100.100.200/metadata",
 		}
 		for _, u := range metadataURLs {
-			err := validateDBCheckURL(u)
+			err := validateDBCheckURL(u, database.MySQLDatabase)
 			assert.Error(t, err, "expected blocked: %s", u)
 			assert.Contains(t, err.Error(), "blocked metadata")
 		}
 	})
 
+	t.Run("blocked hostname resolving to metadata IP", func(t *testing.T) {
+		// 169.254.169.254.nip.io resolves to AWS metadata IP (requires network)
+		err := validateDBCheckURL("http://169.254.169.254.nip.io/metadata", database.MySQLDatabase)
+		require.Error(t, err)
+		if strings.Contains(err.Error(), "failed to resolve") {
+			t.Skip("DNS unavailable in test environment; skipping hostname resolution test")
+		}
+		assert.Contains(t, err.Error(), "blocked metadata")
+	})
+
 	t.Run("empty and invalid", func(t *testing.T) {
-		assert.Error(t, validateDBCheckURL(""))
-		assert.Error(t, validateDBCheckURL("://no-scheme"))
+		assert.Error(t, validateDBCheckURL("", database.MySQLDatabase))
+		assert.Error(t, validateDBCheckURL("://no-scheme", database.MySQLDatabase))
 	})
 }
 
@@ -267,6 +296,20 @@ func TestNewExternalDBConfig_InvalidCheckURL(t *testing.T) {
 		_, err := NewExternalDBConfig(mattermost, secret)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid DB_CONNECTION_CHECK_URL")
+	})
+
+	t.Run("rejects mysql scheme for MySQL db type", func(t *testing.T) {
+		secret := corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: "secret"},
+			Data: map[string][]byte{
+				"DB_CONNECTION_STRING":    []byte("mysql://user:pass@tcp(host:3306)/db"),
+				"DB_CONNECTION_CHECK_URL": []byte("mysql://host:3306/db"),
+			},
+		}
+		_, err := NewExternalDBConfig(mattermost, secret)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid DB_CONNECTION_CHECK_URL")
+		assert.Contains(t, err.Error(), "not allowed")
 	})
 }
 

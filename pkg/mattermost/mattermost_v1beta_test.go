@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/go-logr/logr"
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	"github.com/mattermost/mattermost-operator/pkg/database"
 	"github.com/mattermost/mattermost-operator/pkg/utils"
@@ -335,7 +336,7 @@ func TestGenerateIngress_V1Beta(t *testing.T) {
 				Spec:       tt.spec,
 			}
 
-			ingress := GenerateIngressV1Beta(mattermost)
+			ingress := GenerateIngressV1Beta(mattermost, logr.Discard())
 			require.NotNil(t, ingress)
 			assert.Equal(t, tt.expectedIngress, ingress)
 			assert.Equal(t, networkingv1.PathTypeImplementationSpecific, *ingress.Spec.Rules[0].HTTP.Paths[0].PathType)
@@ -1233,7 +1234,7 @@ func TestSanitizeIngressAnnotations(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := sanitizeIngressAnnotations(tt.input)
+			result := sanitizeIngressAnnotations(tt.input, logr.Discard())
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -1255,7 +1256,31 @@ func TestGenerateIngress_V1Beta_SnippetAnnotationsFiltered(t *testing.T) {
 		},
 	}
 
-	ingress := GenerateIngressV1Beta(mattermost)
+	ingress := GenerateIngressV1Beta(mattermost, logr.Discard())
+	require.NotNil(t, ingress)
+
+	assert.Equal(t, "500M", ingress.Annotations["nginx.ingress.kubernetes.io/proxy-body-size"])
+	assert.NotContains(t, ingress.Annotations, "nginx.ingress.kubernetes.io/configuration-snippet")
+	assert.NotContains(t, ingress.Annotations, "nginx.ingress.kubernetes.io/server-snippet")
+}
+
+func TestGenerateALBIngress_V1Beta_SnippetAnnotationsFiltered(t *testing.T) {
+	mattermost := &mmv1beta.Mattermost{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-mm"},
+		Spec: mmv1beta.MattermostSpec{
+			AWSLoadBalancerController: &mmv1beta.AWSLoadBalancerController{
+				Enabled: true,
+				Hosts:   []mmv1beta.IngressHost{{HostName: "test"}},
+				Annotations: map[string]string{
+					"nginx.ingress.kubernetes.io/proxy-body-size":       "500M",
+					"nginx.ingress.kubernetes.io/configuration-snippet": "more_set_headers 'X-Injected: true';",
+					"nginx.ingress.kubernetes.io/server-snippet":        "lua_shared_dict my_cache 10m;",
+				},
+			},
+		},
+	}
+
+	ingress := GenerateALBIngressV1Beta(mattermost, logr.Discard())
 	require.NotNil(t, ingress)
 
 	assert.Equal(t, "500M", ingress.Annotations["nginx.ingress.kubernetes.io/proxy-body-size"])

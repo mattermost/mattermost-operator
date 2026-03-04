@@ -80,16 +80,23 @@ func (mm *Mattermost) SetDefaults() error {
 	return nil
 }
 
-// validateVolumes checks that no dangerous volume types are specified.
-// Only known-safe volume sources are permitted: ConfigMap, Secret, EmptyDir,
-// PersistentVolumeClaim, Projected, DownwardAPI, and CSI.
-// HostPath volumes are explicitly rejected as they allow mounting arbitrary
-// host filesystem paths into pods.
+// validateVolumes enforces an allowlist of volume sources. Only the following
+// types are permitted: ConfigMap, Secret, EmptyDir, PersistentVolumeClaim,
+// Projected, DownwardAPI, and CSI. All other volume types (e.g., HostPath,
+// NFS, ISCSI, Glusterfs) are rejected for security and consistency.
 func validateVolumes(volumes []corev1.Volume) error {
 	for _, vol := range volumes {
-		if vol.VolumeSource.HostPath != nil {
-			return fmt.Errorf("volume %q uses HostPath source which is not allowed: "+
-				"HostPath volumes can expose the host filesystem and are a security risk", vol.Name)
+		src := vol.VolumeSource
+		isAllowed := src.ConfigMap != nil ||
+			src.Secret != nil ||
+			src.EmptyDir != nil ||
+			src.PersistentVolumeClaim != nil ||
+			src.Projected != nil ||
+			src.DownwardAPI != nil ||
+			src.CSI != nil
+		if !isAllowed {
+			return fmt.Errorf("volume %q uses an unsupported volume source; "+
+				"allowed types: ConfigMap, Secret, EmptyDir, PersistentVolumeClaim, Projected, DownwardAPI, CSI", vol.Name)
 		}
 	}
 	return nil

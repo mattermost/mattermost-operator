@@ -1,11 +1,13 @@
 package mattermost
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
 	"net/url"
 	"strings"
+	"time"
 
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	"github.com/mattermost/mattermost-operator/pkg/database"
@@ -45,7 +47,7 @@ func NewExternalDBConfig(mattermost *mmv1beta.Mattermost, secret corev1.Secret) 
 		externalDB.hasReaderEndpoints = true
 	}
 	if checkURL, ok := secret.Data["DB_CONNECTION_CHECK_URL"]; ok {
-		if err := validateDBCheckURL(string(checkURL)); err != nil {
+		if err := validateDBCheckURL(string(checkURL), externalDB.dbType); err != nil {
 			return nil, fmt.Errorf("invalid DB_CONNECTION_CHECK_URL: %w", err)
 		}
 		externalDB.hasDBCheckURL = true
@@ -141,12 +143,20 @@ func getDBCheckInitContainer(secretName, dbType string) *corev1.Container {
 	return nil
 }
 
-// allowedDBCheckSchemes defines the URL schemes permitted for database connection check URLs.
-var allowedDBCheckSchemes = map[string]bool{
-	"http":     true,
-	"https":    true,
-	"mysql":    true,
-	"postgres": true,
+// allowedDBCheckSchemesByType defines URL schemes permitted per database type.
+// MySQL uses curl for readiness checks (http/https only); PostgreSQL uses pg_isready (postgres URI).
+var allowedDBCheckSchemesByType = map[string]map[string]bool{
+	database.MySQLDatabase:      {"http": true, "https": true},
+	database.PostgreSQLDatabase: {"http": true, "https": true, "postgres": true},
+	"unknown":                   {"http": true, "https": true, "mysql": true, "postgres": true},
+}
+
+func isAllowedDBCheckScheme(dbType, scheme string) bool {
+	schemes, ok := allowedDBCheckSchemesByType[dbType]
+	if !ok {
+		schemes = allowedDBCheckSchemesByType["unknown"]
+	}
+	return schemes[scheme]
 }
 
 // metadataIPBlocks contains IP ranges commonly used for cloud metadata services.
@@ -164,8 +174,9 @@ func init() {
 }
 
 // validateDBCheckURL validates that a DB connection check URL uses an allowed
-// scheme and does not target cloud metadata endpoints.
-func validateDBCheckURL(rawURL string) error {
+// scheme for the given database type and does not target cloud metadata endpoints.
+// For hostnames, it resolves DNS and blocks any IP in metadata ranges.
+func validateDBCheckURL(rawURL, dbType string) error {
 	rawURL = strings.TrimSpace(rawURL)
 	if rawURL == "" {
 		return errors.New("URL is empty")
@@ -177,8 +188,8 @@ func validateDBCheckURL(rawURL string) error {
 	}
 
 	scheme := strings.ToLower(parsed.Scheme)
-	if !allowedDBCheckSchemes[scheme] {
-		return fmt.Errorf("scheme %q is not allowed; permitted schemes: http, https, mysql, postgres", scheme)
+	if !isAllowedDBCheckScheme(dbType, scheme) {
+		return fmt.Errorf("scheme %q is not allowed for database type %q", scheme, dbType)
 	}
 
 	hostname := parsed.Hostname()
@@ -186,8 +197,11 @@ func validateDBCheckURL(rawURL string) error {
 		return errors.New("URL must contain a hostname")
 	}
 
-	// Check if the hostname resolves to a metadata IP.
-	if ip := net.ParseIP(hostname); ip != nil {
+	ips, err := resolveHostnameIPs(hostname)
+	if err != nil {
+		return fmt.Errorf("failed to resolve hostname %q: %w", hostname, err)
+	}
+	for _, ip := range ips {
 		for _, block := range metadataIPBlocks {
 			if block.Contains(ip) {
 				return fmt.Errorf("URL targets a blocked metadata IP range: %s", hostname)
@@ -196,4 +210,23 @@ func validateDBCheckURL(rawURL string) error {
 	}
 
 	return nil
+}
+
+// resolveHostnameIPs returns IPs for a hostname. If hostname is a literal IP,
+// returns it; otherwise performs DNS lookup with timeout.
+func resolveHostnameIPs(hostname string) ([]net.IP, error) {
+	if ip := net.ParseIP(hostname); ip != nil {
+		return []net.IP{ip}, nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	addrs, err := net.DefaultResolver.LookupIPAddr(ctx, hostname)
+	if err != nil {
+		return nil, err
+	}
+	ips := make([]net.IP, 0, len(addrs))
+	for _, a := range addrs {
+		ips = append(ips, a.IP)
+	}
+	return ips, nil
 }

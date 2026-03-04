@@ -80,6 +80,9 @@ func TestValidateVolumes(t *testing.T) {
 			{Name: "secret", VolumeSource: v1.VolumeSource{Secret: &v1.SecretVolumeSource{SecretName: "my-secret"}}},
 			{Name: "tmp", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}},
 			{Name: "data", VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: "my-pvc"}}},
+			{Name: "projected", VolumeSource: v1.VolumeSource{Projected: &v1.ProjectedVolumeSource{Sources: []v1.VolumeProjection{}}}},
+			{Name: "downward", VolumeSource: v1.VolumeSource{DownwardAPI: &v1.DownwardAPIVolumeSource{Items: []v1.DownwardAPIVolumeFile{}}}},
+			{Name: "csi", VolumeSource: v1.VolumeSource{CSI: &v1.CSIVolumeSource{Driver: "test-driver"}}},
 		}
 		err := mm.SetDefaults()
 		require.NoError(t, err)
@@ -92,7 +95,7 @@ func TestValidateVolumes(t *testing.T) {
 		}
 		err := mm.SetDefaults()
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "HostPath")
+		assert.Contains(t, err.Error(), "unsupported")
 		assert.Contains(t, err.Error(), "host-mount")
 	})
 
@@ -105,6 +108,28 @@ func TestValidateVolumes(t *testing.T) {
 		err := mm.SetDefaults()
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "bad-vol")
+		assert.Contains(t, err.Error(), "unsupported")
+	})
+
+	t.Run("reject NFS volume", func(t *testing.T) {
+		mm := &Mattermost{Spec: baseSpec()}
+		mm.Spec.Volumes = []v1.Volume{
+			{Name: "nfs-vol", VolumeSource: v1.VolumeSource{NFS: &v1.NFSVolumeSource{Server: "nfs.example.com", Path: "/export"}}},
+		}
+		err := mm.SetDefaults()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "nfs-vol")
+		assert.Contains(t, err.Error(), "unsupported")
+	})
+
+	t.Run("reject ISCSI volume", func(t *testing.T) {
+		mm := &Mattermost{Spec: baseSpec()}
+		mm.Spec.Volumes = []v1.Volume{
+			{Name: "iscsi-vol", VolumeSource: v1.VolumeSource{ISCSI: &v1.ISCSIVolumeSource{TargetPortal: "10.0.0.1", IQN: "iqn.test", Lun: 0}}},
+		}
+		err := mm.SetDefaults()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "iscsi-vol")
 	})
 
 	t.Run("allow empty volumes list", func(t *testing.T) {

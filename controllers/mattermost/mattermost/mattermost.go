@@ -188,10 +188,10 @@ func (r *MattermostReconciler) checkMattermostRoleBinding(mattermost *mmv1beta.M
 }
 
 func (r *MattermostReconciler) checkMattermostIngress(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) error {
-	desired := mattermostApp.GenerateIngressV1Beta(mattermost)
+	desired := mattermostApp.GenerateIngressV1Beta(mattermost, reqLogger)
 
 	if mattermost.AWSLoadBalancerEnabled() {
-		desired = mattermostApp.GenerateALBIngressV1Beta(mattermost)
+		desired = mattermostApp.GenerateALBIngressV1Beta(mattermost, reqLogger)
 	}
 
 	if !mattermost.IngressEnabled() && !mattermost.AWSLoadBalancerEnabled() {
@@ -323,7 +323,6 @@ func (r *MattermostReconciler) checkMattermostDeployment(
 	if err != nil {
 		reqLogger.Error(err, "Failed to patch deployment")
 		status.SetDeploymentPatchStatus(false, errors.Wrap(err, "failed to apply patch to Deployment"))
-		fmt.Println(mattermost.Status.ResourcePatch)
 	} else if applied {
 		reqLogger.Info("Applied patch to deployment")
 		desired = patchedObj
