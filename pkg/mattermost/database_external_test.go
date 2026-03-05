@@ -1,8 +1,6 @@
 package mattermost
 
 import (
-	"net"
-	"strings"
 	"testing"
 
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
@@ -13,26 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func stubResolver(t *testing.T) {
-	t.Helper()
-
-	original := hostnameResolver
-	hostnameResolver = func(hostname string) ([]net.IP, error) {
-		if ip := net.ParseIP(hostname); ip != nil {
-			return []net.IP{ip}, nil
-		}
-
-		return []net.IP{net.ParseIP("10.0.0.99")}, nil
-	}
-
-	t.Cleanup(func() {
-		hostnameResolver = original
-	})
-}
-
 func TestNewExternalDBInfo(t *testing.T) {
-	stubResolver(t)
-
 	mattermost := &mmv1beta.Mattermost{
 		ObjectMeta: metav1.ObjectMeta{Name: "mm-test"},
 		Spec: mmv1beta.MattermostSpec{
@@ -106,8 +85,6 @@ func TestNewExternalDBInfo(t *testing.T) {
 }
 
 func TestExternalDBConfig_SeparateDatasourceKey(t *testing.T) {
-	stubResolver(t)
-
 	mattermost := &mmv1beta.Mattermost{
 		ObjectMeta: metav1.ObjectMeta{Name: "mm-test"},
 		Spec: mmv1beta.MattermostSpec{
@@ -212,8 +189,6 @@ func TestExternalDBConfig_SeparateDatasourceKey(t *testing.T) {
 }
 
 func TestValidateDBCheckURL(t *testing.T) {
-	stubResolver(t)
-
 	t.Run("valid URLs for MySQL", func(t *testing.T) {
 		validURLs := []string{
 			"http://my-db:3306",
@@ -258,34 +233,6 @@ func TestValidateDBCheckURL(t *testing.T) {
 		}
 	})
 
-	t.Run("blocked metadata IPs", func(t *testing.T) {
-		metadataURLs := []string{
-			"http://169.254.169.254/latest/meta-data",
-			"http://100.100.100.200/metadata",
-		}
-		for _, u := range metadataURLs {
-			err := validateDBCheckURL(u, database.MySQLDatabase)
-			assert.Error(t, err, "expected blocked: %s", u)
-			assert.Contains(t, err.Error(), "blocked metadata")
-		}
-	})
-
-	t.Run("blocked hostname resolving to metadata IP", func(t *testing.T) {
-		original := hostnameResolver
-		hostnameResolver = defaultResolveHostnameIPs
-		t.Cleanup(func() {
-			hostnameResolver = original
-		})
-
-		// 169.254.169.254.nip.io resolves to AWS metadata IP (requires network)
-		err := validateDBCheckURL("http://169.254.169.254.nip.io/metadata", database.MySQLDatabase)
-		require.Error(t, err)
-		if strings.Contains(err.Error(), "failed to resolve") {
-			t.Skip("DNS unavailable in test environment; skipping hostname resolution test")
-		}
-		assert.Contains(t, err.Error(), "blocked metadata")
-	})
-
 	t.Run("empty and invalid", func(t *testing.T) {
 		assert.Error(t, validateDBCheckURL("", database.MySQLDatabase))
 		assert.Error(t, validateDBCheckURL("://no-scheme", database.MySQLDatabase))
@@ -293,8 +240,6 @@ func TestValidateDBCheckURL(t *testing.T) {
 }
 
 func TestNewExternalDBConfig_InvalidCheckURL(t *testing.T) {
-	stubResolver(t)
-
 	mattermost := &mmv1beta.Mattermost{
 		ObjectMeta: metav1.ObjectMeta{Name: "mm-test"},
 		Spec: mmv1beta.MattermostSpec{
@@ -303,19 +248,6 @@ func TestNewExternalDBConfig_InvalidCheckURL(t *testing.T) {
 			},
 		},
 	}
-
-	t.Run("rejects metadata URL", func(t *testing.T) {
-		secret := corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{Name: "secret"},
-			Data: map[string][]byte{
-				"DB_CONNECTION_STRING":    []byte("postgres://my-postgres"),
-				"DB_CONNECTION_CHECK_URL": []byte("http://169.254.169.254/latest/meta-data"),
-			},
-		}
-		_, err := NewExternalDBConfig(mattermost, secret)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid DB_CONNECTION_CHECK_URL")
-	})
 
 	t.Run("rejects disallowed scheme", func(t *testing.T) {
 		secret := corev1.Secret{

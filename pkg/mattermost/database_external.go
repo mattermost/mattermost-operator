@@ -1,13 +1,10 @@
 package mattermost
 
 import (
-	"context"
 	"errors"
 	"fmt"
-	"net"
 	"net/url"
 	"strings"
-	"time"
 
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	"github.com/mattermost/mattermost-operator/pkg/database"
@@ -159,23 +156,8 @@ func isAllowedDBCheckScheme(dbType, scheme string) bool {
 	return schemes[scheme]
 }
 
-// metadataIPBlocks contains IP ranges commonly used for cloud metadata services.
-var metadataIPBlocks []*net.IPNet
-
-func init() {
-	for _, cidr := range []string{
-		"169.254.169.254/32", // AWS, GCP, Azure metadata
-		"100.100.100.200/32", // Alibaba metadata
-		"fd00:ec2::254/128",  // AWS IPv6 metadata
-	} {
-		_, block, _ := net.ParseCIDR(cidr)
-		metadataIPBlocks = append(metadataIPBlocks, block)
-	}
-}
-
 // validateDBCheckURL validates that a DB connection check URL uses an allowed
-// scheme for the given database type and does not target cloud metadata endpoints.
-// For hostnames, it resolves DNS and blocks any IP in metadata ranges.
+// scheme for the given database type.
 func validateDBCheckURL(rawURL, dbType string) error {
 	rawURL = strings.TrimSpace(rawURL)
 	if rawURL == "" {
@@ -192,46 +174,9 @@ func validateDBCheckURL(rawURL, dbType string) error {
 		return fmt.Errorf("scheme %q is not allowed for database type %q", scheme, dbType)
 	}
 
-	hostname := parsed.Hostname()
-	if hostname == "" {
+	if parsed.Hostname() == "" {
 		return errors.New("URL must contain a hostname")
 	}
 
-	ips, err := hostnameResolver(hostname)
-	if err != nil {
-		return fmt.Errorf("failed to resolve hostname %q: %w", hostname, err)
-	}
-	for _, ip := range ips {
-		for _, block := range metadataIPBlocks {
-			if block.Contains(ip) {
-				return fmt.Errorf("URL targets a blocked metadata IP range: %s", hostname)
-			}
-		}
-	}
-
 	return nil
-}
-
-// hostnameResolver is the function used to resolve hostnames to IPs.
-// It defaults to defaultResolveHostnameIPs but can be replaced in tests
-// to avoid real DNS lookups.
-var hostnameResolver = defaultResolveHostnameIPs
-
-// defaultResolveHostnameIPs returns IPs for a hostname. If hostname is a literal IP,
-// returns it; otherwise performs DNS lookup with timeout.
-func defaultResolveHostnameIPs(hostname string) ([]net.IP, error) {
-	if ip := net.ParseIP(hostname); ip != nil {
-		return []net.IP{ip}, nil
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	addrs, err := net.DefaultResolver.LookupIPAddr(ctx, hostname)
-	if err != nil {
-		return nil, err
-	}
-	ips := make([]net.IP, 0, len(addrs))
-	for _, a := range addrs {
-		ips = append(ips, a.IP)
-	}
-	return ips, nil
 }
