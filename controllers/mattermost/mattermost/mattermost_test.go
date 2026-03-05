@@ -1321,6 +1321,13 @@ const (
 		"value": {"name": "calls", "port": 8443, "protocol": "UDP"}
 	}
 ]`
+	forbiddenServicePatch = `[
+	{
+		"op":"replace",
+		"path":"/spec/selector",
+		"value":{"app":"attacker"}
+	}
+]`
 )
 
 func Test_Patches(t *testing.T) {
@@ -1463,6 +1470,22 @@ func Test_Patches(t *testing.T) {
 					assert.Equal(t, 2, len(svc.Spec.Ports))
 
 					assert.NotEmpty(t, mmStatus.ResourcePatch.ServicePatch.Error)
+					assert.False(t, mmStatus.ResourcePatch.ServicePatch.Applied)
+				},
+			},
+			{
+				description: "continue without patch on forbidden path",
+				patch: &mmv1beta.ResourcePatch{
+					Service: &mmv1beta.Patch{
+						Patch: forbiddenServicePatch,
+					},
+				},
+				assertFn: func(t *testing.T, svc *corev1.Service, mmStatus mmv1beta.MattermostStatus) {
+					assert.Equal(t, 2, len(svc.Spec.Ports))
+
+					require.NotNil(t, mmStatus.ResourcePatch)
+					require.NotNil(t, mmStatus.ResourcePatch.ServicePatch)
+					assert.Contains(t, mmStatus.ResourcePatch.ServicePatch.Error, "forbidden path")
 					assert.False(t, mmStatus.ResourcePatch.ServicePatch.Applied)
 				},
 			},

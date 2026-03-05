@@ -45,6 +45,14 @@ var forbiddenDeploymentPatchContains = []string{
 	"/securityContext/capabilities",
 }
 
+// forbiddenServicePatchPrefixes defines path prefixes that are not allowed in
+// JSON patches applied to Services. These paths can alter traffic routing.
+var forbiddenServicePatchPrefixes = []string{
+	"/spec/selector",
+	"/spec/externalIPs",
+	"/spec/externalName",
+}
+
 // patchOperation represents a single JSON Patch operation for validation purposes.
 type patchOperation struct {
 	Op   string `json:"op"`
@@ -70,6 +78,24 @@ func validateDeploymentPatch(rawPatch string) error {
 			}
 		}
 	}
+	return nil
+}
+
+// validateServicePatch checks that no patch operations target forbidden paths.
+func validateServicePatch(rawPatch string) error {
+	var ops []patchOperation
+	if err := json.Unmarshal([]byte(rawPatch), &ops); err != nil {
+		return errors.Wrap(err, "failed to decode patch operations for validation")
+	}
+
+	for _, op := range ops {
+		for _, prefix := range forbiddenServicePatchPrefixes {
+			if op.Path == prefix || strings.HasPrefix(op.Path, prefix+"/") {
+				return fmt.Errorf("patch operation %q on forbidden path %q is not allowed", op.Op, op.Path)
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -123,6 +149,10 @@ func (s *MattermostStatus) ClearDeploymentPatchStatus() {
 func (rp *ResourcePatch) ApplyToService(service *v1.Service) (*v1.Service, bool, error) {
 	if rp == nil || rp.Service == nil || rp.Service.Disable || rp.Service.Patch == "" {
 		return service, false, nil
+	}
+
+	if err := validateServicePatch(rp.Service.Patch); err != nil {
+		return nil, false, errors.Wrap(err, "service patch validation failed")
 	}
 
 	patched := v1.Service{}

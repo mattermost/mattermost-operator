@@ -516,6 +516,89 @@ func TestValidateDeploymentPatch_ForbiddenPaths(t *testing.T) {
 	}
 }
 
+func TestValidateServicePatch_ForbiddenPaths(t *testing.T) {
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{"existing": "val"},
+		},
+		Spec: corev1.ServiceSpec{
+			Selector: map[string]string{"app": "mattermost"},
+			Ports: []corev1.ServicePort{
+				{Name: "http", Port: 80},
+			},
+		},
+	}
+
+	forbiddenPatches := []struct {
+		description string
+		patch       string
+	}{
+		{
+			description: "selector",
+			patch:       `[{"op":"replace","path":"/spec/selector","value":{"app":"attacker"}}]`,
+		},
+		{
+			description: "selector subpath",
+			patch:       `[{"op":"add","path":"/spec/selector/app","value":"attacker"}]`,
+		},
+		{
+			description: "externalIPs",
+			patch:       `[{"op":"add","path":"/spec/externalIPs","value":["1.2.3.4"]}]`,
+		},
+		{
+			description: "externalIPs subpath",
+			patch:       `[{"op":"add","path":"/spec/externalIPs/-","value":"1.2.3.4"}]`,
+		},
+		{
+			description: "externalName",
+			patch:       `[{"op":"replace","path":"/spec/externalName","value":"attacker.example.com"}]`,
+		},
+	}
+
+	for _, tc := range forbiddenPatches {
+		t.Run("should block "+tc.description, func(t *testing.T) {
+			resPatch := ResourcePatch{
+				Service: &Patch{Patch: tc.patch},
+			}
+
+			_, applied, err := resPatch.ApplyToService(service)
+			require.Error(t, err)
+			assert.False(t, applied)
+			assert.Contains(t, err.Error(), "forbidden path")
+		})
+	}
+
+	allowedPatches := []struct {
+		description string
+		patch       string
+	}{
+		{
+			description: "metadata labels",
+			patch:       `[{"op":"add","path":"/metadata/labels/new","value":"value"}]`,
+		},
+		{
+			description: "metadata annotations",
+			patch:       `[{"op":"add","path":"/metadata/annotations","value":{"a":"b"}}]`,
+		},
+		{
+			description: "ports",
+			patch:       `[{"op":"add","path":"/spec/ports/-","value":{"name":"metrics","port":9000}}]`,
+		},
+	}
+
+	for _, tc := range allowedPatches {
+		t.Run("should allow "+tc.description, func(t *testing.T) {
+			resPatch := ResourcePatch{
+				Service: &Patch{Patch: tc.patch},
+			}
+
+			_, applied, err := resPatch.ApplyToService(service)
+			require.NoError(t, err)
+			assert.True(t, applied)
+		})
+	}
+}
+
 func loadFile(t *testing.T, path string) string {
 	b, err := os.ReadFile(path)
 	require.NoError(t, err)
