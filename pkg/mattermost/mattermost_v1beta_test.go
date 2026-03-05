@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/go-logr/logr"
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	"github.com/mattermost/mattermost-operator/pkg/database"
 	"github.com/mattermost/mattermost-operator/pkg/utils"
@@ -335,7 +336,7 @@ func TestGenerateIngress_V1Beta(t *testing.T) {
 				Spec:       tt.spec,
 			}
 
-			ingress := GenerateIngressV1Beta(mattermost)
+			ingress := GenerateIngressV1Beta(mattermost, logr.Discard())
 			require.NotNil(t, ingress)
 			assert.Equal(t, tt.expectedIngress, ingress)
 			assert.Equal(t, networkingv1.PathTypeImplementationSpecific, *ingress.Spec.Rules[0].HTTP.Paths[0].PathType)
@@ -1157,4 +1158,132 @@ func assertEnvVarEqual(t *testing.T, name, val string, env []corev1.EnvVar) {
 	}
 
 	assert.Fail(t, fmt.Sprintf("failed to find env var %s", name))
+}
+
+func TestSanitizeIngressAnnotations(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    map[string]string
+		expected map[string]string
+	}{
+		{
+			name:     "nil annotations",
+			input:    nil,
+			expected: nil,
+		},
+		{
+			name:     "safe annotations pass through",
+			input:    map[string]string{"nginx.ingress.kubernetes.io/proxy-body-size": "1000M", "custom-annotation": "value"},
+			expected: map[string]string{"nginx.ingress.kubernetes.io/proxy-body-size": "1000M", "custom-annotation": "value"},
+		},
+		{
+			name:     "server-snippet blocked",
+			input:    map[string]string{"nginx.ingress.kubernetes.io/server-snippet": "lua_code_here"},
+			expected: map[string]string{},
+		},
+		{
+			name:     "configuration-snippet blocked",
+			input:    map[string]string{"nginx.ingress.kubernetes.io/configuration-snippet": "more_set_headers"},
+			expected: map[string]string{},
+		},
+		{
+			name:     "auth-snippet blocked",
+			input:    map[string]string{"nginx.ingress.kubernetes.io/auth-snippet": "proxy_set_header"},
+			expected: map[string]string{},
+		},
+		{
+			name:     "stream-snippet blocked",
+			input:    map[string]string{"nginx.ingress.kubernetes.io/stream-snippet": "content"},
+			expected: map[string]string{},
+		},
+		{
+			name:     "case insensitive snippet detection",
+			input:    map[string]string{"nginx.ingress.kubernetes.io/Server-Snippet": "content"},
+			expected: map[string]string{},
+		},
+		{
+			name:     "custom snippet annotation blocked",
+			input:    map[string]string{"example.com/my-snippet": "content"},
+			expected: map[string]string{},
+		},
+		{
+			name:     "newline in value blocked",
+			input:    map[string]string{"safe-key": "line1\nline2"},
+			expected: map[string]string{},
+		},
+		{
+			name:     "carriage return in value blocked",
+			input:    map[string]string{"safe-key": "line1\rline2"},
+			expected: map[string]string{},
+		},
+		{
+			name: "mixed safe and dangerous annotations",
+			input: map[string]string{
+				"nginx.ingress.kubernetes.io/proxy-body-size":         "1000M",
+				"nginx.ingress.kubernetes.io/configuration-snippet":   "dangerous",
+				"nginx.ingress.kubernetes.io/ssl-redirect":            "true",
+				"nginx.ingress.kubernetes.io/server-snippet":          "also-dangerous",
+				"safe-key-with-newline":                               "value\ninjected",
+			},
+			expected: map[string]string{
+				"nginx.ingress.kubernetes.io/proxy-body-size": "1000M",
+				"nginx.ingress.kubernetes.io/ssl-redirect":    "true",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := sanitizeIngressAnnotations(tt.input, logr.Discard())
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestGenerateIngress_V1Beta_SnippetAnnotationsFiltered(t *testing.T) {
+	mattermost := &mmv1beta.Mattermost{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-mm"},
+		Spec: mmv1beta.MattermostSpec{
+			Ingress: &mmv1beta.Ingress{
+				Enabled: true,
+				Host:    "test",
+				Annotations: map[string]string{
+					"nginx.ingress.kubernetes.io/proxy-body-size":       "500M",
+					"nginx.ingress.kubernetes.io/configuration-snippet": "more_set_headers 'X-Injected: true';",
+					"nginx.ingress.kubernetes.io/server-snippet":        "lua_shared_dict my_cache 10m;",
+				},
+			},
+		},
+	}
+
+	ingress := GenerateIngressV1Beta(mattermost, logr.Discard())
+	require.NotNil(t, ingress)
+
+	assert.Equal(t, "500M", ingress.Annotations["nginx.ingress.kubernetes.io/proxy-body-size"])
+	assert.NotContains(t, ingress.Annotations, "nginx.ingress.kubernetes.io/configuration-snippet")
+	assert.NotContains(t, ingress.Annotations, "nginx.ingress.kubernetes.io/server-snippet")
+}
+
+func TestGenerateALBIngress_V1Beta_SnippetAnnotationsFiltered(t *testing.T) {
+	mattermost := &mmv1beta.Mattermost{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-mm"},
+		Spec: mmv1beta.MattermostSpec{
+			AWSLoadBalancerController: &mmv1beta.AWSLoadBalancerController{
+				Enabled: true,
+				Hosts:   []mmv1beta.IngressHost{{HostName: "test"}},
+				Annotations: map[string]string{
+					"nginx.ingress.kubernetes.io/proxy-body-size":       "500M",
+					"nginx.ingress.kubernetes.io/configuration-snippet": "more_set_headers 'X-Injected: true';",
+					"nginx.ingress.kubernetes.io/server-snippet":        "lua_shared_dict my_cache 10m;",
+				},
+			},
+		},
+	}
+
+	ingress := GenerateALBIngressV1Beta(mattermost, logr.Discard())
+	require.NotNil(t, ingress)
+
+	assert.Equal(t, "500M", ingress.Annotations["nginx.ingress.kubernetes.io/proxy-body-size"])
+	assert.NotContains(t, ingress.Annotations, "nginx.ingress.kubernetes.io/configuration-snippet")
+	assert.NotContains(t, ingress.Annotations, "nginx.ingress.kubernetes.io/server-snippet")
 }

@@ -5,6 +5,9 @@ package v1beta1
 
 import (
 	"bytes"
+	"encoding/json"
+	"fmt"
+	"strings"
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
@@ -13,9 +16,88 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/apimachinery/pkg/runtime/serializer/json"
+	k8sjson "k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/client-go/kubernetes/scheme"
 )
+
+// forbiddenDeploymentPatchPrefixes defines path prefixes that are not allowed
+// in JSON patches applied to Deployments. These paths can be used to escalate
+// privileges or break security boundaries.
+var forbiddenDeploymentPatchPrefixes = []string{
+	"/spec/template/spec/hostNetwork",
+	"/spec/template/spec/hostPID",
+	"/spec/template/spec/hostIPC",
+	"/spec/template/spec/volumes",
+	"/spec/template/spec/serviceAccountName",
+	"/spec/template/spec/serviceAccount",
+	"/spec/template/spec/nodeSelector",
+	"/spec/template/spec/nodeName",
+	"/spec/template/spec/initContainers",
+}
+
+// forbiddenDeploymentPatchContains defines path segments that are forbidden
+// anywhere in a Deployment patch path. This catches per-container security
+// settings regardless of the container index.
+var forbiddenDeploymentPatchContains = []string{
+	"/securityContext/privileged",
+	"/securityContext/allowPrivilegeEscalation",
+	"/securityContext/runAsUser",
+	"/securityContext/capabilities",
+}
+
+// forbiddenServicePatchPrefixes defines path prefixes that are not allowed in
+// JSON patches applied to Services. These paths can alter traffic routing.
+var forbiddenServicePatchPrefixes = []string{
+	"/spec/selector",
+	"/spec/externalIPs",
+	"/spec/externalName",
+}
+
+// patchOperation represents a single JSON Patch operation for validation purposes.
+type patchOperation struct {
+	Op   string `json:"op"`
+	Path string `json:"path"`
+}
+
+// validateDeploymentPatch checks that no patch operations target forbidden paths.
+func validateDeploymentPatch(rawPatch string) error {
+	var ops []patchOperation
+	if err := json.Unmarshal([]byte(rawPatch), &ops); err != nil {
+		return errors.Wrap(err, "failed to decode patch operations for validation")
+	}
+
+	for _, op := range ops {
+		for _, prefix := range forbiddenDeploymentPatchPrefixes {
+			if op.Path == prefix || strings.HasPrefix(op.Path, prefix+"/") {
+				return fmt.Errorf("patch operation %q on forbidden path %q is not allowed", op.Op, op.Path)
+			}
+		}
+		for _, segment := range forbiddenDeploymentPatchContains {
+			if strings.Contains(op.Path, segment) {
+				return fmt.Errorf("patch operation %q on forbidden path %q is not allowed", op.Op, op.Path)
+			}
+		}
+	}
+	return nil
+}
+
+// validateServicePatch checks that no patch operations target forbidden paths.
+func validateServicePatch(rawPatch string) error {
+	var ops []patchOperation
+	if err := json.Unmarshal([]byte(rawPatch), &ops); err != nil {
+		return errors.Wrap(err, "failed to decode patch operations for validation")
+	}
+
+	for _, op := range ops {
+		for _, prefix := range forbiddenServicePatchPrefixes {
+			if op.Path == prefix || strings.HasPrefix(op.Path, prefix+"/") {
+				return fmt.Errorf("patch operation %q on forbidden path %q is not allowed", op.Op, op.Path)
+			}
+		}
+	}
+
+	return nil
+}
 
 var decoder runtime.Decoder
 var encoder runtime.Encoder
@@ -28,6 +110,10 @@ func (rp *ResourcePatch) IsEmpty() bool {
 func (rp *ResourcePatch) ApplyToDeployment(deployment *appsv1.Deployment) (*appsv1.Deployment, bool, error) {
 	if rp == nil || rp.Deployment == nil || rp.Deployment.Disable || rp.Deployment.Patch == "" {
 		return deployment, false, nil
+	}
+
+	if err := validateDeploymentPatch(rp.Deployment.Patch); err != nil {
+		return nil, false, errors.Wrap(err, "deployment patch validation failed")
 	}
 
 	patched := appsv1.Deployment{}
@@ -63,6 +149,10 @@ func (s *MattermostStatus) ClearDeploymentPatchStatus() {
 func (rp *ResourcePatch) ApplyToService(service *v1.Service) (*v1.Service, bool, error) {
 	if rp == nil || rp.Service == nil || rp.Service.Disable || rp.Service.Patch == "" {
 		return service, false, nil
+	}
+
+	if err := validateServicePatch(rp.Service.Patch); err != nil {
+		return nil, false, errors.Wrap(err, "service patch validation failed")
 	}
 
 	patched := v1.Service{}
@@ -207,7 +297,7 @@ func defaultEncoder() (runtime.Encoder, error) {
 		return nil, err
 	}
 
-	jsonSerializer := json.NewSerializerWithOptions(json.DefaultMetaFactory, resourceScheme, resourceScheme, json.SerializerOptions{})
+	jsonSerializer := k8sjson.NewSerializerWithOptions(k8sjson.DefaultMetaFactory, resourceScheme, resourceScheme, k8sjson.SerializerOptions{})
 
 	return jsonSerializer, nil
 }

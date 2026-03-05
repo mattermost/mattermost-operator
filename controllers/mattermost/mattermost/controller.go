@@ -136,6 +136,11 @@ func (r *MattermostReconciler) Reconcile(ctx context.Context, request ctrl.Reque
 		return reconcile.Result{}, err
 	}
 
+	// Log warnings for mutable image tags (e.g. "latest")
+	for _, w := range mattermost.ImageTagWarnings() {
+		reqLogger.Info(fmt.Sprintf("WARNING: %s", w))
+	}
+
 	softError := mattermost.SetReplicasAndResourcesFromSize()
 	if softError != nil {
 		reqLogger.Error(softError, "Error setting replicas and resources from size. Using default values")

@@ -73,6 +73,32 @@ func (mm *Mattermost) SetDefaults() error {
 	mm.Spec.FileStore.SetDefaults()
 	mm.Spec.Database.SetDefaults()
 
+	if err := validateVolumes(mm.Spec.Volumes); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// validateVolumes enforces an allowlist of volume sources. Only the following
+// types are permitted: ConfigMap, Secret, EmptyDir, PersistentVolumeClaim,
+// Projected, DownwardAPI, and CSI. All other volume types (e.g., HostPath,
+// NFS, ISCSI, Glusterfs) are rejected for security and consistency.
+func validateVolumes(volumes []corev1.Volume) error {
+	for _, vol := range volumes {
+		src := vol.VolumeSource
+		isAllowed := src.ConfigMap != nil ||
+			src.Secret != nil ||
+			src.EmptyDir != nil ||
+			src.PersistentVolumeClaim != nil ||
+			src.Projected != nil ||
+			src.DownwardAPI != nil ||
+			src.CSI != nil
+		if !isAllowed {
+			return fmt.Errorf("volume %q uses an unsupported volume source; "+
+				"allowed types: ConfigMap, Secret, EmptyDir, PersistentVolumeClaim, Projected, DownwardAPI, CSI", vol.Name)
+		}
+	}
 	return nil
 }
 
@@ -217,6 +243,40 @@ func (mm *Mattermost) GetImageName() string {
 		return fmt.Sprintf("%s@%s", mm.Spec.Image, mm.Spec.Version)
 	}
 	return fmt.Sprintf("%s:%s", mm.Spec.Image, mm.Spec.Version)
+}
+
+// mutableImageTags is the set of well-known mutable tags that should be avoided
+// for reproducible deployments.
+var mutableImageTags = map[string]bool{
+	"latest":  true,
+	"master":  true,
+	"main":    true,
+	"nightly": true,
+	"edge":    true,
+}
+
+// ImageTagWarnings returns a list of warnings about the image reference
+// configuration. It warns when mutable tags are used and recommends
+// digest-pinned references for supply-chain safety.
+// The GetImageName() method already supports digest format (image@sha256:...)
+// which is the recommended approach for production deployments.
+func (mm *Mattermost) ImageTagWarnings() []string {
+	var warnings []string
+
+	version := mm.Spec.Version
+	if version == "" {
+		version = DefaultMattermostVersion
+	}
+
+	// Check for well-known mutable tags
+	if mutableImageTags[strings.ToLower(version)] {
+		warnings = append(warnings, fmt.Sprintf(
+			"image version %q is a mutable tag; consider using a digest reference (image@sha256:...) for reproducible deployments",
+			version,
+		))
+	}
+
+	return warnings
 }
 
 // GetProductionDeploymentName returns the name of the deployment that is
