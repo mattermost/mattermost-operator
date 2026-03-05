@@ -197,7 +197,7 @@ func validateDBCheckURL(rawURL, dbType string) error {
 		return errors.New("URL must contain a hostname")
 	}
 
-	ips, err := resolveHostnameIPs(hostname)
+	ips, err := hostnameResolver(hostname)
 	if err != nil {
 		return fmt.Errorf("failed to resolve hostname %q: %w", hostname, err)
 	}
@@ -212,9 +212,14 @@ func validateDBCheckURL(rawURL, dbType string) error {
 	return nil
 }
 
-// resolveHostnameIPs returns IPs for a hostname. If hostname is a literal IP,
+// hostnameResolver is the function used to resolve hostnames to IPs.
+// It defaults to defaultResolveHostnameIPs but can be replaced in tests
+// to avoid real DNS lookups.
+var hostnameResolver = defaultResolveHostnameIPs
+
+// defaultResolveHostnameIPs returns IPs for a hostname. If hostname is a literal IP,
 // returns it; otherwise performs DNS lookup with timeout.
-func resolveHostnameIPs(hostname string) ([]net.IP, error) {
+func defaultResolveHostnameIPs(hostname string) ([]net.IP, error) {
 	if ip := net.ParseIP(hostname); ip != nil {
 		return []net.IP{ip}, nil
 	}

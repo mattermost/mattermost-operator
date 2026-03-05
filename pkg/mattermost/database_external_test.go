@@ -1,6 +1,7 @@
 package mattermost
 
 import (
+	"net"
 	"strings"
 	"testing"
 
@@ -12,7 +13,26 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+func stubResolver(t *testing.T) {
+	t.Helper()
+
+	original := hostnameResolver
+	hostnameResolver = func(hostname string) ([]net.IP, error) {
+		if ip := net.ParseIP(hostname); ip != nil {
+			return []net.IP{ip}, nil
+		}
+
+		return []net.IP{net.ParseIP("10.0.0.99")}, nil
+	}
+
+	t.Cleanup(func() {
+		hostnameResolver = original
+	})
+}
+
 func TestNewExternalDBInfo(t *testing.T) {
+	stubResolver(t)
+
 	mattermost := &mmv1beta.Mattermost{
 		ObjectMeta: metav1.ObjectMeta{Name: "mm-test"},
 		Spec: mmv1beta.MattermostSpec{
@@ -86,6 +106,8 @@ func TestNewExternalDBInfo(t *testing.T) {
 }
 
 func TestExternalDBConfig_SeparateDatasourceKey(t *testing.T) {
+	stubResolver(t)
+
 	mattermost := &mmv1beta.Mattermost{
 		ObjectMeta: metav1.ObjectMeta{Name: "mm-test"},
 		Spec: mmv1beta.MattermostSpec{
@@ -190,6 +212,8 @@ func TestExternalDBConfig_SeparateDatasourceKey(t *testing.T) {
 }
 
 func TestValidateDBCheckURL(t *testing.T) {
+	stubResolver(t)
+
 	t.Run("valid URLs for MySQL", func(t *testing.T) {
 		validURLs := []string{
 			"http://my-db:3306",
@@ -247,6 +271,12 @@ func TestValidateDBCheckURL(t *testing.T) {
 	})
 
 	t.Run("blocked hostname resolving to metadata IP", func(t *testing.T) {
+		original := hostnameResolver
+		hostnameResolver = defaultResolveHostnameIPs
+		t.Cleanup(func() {
+			hostnameResolver = original
+		})
+
 		// 169.254.169.254.nip.io resolves to AWS metadata IP (requires network)
 		err := validateDBCheckURL("http://169.254.169.254.nip.io/metadata", database.MySQLDatabase)
 		require.Error(t, err)
@@ -263,6 +293,8 @@ func TestValidateDBCheckURL(t *testing.T) {
 }
 
 func TestNewExternalDBConfig_InvalidCheckURL(t *testing.T) {
+	stubResolver(t)
+
 	mattermost := &mmv1beta.Mattermost{
 		ObjectMeta: metav1.ObjectMeta{Name: "mm-test"},
 		Spec: mmv1beta.MattermostSpec{
