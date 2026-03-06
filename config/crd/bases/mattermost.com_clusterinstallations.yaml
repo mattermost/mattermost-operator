@@ -1601,6 +1601,19 @@ spec:
                   Selector which must match a node's labels for the pod to be scheduled on that node.
                   More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
                 type: object
+              podTerminationGracePeriodSeconds:
+                description: |-
+                  PodTerminationGracePeriodSeconds defines how long to wait before forcefully terminating the pod during shutdown.
+                  This gives time for the pod to finish processing in-flight requests.
+                  If not specified, Kubernetes default of 30 seconds is used.
+                format: int64
+                type: integer
+              publishNotReadyAddresses:
+                description: |-
+                  PublishNotReadyAddresses controls whether pod endpoints are published before pods are ready.
+                  When false (recommended), only ready pods receive traffic. When true, pods receive traffic immediately upon creation.
+                  Defaults to false if not specified.
+                type: boolean
               readinessProbe:
                 description: Defines the probe to check if the application is ready
                   to accept traffic.
