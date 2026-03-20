@@ -109,6 +109,23 @@ jobs:
         with:
           version: v0.19.3
 
+      - name: ci/scan-docker-security
+        id: grype-scan
+        uses: anchore/scan-action@7037fa011853d5a11690026fb85feee79f4c946c # v7.3.2
+        continue-on-error: true
+        with:
+          image: "mattermost/mattermost-operator:test"
+          output-format: sarif
+          output-file: "grype-results.sarif"
+          only-fixed: true
+          fail-build: false
+          severity-cutoff: high
+
+      - name: ci/upload-grype-sarif-results
+        uses: github/codeql-action/upload-sarif@c6f931105cb2c34c8f901cc885ba1e2e259cf745 # v4.34.0
+        with:
+          sarif_file: "grype-results.sarif"
+
       - name: ci/docker-login
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
@@ -150,6 +167,25 @@ jobs:
       - name: ci/build-docker-fips
         if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
         run: make build-image-fips
+
+      - name: ci/scan-docker-security-fips
+        if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
+        id: grype-scan-fips
+        uses: anchore/scan-action@7037fa011853d5a11690026fb85feee79f4c946c # v7.3.2
+        continue-on-error: true
+        with:
+          image: "mattermost/mattermost-operator-fips:test"
+          output-format: sarif
+          output-file: "grype-results-fips.sarif"
+          only-fixed: true
+          fail-build: false
+          severity-cutoff: high
+
+      - name: ci/upload-grype-sarif-results-fips
+        if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
+        uses: github/codeql-action/upload-sarif@c6f931105cb2c34c8f901cc885ba1e2e259cf745 # v4.34.0
+        with:
+          sarif_file: "grype-results-fips.sarif"
 
       - name: ci/setup-buildx
         if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
