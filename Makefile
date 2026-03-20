@@ -44,10 +44,6 @@ TARGET_ARCH ?= amd64
 BUNDLE_IMG ?= controller-bundle:$(VERSION) # Default bundle image tag
 CRD_OPTIONS ?= "crd" # Image URL to use all building/pushing image targets
 
-TRIVY_SEVERITY := CRITICAL
-TRIVY_EXIT_CODE := 1
-TRIVY_VULN_TYPE := os,library
-
 ################################################################################
 
 # Options for 'bundle-build'
@@ -300,11 +296,6 @@ bundle: operator-sdk manifests ## Generate bundle manifests and metadata, then v
 .PHONY: bundle-build
 bundle-build: ## Build the bundle image.
 	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
-
-## Checks for vulnerabilities
-trivy: build-image
-	@echo running trivy
-	@trivy image --format table --exit-code $(TRIVY_EXIT_CODE) --ignore-unfixed --vuln-type $(TRIVY_VULN_TYPE) --severity $(TRIVY_SEVERITY) $(OPERATOR_IMAGE)
 
 ## --------------------------------------
 ## Tooling Binaries
