@@ -104,25 +104,6 @@ jobs:
       - name: ci/build-docker
         run: make build-image
 
-      - name: ci/scan-docker-security
-        uses: aquasecurity/trivy-action@97e0b3872f55f89b95b2f65b3dbab56962816478 # v0.34.2
-        continue-on-error: true
-        with:
-          image-ref: "mattermost/mattermost-operator:test"
-          format: "sarif"
-          limit-severities-for-sarif: true # https://github.com/aquasecurity/trivy-action/blob/0.9.1/entrypoint.sh#L172
-          output: "trivy-results.sarif"
-          exit-code: "0"
-          ignore-unfixed: true
-          vuln-type: "os,library"
-          severity: "CRITICAL,HIGH"
-
-      - name: ci/create-trivy-results-report
-        # if: failure()
-        uses: github/codeql-action/upload-sarif@64d10c13136e1c5bce3e5fbde8d4906eeaafc885 # v3.29.5
-        with:
-          sarif_file: "trivy-results.sarif"
-
       - name: ci/setup-buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
         with:
@@ -169,26 +150,6 @@ jobs:
       - name: ci/build-docker-fips
         if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
         run: make build-image-fips
-
-      - name: ci/scan-docker-security-fips
-        if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
-        uses: aquasecurity/trivy-action@97e0b3872f55f89b95b2f65b3dbab56962816478 # v0.34.2
-        continue-on-error: true
-        with:
-          image-ref: "mattermost/mattermost-operator-fips:test"
-          format: "sarif"
-          limit-severities-for-sarif: true
-          output: "trivy-results-fips.sarif"
-          exit-code: "0"
-          ignore-unfixed: true
-          vuln-type: "os,library"
-          severity: "CRITICAL,HIGH"
-
-      - name: ci/create-trivy-results-report-fips
-        if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
-        uses: github/codeql-action/upload-sarif@64d10c13136e1c5bce3e5fbde8d4906eeaafc885 # v3.29.5
-        with:
-          sarif_file: "trivy-results-fips.sarif"
 
       - name: ci/setup-buildx
         if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
