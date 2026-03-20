@@ -123,6 +123,7 @@ jobs:
         uses: github/codeql-action/upload-sarif@c6f931105cb2c34c8f901cc885ba1e2e259cf745 # v4.34.0
         with:
           sarif_file: "grype-results.sarif"
+          category: build-grype-scan
 
       - name: ci/docker-login
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
@@ -184,6 +185,7 @@ jobs:
         uses: github/codeql-action/upload-sarif@c6f931105cb2c34c8f901cc885ba1e2e259cf745 # v4.34.0
         with:
           sarif_file: "grype-results-fips.sarif"
+          category: build-grype-scan-fips
 
       - name: ci/setup-buildx
         if: ${{ env.ENABLE_FIPS_BUILDS == 'true' }}
