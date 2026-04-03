@@ -560,6 +560,11 @@ func mattermostRolePermissions() []rbacv1.PolicyRule {
 			Resources:     []string{"jobs"},
 			ResourceNames: []string{SetupJobName},
 		},
+		{
+			Verbs:     []string{"get", "list", "watch"},
+			APIGroups: []string{"installation.mattermost.com"},
+			Resources: []string{"agents"},
+		},
 	}
 }
 

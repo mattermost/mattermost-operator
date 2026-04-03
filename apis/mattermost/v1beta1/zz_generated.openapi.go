@@ -17,12 +17,178 @@ import (
 
 func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
 	return map[string]common.OpenAPIDefinition{
-		"github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.Mattermost":     schema_mattermost_operator_apis_mattermost_v1beta1_Mattermost(ref),
-		"github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.MattermostSpec": schema_mattermost_operator_apis_mattermost_v1beta1_MattermostSpec(ref),
+		"./apis/mattermost/v1beta1.Agent":          schema__apis_mattermost_v1beta1_Agent(ref),
+		"./apis/mattermost/v1beta1.AgentSpec":      schema__apis_mattermost_v1beta1_AgentSpec(ref),
+		"./apis/mattermost/v1beta1.Mattermost":     schema__apis_mattermost_v1beta1_Mattermost(ref),
+		"./apis/mattermost/v1beta1.MattermostSpec": schema__apis_mattermost_v1beta1_MattermostSpec(ref),
 	}
 }
 
-func schema_mattermost_operator_apis_mattermost_v1beta1_Mattermost(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema__apis_mattermost_v1beta1_Agent(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Agent is the Schema for the agents API",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Default: map[string]interface{}{},
+							Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Default: map[string]interface{}{},
+							Ref:     ref("./apis/mattermost/v1beta1.AgentSpec"),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Default: map[string]interface{}{},
+							Ref:     ref("./apis/mattermost/v1beta1.AgentStatus"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"./apis/mattermost/v1beta1.AgentSpec", "./apis/mattermost/v1beta1.AgentStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+	}
+}
+
+func schema__apis_mattermost_v1beta1_AgentSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "AgentSpec defines the desired state of Agent",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"image": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Image defines the agent container image.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"hooks": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Hooks lists the Mattermost plugin hook names this agent subscribes to. Example: [\"MessageHasBeenPosted\", \"UserHasJoinedChannel\"]",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"resources": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Resources defines the CPU/memory requests and limits for the agent pod.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/api/core/v1.ResourceRequirements"),
+						},
+					},
+					"egressPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "EgressPolicy controls outbound network access from the agent pod. Accepted values are \"deny\" (default, blocks all egress except Mattermost) and \"allowList\" (permits additional domains listed in EgressAllowList).",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"egressAllowList": {
+						SchemaProps: spec.SchemaProps{
+							Description: "EgressAllowList lists additional external domains to permit egress to. Only evaluated when EgressPolicy is \"allowList\".",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"mattermostRef": {
+						SchemaProps: spec.SchemaProps{
+							Description: "MattermostRef is a reference to the Mattermost CR in the same namespace that this agent is associated with.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/api/core/v1.LocalObjectReference"),
+						},
+					},
+					"adminCredentialsSecret": {
+						SchemaProps: spec.SchemaProps{
+							Description: "AdminCredentialsSecret is the name of the Kubernetes Secret containing a Mattermost admin access token used to provision the bot account. The Secret must have a key \"token\" with the admin access token value.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"env": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Env defines optional environment variables to inject into the agent pod.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/core/v1.EnvVar"),
+									},
+								},
+							},
+						},
+					},
+					"llmGateway": {
+						SchemaProps: spec.SchemaProps{
+							Description: "LLMGateway configures the LLM gateway for this agent. When OperatorManaged is set, the operator deploys a shared LiteLLM instance in the agent's namespace and provisions a virtual key for this agent. When External is set, the agent uses an existing LiteLLM instance.",
+							Ref:         ref("./apis/mattermost/v1beta1.LLMGatewayConfig"),
+						},
+					},
+					"mcpServers": {
+						SchemaProps: spec.SchemaProps{
+							Description: "MCPServers lists MCP servers to register in the LiteLLM gateway for this agent. Only evaluated when LLMGateway.OperatorManaged is set.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("./apis/mattermost/v1beta1.AgentMCPServer"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"image", "mattermostRef", "adminCredentialsSecret"},
+			},
+		},
+		Dependencies: []string{
+			"./apis/mattermost/v1beta1.AgentMCPServer", "./apis/mattermost/v1beta1.LLMGatewayConfig", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.LocalObjectReference", "k8s.io/api/core/v1.ResourceRequirements"},
+	}
+}
+
+func schema__apis_mattermost_v1beta1_Mattermost(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -52,24 +218,24 @@ func schema_mattermost_operator_apis_mattermost_v1beta1_Mattermost(ref common.Re
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Default: map[string]interface{}{},
-							Ref:     ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.MattermostSpec"),
+							Ref:     ref("./apis/mattermost/v1beta1.MattermostSpec"),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Default: map[string]interface{}{},
-							Ref:     ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.MattermostStatus"),
+							Ref:     ref("./apis/mattermost/v1beta1.MattermostStatus"),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.MattermostSpec", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.MattermostStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			"./apis/mattermost/v1beta1.MattermostSpec", "./apis/mattermost/v1beta1.MattermostStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
 	}
 }
 
-func schema_mattermost_operator_apis_mattermost_v1beta1_MattermostSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema__apis_mattermost_v1beta1_MattermostSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -195,12 +361,12 @@ func schema_mattermost_operator_apis_mattermost_v1beta1_MattermostSpec(ref commo
 					"ingress": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Ingress defines configuration for Ingress resource created by the Operator.",
-							Ref:         ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.Ingress"),
+							Ref:         ref("./apis/mattermost/v1beta1.Ingress"),
 						},
 					},
 					"awsLoadBalancerController": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.AWSLoadBalancerController"),
+							Ref: ref("./apis/mattermost/v1beta1.AWSLoadBalancerController"),
 						},
 					},
 					"volumes": {
@@ -269,76 +435,76 @@ func schema_mattermost_operator_apis_mattermost_v1beta1_MattermostSpec(ref commo
 						SchemaProps: spec.SchemaProps{
 							Description: "External Services",
 							Default:     map[string]interface{}{},
-							Ref:         ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.Database"),
+							Ref:         ref("./apis/mattermost/v1beta1.Database"),
 						},
 					},
 					"fileStore": {
 						SchemaProps: spec.SchemaProps{
 							Default: map[string]interface{}{},
-							Ref:     ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.FileStore"),
+							Ref:     ref("./apis/mattermost/v1beta1.FileStore"),
 						},
 					},
 					"elasticSearch": {
 						SchemaProps: spec.SchemaProps{
 							Default: map[string]interface{}{},
-							Ref:     ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.ElasticSearch"),
+							Ref:     ref("./apis/mattermost/v1beta1.ElasticSearch"),
 						},
 					},
 					"scheduling": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Scheduling defines the configuration related to scheduling of the Mattermost pods as well as resource constraints. These settings generally don't need to be changed.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.Scheduling"),
+							Ref:         ref("./apis/mattermost/v1beta1.Scheduling"),
 						},
 					},
 					"probes": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Probes defines configuration of liveness and readiness probe for Mattermost pods. These settings generally don't need to be changed.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.Probes"),
+							Ref:         ref("./apis/mattermost/v1beta1.Probes"),
 						},
 					},
 					"podTemplate": {
 						SchemaProps: spec.SchemaProps{
 							Description: "PodTemplate defines configuration for the template for Mattermost pods.",
-							Ref:         ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.PodTemplate"),
+							Ref:         ref("./apis/mattermost/v1beta1.PodTemplate"),
 						},
 					},
 					"deploymentTemplate": {
 						SchemaProps: spec.SchemaProps{
 							Description: "DeploymentTemplate defines configuration for the template for Mattermost deployment.",
-							Ref:         ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.DeploymentTemplate"),
+							Ref:         ref("./apis/mattermost/v1beta1.DeploymentTemplate"),
 						},
 					},
 					"updateJob": {
 						SchemaProps: spec.SchemaProps{
 							Description: "UpdateJob defines configuration for the template for the update job.",
-							Ref:         ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.UpdateJob"),
+							Ref:         ref("./apis/mattermost/v1beta1.UpdateJob"),
 						},
 					},
 					"jobServer": {
 						SchemaProps: spec.SchemaProps{
 							Description: "JobServer defines configuration for the Mattermost job server.",
-							Ref:         ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.JobServer"),
+							Ref:         ref("./apis/mattermost/v1beta1.JobServer"),
 						},
 					},
 					"podExtensions": {
 						SchemaProps: spec.SchemaProps{
 							Description: "PodExtensions specify custom extensions for Mattermost pods. This can be used for custom readiness checks etc. These settings generally don't need to be changed.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.PodExtensions"),
+							Ref:         ref("./apis/mattermost/v1beta1.PodExtensions"),
 						},
 					},
 					"resourcePatch": {
 						SchemaProps: spec.SchemaProps{
 							Description: "ResourcePatch specifies JSON patches that can be applied to resources created by Mattermost Operator.\n\nWARNING: ResourcePatch is highly experimental and subject to change. Some patches may be impossible to perform or may impact the stability of Mattermost server.\n\nUse at your own risk when no other options are available.",
-							Ref:         ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.ResourcePatch"),
+							Ref:         ref("./apis/mattermost/v1beta1.ResourcePatch"),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.AWSLoadBalancerController", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.Database", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.DeploymentTemplate", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.ElasticSearch", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.FileStore", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.Ingress", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.JobServer", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.PodExtensions", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.PodTemplate", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.Probes", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.ResourcePatch", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.Scheduling", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.UpdateJob", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.LocalObjectReference", "k8s.io/api/core/v1.PodDNSConfig", "k8s.io/api/core/v1.Volume", "k8s.io/api/core/v1.VolumeMount"},
+			"./apis/mattermost/v1beta1.AWSLoadBalancerController", "./apis/mattermost/v1beta1.Database", "./apis/mattermost/v1beta1.DeploymentTemplate", "./apis/mattermost/v1beta1.ElasticSearch", "./apis/mattermost/v1beta1.FileStore", "./apis/mattermost/v1beta1.Ingress", "./apis/mattermost/v1beta1.JobServer", "./apis/mattermost/v1beta1.PodExtensions", "./apis/mattermost/v1beta1.PodTemplate", "./apis/mattermost/v1beta1.Probes", "./apis/mattermost/v1beta1.ResourcePatch", "./apis/mattermost/v1beta1.Scheduling", "./apis/mattermost/v1beta1.UpdateJob", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.LocalObjectReference", "k8s.io/api/core/v1.PodDNSConfig", "k8s.io/api/core/v1.Volume", "k8s.io/api/core/v1.VolumeMount"},
 	}
 }

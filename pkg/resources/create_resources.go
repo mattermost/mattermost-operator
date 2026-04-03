@@ -192,6 +192,32 @@ func (r *ResourceHelper) CreatePvcIfNotExists(owner v1.Object, pvc *corev1.Persi
 	return nil
 }
 
+func (r *ResourceHelper) CreateNetworkPolicyIfNotExists(owner v1.Object, networkPolicy *networkingv1.NetworkPolicy, reqLogger logr.Logger) error {
+	foundNetworkPolicy := &networkingv1.NetworkPolicy{}
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: networkPolicy.Name, Namespace: networkPolicy.Namespace}, foundNetworkPolicy)
+	if err != nil && k8sErrors.IsNotFound(err) {
+		reqLogger.Info("Creating network policy", "name", networkPolicy.Name)
+		return r.Create(owner, networkPolicy, reqLogger)
+	} else if err != nil {
+		return errors.Wrap(err, "failed to check if network policy exists")
+	}
+
+	return nil
+}
+
+func (r *ResourceHelper) CreateSecretIfNotExists(owner v1.Object, secret *corev1.Secret, reqLogger logr.Logger) error {
+	foundSecret := &corev1.Secret{}
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: secret.Name, Namespace: secret.Namespace}, foundSecret)
+	if err != nil && k8sErrors.IsNotFound(err) {
+		reqLogger.Info("Creating secret", "name", secret.Name)
+		return r.Create(owner, secret, reqLogger)
+	} else if err != nil {
+		return errors.Wrap(err, "failed to check if secret exists")
+	}
+
+	return nil
+}
+
 func (r *ResourceHelper) DeleteDeployment(key types.NamespacedName, reqLogger logr.Logger) error {
 	foundDeployment := &appsv1.Deployment{}
 	err := r.client.Get(context.TODO(), key, foundDeployment)
@@ -259,6 +285,20 @@ func (r *ResourceHelper) DeleteService(key types.NamespacedName, reqLogger logr.
 	err = r.client.Delete(context.TODO(), foundService)
 	if err != nil {
 		return errors.Wrap(err, "failed to delete service")
+	}
+
+	return nil
+}
+
+// NOTE: This sets an OwnerReference via controllerutil. For shared (ownerless) resources like the LiteLLM ConfigMap, call r.client.Create directly instead.
+func (r *ResourceHelper) CreateConfigMapIfNotExists(owner v1.Object, cm *corev1.ConfigMap, reqLogger logr.Logger) error {
+	foundCM := &corev1.ConfigMap{}
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: cm.Name, Namespace: cm.Namespace}, foundCM)
+	if err != nil && k8sErrors.IsNotFound(err) {
+		reqLogger.Info("Creating configmap", "name", cm.Name)
+		return r.Create(owner, cm, reqLogger)
+	} else if err != nil {
+		return errors.Wrap(err, "failed to check if configmap exists")
 	}
 
 	return nil

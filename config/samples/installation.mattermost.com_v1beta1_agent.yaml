@@ -1,0 +1,30 @@
+apiVersion: installation.mattermost.com/v1beta1
+kind: Agent
+metadata:
+  name: my-agent
+  namespace: default
+spec:
+  image: registry.example.com/my-agent:latest
+  hooks:
+    - MessageHasBeenPosted
+    - UserHasJoinedChannel
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  egressPolicy: allowList
+  egressAllowList:
+    - "api.openai.com"
+    - "api.anthropic.com"
+  mattermostRef:
+    name: my-mattermost
+  adminCredentialsSecret: my-mattermost-admin-token
+  env:
+    - name: OPENAI_API_KEY
+      valueFrom:
+        secretKeyRef:
+          name: agent-secrets
+          key: openai-key

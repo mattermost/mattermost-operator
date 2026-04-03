@@ -1,0 +1,16 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: pg-dev
+  namespace: mattermost
+spec:
+  instances: 1
+  storage:
+    size: 1Gi
+  postgresql:
+    parameters:
+      max_connections: "50"
+  bootstrap:
+    initdb:
+      database: mattermost
+      owner: mattermost

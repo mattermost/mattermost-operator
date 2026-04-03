@@ -1,0 +1,20 @@
+apiVersion: installation.mattermost.com/v1beta1
+kind: Agent
+metadata:
+  name: langgraph-demo
+  namespace: mattermost
+spec:
+  image: dev-registry:5000/langgraph-demo:dev
+  imagePullPolicy: Always
+  mattermostRef:
+    name: mattermost-dev
+  adminCredentialsSecret: mm-admin-token
+  egressPolicy: allowList
+  hooks:
+    - MessageHasBeenPosted
+  env:
+    - name: ANTHROPIC_API_KEY
+      valueFrom:
+        secretKeyRef:
+          name: anthropic-key
+          key: ANTHROPIC_API_KEY

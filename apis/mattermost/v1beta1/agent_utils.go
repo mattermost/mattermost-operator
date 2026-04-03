@@ -1,0 +1,86 @@
+// Copyright (c) 2017-present Mattermost, Inc. All Rights Reserved.
+// See License.txt for license information.
+
+package v1beta1
+
+import (
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+)
+
+const (
+	AgentEgressPolicyDeny             = "deny"
+	AgentEgressPolicyAllowList        = "allowList"
+	AgentContainerName                = "agent"
+	AgentGRPCPort                     = int32(50051)
+	AgentBotTokenSecretNamePrefix     = "agent-"
+	AgentLiteLLMDefaultImage          = "ghcr.io/berriai/litellm-database:main-v1.82.0-stable"
+	AgentLiteLLMPort                  = int32(4000)
+	AgentLiteLLMDeploymentName        = "litellm"
+	AgentLiteLLMServiceName           = "litellm"
+	AgentLiteLLMConfigMapName         = "litellm-config"
+	AgentLiteLLMMasterKeySecretName   = "litellm-master-key"
+	AgentLiteLLMDBCredentialsSecret   = "litellm-db-credentials"
+)
+
+// SetDefaults sets missing values in the Agent manifest to their defaults.
+func (a *Agent) SetDefaults() error {
+	if a.Spec.EgressPolicy == "" {
+		a.Spec.EgressPolicy = AgentEgressPolicyDeny
+	}
+
+	if a.Spec.Resources.Requests == nil {
+		a.Spec.Resources.Requests = corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("100m"),
+			corev1.ResourceMemory: resource.MustParse("128Mi"),
+		}
+	}
+
+	if a.Spec.Resources.Limits == nil {
+		a.Spec.Resources.Limits = corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("500m"),
+			corev1.ResourceMemory: resource.MustParse("512Mi"),
+		}
+	}
+
+	if a.Spec.LLMGateway != nil && a.Spec.LLMGateway.OperatorManaged != nil {
+		if a.Spec.LLMGateway.OperatorManaged.Image == "" {
+			a.Spec.LLMGateway.OperatorManaged.Image = AgentLiteLLMDefaultImage
+		}
+	}
+
+	return nil
+}
+
+// AgentLabels returns the full set of labels for all resources belonging to the agent.
+func AgentLabels(name string) map[string]string {
+	l := AgentResourceLabels(name)
+	l[ClusterLabel] = name
+	l["app"] = AgentContainerName
+	return l
+}
+
+// AgentSelectorLabels returns the minimal label set used as a pod selector.
+// Today this is identical to AgentLabels; the two are kept separate so that
+// selector labels can be narrowed in the future without changing resource labels.
+func AgentSelectorLabels(name string) map[string]string {
+	l := AgentResourceLabels(name)
+	l[ClusterLabel] = name
+	l["app"] = AgentContainerName
+	return l
+}
+
+// AgentResourceLabels returns the resource-scoped label for the agent.
+func AgentResourceLabels(name string) map[string]string {
+	return map[string]string{ClusterResourceLabel: name}
+}
+
+// BotTokenSecretName returns the name of the K8s Secret storing the agent's bot token.
+func (a *Agent) BotTokenSecretName() string {
+	return AgentBotTokenSecretNamePrefix + a.Name + "-token"
+}
+
+// LiteLLMKeySecretName returns the name of the K8s Secret storing this agent's LiteLLM virtual key.
+func (a *Agent) LiteLLMKeySecretName() string {
+	return "agent-" + a.Name + "-litellm-key"
+}
