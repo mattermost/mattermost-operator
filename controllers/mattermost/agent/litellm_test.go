@@ -146,21 +146,27 @@ func TestCheckLiteLLMReady_Ready(t *testing.T) {
 	assert.True(t, ready)
 }
 
-// TestReconcileLiteLLMModels_CallsAPI verifies POST /model/new is called for each model.
+// TestReconcileLiteLLMModels_CallsAPI verifies POST /model/new is called for each model
+// that does not already exist.
 func TestReconcileLiteLLMModels_CallsAPI(t *testing.T) {
 	agent := newTestAgentWithLLMGateway()
 
 	var modelsCalled []string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == "POST" && r.URL.Path == "/model/new" {
+		switch {
+		case r.Method == "GET" && r.URL.Path == "/model/info":
+			// Return empty list — no models registered yet.
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(liteLLMModelInfoResponse{Data: []liteLLMModelInfo{}})
+		case r.Method == "POST" && r.URL.Path == "/model/new":
 			var req liteLLMModelRequest
 			_ = json.NewDecoder(r.Body).Decode(&req)
 			modelsCalled = append(modelsCalled, req.LiteLLMParams.Model)
 			w.WriteHeader(http.StatusOK)
 			json.NewEncoder(w).Encode(map[string]string{"model_id": "id1"})
-			return
+		default:
+			w.WriteHeader(http.StatusNotFound)
 		}
-		w.WriteHeader(http.StatusNotFound)
 	}))
 	defer srv.Close()
 
@@ -172,62 +178,39 @@ func TestReconcileLiteLLMModels_CallsAPI(t *testing.T) {
 	assert.Contains(t, modelsCalled, "anthropic/claude-3-5-sonnet-20241022")
 }
 
-// TestReconcileLiteLLMVirtualKey_CreatesSecret verifies that the key Secret is created
-// when it does not yet exist.
-func TestReconcileLiteLLMVirtualKey_CreatesSecret(t *testing.T) {
+// TestReconcileLiteLLMModels_SkipsExisting verifies that models already registered
+// in LiteLLM are not re-registered, preventing duplicates.
+func TestReconcileLiteLLMModels_SkipsExisting(t *testing.T) {
 	agent := newTestAgentWithLLMGateway()
 
+	postCallCount := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == "POST" && r.URL.Path == "/key/generate" {
+		switch {
+		case r.Method == "GET" && r.URL.Path == "/model/info":
+			// Return both the prefixed and bare model names as already existing.
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(liteLLMKeyResponse{Key: "sk-virtual-key-123", KeyAlias: "agent-test-agent-key"})
-			return
+			json.NewEncoder(w).Encode(liteLLMModelInfoResponse{
+				Data: []liteLLMModelInfo{
+					{ModelName: "anthropic/claude-3-5-sonnet-20241022"},
+					{ModelName: "claude-3-5-sonnet-20241022"},
+				},
+			})
+		case r.Method == "POST" && r.URL.Path == "/model/new":
+			postCallCount++
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(map[string]string{"model_id": "id1"})
+		default:
+			w.WriteHeader(http.StatusNotFound)
 		}
-		w.WriteHeader(http.StatusNotFound)
 	}))
 	defer srv.Close()
 
 	reconciler, _ := setupReconciler(t, agent)
 	logger := testLogger()
 
-	err := reconciler.reconcileLiteLLMVirtualKey(context.TODO(), agent, srv.URL, "master-key", nil, logger)
+	err := reconciler.reconcileLiteLLMModels(context.TODO(), agent, srv.URL, "master-key", logger)
 	require.NoError(t, err)
-
-	secret := &corev1.Secret{}
-	err = reconciler.Client.Get(context.TODO(), types.NamespacedName{
-		Name:      agent.LiteLLMKeySecretName(),
-		Namespace: agent.Namespace,
-	}, secret)
-	require.NoError(t, err)
-	assert.Equal(t, "sk-virtual-key-123", string(secret.Data["apiKey"]))
-}
-
-// TestReconcileLiteLLMVirtualKey_Idempotent verifies that if the Secret already exists
-// the API is never called.
-func TestReconcileLiteLLMVirtualKey_Idempotent(t *testing.T) {
-	agent := newTestAgentWithLLMGateway()
-
-	existing := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      agent.LiteLLMKeySecretName(),
-			Namespace: agent.Namespace,
-		},
-		Data: map[string][]byte{"apiKey": []byte("existing-key")},
-	}
-
-	apiCalled := false
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		apiCalled = true
-		w.WriteHeader(http.StatusInternalServerError)
-	}))
-	defer srv.Close()
-
-	reconciler, _ := setupReconciler(t, agent, existing)
-	logger := testLogger()
-
-	err := reconciler.reconcileLiteLLMVirtualKey(context.TODO(), agent, srv.URL, "master-key", nil, logger)
-	require.NoError(t, err)
-	assert.False(t, apiCalled, "expected no API call when secret already exists")
+	assert.Equal(t, 0, postCallCount, "expected no POST calls when all models already exist")
 }
 
 // ─── MCP server registration tests ──────────────────────────────────────────

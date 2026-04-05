@@ -137,14 +137,6 @@ func schema__apis_mattermost_v1beta1_AgentSpec(ref common.ReferenceCallback) com
 							Ref:         ref("k8s.io/api/core/v1.LocalObjectReference"),
 						},
 					},
-					"adminCredentialsSecret": {
-						SchemaProps: spec.SchemaProps{
-							Description: "AdminCredentialsSecret is the name of the Kubernetes Secret containing a Mattermost admin access token used to provision the bot account. The Secret must have a key \"token\" with the admin access token value.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
 					"env": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Env defines optional environment variables to inject into the agent pod.",
@@ -180,7 +172,7 @@ func schema__apis_mattermost_v1beta1_AgentSpec(ref common.ReferenceCallback) com
 						},
 					},
 				},
-				Required: []string{"image", "mattermostRef", "adminCredentialsSecret"},
+				Required: []string{"image", "mattermostRef"},
 			},
 		},
 		Dependencies: []string{

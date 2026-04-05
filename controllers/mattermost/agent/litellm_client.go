@@ -117,8 +117,35 @@ func (c *liteLLMClient) do(method, path string, body interface{}) ([]byte, int, 
 
 // ─── Model registration ────────────────────────────────────────────────────
 
+// liteLLMModelInfo represents a single entry returned by GET /model/info.
+type liteLLMModelInfo struct {
+	ModelName string `json:"model_name"`
+}
+
+// liteLLMModelInfoResponse is the envelope returned by GET /model/info.
+type liteLLMModelInfoResponse struct {
+	Data []liteLLMModelInfo `json:"data"`
+}
+
+// listModels returns all registered model names via GET /model/info.
+func (c *liteLLMClient) listModels() ([]liteLLMModelInfo, error) {
+	body, status, err := c.do("GET", "/model/info", nil)
+	if err != nil {
+		return nil, err
+	}
+	if status != http.StatusOK {
+		return nil, fmt.Errorf("list models returned status %d: %s", status, string(body))
+	}
+
+	var resp liteLLMModelInfoResponse
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return nil, fmt.Errorf("failed to decode model info response: %w", err)
+	}
+	return resp.Data, nil
+}
+
 // registerModel registers an LLM model via POST /model/new.
-// Safe to call multiple times — LiteLLM upserts.
+// NOT idempotent — callers must check listModels first.
 func (c *liteLLMClient) registerModel(modelName, litellmModel, apiKeyEnvRef string) error {
 	req := liteLLMModelRequest{
 		ModelName: modelName,

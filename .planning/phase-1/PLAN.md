@@ -1,917 +1,700 @@
-# Phase 1: CRD Types + Resource Generation — Prescriptive Plan
+# Phase 1: Operator RBAC + CRD Changes — Prescriptive Plan
 
-> **Milestone:** M3 — Agent Secret Protection (LiteLLM Gateway)
+> **Milestone:** M4 — Plugin-Driven Trail Agent Orchestration
 > **Target repo:** `~/workspace/worktrees/mattermost-operator-the-trail`
-> **Phase:** 1 of 6
+> **Phase:** 1 (Operator Simplification + RBAC Extension)
 > **Depends on:** nothing (first phase)
-> **Goal:** All new Go types compiled, resource generators for LiteLLM K8s resources, env var injection into agent pods, NetworkPolicy update. No API calls yet — purely K8s resource generation.
+> **Goal:** Extend MM server pod RBAC Role for Agent CRUD + Secret write. Add status fields (phase, message, readyReplicas) to Agent CRD. Remove `AdminCredentialsSecret`. Add lifecycle phase tracking in reconciler. All tests pass.
 
 ---
 
 ## Context: What Already Exists
 
-The files below already exist with working content. All tasks in this phase **extend** them — do not replace or recreate them from scratch.
+All tasks in this phase **modify** existing files. Do not recreate files from scratch.
 
-- `apis/mattermost/v1beta1/agent_types.go` — `AgentSpec` struct with existing fields (Image, Hooks, Resources, EgressPolicy, EgressAllowList, MattermostRef, AdminCredentialsSecret, Env). Ends with `func init()` at line 116.
-- `apis/mattermost/v1beta1/agent_utils.go` — constants (AgentEgressPolicyDeny, AgentContainerName, AgentGRPCPort, AgentBotTokenSecretNamePrefix), `SetDefaults()`, label helpers, `BotTokenSecretName()`.
-- `pkg/mattermost/agent.go` — `GenerateAgentDeployment` (builds `baseEnv`, calls `mergeEnvVars`), `GenerateAgentNetworkPolicy` (builds egressRules slice), `GenerateAgentBotTokenSecret`.
-- `pkg/resources/create_resources.go` — `ResourceHelper` with `CreateSecretIfNotExists`, `CreateDeploymentIfNotExists`, etc.
-- `controllers/mattermost/agent/controller.go` — `SetupWithManager` (Owns registrations), `Reconcile` loop (checkAgentBot → checkAgentServiceAccount → checkAgentService → checkAgentDeployment → checkAgentNetworkPolicy → checkAgentHealth).
+- `apis/mattermost/v1beta1/agent_types.go` — `AgentSpec` with `AdminCredentialsSecret` field (line 53), `AgentStatus` with State, Endpoint, BotUserID, BotUsername, ObservedGeneration, Error (lines 73-99).
+- `apis/mattermost/v1beta1/agent_utils.go` — constants block (lines 11-24), `SetDefaults()`, label helpers, `BotTokenSecretName()`, `LiteLLMKeySecretName()`.
+- `pkg/mattermost/mattermost_v1beta.go` — `mattermostRolePermissions()` returns 2 `PolicyRule` entries (lines 555-569), `GenerateRoleV1Beta()` calls it (line 544).
+- `controllers/mattermost/agent/controller.go` — `Reconcile()` loop with admin secret read (lines 101-111), `checkAgentBot` call (lines 113-118), `reconcileLiteLLMVirtualKey` call (line 156).
+- `controllers/mattermost/agent/agent.go` — `checkAgentBot()` (line 35), `checkAgentBotWithURL()` (line 41), bot HTTP helpers, `checkAgentHealth()` (line 245).
+- `controllers/mattermost/agent/litellm.go` — `reconcileLiteLLMVirtualKey()` (line 157).
+- `controllers/mattermost/agent/utils.go` — `updateStatusReconciling()`, `updateStatusReconcilingAndLogError()`, `updateStatus()`.
 
 Module path: `github.com/mattermost/mattermost-operator`
 
 ---
 
-## Task 1.1: Extend `apis/mattermost/v1beta1/agent_types.go`
+## Task 1.1: Extend MM Server Pod RBAC Role
+
+**File:** `pkg/mattermost/mattermost_v1beta.go`
+**Lines:** 555-569 (`mattermostRolePermissions()`)
+
+### What to change
+
+Replace the current 2-rule return value with a 4-rule return value. The first rule (batch/jobs) is unchanged. The second rule (agents get/list/watch) is expanded to full CRUD. Two new rules are added: agents/status get, and secrets get/create/update.
+
+### Exact edit
+
+Replace the entire function body of `mattermostRolePermissions()` (lines 555-569):
+
+**Old (lines 555-569):**
+```go
+func mattermostRolePermissions() []rbacv1.PolicyRule {
+	return []rbacv1.PolicyRule{
+		{
+			Verbs:         []string{"get", "list", "watch"},
+			APIGroups:     []string{"batch"},
+			Resources:     []string{"jobs"},
+			ResourceNames: []string{SetupJobName},
+		},
+		{
+			Verbs:     []string{"get", "list", "watch"},
+			APIGroups: []string{"installation.mattermost.com"},
+			Resources: []string{"agents"},
+		},
+	}
+}
+```
+
+**New:**
+```go
+func mattermostRolePermissions() []rbacv1.PolicyRule {
+	return []rbacv1.PolicyRule{
+		{
+			Verbs:         []string{"get", "list", "watch"},
+			APIGroups:     []string{"batch"},
+			Resources:     []string{"jobs"},
+			ResourceNames: []string{SetupJobName},
+		},
+		{
+			Verbs:     []string{"get", "list", "watch", "create", "update", "patch", "delete"},
+			APIGroups: []string{"installation.mattermost.com"},
+			Resources: []string{"agents"},
+		},
+		{
+			Verbs:     []string{"get"},
+			APIGroups: []string{"installation.mattermost.com"},
+			Resources: []string{"agents/status"},
+		},
+		{
+			Verbs:     []string{"get", "create", "update"},
+			APIGroups: []string{""},
+			Resources: []string{"secrets"},
+		},
+	}
+}
+```
+
+### Tests to update
+
+**File:** `pkg/mattermost/mattermost_v1beta_test.go`
+**Lines:** 1104-1132 (`TestGenerateRBACResources_V1Beta`)
+
+The test currently asserts `require.Equal(t, 2, len(role.Rules))` on line 1123. Change to 4 rules and add verb assertions:
+
+**Old (line 1123):**
+```go
+	require.Equal(t, 2, len(role.Rules))
+```
+
+**New (replace line 1123 with):**
+```go
+	require.Equal(t, 4, len(role.Rules))
+
+	// Rule 0: batch/jobs — get,list,watch (unchanged).
+	assert.Equal(t, []string{"get", "list", "watch"}, role.Rules[0].Verbs)
+	assert.Equal(t, []string{"batch"}, role.Rules[0].APIGroups)
+	assert.Equal(t, []string{"jobs"}, role.Rules[0].Resources)
+
+	// Rule 1: agents — full CRUD.
+	assert.Equal(t, []string{"get", "list", "watch", "create", "update", "patch", "delete"}, role.Rules[1].Verbs)
+	assert.Equal(t, []string{"installation.mattermost.com"}, role.Rules[1].APIGroups)
+	assert.Equal(t, []string{"agents"}, role.Rules[1].Resources)
+
+	// Rule 2: agents/status — get only.
+	assert.Equal(t, []string{"get"}, role.Rules[2].Verbs)
+	assert.Equal(t, []string{"installation.mattermost.com"}, role.Rules[2].APIGroups)
+	assert.Equal(t, []string{"agents/status"}, role.Rules[2].Resources)
+
+	// Rule 3: secrets — get, create, update.
+	assert.Equal(t, []string{"get", "create", "update"}, role.Rules[3].Verbs)
+	assert.Equal(t, []string{""}, role.Rules[3].APIGroups)
+	assert.Equal(t, []string{"secrets"}, role.Rules[3].Resources)
+```
+
+Also ensure `assert` is imported in this test file. It currently uses `require` but not `assert`. Add to the import block:
+```go
+	"github.com/stretchr/testify/assert"
+```
+
+**File:** `controllers/mattermost/mattermost/mattermost_test.go`
+**Lines:** 175-197 (`"role"` subtest)
+
+The existing test creates the role, modifies it (sets `Rules = nil`), re-reconciles, and asserts rules are restored. No changes needed — the `assert.Equal(t, original.Rules, found.Rules)` on line 196 will pass with the new 4-rule set because `original` captures whatever `mattermostRolePermissions()` returns.
+
+### Validation
+
+```bash
+cd ~/workspace/worktrees/mattermost-operator-the-trail
+go test ./pkg/mattermost/ -run TestGenerateRBACResources_V1Beta -v
+go test ./controllers/mattermost/mattermost/ -run TestCheckMattermost -v
+```
+
+---
+
+## Task 1.2: Add Agent CR Status Fields
+
+### Part A: Add fields to AgentStatus
 
 **File:** `apis/mattermost/v1beta1/agent_types.go`
-**Action:** Two separate edits to the existing file.
+**Lines:** 72-99 (`AgentStatus` struct)
 
-### Edit A: Add two fields to `AgentSpec`
+Insert three new fields after the `Error` field (after line 98, before the closing `}` of `AgentStatus`):
 
-Insert after line 57 (the `Env` field, `json:"env,omitempty"`), before the closing `}` of `AgentSpec`:
-
+**Old (lines 96-99):**
 ```go
-	// LLMGateway configures the LLM gateway for this agent.
-	// When OperatorManaged is set, the operator deploys a shared LiteLLM instance
-	// in the agent's namespace and provisions a virtual key for this agent.
-	// When External is set, the agent uses an existing LiteLLM instance.
+	// Error records the last observed error in the reconciliation of this Agent.
 	// +optional
-	LLMGateway *LLMGatewayConfig `json:"llmGateway,omitempty"`
-
-	// MCPServers lists MCP servers to register in the LiteLLM gateway for this agent.
-	// Only evaluated when LLMGateway.OperatorManaged is set.
-	// +optional
-	MCPServers []AgentMCPServer `json:"mcpServers,omitempty"`
-```
-
-After this edit `AgentSpec` ends as:
-
-```go
-	// Env defines optional environment variables to inject into the agent pod.
-	// +optional
-	Env []corev1.EnvVar `json:"env,omitempty"`
-
-	// LLMGateway configures the LLM gateway for this agent.
-	// When OperatorManaged is set, the operator deploys a shared LiteLLM instance
-	// in the agent's namespace and provisions a virtual key for this agent.
-	// When External is set, the agent uses an existing LiteLLM instance.
-	// +optional
-	LLMGateway *LLMGatewayConfig `json:"llmGateway,omitempty"`
-
-	// MCPServers lists MCP servers to register in the LiteLLM gateway for this agent.
-	// Only evaluated when LLMGateway.OperatorManaged is set.
-	// +optional
-	MCPServers []AgentMCPServer `json:"mcpServers,omitempty"`
+	Error string `json:"error,omitempty"`
 }
 ```
 
-### Edit B: Add 7 new type definitions
-
-Insert the following block **before** `func init()` at the end of the file (currently line 116). Add it between the `AgentList` struct's closing brace and `func init()`:
-
+**New:**
 ```go
-// LLMGatewayConfig defines how the agent connects to an LLM gateway.
-// Exactly one of External or OperatorManaged must be set.
-type LLMGatewayConfig struct {
-	// External configures the agent to use an existing LiteLLM instance.
+	// Error records the last observed error in the reconciliation of this Agent.
 	// +optional
-	External *ExternalLLMGateway `json:"external,omitempty"`
+	Error string `json:"error,omitempty"`
 
-	// OperatorManaged configures the operator to deploy and manage a shared
-	// LiteLLM instance in the agent's namespace.
+	// Phase is the lifecycle phase of the agent.
+	// One of: Provisioning, Deploying, Ready, Error.
 	// +optional
-	OperatorManaged *OperatorManagedLLMGateway `json:"operatorManaged,omitempty"`
-}
+	Phase string `json:"phase,omitempty"`
 
-// ExternalLLMGateway configures the agent to use an externally managed LiteLLM instance.
-type ExternalLLMGateway struct {
-	// URL is the base URL of the external LiteLLM instance.
-	// Example: "http://litellm.my-namespace.svc.cluster.local:4000"
-	URL string `json:"url"`
-
-	// VirtualKeySecret is the name of the K8s Secret containing the virtual key
-	// for this agent. The Secret must have a key "apiKey".
-	VirtualKeySecret string `json:"virtualKeySecret"`
-}
-
-// OperatorManagedLLMGateway configures the operator to deploy and manage LiteLLM.
-type OperatorManagedLLMGateway struct {
-	// Image is the LiteLLM container image to use.
-	// Defaults to "ghcr.io/berriai/litellm-database:main-v1.82.0-stable".
+	// Message is a human-readable status message providing additional detail.
 	// +optional
-	Image string `json:"image,omitempty"`
+	Message string `json:"message,omitempty"`
 
-	// Resources defines the CPU/memory requests and limits for the LiteLLM pod.
+	// ReadyReplicas is the number of ready replicas for the agent deployment.
 	// +optional
-	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
-
-	// LLMProviders lists the LLM providers to register in LiteLLM.
-	// Each provider maps to a POST /model/new call during reconciliation.
-	// +optional
-	LLMProviders []LLMProvider `json:"llmProviders,omitempty"`
-}
-
-// LLMProvider defines a provider (e.g. anthropic, openai) and the models to register.
-type LLMProvider struct {
-	// Name is the provider name as recognised by LiteLLM.
-	// Examples: "anthropic", "openai", "bedrock".
-	Name string `json:"name"`
-
-	// Secret is the name of the K8s Secret containing the provider API key.
-	// The Secret must have a key "apiKey".
-	Secret string `json:"secret"`
-
-	// Models lists the model names to register for this provider.
-	// Example: ["claude-3-5-sonnet-20241022", "claude-3-opus-20240229"]
-	Models []string `json:"models"`
-}
-
-// AgentMCPServer defines an MCP server entry to register in LiteLLM for this agent.
-type AgentMCPServer struct {
-	// Name is the human-readable name for this MCP server.
-	// Will be sanitized (hyphens replaced with underscores) when registered in LiteLLM.
-	Name string `json:"name"`
-
-	// URL is the base URL of the MCP server.
-	// Example: "http://jira-mcp.tools.svc.cluster.local:8080"
-	URL string `json:"url"`
-
-	// CredentialSecret is the name of the K8s Secret containing the auth credential
-	// for this MCP server. The Secret must have a key "apiKey".
-	// +optional
-	CredentialSecret string `json:"credentialSecret,omitempty"`
-
-	// MCPAccessGroup is the access group name used to scope this server to virtual keys.
-	// If empty, the operator generates one: "<agentName>_<sanitizedServerName>".
-	// +optional
-	MCPAccessGroup string `json:"mcpAccessGroup,omitempty"`
-
-	// AllowedTools lists specific tool names to permit (in addition to server-level access).
-	// If empty, all tools on the server are accessible.
-	// +optional
-	AllowedTools []string `json:"allowedTools,omitempty"`
-
-	// DisallowedTools lists specific tool names to block.
-	// +optional
-	DisallowedTools []string `json:"disallowedTools,omitempty"`
+	ReadyReplicas int32 `json:"readyReplicas,omitempty"`
 }
 ```
 
-**Full resulting end of file** (from `AgentList` onward):
-
-```go
-// +kubebuilder:object:root=true
-
-// AgentList contains a list of Agent
-type AgentList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Agent `json:"items"`
-}
-
-// LLMGatewayConfig defines how the agent connects to an LLM gateway.
-// Exactly one of External or OperatorManaged must be set.
-type LLMGatewayConfig struct {
-	// External configures the agent to use an existing LiteLLM instance.
-	// +optional
-	External *ExternalLLMGateway `json:"external,omitempty"`
-
-	// OperatorManaged configures the operator to deploy and manage a shared
-	// LiteLLM instance in the agent's namespace.
-	// +optional
-	OperatorManaged *OperatorManagedLLMGateway `json:"operatorManaged,omitempty"`
-}
-
-// ExternalLLMGateway configures the agent to use an externally managed LiteLLM instance.
-type ExternalLLMGateway struct {
-	// URL is the base URL of the external LiteLLM instance.
-	// Example: "http://litellm.my-namespace.svc.cluster.local:4000"
-	URL string `json:"url"`
-
-	// VirtualKeySecret is the name of the K8s Secret containing the virtual key
-	// for this agent. The Secret must have a key "apiKey".
-	VirtualKeySecret string `json:"virtualKeySecret"`
-}
-
-// OperatorManagedLLMGateway configures the operator to deploy and manage LiteLLM.
-type OperatorManagedLLMGateway struct {
-	// Image is the LiteLLM container image to use.
-	// Defaults to "ghcr.io/berriai/litellm-database:main-v1.82.0-stable".
-	// +optional
-	Image string `json:"image,omitempty"`
-
-	// Resources defines the CPU/memory requests and limits for the LiteLLM pod.
-	// +optional
-	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
-
-	// LLMProviders lists the LLM providers to register in LiteLLM.
-	// Each provider maps to a POST /model/new call during reconciliation.
-	// +optional
-	LLMProviders []LLMProvider `json:"llmProviders,omitempty"`
-}
-
-// LLMProvider defines a provider (e.g. anthropic, openai) and the models to register.
-type LLMProvider struct {
-	// Name is the provider name as recognised by LiteLLM.
-	// Examples: "anthropic", "openai", "bedrock".
-	Name string `json:"name"`
-
-	// Secret is the name of the K8s Secret containing the provider API key.
-	// The Secret must have a key "apiKey".
-	Secret string `json:"secret"`
-
-	// Models lists the model names to register for this provider.
-	// Example: ["claude-3-5-sonnet-20241022", "claude-3-opus-20240229"]
-	Models []string `json:"models"`
-}
-
-// AgentMCPServer defines an MCP server entry to register in LiteLLM for this agent.
-type AgentMCPServer struct {
-	// Name is the human-readable name for this MCP server.
-	// Will be sanitized (hyphens replaced with underscores) when registered in LiteLLM.
-	Name string `json:"name"`
-
-	// URL is the base URL of the MCP server.
-	// Example: "http://jira-mcp.tools.svc.cluster.local:8080"
-	URL string `json:"url"`
-
-	// CredentialSecret is the name of the K8s Secret containing the auth credential
-	// for this MCP server. The Secret must have a key "apiKey".
-	// +optional
-	CredentialSecret string `json:"credentialSecret,omitempty"`
-
-	// MCPAccessGroup is the access group name used to scope this server to virtual keys.
-	// If empty, the operator generates one: "<agentName>_<sanitizedServerName>".
-	// +optional
-	MCPAccessGroup string `json:"mcpAccessGroup,omitempty"`
-
-	// AllowedTools lists specific tool names to permit (in addition to server-level access).
-	// If empty, all tools on the server are accessible.
-	// +optional
-	AllowedTools []string `json:"allowedTools,omitempty"`
-
-	// DisallowedTools lists specific tool names to block.
-	// +optional
-	DisallowedTools []string `json:"disallowedTools,omitempty"`
-}
-
-func init() {
-	SchemeBuilder.Register(&Agent{}, &AgentList{})
-}
-```
-
-**No new imports needed** — `corev1` is already imported.
-
----
-
-## Task 1.2: Extend `apis/mattermost/v1beta1/agent_utils.go`
+### Part B: Add phase constants
 
 **File:** `apis/mattermost/v1beta1/agent_utils.go`
-**Action:** Two edits to the existing file.
+**Lines:** 11-24 (existing const block)
 
-### Edit A: Add constants
-
-In the `const` block (currently lines 11–17), add after `AgentBotTokenSecretNamePrefix`:
+Add a new const block **after** the existing one (after line 24):
 
 ```go
-	AgentLiteLLMDefaultImage          = "ghcr.io/berriai/litellm-database:main-v1.82.0-stable"
-	AgentLiteLLMPort                  = int32(4000)
-	AgentLiteLLMDeploymentName        = "litellm"
-	AgentLiteLLMServiceName           = "litellm"
-	AgentLiteLLMConfigMapName         = "litellm-config"
-	AgentLiteLLMMasterKeySecretName   = "litellm-master-key"
-	AgentLiteLLMDBCredentialsSecret   = "litellm-db-credentials"
-```
-
-**Full resulting `const` block:**
-
-```go
+// Agent lifecycle phases (written to AgentStatus.Phase).
 const (
-	AgentEgressPolicyDeny             = "deny"
-	AgentEgressPolicyAllowList        = "allowList"
-	AgentContainerName                = "agent"
-	AgentGRPCPort                     = int32(50051)
-	AgentBotTokenSecretNamePrefix     = "agent-"
-	AgentLiteLLMDefaultImage          = "ghcr.io/berriai/litellm-database:main-v1.82.0-stable"
-	AgentLiteLLMPort                  = int32(4000)
-	AgentLiteLLMDeploymentName        = "litellm"
-	AgentLiteLLMServiceName           = "litellm"
-	AgentLiteLLMConfigMapName         = "litellm-config"
-	AgentLiteLLMMasterKeySecretName   = "litellm-master-key"
-	AgentLiteLLMDBCredentialsSecret   = "litellm-db-credentials"
+	AgentPhaseProvisioning = "Provisioning"
+	AgentPhaseDeploying    = "Deploying"
+	AgentPhaseReady        = "Ready"
+	AgentPhaseError        = "Error"
 )
 ```
 
-### Edit B: Add `LiteLLMKeySecretName()` method and extend `SetDefaults()`
-
-Append at the **end of the file** (after `BotTokenSecretName()`):
-
-```go
-// LiteLLMKeySecretName returns the name of the K8s Secret storing this agent's LiteLLM virtual key.
-func (a *Agent) LiteLLMKeySecretName() string {
-	return "agent-" + a.Name + "-litellm-key"
-}
-```
-
-Also extend `SetDefaults()` — add the following block **at the end of the function body**, before `return nil`:
-
-```go
-	if a.Spec.LLMGateway != nil && a.Spec.LLMGateway.OperatorManaged != nil {
-		if a.Spec.LLMGateway.OperatorManaged.Image == "" {
-			a.Spec.LLMGateway.OperatorManaged.Image = AgentLiteLLMDefaultImage
-		}
-	}
-```
-
-**Full resulting `SetDefaults()` function:**
-
-```go
-// SetDefaults sets missing values in the Agent manifest to their defaults.
-func (a *Agent) SetDefaults() error {
-	if a.Spec.EgressPolicy == "" {
-		a.Spec.EgressPolicy = AgentEgressPolicyDeny
-	}
-
-	if a.Spec.Resources.Requests == nil {
-		a.Spec.Resources.Requests = corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse("100m"),
-			corev1.ResourceMemory: resource.MustParse("128Mi"),
-		}
-	}
-
-	if a.Spec.Resources.Limits == nil {
-		a.Spec.Resources.Limits = corev1.ResourceList{
-			corev1.ResourceCPU:    resource.MustParse("500m"),
-			corev1.ResourceMemory: resource.MustParse("512Mi"),
-		}
-	}
-
-	if a.Spec.LLMGateway != nil && a.Spec.LLMGateway.OperatorManaged != nil {
-		if a.Spec.LLMGateway.OperatorManaged.Image == "" {
-			a.Spec.LLMGateway.OperatorManaged.Image = AgentLiteLLMDefaultImage
-		}
-	}
-
-	return nil
-}
-```
-
-**No new imports needed** — `corev1` and `resource` are already imported.
-
----
-
-## Task 1.3: Create `pkg/mattermost/litellm.go`
-
-**File:** `pkg/mattermost/litellm.go`
-**Action:** Create (new file)
-
-This file lives in package `mattermost` alongside `agent.go`. It provides resource generators for all LiteLLM K8s objects.
-
-```go
-// Copyright (c) 2017-present Mattermost, Inc. All Rights Reserved.
-// See License.txt for license information.
-
-package mattermost
-
-import (
-	"fmt"
-
-	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
-
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
-)
-
-// liteLLMLabels returns the label set for all LiteLLM resources.
-func liteLLMLabels() map[string]string {
-	return map[string]string{"app": "litellm"}
-}
-
-// LiteLLMServiceURL returns the in-cluster base URL for the LiteLLM service.
-func LiteLLMServiceURL(namespace string) string {
-	return fmt.Sprintf("http://%s.%s.svc.cluster.local:%d",
-		mmv1beta.AgentLiteLLMServiceName, namespace, mmv1beta.AgentLiteLLMPort)
-}
-
-// secretEnvSource returns an EnvVarSource that reads from a Secret key.
-func secretEnvSource(secretName, key string) *corev1.EnvVarSource {
-	return &corev1.EnvVarSource{
-		SecretKeyRef: &corev1.SecretKeySelector{
-			LocalObjectReference: corev1.LocalObjectReference{Name: secretName},
-			Key:                  key,
-		},
-	}
-}
-
-// GenerateLiteLLMConfigMap returns the ConfigMap for LiteLLM general settings.
-// It contains only general_settings — all models are registered via API.
-// This resource is NOT owned by any single Agent (it is shared), so the caller
-// must NOT use r.Resources.Create (which sets OwnerReference). Use r.client.Create directly.
-func GenerateLiteLLMConfigMap(namespace string) *corev1.ConfigMap {
-	return &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      mmv1beta.AgentLiteLLMConfigMapName,
-			Namespace: namespace,
-			Labels:    liteLLMLabels(),
-		},
-		Data: map[string]string{
-			"config.yaml": "general_settings:\n  store_model_in_db: true\n",
-		},
-	}
-}
-
-// GenerateLiteLLMDeployment returns the Deployment for the LiteLLM gateway.
-// providerEnvVars are injected to give LiteLLM access to provider API keys
-// (e.g. ANTHROPIC_API_KEY, OPENAI_API_KEY) sourced from K8s Secrets.
-// This resource is NOT owned by any single Agent. The caller must NOT use
-// r.Resources.Create — use r.client.Create directly.
-func GenerateLiteLLMDeployment(namespace, image string, providerEnvVars []corev1.EnvVar) *appsv1.Deployment {
-	replicas := int32(1)
-	configVolumeName := "litellm-config"
-
-	baseEnv := []corev1.EnvVar{
-		{
-			Name:      "DATABASE_URL",
-			ValueFrom: secretEnvSource(mmv1beta.AgentLiteLLMDBCredentialsSecret, "connectionString"),
-		},
-		{
-			Name:      "LITELLM_MASTER_KEY",
-			ValueFrom: secretEnvSource(mmv1beta.AgentLiteLLMMasterKeySecretName, "masterKey"),
-		},
-		{
-			Name:  "STORE_MODEL_IN_DB",
-			Value: "True",
-		},
-	}
-	baseEnv = append(baseEnv, providerEnvVars...)
-
-	livenessProbe := &corev1.Probe{
-		ProbeHandler: corev1.ProbeHandler{
-			HTTPGet: &corev1.HTTPGetAction{
-				Path: "/health/liveliness",
-				Port: intstr.FromInt32(mmv1beta.AgentLiteLLMPort),
-			},
-		},
-		InitialDelaySeconds: 15,
-		PeriodSeconds:       10,
-		FailureThreshold:    3,
-	}
-
-	readinessProbe := &corev1.Probe{
-		ProbeHandler: corev1.ProbeHandler{
-			HTTPGet: &corev1.HTTPGetAction{
-				Path: "/health/readiness",
-				Port: intstr.FromInt32(mmv1beta.AgentLiteLLMPort),
-			},
-		},
-		InitialDelaySeconds: 15,
-		PeriodSeconds:       5,
-		FailureThreshold:    6,
-	}
-
-	return &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      mmv1beta.AgentLiteLLMDeploymentName,
-			Namespace: namespace,
-			Labels:    liteLLMLabels(),
-		},
-		Spec: appsv1.DeploymentSpec{
-			Replicas: &replicas,
-			Selector: &metav1.LabelSelector{
-				MatchLabels: liteLLMLabels(),
-			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: liteLLMLabels(),
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Name:  "litellm",
-							Image: image,
-							Args:  []string{"--config", "/app/config/config.yaml"},
-							Env:   baseEnv,
-							Ports: []corev1.ContainerPort{
-								{
-									ContainerPort: mmv1beta.AgentLiteLLMPort,
-									Name:          "http",
-								},
-							},
-							Resources: corev1.ResourceRequirements{
-								Requests: corev1.ResourceList{
-									corev1.ResourceCPU:    resource.MustParse("500m"),
-									corev1.ResourceMemory: resource.MustParse("512Mi"),
-								},
-								Limits: corev1.ResourceList{
-									corev1.ResourceCPU:    resource.MustParse("2"),
-									corev1.ResourceMemory: resource.MustParse("2Gi"),
-								},
-							},
-							LivenessProbe:  livenessProbe,
-							ReadinessProbe: readinessProbe,
-							VolumeMounts: []corev1.VolumeMount{
-								{
-									Name:      configVolumeName,
-									MountPath: "/app/config",
-									ReadOnly:  true,
-								},
-							},
-						},
-					},
-					Volumes: []corev1.Volume{
-						{
-							Name: configVolumeName,
-							VolumeSource: corev1.VolumeSource{
-								ConfigMap: &corev1.ConfigMapVolumeSource{
-									LocalObjectReference: corev1.LocalObjectReference{
-										Name: mmv1beta.AgentLiteLLMConfigMapName,
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-}
-
-// GenerateLiteLLMService returns the ClusterIP Service for the LiteLLM gateway.
-// This resource is NOT owned by any single Agent. The caller must NOT use
-// r.Resources.Create — use r.client.Create directly.
-func GenerateLiteLLMService(namespace string) *corev1.Service {
-	return &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      mmv1beta.AgentLiteLLMServiceName,
-			Namespace: namespace,
-			Labels:    liteLLMLabels(),
-		},
-		Spec: corev1.ServiceSpec{
-			Type:     corev1.ServiceTypeClusterIP,
-			Selector: liteLLMLabels(),
-			Ports: []corev1.ServicePort{
-				{
-					Name:       "http",
-					Port:       mmv1beta.AgentLiteLLMPort,
-					TargetPort: intstr.FromInt32(mmv1beta.AgentLiteLLMPort),
-				},
-			},
-		},
-	}
-}
-
-// GenerateAgentLiteLLMKeySecret returns the Secret storing an agent's LiteLLM virtual key.
-// Follows the same pattern as GenerateAgentBotTokenSecret.
-func GenerateAgentLiteLLMKeySecret(agent *mmv1beta.Agent, keyValue string) *corev1.Secret {
-	return &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            agent.LiteLLMKeySecretName(),
-			Namespace:       agent.Namespace,
-			Labels:          mmv1beta.AgentLabels(agent.Name),
-			OwnerReferences: AgentOwnerReference(agent),
-		},
-		Data: map[string][]byte{"apiKey": []byte(keyValue)},
-	}
-}
-```
-
----
-
-## Task 1.4: Modify `pkg/mattermost/agent.go` — Env Var Injection
-
-**File:** `pkg/mattermost/agent.go`
-**Action:** Modify `GenerateAgentDeployment` — add LiteLLM env vars to `baseEnv` before the `mergeEnvVars` call.
-
-**Exact location:** Line 91 currently reads `envVars := mergeEnvVars(baseEnv, agent.Spec.Env)`.
-
-Insert the following block **between** the closing `}` of `baseEnv` (line 91) and `envVars := mergeEnvVars(...)` (currently line 93):
-
-```go
-	// Inject LiteLLM gateway env vars when llmGateway is configured.
-	// These go into baseEnv so user's spec.env can override them via mergeEnvVars.
-	if agent.Spec.LLMGateway != nil {
-		var baseURL string
-		var keySecretName string
-
-		if agent.Spec.LLMGateway.OperatorManaged != nil {
-			baseURL = LiteLLMServiceURL(agent.Namespace)
-			keySecretName = agent.LiteLLMKeySecretName()
-		} else if agent.Spec.LLMGateway.External != nil {
-			baseURL = agent.Spec.LLMGateway.External.URL
-			keySecretName = agent.Spec.LLMGateway.External.VirtualKeySecret
-		}
-
-		if baseURL != "" && keySecretName != "" {
-			keyEnvSource := secretEnvSource(keySecretName, "apiKey")
-			baseEnv = append(baseEnv,
-				corev1.EnvVar{Name: "LITELLM_BASE_URL", Value: baseURL},
-				corev1.EnvVar{Name: "LITELLM_MCP_URL", Value: baseURL + "/mcp"},
-				corev1.EnvVar{Name: "OPENAI_BASE_URL", Value: baseURL + "/v1"},
-				corev1.EnvVar{Name: "OPENAI_API_KEY", ValueFrom: keyEnvSource},
-				corev1.EnvVar{Name: "ANTHROPIC_BASE_URL", Value: baseURL + "/v1"},
-				corev1.EnvVar{Name: "ANTHROPIC_API_KEY", ValueFrom: keyEnvSource},
-			)
-		}
-	}
-```
-
-**Full resulting `GenerateAgentDeployment` function body** (lines 68–189 of original, showing the modified section):
-
-```go
-func GenerateAgentDeployment(agent *mmv1beta.Agent) *appsv1.Deployment {
-	replicas := int32(1)
-
-	baseEnv := []corev1.EnvVar{
-		{
-			Name:  "MM_SERVER_URL",
-			Value: mmServerURL(agent),
-		},
-		{
-			Name:  "AGENT_HOOKS",
-			Value: strings.Join(agent.Spec.Hooks, ","),
-		},
-		{
-			Name: "MM_BOT_TOKEN",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: agent.BotTokenSecretName(),
-					},
-					Key: "token",
-				},
-			},
-		},
-	}
-
-	// Inject LiteLLM gateway env vars when llmGateway is configured.
-	// These go into baseEnv so user's spec.env can override them via mergeEnvVars.
-	if agent.Spec.LLMGateway != nil {
-		var baseURL string
-		var keySecretName string
-
-		if agent.Spec.LLMGateway.OperatorManaged != nil {
-			baseURL = LiteLLMServiceURL(agent.Namespace)
-			keySecretName = agent.LiteLLMKeySecretName()
-		} else if agent.Spec.LLMGateway.External != nil {
-			baseURL = agent.Spec.LLMGateway.External.URL
-			keySecretName = agent.Spec.LLMGateway.External.VirtualKeySecret
-		}
-
-		if baseURL != "" && keySecretName != "" {
-			keyEnvSource := secretEnvSource(keySecretName, "apiKey")
-			baseEnv = append(baseEnv,
-				corev1.EnvVar{Name: "LITELLM_BASE_URL", Value: baseURL},
-				corev1.EnvVar{Name: "LITELLM_MCP_URL", Value: baseURL + "/mcp"},
-				corev1.EnvVar{Name: "OPENAI_BASE_URL", Value: baseURL + "/v1"},
-				corev1.EnvVar{Name: "OPENAI_API_KEY", ValueFrom: keyEnvSource},
-				corev1.EnvVar{Name: "ANTHROPIC_BASE_URL", Value: baseURL + "/v1"},
-				corev1.EnvVar{Name: "ANTHROPIC_API_KEY", ValueFrom: keyEnvSource},
-			)
-		}
-	}
-
-	envVars := mergeEnvVars(baseEnv, agent.Spec.Env)
-
-	return &appsv1.Deployment{
-		// ... rest unchanged
-	}
-}
-```
-
-**No new imports needed** — `corev1` and `strings` are already imported in `agent.go`. The `secretEnvSource` and `LiteLLMServiceURL` helpers are defined in `litellm.go` in the same package.
-
----
-
-## Task 1.5: Modify `pkg/mattermost/agent.go` — NetworkPolicy Egress Rule
-
-**File:** `pkg/mattermost/agent.go`
-**Action:** Modify `GenerateAgentNetworkPolicy` — add a LiteLLM egress rule when `LLMGateway` is set.
-
-**Exact location:** The `egressRules` slice (lines 199–231) currently defines two entries: the MM pod rule and the DNS rule. Insert the LiteLLM rule **between** the MM pod rule and the DNS rule.
-
-Current code (abridged):
-
-```go
-	egressRules := []networkingv1.NetworkPolicyEgressRule{
-		// Allow egress to Mattermost pods on port 8065
-		{
-			To: []networkingv1.NetworkPolicyPeer{ ... },
-			Ports: []networkingv1.NetworkPolicyPort{ ... },
-		},
-		// Allow DNS
-		{
-			Ports: []networkingv1.NetworkPolicyPort{ ... },
-		},
-	}
-```
-
-Change to:
-
-```go
-	liteLLMPort := intstr.FromInt32(mmv1beta.AgentLiteLLMPort)
-
-	egressRules := []networkingv1.NetworkPolicyEgressRule{
-		// Allow egress to Mattermost pods on port 8065
-		{
-			To: []networkingv1.NetworkPolicyPeer{
-				{
-					PodSelector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{
-							mmv1beta.ClusterLabel: agent.Spec.MattermostRef.Name,
-						},
-					},
-				},
-			},
-			Ports: []networkingv1.NetworkPolicyPort{
-				{
-					Protocol: &protocol,
-					Port:     &mmPort,
-				},
-			},
-		},
-		// Allow DNS
-		{
-			Ports: []networkingv1.NetworkPolicyPort{
-				{
-					Protocol: &protocolUDP,
-					Port:     &dnsPort,
-				},
-				{
-					Protocol: &protocol,
-					Port:     &dnsPort,
-				},
-			},
-		},
-	}
-
-	// When llmGateway is configured, agents must be able to reach LiteLLM on port 4000.
-	// Insert before DNS rule so deny-mode agents route LLM calls through the gateway.
-	if agent.Spec.LLMGateway != nil {
-		liteLLMEgressRule := networkingv1.NetworkPolicyEgressRule{
-			To: []networkingv1.NetworkPolicyPeer{
-				{
-					PodSelector: &metav1.LabelSelector{
-						MatchLabels: liteLLMLabels(),
-					},
-				},
-			},
-			Ports: []networkingv1.NetworkPolicyPort{
-				{
-					Protocol: &protocol,
-					Port:     &liteLLMPort,
-				},
-			},
-		}
-		// Insert after MM rule (index 0), before DNS rule (index 1).
-		egressRules = append(egressRules[:1], append([]networkingv1.NetworkPolicyEgressRule{liteLLMEgressRule}, egressRules[1:]...)...)
-	}
-```
-
-**Important:** The `liteLLMPort` variable must be declared before `egressRules` (as shown above), since it is used by reference (`&liteLLMPort`). Declare it alongside `protocol`, `protocolUDP`, `grpcPort`, `mmPort`, `dnsPort` at the top of `GenerateAgentNetworkPolicy`.
-
-**Full resulting variable declarations** at the start of `GenerateAgentNetworkPolicy`:
-
-```go
-func GenerateAgentNetworkPolicy(agent *mmv1beta.Agent) *networkingv1.NetworkPolicy {
-	protocol := corev1.ProtocolTCP
-	protocolUDP := corev1.ProtocolUDP
-	grpcPort := intstr.FromInt32(mmv1beta.AgentGRPCPort)
-	mmPort := intstr.FromInt32(8065)
-	dnsPort := intstr.FromInt32(53)
-	liteLLMPort := intstr.FromInt32(mmv1beta.AgentLiteLLMPort)
-	// ... rest of function
-```
-
-**No new imports needed** — `networkingv1`, `metav1`, `intstr`, `mmv1beta`, `corev1` are already imported in `agent.go`. The `liteLLMLabels()` helper is defined in `litellm.go` in the same package.
-
----
-
-## Task 1.6: Extend `pkg/resources/create_resources.go`
-
-**File:** `pkg/resources/create_resources.go`
-**Action:** Add `CreateConfigMapIfNotExists` method.
-
-Append the following at the end of the file (after the last `DeleteService` function):
-
-```go
-func (r *ResourceHelper) CreateConfigMapIfNotExists(owner v1.Object, cm *corev1.ConfigMap, reqLogger logr.Logger) error {
-	foundCM := &corev1.ConfigMap{}
-	err := r.client.Get(context.TODO(), types.NamespacedName{Name: cm.Name, Namespace: cm.Namespace}, foundCM)
-	if err != nil && k8sErrors.IsNotFound(err) {
-		reqLogger.Info("Creating configmap", "name", cm.Name)
-		return r.Create(owner, cm, reqLogger)
-	} else if err != nil {
-		return errors.Wrap(err, "failed to check if configmap exists")
-	}
-
-	return nil
-}
-```
-
-**Note on usage:** This method calls `r.Create(owner, ...)` which sets an OwnerReference. For LiteLLM's shared ConfigMap (not owned by a single Agent), the reconciler in Phase 3 must call `r.client.Create(context.TODO(), cm)` directly after `defaultAnnotator.SetLastAppliedAnnotation(cm)`, **not** `r.Resources.CreateConfigMapIfNotExists(agent, ...)`. This method is for other callers that do want owner references on ConfigMaps.
-
-**No new imports needed** — all imports (`context`, `types`, `k8sErrors`, `errors`, `logr`, `v1`, `corev1`) are already present in this file.
-
----
-
-## Task 1.7: Run `make generate manifests`
-
-After completing tasks 1.1–1.6, run code generation:
+### After editing
 
 ```bash
-cd /Users/nickmisasi/workspace/worktrees/mattermost-operator-the-trail
+cd ~/workspace/worktrees/mattermost-operator-the-trail
+make generate manifests
+```
 
-# Regenerate deepcopy functions for all types including new ones
-make generate
+This regenerates `zz_generated.deepcopy.go` (adds the new fields to `DeepCopyInto`) and updates CRD YAML manifests.
 
-# Regenerate CRD YAML from kubebuilder markers
-make manifests
+### Validation
 
-# Verify the CRD contains new fields
-grep -A5 "llmGateway" config/crd/bases/installation.mattermost.com_agents.yaml
+Verify the CRD YAML contains the new status fields:
+```bash
+grep -A2 'phase\|message\|readyReplicas' config/crd/bases/installation.mattermost.com_agents.yaml
+```
 
-# Compile everything
+Expected: `phase`, `message`, and `readyReplicas` appear under `status.properties`.
+
+---
+
+## Task 1.3: Remove AdminCredentialsSecret
+
+### Part A: Remove from AgentSpec
+
+**File:** `apis/mattermost/v1beta1/agent_types.go`
+**Lines:** 50-53
+
+Delete these 4 lines entirely:
+```go
+	// AdminCredentialsSecret is the name of the Kubernetes Secret containing
+	// a Mattermost admin access token used to provision the bot account.
+	// The Secret must have a key "token" with the admin access token value.
+	AdminCredentialsSecret string `json:"adminCredentialsSecret"`
+```
+
+### Part B: Remove admin secret read + bot provisioning from reconciler
+
+**File:** `controllers/mattermost/agent/controller.go`
+
+**Delete lines 101-118** (the admin secret read block and `checkAgentBot` call):
+```go
+	// Read admin token.
+	adminSecret := &corev1.Secret{}
+	err = r.Client.Get(ctx, types.NamespacedName{
+		Name:      agent.Spec.AdminCredentialsSecret,
+		Namespace: agent.Namespace,
+	}, adminSecret)
+	if err != nil {
+		r.updateStatusReconcilingAndLogError(ctx, agent, status, reqLogger, err)
+		return reconcile.Result{}, err
+	}
+	adminToken := string(adminSecret.Data["token"])
+
+	// Bot provisioning.
+	err = r.checkAgentBot(ctx, agent, adminToken, reqLogger)
+	if err != nil {
+		r.updateStatusReconcilingAndLogError(ctx, agent, status, reqLogger, err)
+		return reconcile.Result{}, err
+	}
+```
+
+Also remove the `reconcileLiteLLMVirtualKey` call. **Delete lines 156-159** (inside the `if agent.Spec.LLMGateway... OperatorManaged` block):
+```go
+		if err = r.reconcileLiteLLMVirtualKey(ctx, agent, litellmURL, masterKey, mcpAccessGroups, reqLogger); err != nil {
+			r.updateStatusReconcilingAndLogError(ctx, agent, status, reqLogger, err)
+			return reconcile.Result{}, err
+		}
+```
+
+After this removal, the `mcpAccessGroups` variable returned by `reconcileLiteLLMMCPServers` is unused. Change the call on line 151 to discard it:
+
+**Old:**
+```go
+		mcpAccessGroups, err := r.reconcileLiteLLMMCPServers(ctx, agent, litellmURL, masterKey, reqLogger)
+```
+
+**New:**
+```go
+		_, err = r.reconcileLiteLLMMCPServers(ctx, agent, litellmURL, masterKey, reqLogger)
+```
+
+The resulting reconcile loop (after edits) should look like:
+```
+1. Fetch Agent CR
+2. Set initial state
+3. Set defaults
+4. Fetch Mattermost CR, check stability
+5. LiteLLM gateway (operator-managed):
+   a. checkLiteLLMDeployment
+   b. checkLiteLLMService
+   c. checkLiteLLMReady
+   d. getLiteLLMMasterKey
+   e. reconcileLiteLLMModels
+   f. reconcileLiteLLMMCPServers (return value discarded)
+6. checkAgentServiceAccount
+7. checkAgentService
+8. checkAgentDeployment
+9. checkAgentNetworkPolicy
+10. checkAgentHealth
+11. updateStatus
+```
+
+### Part C: Remove unused imports from controller.go
+
+After removing the admin secret and bot provisioning code, check if any imports become unused. The `adminToken` variable and `adminSecret` variable are removed. The `corev1` import is still used elsewhere, so no import removal needed.
+
+### Part D: Update test fixtures (compile errors)
+
+These fixtures reference `AdminCredentialsSecret` and will fail to compile after Part A.
+
+**File:** `controllers/mattermost/agent/agent_test.go` — `newTestAgent()` (line 39)
+
+Delete:
+```go
+			AdminCredentialsSecret: "admin-secret",
+```
+
+**File:** `pkg/mattermost/agent_test.go` — `testAgent()` (line 37)
+
+Delete:
+```go
+			AdminCredentialsSecret: "admin-secret",
+```
+
+**File:** `pkg/mattermost/litellm_test.go` — `TestGenerateAgentLiteLLMKeySecret` (line 178)
+
+Delete:
+```go
+			AdminCredentialsSecret: "admin-secret",
+```
+
+**File:** `controllers/mattermost/agent/controller_test.go`
+
+Multiple tests create `adminSecret` objects and pass them to the fake client. Remove these:
+
+1. **`TestReconcileAgent_FullReconcile` (line 81):**
+   - Delete the `adminSecret` variable declaration (lines 104-110).
+   - Remove `adminSecret` from `WithRuntimeObjects(agent, mm, adminSecret)` → `WithRuntimeObjects(agent, mm)`.
+
+2. **`TestReconcileAgent_ImageUpdate` (line 203):**
+   - Delete the `adminSecret` variable declaration (lines 223-229).
+   - Remove `adminSecret` from `WithRuntimeObjects(agent, mm, adminSecret, botTokenSecret)` → `WithRuntimeObjects(agent, mm, botTokenSecret)`.
+
+3. **`TestReconcileAgent_WithLLMGateway` (line 283):**
+   - Delete the `adminSecret` variable declaration (lines 310-316).
+   - Remove `adminSecret` from `WithRuntimeObjects(agent, mm, adminSecret, masterKeySecret, botTokenSecret)` → `WithRuntimeObjects(agent, mm, masterKeySecret, botTokenSecret)`.
+
+**File:** `config/samples/installation.mattermost.com_v1beta1_agent.yaml` (line 24)
+
+Delete:
+```yaml
+  adminCredentialsSecret: my-mattermost-admin-token
+```
+
+### Part E: Remove unused bot provisioning code
+
+After removing the `checkAgentBot` call from the reconciler, the following functions in `agent.go` are dead code. **Delete them entirely:**
+
+**File:** `controllers/mattermost/agent/agent.go`
+
+Delete these functions and their associated types:
+- `type mmBot struct` (lines 23-26)
+- `type mmToken struct` (lines 28-31)
+- `func (r *AgentReconciler) checkAgentBot(...)` (lines 35-38)
+- `func (r *AgentReconciler) checkAgentBotWithURL(...)` (lines 41-94)
+- `func (r *AgentReconciler) listBots(...)` (lines 96-119)
+- `func (r *AgentReconciler) createBot(...)` (lines 121-146)
+- `func (r *AgentReconciler) createBotToken(...)` (lines 148-173)
+
+After deletion, remove unused imports from `agent.go`. The following imports are only used by bot provisioning code:
+- `"encoding/json"`
+- `"io"`
+- `"net/http"`
+- `"strings"`
+
+Check after deletion — `fmt` is still used by `checkAgentHealth`.
+
+### Part F: Remove unused bot provisioning tests
+
+**File:** `controllers/mattermost/agent/agent_test.go`
+
+Delete these test functions (they test the removed `checkAgentBotWithURL`):
+- `TestCheckAgentBot_CreatesNewBot` (lines 78-120)
+- `TestCheckAgentBot_BotAlreadyExists` (lines 122-149)
+
+After deletion, remove unused imports:
+- `"encoding/json"`
+- `"net/http"`
+- `"net/http/httptest"`
+
+Check remaining imports — `context`, `testing`, `mmv1beta`, `resources`, `logrus`, `blubr`, `assert`, `require`, `appsv1`, `corev1`, `networkingv1`, `metav1`, `runtime`, `types`, `scheme`, `fake` are still used by the remaining tests.
+
+### Part G: Remove unused virtual key code
+
+**File:** `controllers/mattermost/agent/litellm.go`
+
+Delete the `reconcileLiteLLMVirtualKey` function (lines 153-208). It is no longer called.
+
+After this deletion, check if `errKeyAliasExists` (used only by this function) is still referenced. If not, find its definition in `litellm_client.go` and remove it too.
+
+**File:** `controllers/mattermost/agent/litellm_test.go`
+
+Delete these test functions (they test the removed `reconcileLiteLLMVirtualKey`):
+- `TestReconcileLiteLLMVirtualKey_CreatesSecret` (lines 177-203)
+- `TestReconcileLiteLLMVirtualKey_Idempotent` (lines 207-231)
+
+Also check if `liteLLMKeyResponse` type (used by these tests) is still referenced elsewhere; if not, remove it from `litellm_client.go`.
+
+### After editing
+
+```bash
+cd ~/workspace/worktrees/mattermost-operator-the-trail
+make generate manifests
+```
+
+### Validation
+
+```bash
+# Must compile
 make build
-```
 
-Expected output from `grep`: a YAML block describing the `llmGateway` schema with `operatorManaged` and `external` sub-schemas.
+# CRD YAML must NOT contain adminCredentialsSecret
+grep -c adminCredentialsSecret config/crd/bases/installation.mattermost.com_agents.yaml
+# Expected: 0
 
----
-
-## Task 1.8: Run existing unit tests
-
-```bash
-cd /Users/nickmisasi/workspace/worktrees/mattermost-operator-the-trail
-
+# All tests pass
 make unittest
 ```
 
-All existing tests must pass. The two existing NetworkPolicy tests (`TestCheckAgentNetworkPolicy_Deny` and `TestCheckAgentNetworkPolicy_AllowList`) assert specific egress rule counts. With the new LiteLLM rule conditional on `agent.Spec.LLMGateway != nil`, and the test agents having `LLMGateway: nil`, the existing counts (2 for deny, 3 for allowList — wait, that's wrong, see note below) are unaffected.
+---
 
-**Note:** Check the current test at `controllers/mattermost/agent/agent_test.go:243`:
-- `TestCheckAgentNetworkPolicy_Deny` asserts `Len(t, np.Spec.Egress, 2)` — correct, newTestAgent has no LLMGateway, so still 2 rules.
-- `TestCheckAgentNetworkPolicy_AllowList` asserts `Len(t, np.Spec.Egress, 3)` — correct, allowList adds HTTPS+HTTP rules but still no LiteLLM rule since no LLMGateway.
+## Task 1.4: Verify Dual-Mode (Read-Only)
 
-No test changes required for Phase 1.
+**No code changes.** This task verifies that the remaining skip-if-exists paths work correctly after Task 1.3 removes the bot/key provisioning code.
+
+### What the plugin will do (context for verification)
+
+In Phase 2 (plugin changes), the plugin creates these Secrets **before** the Agent CR:
+- `agent-<name>-token` — bot token
+- `agent-<name>-litellm-key` — LiteLLM virtual key
+
+The operator does **not** create these Secrets anymore (Task 1.3 removed that code). The operator only **mounts** them into the agent Deployment.
+
+### Verification points
+
+1. **Bot token Secret mount is still present.**
+
+   **File:** `pkg/mattermost/agent.go` — `GenerateAgentDeployment()`
+
+   The deployment generator mounts `agent.BotTokenSecretName()` as volume `bot-token`. This code is unchanged and will continue to work. The Secret must exist when the pod starts; if it doesn't, the pod will stay in `CreateContainerConfigError` and the operator will requeue via `checkAgentHealth`.
+
+2. **LiteLLM key Secret mount is still present.**
+
+   **File:** `pkg/mattermost/agent.go` — `GenerateAgentDeployment()`
+
+   When `LLMGateway.OperatorManaged` or `LLMGateway.External` is set, the deployment generator adds `OPENAI_API_KEY` and `ANTHROPIC_API_KEY` env vars referencing `agent.LiteLLMKeySecretName()` via `SecretKeyRef`. Same behavior — pod won't start until the Secret exists.
+
+3. **No explicit "requeue if Secret missing" logic is needed in the operator.**
+
+   K8s handles this natively: a Deployment referencing a non-existent Secret will keep pods in `Pending`/`CreateContainerConfigError`. The operator's `checkAgentHealth` (which checks `deployment.Status.ReadyReplicas < 1`) will requeue with `healthCheckRequeueDelay` (6s). This is functionally equivalent to an explicit Secret-existence check with requeue.
+
+### Document in PR description
+
+Include in the PR description:
+> **Dual-mode provisioning:** The operator no longer creates bot token or LiteLLM key Secrets. These are now created by the plugin before the Agent CR. The operator mounts them via volume mounts and secretKeyRefs. If the Secrets don't exist when the pod starts, K8s keeps the pod in CreateContainerConfigError and the operator requeues via checkAgentHealth (6s delay).
 
 ---
+
+## Task 1.5: Status Phase Tracking in Reconciler
+
+**Depends on:** Task 1.2 (phase constants and status fields must exist)
+
+### Part A: Set initial phase in reconcile loop
+
+**File:** `controllers/mattermost/agent/controller.go`
+
+In the `Reconcile()` function, after the initial state check block (which sets State to Reconciling), also set Phase to Provisioning if empty.
+
+**Old (approximately lines 72-77 after Task 1.3 edits):**
+```go
+	// Set initial state to Reconciling.
+	if len(agent.Status.State) == 0 {
+		err = r.updateStatusReconciling(ctx, agent, status, reqLogger)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+	}
+```
+
+**New:**
+```go
+	// Set initial state to Reconciling.
+	if len(agent.Status.State) == 0 {
+		status.Phase = mmv1beta.AgentPhaseProvisioning
+		err = r.updateStatusReconciling(ctx, agent, status, reqLogger)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+	}
+```
+
+### Part B: Set phase to Deploying after LiteLLM is ready
+
+**File:** `controllers/mattermost/agent/controller.go`
+
+After the LiteLLM block completes (before `checkAgentServiceAccount`), add:
+
+```go
+	// LiteLLM is ready (or not configured); transition to Deploying.
+	if status.Phase == mmv1beta.AgentPhaseProvisioning {
+		status.Phase = mmv1beta.AgentPhaseDeploying
+	}
+```
+
+Insert this right **before** the `// ServiceAccount` comment. If the agent has no LiteLLM gateway, it transitions from Provisioning to Deploying immediately after the Mattermost CR readiness check.
+
+### Part C: Set Error phase on errors
+
+**File:** `controllers/mattermost/agent/utils.go`
+
+In `updateStatusReconcilingAndLogError`, also set Phase to Error:
+
+**Old (lines 18-26):**
+```go
+func (r *AgentReconciler) updateStatusReconcilingAndLogError(ctx context.Context, agent *mmv1beta.Agent, status mmv1beta.AgentStatus, reqLogger logr.Logger, statusErr error) {
+	if statusErr != nil {
+		status.Error = statusErr.Error()
+	}
+	err := r.updateStatusReconciling(ctx, agent, status, reqLogger)
+	if err != nil {
+		reqLogger.Error(err, "Failed to set agent state to reconciling")
+	}
+}
+```
+
+**New:**
+```go
+func (r *AgentReconciler) updateStatusReconcilingAndLogError(ctx context.Context, agent *mmv1beta.Agent, status mmv1beta.AgentStatus, reqLogger logr.Logger, statusErr error) {
+	if statusErr != nil {
+		status.Error = statusErr.Error()
+	}
+	status.Phase = mmv1beta.AgentPhaseError
+	err := r.updateStatusReconciling(ctx, agent, status, reqLogger)
+	if err != nil {
+		reqLogger.Error(err, "Failed to set agent state to reconciling")
+	}
+}
+```
+
+### Part D: Set Ready/Deploying phase in checkAgentHealth
+
+**File:** `controllers/mattermost/agent/agent.go` — `checkAgentHealth()` (line 245 before edits; line number will shift after Task 1.3 deletions)
+
+**Old:**
+```go
+func (r *AgentReconciler) checkAgentHealth(ctx context.Context, agent *mmv1beta.Agent, currentStatus mmv1beta.AgentStatus, reqLogger logr.Logger) (mmv1beta.AgentStatus, error) {
+	status := mmv1beta.AgentStatus{
+		State:              mmv1beta.Reconciling,
+		ObservedGeneration: agent.Generation,
+		Endpoint:           fmt.Sprintf("%s.%s.svc.cluster.local:%d", agent.Name, agent.Namespace, mmv1beta.AgentGRPCPort),
+	}
+
+	deployment := &appsv1.Deployment{}
+	err := r.Client.Get(ctx, types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, deployment)
+	if err != nil {
+		return status, errors.Wrap(err, "failed to get agent deployment for health check")
+	}
+
+	if deployment.Status.ReadyReplicas < 1 {
+		return status, fmt.Errorf("agent deployment has %d ready replicas, need at least 1", deployment.Status.ReadyReplicas)
+	}
+
+	status.State = mmv1beta.Stable
+	return status, nil
+}
+```
+
+**New:**
+```go
+func (r *AgentReconciler) checkAgentHealth(ctx context.Context, agent *mmv1beta.Agent, currentStatus mmv1beta.AgentStatus, reqLogger logr.Logger) (mmv1beta.AgentStatus, error) {
+	status := mmv1beta.AgentStatus{
+		State:              mmv1beta.Reconciling,
+		Phase:              mmv1beta.AgentPhaseDeploying,
+		ObservedGeneration: agent.Generation,
+		Endpoint:           fmt.Sprintf("%s.%s.svc.cluster.local:%d", agent.Name, agent.Namespace, mmv1beta.AgentGRPCPort),
+	}
+
+	deployment := &appsv1.Deployment{}
+	err := r.Client.Get(ctx, types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, deployment)
+	if err != nil {
+		return status, errors.Wrap(err, "failed to get agent deployment for health check")
+	}
+
+	if deployment.Status.ReadyReplicas < 1 {
+		return status, fmt.Errorf("agent deployment has %d ready replicas, need at least 1", deployment.Status.ReadyReplicas)
+	}
+
+	status.State = mmv1beta.Stable
+	status.Phase = mmv1beta.AgentPhaseReady
+	status.ReadyReplicas = deployment.Status.ReadyReplicas
+	return status, nil
+}
+```
+
+### Tests to update
+
+**File:** `controllers/mattermost/agent/controller_test.go`
+
+**`TestReconcileAgent_FullReconcile`:**
+
+After the "second reconcile" (when deployment is ready and status is Stable), add assertions for the new phase fields. After line 199 (`assert.Contains(t, updatedAgent.Status.Endpoint, agent.Name)`), add:
+
+```go
+	assert.Equal(t, mmv1beta.AgentPhaseReady, updatedAgent.Status.Phase)
+	assert.Equal(t, int32(1), updatedAgent.Status.ReadyReplicas)
+```
+
+**`TestReconcileAgent_WithLLMGateway`:**
+
+Similarly, after the first reconcile (deployment not ready, requeued), verify the agent is in Deploying phase. After line 387 (`assert.Equal(t, 6*time.Second, res.RequeueAfter)`), add:
+
+```go
+	// Verify agent is in Deploying phase (not ready yet).
+	agentAfterFirstReconcile := &mmv1beta.Agent{}
+	err = c.Get(context.TODO(), types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, agentAfterFirstReconcile)
+	require.NoError(t, err)
+	assert.Equal(t, mmv1beta.AgentPhaseDeploying, agentAfterFirstReconcile.Status.Phase)
+```
+
+### Validation
+
+```bash
+cd ~/workspace/worktrees/mattermost-operator-the-trail
+go test ./controllers/mattermost/agent/ -run TestReconcileAgent -v
+```
+
+---
+
+## Execution Order
+
+```
+Tasks 1.1, 1.2, 1.3 — can run in parallel (independent edits to different code)
+Task 1.4 — read-only verification (anytime)
+Task 1.5 — after Task 1.2 completes (needs phase constants)
+
+Final validation:
+  make generate manifests
+  make build
+  make unittest
+```
 
 ## Definition of Done
 
-- [ ] `make generate` succeeds with no errors
-- [ ] `make manifests` succeeds with no errors
-- [ ] `config/crd/bases/installation.mattermost.com_agents.yaml` contains `llmGateway` and `mcpServers` fields
-- [ ] `make build` compiles successfully (no import errors, no undefined references)
-- [ ] `make unittest` passes with 0 failures (all pre-existing tests still pass)
-- [ ] `agent_types.go` has `LLMGateway` and `MCPServers` in `AgentSpec`, plus 7 new type definitions
-- [ ] `agent_utils.go` has 7 new constants, `LiteLLMKeySecretName()` method, default image set in `SetDefaults()`
-- [ ] `pkg/mattermost/litellm.go` exists with `GenerateLiteLLMConfigMap`, `GenerateLiteLLMDeployment`, `GenerateLiteLLMService`, `GenerateAgentLiteLLMKeySecret`, `LiteLLMServiceURL`, `secretEnvSource`
-- [ ] `pkg/mattermost/agent.go` injects 6 LiteLLM env vars into `GenerateAgentDeployment` when `LLMGateway != nil`
-- [ ] `pkg/mattermost/agent.go` adds LiteLLM egress rule in `GenerateAgentNetworkPolicy` when `LLMGateway != nil`
-- [ ] `pkg/resources/create_resources.go` has `CreateConfigMapIfNotExists`
+- [x] `make generate manifests` succeeds
+- [x] `make build` compiles with zero errors
+- [x] `make unittest` passes (0 failures)
+- [x] CRD YAML contains `phase`, `message`, `readyReplicas` in status
+- [x] CRD YAML does NOT contain `adminCredentialsSecret`
+- [x] Role YAML includes agents CRUD + agents/status get + secrets get/create/update (4 rules total)
+- [x] `checkAgentBot` and `reconcileLiteLLMVirtualKey` are fully removed (no dead code)
+- [x] Phase tracking: agent reaches `Ready` phase with correct `readyReplicas` in tests
 
 ---
 
-## Precise Change Map
+## Implementation Summary (2026-04-04)
 
-| File | Lines Changed | Nature |
-|------|--------------|--------|
-| `apis/mattermost/v1beta1/agent_types.go` | After line 57 (AgentSpec body); before line 116 (init()) | Insert 2 fields in struct; insert 7 type definitions |
-| `apis/mattermost/v1beta1/agent_utils.go` | const block (lines 11–17); end of SetDefaults(); end of file | Add 7 constants; add LiteLLM default block; add new method |
-| `pkg/mattermost/litellm.go` | New file | Create with 6 functions |
-| `pkg/mattermost/agent.go` | Between baseEnv and mergeEnvVars in GenerateAgentDeployment; top of GenerateAgentNetworkPolicy | Insert conditional env var block; add liteLLMPort var + conditional egress rule |
-| `pkg/resources/create_resources.go` | End of file | Append new method |
-| `apis/mattermost/v1beta1/zz_generated.deepcopy.go` | Entire file | Auto-regenerated by `make generate` |
-| `config/crd/bases/installation.mattermost.com_agents.yaml` | Entire file | Auto-regenerated by `make manifests` |
-| `pkg/mattermost/litellm_test.go` | New file | 13 unit tests for all LiteLLM generators |
-| `controllers/mattermost/agent/agent_test.go` | Line 264–265 | Fix pre-existing test assertion: AllowList produces 4 egress rules, not 3 |
+All 5 tasks completed successfully:
 
----
+### Task 1.1: RBAC Role Extended
+- `mattermostRolePermissions()` now returns 4 rules: batch/jobs (unchanged), agents full CRUD, agents/status get, secrets get/create/update
+- Updated both v1alpha1 and v1beta1 RBAC tests to assert 4 rules with verb-level checks
 
-## Implementation Summary
+### Task 1.2: Agent CR Status Fields Added
+- Added `Phase`, `Message`, `ReadyReplicas` to `AgentStatus` struct
+- Added phase constants: `AgentPhaseProvisioning`, `AgentPhaseDeploying`, `AgentPhaseReady`, `AgentPhaseError`
+- Ran `make generate manifests` to update deepcopy and CRD YAML
 
-**Completed:** 2026-03-24
+### Task 1.3: AdminCredentialsSecret Removed
+- Removed `AdminCredentialsSecret` field from `AgentSpec`
+- Removed admin secret read + `checkAgentBot` call from reconciler
+- Removed `reconcileLiteLLMVirtualKey` call from reconciler (discarded `mcpAccessGroups` return value)
+- Deleted all bot provisioning code: `mmBot`, `mmToken`, `checkAgentBot`, `checkAgentBotWithURL`, `listBots`, `createBot`, `createBotToken`
+- Deleted `reconcileLiteLLMVirtualKey` function from litellm.go
+- Deleted bot provisioning tests: `TestCheckAgentBot_CreatesNewBot`, `TestCheckAgentBot_BotAlreadyExists`
+- Deleted virtual key tests: `TestReconcileLiteLLMVirtualKey_CreatesSecret`, `TestReconcileLiteLLMVirtualKey_Idempotent`
+- Updated all test fixtures to remove `AdminCredentialsSecret` and `adminSecret` objects
+- Cleaned up unused imports across all modified files
+- Removed `adminCredentialsSecret` from sample YAML
 
-### What was done
+### Task 1.4: Dual-Mode Verified (Read-Only)
+- Bot token Secret mount still present in `GenerateAgentDeployment()` (volume mount)
+- LiteLLM key Secret still referenced via `SecretKeyRef` env vars
+- K8s handles missing Secrets natively (pod stays in CreateContainerConfigError)
+- Operator requeues via `checkAgentHealth` with 6s delay
 
-All tasks 1.1–1.8 implemented as specified.
-
-**Task 1.1** (`agent_types.go`): Added `LLMGateway *LLMGatewayConfig` and `MCPServers []AgentMCPServer` to `AgentSpec`. Added 7 new type definitions: `LLMGatewayConfig`, `ExternalLLMGateway`, `OperatorManagedLLMGateway`, `LLMProvider`, `AgentMCPServer`.
-
-**Task 1.2** (`agent_utils.go`): Added 7 constants (`AgentLiteLLMDefaultImage`, `AgentLiteLLMPort`, `AgentLiteLLMDeploymentName`, `AgentLiteLLMServiceName`, `AgentLiteLLMConfigMapName`, `AgentLiteLLMMasterKeySecretName`, `AgentLiteLLMDBCredentialsSecret`). Added `LiteLLMKeySecretName()` method. Extended `SetDefaults()` to default the LiteLLM image.
-
-**Task 1.3** (`litellm.go`): Created new file with `liteLLMLabels()`, `LiteLLMServiceURL()`, `secretEnvSource()`, `GenerateLiteLLMConfigMap()`, `GenerateLiteLLMDeployment()`, `GenerateLiteLLMService()`, `GenerateAgentLiteLLMKeySecret()`.
-
-**Task 1.4** (`agent.go` env vars): Added conditional block in `GenerateAgentDeployment` that injects 6 LiteLLM env vars (`LITELLM_BASE_URL`, `LITELLM_MCP_URL`, `OPENAI_BASE_URL`, `OPENAI_API_KEY`, `ANTHROPIC_BASE_URL`, `ANTHROPIC_API_KEY`) when `LLMGateway != nil`. Works for both `OperatorManaged` and `External` variants.
-
-**Task 1.5** (`agent.go` NetworkPolicy): Added `liteLLMPort` variable and conditional LiteLLM egress rule in `GenerateAgentNetworkPolicy` inserted between the MM rule and DNS rule.
-
-**Task 1.6** (`create_resources.go`): Appended `CreateConfigMapIfNotExists` method.
-
-**Task 1.7**: `make generate` and `make manifests` succeeded. CRD YAML contains `llmGateway` and `mcpServers` fields. `make build` succeeded.
-
-**Task 1.8 (tests)**: Created `pkg/mattermost/litellm_test.go` with 13 tests covering all specified scenarios. All 13 new tests pass. The 3 pre-existing failures in `pkg/mattermost` (`TestGenerateAgentDeployment` path mismatch, `TestGenerateRBACResources` x2) were present before this phase and are unrelated to LiteLLM changes. Fixed one additional pre-existing failure in `controllers/mattermost/agent/agent_test.go`: `TestCheckAgentNetworkPolicy_AllowList` had wrong assertion (expected 3, should be 4 for MM+DNS+HTTPS+HTTP).
+### Task 1.5: Phase Tracking Wired
+- Initial reconcile sets `Phase = Provisioning`
+- After LiteLLM block: transitions to `Deploying`
+- `checkAgentHealth`: non-ready returns `Deploying`, ready returns `Ready` + `ReadyReplicas`
+- `updateStatusReconcilingAndLogError`: sets `Phase = Error`
+- Tests assert `Phase == Ready` and `ReadyReplicas == 1` in FullReconcile, `Phase == Deploying` in WithLLMGateway

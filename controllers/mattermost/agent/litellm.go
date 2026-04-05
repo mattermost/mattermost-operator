@@ -5,7 +5,6 @@ package agent
 
 import (
 	"context"
-	"errors"
 	"strings"
 
 	objectMatcher "github.com/banzaicloud/k8s-objectmatcher/patch"
@@ -132,78 +131,56 @@ func (r *AgentReconciler) getLiteLLMMasterKey(ctx context.Context, namespace str
 }
 
 // reconcileLiteLLMModels registers all provider models via POST /model/new.
-// Safe to call every reconcile — LiteLLM upserts on repeated calls.
+//
+// Idempotency: POST /model/new is NOT idempotent — it creates duplicates.
+// This function lists existing models first and only creates missing ones.
 func (r *AgentReconciler) reconcileLiteLLMModels(ctx context.Context, agent *mmv1beta.Agent, litellmURL, masterKey string, reqLogger logr.Logger) error {
+	providers := agent.Spec.LLMGateway.OperatorManaged.LLMProviders
+	if len(providers) == 0 {
+		return nil
+	}
+
 	c := newLiteLLMClient(litellmURL, masterKey)
-	for _, provider := range agent.Spec.LLMGateway.OperatorManaged.LLMProviders {
+
+	// Build a set of existing model names to check before creating.
+	existing, err := c.listModels()
+	if err != nil {
+		return pkgerrors.Wrap(err, "failed to list existing models")
+	}
+	existingByName := make(map[string]struct{}, len(existing))
+	for _, m := range existing {
+		existingByName[m.ModelName] = struct{}{}
+	}
+
+	for _, provider := range providers {
 		// os.environ/<VAR> tells LiteLLM to read the key from the pod's env at runtime.
 		apiKeyEnvRef := "os.environ/" + strings.ToUpper(provider.Name) + "_API_KEY"
 		for _, model := range provider.Models {
-			// LiteLLM model name: "<provider>/<model>", e.g. "anthropic/claude-3-5-sonnet-20241022"
+			// Register with the prefixed name: "<provider>/<model>" for OpenAI-compat calls.
 			litellmModel := provider.Name + "/" + model
-			reqLogger.Info("Registering LiteLLM model", "model", litellmModel)
-			if err := c.registerModel(litellmModel, litellmModel, apiKeyEnvRef); err != nil {
-				return pkgerrors.Wrapf(err, "failed to register model %s", litellmModel)
+
+			if _, found := existingByName[litellmModel]; found {
+				reqLogger.Info("Model already registered, skipping", "model", litellmModel)
+			} else {
+				reqLogger.Info("Registering LiteLLM model", "model", litellmModel)
+				if err := c.registerModel(litellmModel, litellmModel, apiKeyEnvRef); err != nil {
+					return pkgerrors.Wrapf(err, "failed to register model %s", litellmModel)
+				}
+			}
+
+			// Also register with the bare model name (no provider prefix).
+			// LiteLLM's Anthropic passthrough endpoint (/v1/messages) looks up
+			// models by the bare name, so agents using the Anthropic SDK need this.
+			if _, found := existingByName[model]; found {
+				reqLogger.Info("Model already registered (bare name), skipping", "model", model)
+			} else {
+				reqLogger.Info("Registering LiteLLM model (bare name)", "model", model)
+				if err := c.registerModel(model, litellmModel, apiKeyEnvRef); err != nil {
+					return pkgerrors.Wrapf(err, "failed to register model %s (bare name)", model)
+				}
 			}
 		}
 	}
-	return nil
-}
-
-// reconcileLiteLLMVirtualKey creates a per-agent virtual key and stores it in a K8s Secret.
-// Idempotency: if the Secret already exists, the function returns immediately (no API call).
-// If the LiteLLM API returns errKeyAliasExists, the error is logged and swallowed — the
-// Secret was likely deleted after the key was created; the user must recreate it.
-func (r *AgentReconciler) reconcileLiteLLMVirtualKey(ctx context.Context, agent *mmv1beta.Agent, litellmURL, masterKey string, mcpAccessGroups []string, reqLogger logr.Logger) error {
-	// Idempotency: Secret existence means the key is already provisioned.
-	existingSecret := &corev1.Secret{}
-	err := r.Client.Get(ctx, types.NamespacedName{
-		Name:      agent.LiteLLMKeySecretName(),
-		Namespace: agent.Namespace,
-	}, existingSecret)
-	if err == nil {
-		reqLogger.Info("LiteLLM key secret already exists, skipping", "agent", agent.Name)
-		return nil
-	}
-	if !k8sErrors.IsNotFound(err) {
-		return pkgerrors.Wrap(err, "failed to check litellm key secret")
-	}
-
-	// Build model list for the key's allowed models.
-	var models []string
-	for _, p := range agent.Spec.LLMGateway.OperatorManaged.LLMProviders {
-		for _, m := range p.Models {
-			models = append(models, p.Name+"/"+m)
-		}
-	}
-
-	c := newLiteLLMClient(litellmURL, masterKey)
-	keyResp, err := c.generateKey(liteLLMKeyRequest{
-		KeyAlias: "agent-" + agent.Name + "-key",
-		Models:   models,
-		Metadata: map[string]string{
-			"agent_name": agent.Name,
-			"managed_by": "mattermost-operator",
-			"namespace":  agent.Namespace,
-		},
-		ObjectPermission: liteLLMObjectPermission{
-			MCPAccessGroups: mcpAccessGroups,
-		},
-	})
-	if err != nil {
-		if errors.Is(err, errKeyAliasExists) {
-			reqLogger.Info("LiteLLM key alias already exists (Secret missing?), skipping", "agent", agent.Name)
-			return nil
-		}
-		return pkgerrors.Wrap(err, "failed to generate litellm virtual key")
-	}
-
-	desired := mattermostApp.GenerateAgentLiteLLMKeySecret(agent, keyResp.Key)
-	if err := r.Resources.CreateSecretIfNotExists(agent, desired, reqLogger); err != nil {
-		return pkgerrors.Wrap(err, "failed to create litellm key secret")
-	}
-
-	reqLogger.Info("LiteLLM virtual key provisioned", "agent", agent.Name, "keyAlias", keyResp.KeyAlias)
 	return nil
 }
 

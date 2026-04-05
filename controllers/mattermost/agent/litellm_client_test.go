@@ -53,6 +53,44 @@ func TestRegisterModel_Error(t *testing.T) {
 	assert.Contains(t, err.Error(), "500")
 }
 
+// ─── listModels ───────────────────────────────────────────────────────────
+
+func TestListModels_Empty(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "GET", r.Method)
+		require.Equal(t, "/model/info", r.URL.Path)
+
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(liteLLMModelInfoResponse{Data: []liteLLMModelInfo{}})
+	}))
+	defer srv.Close()
+
+	c := newLiteLLMClient(srv.URL, "key")
+	models, err := c.listModels()
+	require.NoError(t, err)
+	assert.Empty(t, models)
+}
+
+func TestListModels_WithEntries(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(liteLLMModelInfoResponse{
+			Data: []liteLLMModelInfo{
+				{ModelName: "anthropic/claude-3-5-sonnet-20241022"},
+				{ModelName: "openai/gpt-4o"},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	c := newLiteLLMClient(srv.URL, "key")
+	models, err := c.listModels()
+	require.NoError(t, err)
+	require.Len(t, models, 2)
+	assert.Equal(t, "anthropic/claude-3-5-sonnet-20241022", models[0].ModelName)
+	assert.Equal(t, "openai/gpt-4o", models[1].ModelName)
+}
+
 // ─── listMCPServers ─────────────────────────────────────────────────────────
 
 func TestListMCPServers_Empty(t *testing.T) {

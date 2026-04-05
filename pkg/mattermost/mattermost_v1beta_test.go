@@ -1120,7 +1120,27 @@ func TestGenerateRBACResources_V1Beta(t *testing.T) {
 	require.Equal(t, roleName, role.Name)
 	require.Equal(t, mattermost.Namespace, role.Namespace)
 	require.Equal(t, 1, len(role.OwnerReferences))
-	require.Equal(t, 2, len(role.Rules))
+	require.Equal(t, 4, len(role.Rules))
+
+	// Rule 0: batch/jobs — get,list,watch (unchanged).
+	assert.Equal(t, []string{"get", "list", "watch"}, role.Rules[0].Verbs)
+	assert.Equal(t, []string{"batch"}, role.Rules[0].APIGroups)
+	assert.Equal(t, []string{"jobs"}, role.Rules[0].Resources)
+
+	// Rule 1: agents — full CRUD.
+	assert.Equal(t, []string{"get", "list", "watch", "create", "update", "patch", "delete"}, role.Rules[1].Verbs)
+	assert.Equal(t, []string{"installation.mattermost.com"}, role.Rules[1].APIGroups)
+	assert.Equal(t, []string{"agents"}, role.Rules[1].Resources)
+
+	// Rule 2: agents/status — get only.
+	assert.Equal(t, []string{"get"}, role.Rules[2].Verbs)
+	assert.Equal(t, []string{"installation.mattermost.com"}, role.Rules[2].APIGroups)
+	assert.Equal(t, []string{"agents/status"}, role.Rules[2].Resources)
+
+	// Rule 3: secrets — get, create, update, delete.
+	assert.Equal(t, []string{"get", "create", "update", "delete"}, role.Rules[3].Verbs)
+	assert.Equal(t, []string{""}, role.Rules[3].APIGroups)
+	assert.Equal(t, []string{"secrets"}, role.Rules[3].Resources)
 
 	roleBinding := GenerateRoleBindingV1Beta(mattermost, roleName, saName)
 	require.Equal(t, roleName, roleBinding.Name)

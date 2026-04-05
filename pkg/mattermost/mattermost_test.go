@@ -365,7 +365,7 @@ func TestGenerateRBACResources(t *testing.T) {
 	require.Equal(t, roleName, role.Name)
 	require.Equal(t, mattermost.Namespace, role.Namespace)
 	require.Equal(t, 1, len(role.OwnerReferences))
-	require.Equal(t, 2, len(role.Rules))
+	require.Equal(t, 4, len(role.Rules))
 
 	roleBinding := GenerateRoleBinding(mattermost, roleName, saName)
 	require.Equal(t, roleName, roleBinding.Name)

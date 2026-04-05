@@ -47,11 +47,6 @@ type AgentSpec struct {
 	// that this agent is associated with.
 	MattermostRef corev1.LocalObjectReference `json:"mattermostRef"`
 
-	// AdminCredentialsSecret is the name of the Kubernetes Secret containing
-	// a Mattermost admin access token used to provision the bot account.
-	// The Secret must have a key "token" with the admin access token value.
-	AdminCredentialsSecret string `json:"adminCredentialsSecret"`
-
 	// Env defines optional environment variables to inject into the agent pod.
 	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty"`
@@ -96,6 +91,19 @@ type AgentStatus struct {
 	// Error records the last observed error in the reconciliation of this Agent.
 	// +optional
 	Error string `json:"error,omitempty"`
+
+	// Phase is the lifecycle phase of the agent.
+	// One of: Provisioning, Deploying, Ready, Error.
+	// +optional
+	Phase string `json:"phase,omitempty"`
+
+	// Message is a human-readable status message providing additional detail.
+	// +optional
+	Message string `json:"message,omitempty"`
+
+	// ReadyReplicas is the number of ready replicas for the agent deployment.
+	// +optional
+	ReadyReplicas int32 `json:"readyReplicas,omitempty"`
 }
 
 // +genclient

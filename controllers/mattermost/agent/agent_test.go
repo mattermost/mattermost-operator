@@ -2,9 +2,6 @@ package agent
 
 import (
 	"context"
-	"encoding/json"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/go-logr/logr"
@@ -33,11 +30,10 @@ func newTestAgent() *mmv1beta.Agent {
 			UID:       types.UID("test-uid"),
 		},
 		Spec: mmv1beta.AgentSpec{
-			Image:                  "mattermost/agent:latest",
-			Hooks:                  []string{"MessageHasBeenPosted"},
-			MattermostRef:          corev1.LocalObjectReference{Name: "mm-test"},
-			AdminCredentialsSecret: "admin-secret",
-			EgressPolicy:           mmv1beta.AgentEgressPolicyDeny,
+			Image:         "mattermost/agent:latest",
+			Hooks:         []string{"MessageHasBeenPosted"},
+			MattermostRef: corev1.LocalObjectReference{Name: "mm-test"},
+			EgressPolicy:  mmv1beta.AgentEgressPolicyDeny,
 		},
 	}
 }
@@ -73,79 +69,6 @@ func setupReconciler(t *testing.T, objs ...runtime.Object) (*AgentReconciler, *r
 	}
 
 	return r, s
-}
-
-func TestCheckAgentBot_CreatesNewBot(t *testing.T) {
-	agent := newTestAgent()
-
-	var createBotCalled, createTokenCalled bool
-
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.Method == "GET" && r.URL.Path == "/api/v4/bots":
-			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode([]mmBot{})
-		case r.Method == "POST" && r.URL.Path == "/api/v4/bots":
-			createBotCalled = true
-			w.WriteHeader(http.StatusCreated)
-			json.NewEncoder(w).Encode(mmBot{UserID: "bot123", Username: agent.Name})
-		case r.Method == "POST" && r.URL.Path == "/api/v4/users/bot123/tokens":
-			createTokenCalled = true
-			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(mmToken{ID: "tok1", Token: "secret-token"})
-		default:
-			w.WriteHeader(http.StatusNotFound)
-		}
-	}))
-	defer srv.Close()
-
-	reconciler, _ := setupReconciler(t, agent)
-
-	logSink := blubr.InitLogger(logrus.NewEntry(logrus.New()))
-	logger := logr.New(logSink.WithName("test"))
-
-	err := reconciler.checkAgentBotWithURL(context.TODO(), agent, "admin-token", srv.URL, logger)
-	require.NoError(t, err)
-	assert.True(t, createBotCalled, "expected bot creation API call")
-	assert.True(t, createTokenCalled, "expected token creation API call")
-
-	// Verify secret was created.
-	secret := &corev1.Secret{}
-	err = reconciler.Client.Get(context.TODO(), types.NamespacedName{
-		Name:      agent.BotTokenSecretName(),
-		Namespace: agent.Namespace,
-	}, secret)
-	require.NoError(t, err)
-	assert.Equal(t, "secret-token", string(secret.Data["token"]))
-}
-
-func TestCheckAgentBot_BotAlreadyExists(t *testing.T) {
-	agent := newTestAgent()
-
-	// Pre-create the bot token secret.
-	existingSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      agent.BotTokenSecretName(),
-			Namespace: agent.Namespace,
-		},
-		Data: map[string][]byte{"token": []byte("existing-token")},
-	}
-
-	apiCalled := false
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		apiCalled = true
-		w.WriteHeader(http.StatusInternalServerError)
-	}))
-	defer srv.Close()
-
-	reconciler, _ := setupReconciler(t, agent, existingSecret)
-
-	logSink := blubr.InitLogger(logrus.NewEntry(logrus.New()))
-	logger := logr.New(logSink.WithName("test"))
-
-	err := reconciler.checkAgentBotWithURL(context.TODO(), agent, "admin-token", srv.URL, logger)
-	require.NoError(t, err)
-	assert.False(t, apiCalled, "expected no API calls when bot token secret exists")
 }
 
 func TestCheckAgentService(t *testing.T) {
@@ -314,7 +237,7 @@ func TestCheckAgentDeployment_WithLLMGateway(t *testing.T) {
 	assert.Equal(t, expectedLiteLLMBaseURL, envMap["LITELLM_BASE_URL"].Value, "LITELLM_BASE_URL")
 	assert.Equal(t, expectedLiteLLMBaseURL+"/mcp", envMap["LITELLM_MCP_URL"].Value, "LITELLM_MCP_URL")
 	assert.Equal(t, expectedLiteLLMBaseURL+"/v1", envMap["OPENAI_BASE_URL"].Value, "OPENAI_BASE_URL")
-	assert.Equal(t, expectedLiteLLMBaseURL+"/v1", envMap["ANTHROPIC_BASE_URL"].Value, "ANTHROPIC_BASE_URL")
+	assert.Equal(t, expectedLiteLLMBaseURL, envMap["ANTHROPIC_BASE_URL"].Value, "ANTHROPIC_BASE_URL")
 
 	// OPENAI_API_KEY and ANTHROPIC_API_KEY must be secretKeyRefs (not plain values).
 	expectedKeySecretName := agent.LiteLLMKeySecretName()

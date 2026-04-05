@@ -23,6 +23,14 @@ const (
 	AgentLiteLLMDBCredentialsSecret   = "litellm-db-credentials"
 )
 
+// Agent lifecycle phases (written to AgentStatus.Phase).
+const (
+	AgentPhaseProvisioning = "Provisioning"
+	AgentPhaseDeploying    = "Deploying"
+	AgentPhaseReady        = "Ready"
+	AgentPhaseError        = "Error"
+)
+
 // SetDefaults sets missing values in the Agent manifest to their defaults.
 func (a *Agent) SetDefaults() error {
 	if a.Spec.EgressPolicy == "" {

@@ -19,6 +19,7 @@ func (r *AgentReconciler) updateStatusReconcilingAndLogError(ctx context.Context
 	if statusErr != nil {
 		status.Error = statusErr.Error()
 	}
+	status.Phase = mmv1beta.AgentPhaseError
 	err := r.updateStatusReconciling(ctx, agent, status, reqLogger)
 	if err != nil {
 		reqLogger.Error(err, "Failed to set agent state to reconciling")

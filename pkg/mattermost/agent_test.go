@@ -34,7 +34,6 @@ func testAgent(name, ns string) *mmv1beta.Agent {
 			MattermostRef: corev1.LocalObjectReference{
 				Name: "mm-prod",
 			},
-			AdminCredentialsSecret: "admin-secret",
 		},
 	}
 }

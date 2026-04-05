@@ -2,9 +2,6 @@ package agent
 
 import (
 	"context"
-	"encoding/json"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -101,37 +98,11 @@ func TestReconcileAgent_FullReconcile(t *testing.T) {
 		},
 	}
 
-	adminSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "admin-secret",
-			Namespace: "default",
-		},
-		Data: map[string][]byte{"token": []byte("admin-token")},
-	}
-
-	// Mock the MM API server for bot provisioning.
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.Method == "GET" && r.URL.Path == "/api/v4/bots":
-			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode([]mmBot{})
-		case r.Method == "POST" && r.URL.Path == "/api/v4/bots":
-			w.WriteHeader(http.StatusCreated)
-			json.NewEncoder(w).Encode(mmBot{UserID: "bot123", Username: agent.Name})
-		case r.Method == "POST" && r.URL.Path == "/api/v4/users/bot123/tokens":
-			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(mmToken{ID: "tok1", Token: "bot-secret-token"})
-		default:
-			w.WriteHeader(http.StatusNotFound)
-		}
-	}))
-	defer srv.Close()
-
 	s := setupScheme(t)
 	c := fake.NewClientBuilder().
 		WithScheme(s).
 		WithStatusSubresource(&mmv1beta.Agent{}, &appsv1.Deployment{}, &mmv1beta.Mattermost{}).
-		WithRuntimeObjects(agent, mm, adminSecret).
+		WithRuntimeObjects(agent, mm).
 		Build()
 
 	r := &AgentReconciler{
@@ -141,12 +112,7 @@ func TestReconcileAgent_FullReconcile(t *testing.T) {
 		Resources: resources.NewResourceHelper(c, s),
 	}
 
-	// Override the bot provisioning to use our test server.
-	// We do this by pre-creating the bot token secret (since checkAgentBot
-	// uses the secret as an idempotency check, we can't easily override the URL
-	// in the full reconcile loop). Instead, let's create the bot token secret
-	// to skip the API calls in the real reconcile, since that path is tested
-	// separately in agent_test.go.
+	// Pre-create the bot token secret (the plugin creates this before the Agent CR).
 	botTokenSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      agent.BotTokenSecretName(),
@@ -198,6 +164,8 @@ func TestReconcileAgent_FullReconcile(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, mmv1beta.Stable, updatedAgent.Status.State)
 	assert.Contains(t, updatedAgent.Status.Endpoint, agent.Name)
+	assert.Equal(t, mmv1beta.AgentPhaseReady, updatedAgent.Status.Phase)
+	assert.Equal(t, int32(1), updatedAgent.Status.ReadyReplicas)
 }
 
 func TestReconcileAgent_ImageUpdate(t *testing.T) {
@@ -220,14 +188,6 @@ func TestReconcileAgent_ImageUpdate(t *testing.T) {
 		},
 	}
 
-	adminSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "admin-secret",
-			Namespace: "default",
-		},
-		Data: map[string][]byte{"token": []byte("admin-token")},
-	}
-
 	botTokenSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      agent.BotTokenSecretName(),
@@ -240,7 +200,7 @@ func TestReconcileAgent_ImageUpdate(t *testing.T) {
 	c := fake.NewClientBuilder().
 		WithScheme(s).
 		WithStatusSubresource(&mmv1beta.Agent{}, &appsv1.Deployment{}, &mmv1beta.Mattermost{}).
-		WithRuntimeObjects(agent, mm, adminSecret, botTokenSecret).
+		WithRuntimeObjects(agent, mm, botTokenSecret).
 		Build()
 
 	r := &AgentReconciler{
@@ -307,14 +267,6 @@ func TestReconcileAgent_WithLLMGateway(t *testing.T) {
 		},
 	}
 
-	adminSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "admin-secret",
-			Namespace: "default",
-		},
-		Data: map[string][]byte{"token": []byte("admin-token")},
-	}
-
 	masterKeySecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      mmv1beta.AgentLiteLLMMasterKeySecretName,
@@ -335,7 +287,7 @@ func TestReconcileAgent_WithLLMGateway(t *testing.T) {
 	c := fake.NewClientBuilder().
 		WithScheme(s).
 		WithStatusSubresource(&mmv1beta.Agent{}, &appsv1.Deployment{}, &mmv1beta.Mattermost{}).
-		WithRuntimeObjects(agent, mm, adminSecret, masterKeySecret, botTokenSecret).
+		WithRuntimeObjects(agent, mm, masterKeySecret, botTokenSecret).
 		Build()
 
 	r := &AgentReconciler{
@@ -344,17 +296,6 @@ func TestReconcileAgent_WithLLMGateway(t *testing.T) {
 		Scheme:    s,
 		Resources: resources.NewResourceHelper(c, s),
 	}
-
-	// Pre-create the LiteLLM virtual key Secret so reconcileLiteLLMVirtualKey is a no-op.
-	litellmKeySecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      agent.LiteLLMKeySecretName(),
-			Namespace: agent.Namespace,
-		},
-		Data: map[string][]byte{"apiKey": []byte("sk-virtual-key-pre-created")},
-	}
-	err := c.Create(context.TODO(), litellmKeySecret)
-	require.NoError(t, err)
 
 	// Pre-create the LiteLLM Deployment with ReadyReplicas=1 so checkLiteLLMReady passes.
 	litellmDeploy := &appsv1.Deployment{
@@ -373,7 +314,7 @@ func TestReconcileAgent_WithLLMGateway(t *testing.T) {
 		},
 		Status: appsv1.DeploymentStatus{ReadyReplicas: 1, Replicas: 1},
 	}
-	err = c.Create(context.TODO(), litellmDeploy)
+	err := c.Create(context.TODO(), litellmDeploy)
 	require.NoError(t, err)
 	litellmDeploy.Status.ReadyReplicas = 1
 	err = c.Status().Update(context.TODO(), litellmDeploy)
@@ -385,6 +326,12 @@ func TestReconcileAgent_WithLLMGateway(t *testing.T) {
 	res, err := r.Reconcile(context.Background(), req)
 	require.NoError(t, err)
 	assert.Equal(t, 6*time.Second, res.RequeueAfter)
+
+	// Verify agent is in Deploying phase (not ready yet).
+	agentAfterFirstReconcile := &mmv1beta.Agent{}
+	err = c.Get(context.TODO(), types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, agentAfterFirstReconcile)
+	require.NoError(t, err)
+	assert.Equal(t, mmv1beta.AgentPhaseDeploying, agentAfterFirstReconcile.Status.Phase)
 
 	// Verify LiteLLM ConfigMap was created (shared resource, no OwnerReference).
 	litellmCM := &corev1.ConfigMap{}

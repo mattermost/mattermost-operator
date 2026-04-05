@@ -54,12 +54,6 @@ spec:
           spec:
             description: AgentSpec defines the desired state of Agent
             properties:
-              adminCredentialsSecret:
-                description: |-
-                  AdminCredentialsSecret is the name of the Kubernetes Secret containing
-                  a Mattermost admin access token used to provision the bot account.
-                  The Secret must have a key "token" with the admin access token value.
-                type: string
               egressAllowList:
                 description: |-
                   EgressAllowList lists additional external domains to permit egress to.
@@ -452,7 +446,6 @@ spec:
                     type: object
                 type: object
             required:
-            - adminCredentialsSecret
             - image
             - mattermostRef
             type: object
@@ -476,11 +469,25 @@ spec:
                 description: Error records the last observed error in the reconciliation
                   of this Agent.
                 type: string
+              message:
+                description: Message is a human-readable status message providing
+                  additional detail.
+                type: string
               observedGeneration:
                 description: |-
                   ObservedGeneration is the last observed Generation of the Agent resource
                   that was acted on.
                 format: int64
+                type: integer
+              phase:
+                description: |-
+                  Phase is the lifecycle phase of the agent.
+                  One of: Provisioning, Deploying, Ready, Error.
+                type: string
+              readyReplicas:
+                description: ReadyReplicas is the number of ready replicas for the
+                  agent deployment.
+                format: int32
                 type: integer
               state:
                 description: State is the current running state of the agent.

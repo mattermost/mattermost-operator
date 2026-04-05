@@ -175,7 +175,6 @@ func TestGenerateAgentLiteLLMKeySecret(t *testing.T) {
 			MattermostRef: corev1.LocalObjectReference{
 				Name: "mm-prod",
 			},
-			AdminCredentialsSecret: "admin-secret",
 		},
 	}
 
@@ -248,7 +247,7 @@ func TestGenerateAgentDeployment_WithLLMGateway(t *testing.T) {
 
 	// ANTHROPIC_BASE_URL
 	require.Contains(t, envMap, "ANTHROPIC_BASE_URL")
-	assert.Equal(t, expectedBaseURL+"/v1", envMap["ANTHROPIC_BASE_URL"].Value)
+	assert.Equal(t, expectedBaseURL, envMap["ANTHROPIC_BASE_URL"].Value)
 
 	// ANTHROPIC_API_KEY from secret
 	require.Contains(t, envMap, "ANTHROPIC_API_KEY")

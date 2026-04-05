@@ -70,6 +70,7 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, request ctrl.Request) (
 
 	// Set initial state to Reconciling.
 	if len(agent.Status.State) == 0 {
+		status.Phase = mmv1beta.AgentPhaseProvisioning
 		err = r.updateStatusReconciling(ctx, agent, status, reqLogger)
 		if err != nil {
 			return reconcile.Result{}, err
@@ -96,25 +97,6 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, request ctrl.Request) (
 	if mm.Status.State != mmv1beta.Stable {
 		reqLogger.Info("Mattermost not stable, requeuing", "mmState", mm.Status.State)
 		return reconcile.Result{RequeueAfter: mattermostNotReadyDelay}, nil
-	}
-
-	// Read admin token.
-	adminSecret := &corev1.Secret{}
-	err = r.Client.Get(ctx, types.NamespacedName{
-		Name:      agent.Spec.AdminCredentialsSecret,
-		Namespace: agent.Namespace,
-	}, adminSecret)
-	if err != nil {
-		r.updateStatusReconcilingAndLogError(ctx, agent, status, reqLogger, err)
-		return reconcile.Result{}, err
-	}
-	adminToken := string(adminSecret.Data["token"])
-
-	// Bot provisioning.
-	err = r.checkAgentBot(ctx, agent, adminToken, reqLogger)
-	if err != nil {
-		r.updateStatusReconcilingAndLogError(ctx, agent, status, reqLogger, err)
-		return reconcile.Result{}, err
 	}
 
 	// LiteLLM gateway (operator-managed).
@@ -148,15 +130,16 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, request ctrl.Request) (
 			r.updateStatusReconcilingAndLogError(ctx, agent, status, reqLogger, err)
 			return reconcile.Result{}, err
 		}
-		mcpAccessGroups, err := r.reconcileLiteLLMMCPServers(ctx, agent, litellmURL, masterKey, reqLogger)
+		_, err = r.reconcileLiteLLMMCPServers(ctx, agent, litellmURL, masterKey, reqLogger)
 		if err != nil {
 			r.updateStatusReconcilingAndLogError(ctx, agent, status, reqLogger, err)
 			return reconcile.Result{}, err
 		}
-		if err = r.reconcileLiteLLMVirtualKey(ctx, agent, litellmURL, masterKey, mcpAccessGroups, reqLogger); err != nil {
-			r.updateStatusReconcilingAndLogError(ctx, agent, status, reqLogger, err)
-			return reconcile.Result{}, err
-		}
+	}
+
+	// LiteLLM is ready (or not configured); transition to Deploying.
+	if status.Phase == mmv1beta.AgentPhaseProvisioning {
+		status.Phase = mmv1beta.AgentPhaseDeploying
 	}
 
 	// ServiceAccount

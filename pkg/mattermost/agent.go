@@ -111,7 +111,9 @@ func GenerateAgentDeployment(agent *mmv1beta.Agent) *appsv1.Deployment {
 				corev1.EnvVar{Name: "LITELLM_MCP_URL", Value: baseURL + "/mcp"},
 				corev1.EnvVar{Name: "OPENAI_BASE_URL", Value: baseURL + "/v1"},
 				corev1.EnvVar{Name: "OPENAI_API_KEY", ValueFrom: keyEnvSource},
-				corev1.EnvVar{Name: "ANTHROPIC_BASE_URL", Value: baseURL + "/v1"},
+				// The Anthropic SDK already prepends /v1/ to its API paths,
+				// so ANTHROPIC_BASE_URL must NOT include /v1.
+				corev1.EnvVar{Name: "ANTHROPIC_BASE_URL", Value: baseURL},
 				corev1.EnvVar{Name: "ANTHROPIC_API_KEY", ValueFrom: keyEnvSource},
 			)
 		}

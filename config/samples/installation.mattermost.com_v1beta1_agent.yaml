@@ -21,7 +21,6 @@ spec:
     - "api.anthropic.com"
   mattermostRef:
     name: my-mattermost
-  adminCredentialsSecret: my-mattermost-admin-token
   env:
     - name: OPENAI_API_KEY
       valueFrom:
