@@ -87,7 +87,7 @@ func TestCheckAgentService(t *testing.T) {
 	svc := &corev1.Service{}
 	err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, svc)
 	require.NoError(t, err)
-	assert.Equal(t, "grpc", svc.Spec.Ports[0].Name)
+	assert.Equal(t, "http", svc.Spec.Ports[0].Name)
 
 	// Second call is idempotent.
 	err = reconciler.checkAgentService(context.TODO(), agent, logger)
@@ -262,6 +262,59 @@ func TestCheckAgentDeployment_WithLLMGateway(t *testing.T) {
 	assert.Contains(t, envMap, "AGENT_HOOKS")
 }
 
+func TestCheckHookSecret_CreatesSecret(t *testing.T) {
+	agent := newTestAgent()
+	_ = agent.SetDefaults()
+
+	reconciler, _ := setupReconciler(t, agent)
+	logger := testLogger()
+
+	err := reconciler.checkHookSecret(context.TODO(), agent, logger)
+	require.NoError(t, err)
+
+	// Verify Secret was created.
+	secret := &corev1.Secret{}
+	err = reconciler.Client.Get(context.TODO(), types.NamespacedName{
+		Name:      agent.HookSecretName(),
+		Namespace: agent.Namespace,
+	}, secret)
+	require.NoError(t, err)
+	assert.Contains(t, secret.Data, "hookSecret")
+
+	// Verify the hook secret is a 64-character hex string (32 bytes encoded).
+	hookSecret := string(secret.Data["hookSecret"])
+	assert.Len(t, hookSecret, 64)
+}
+
+func TestCheckHookSecret_Idempotent(t *testing.T) {
+	agent := newTestAgent()
+	_ = agent.SetDefaults()
+
+	// Pre-create the hook secret.
+	existingSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      agent.HookSecretName(),
+			Namespace: agent.Namespace,
+		},
+		Data: map[string][]byte{"hookSecret": []byte("pre-existing-value")},
+	}
+
+	reconciler, _ := setupReconciler(t, agent, existingSecret)
+	logger := testLogger()
+
+	err := reconciler.checkHookSecret(context.TODO(), agent, logger)
+	require.NoError(t, err)
+
+	// Verify original value is preserved.
+	secret := &corev1.Secret{}
+	err = reconciler.Client.Get(context.TODO(), types.NamespacedName{
+		Name:      agent.HookSecretName(),
+		Namespace: agent.Namespace,
+	}, secret)
+	require.NoError(t, err)
+	assert.Equal(t, []byte("pre-existing-value"), secret.Data["hookSecret"])
+}
+
 func TestCheckAgentNetworkPolicy_DenyWithLiteLLM(t *testing.T) {
 	agent := newTestAgent()
 	agent.Spec.EgressPolicy = mmv1beta.AgentEgressPolicyDeny
@@ -283,6 +336,12 @@ func TestCheckAgentNetworkPolicy_DenyWithLiteLLM(t *testing.T) {
 	np := &networkingv1.NetworkPolicy{}
 	err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, np)
 	require.NoError(t, err)
+
+	// Ingress: MM + LiteLLM pods on agent port 8080.
+	require.Len(t, np.Spec.Ingress, 1)
+	require.Len(t, np.Spec.Ingress[0].From, 2, "ingress should allow both MM and LiteLLM pods")
+	assert.Equal(t, agent.Spec.MattermostRef.Name, np.Spec.Ingress[0].From[0].PodSelector.MatchLabels[mmv1beta.ClusterLabel])
+	assert.Equal(t, "litellm", np.Spec.Ingress[0].From[1].PodSelector.MatchLabels["app"])
 
 	// Deny + LiteLLM: 3 egress rules (MM + LiteLLM + DNS).
 	assert.Len(t, np.Spec.Egress, 3, "deny+litellm should have 3 egress rules: MM, LiteLLM, DNS")

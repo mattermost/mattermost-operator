@@ -5,6 +5,7 @@ package agent
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	objectMatcher "github.com/banzaicloud/k8s-objectmatcher/patch"
@@ -181,6 +182,93 @@ func (r *AgentReconciler) reconcileLiteLLMModels(ctx context.Context, agent *mmv
 			}
 		}
 	}
+	return nil
+}
+
+// reconcileAgentModel registers the agent pod's K8s Service endpoint as a model
+// in LiteLLM. This allows the plugin to route chat/completion requests to the
+// agent through LiteLLM using the agent's name as the model identifier.
+//
+// Idempotency: POST /model/new is NOT idempotent — this function lists existing
+// models first and only creates if missing.
+func (r *AgentReconciler) reconcileAgentModel(ctx context.Context, agent *mmv1beta.Agent, litellmURL, masterKey string, reqLogger logr.Logger) error {
+	c := newLiteLLMClient(litellmURL, masterKey)
+
+	existing, err := c.listModels()
+	if err != nil {
+		return pkgerrors.Wrap(err, "failed to list existing models for agent model registration")
+	}
+	existingByName := make(map[string]struct{}, len(existing))
+	for _, m := range existing {
+		existingByName[m.ModelName] = struct{}{}
+	}
+
+	if _, found := existingByName[agent.Name]; found {
+		reqLogger.Info("Agent model already registered, skipping", "model", agent.Name)
+		return nil
+	}
+
+	apiBase := fmt.Sprintf("http://%s.%s.svc.cluster.local:%d/v1", agent.Name, agent.Namespace, mmv1beta.AgentHTTPPort)
+
+	reqLogger.Info("Registering agent model in LiteLLM", "model", agent.Name, "apiBase", apiBase)
+	if err := c.registerAgentModel(agent.Name, apiBase); err != nil {
+		return pkgerrors.Wrapf(err, "failed to register agent model %s", agent.Name)
+	}
+
+	return nil
+}
+
+// reconcileLiteLLMVirtualKey ensures a LiteLLM virtual key exists for the agent
+// and is stored in a K8s Secret. The key grants access to the agent's own model
+// and any MCP access groups returned by reconcileLiteLLMMCPServers.
+//
+// Idempotency: if the Secret already exists, this is a no-op. If the key_alias
+// already exists in LiteLLM (but we lost the Secret), we cannot recover the key
+// value — log a warning. A future reconcile after manual cleanup will recreate it.
+func (r *AgentReconciler) reconcileLiteLLMVirtualKey(ctx context.Context, agent *mmv1beta.Agent, litellmURL, masterKey string, mcpAccessGroups []string, reqLogger logr.Logger) error {
+	// Check if the Secret already exists — if so, nothing to do.
+	secretName := agent.LiteLLMKeySecretName()
+	existingSecret := &corev1.Secret{}
+	err := r.Client.Get(ctx, types.NamespacedName{Name: secretName, Namespace: agent.Namespace}, existingSecret)
+	if err == nil {
+		reqLogger.Info("LiteLLM virtual key secret already exists, skipping", "secret", secretName)
+		return nil
+	}
+	if !k8sErrors.IsNotFound(err) {
+		return pkgerrors.Wrap(err, "failed to check for existing litellm key secret")
+	}
+
+	// Secret does not exist — generate a virtual key via the LiteLLM API.
+	c := newLiteLLMClient(litellmURL, masterKey)
+
+	keyReq := liteLLMKeyRequest{
+		KeyAlias: agent.Name,
+		Models:   []string{agent.Name},
+		Metadata: map[string]string{"agent_name": agent.Name},
+	}
+	if len(mcpAccessGroups) > 0 {
+		keyReq.ObjectPermission = liteLLMObjectPermission{
+			MCPAccessGroups: mcpAccessGroups,
+		}
+	}
+
+	keyResp, err := c.generateKey(keyReq)
+	if err != nil {
+		if err == errKeyAliasExists {
+			reqLogger.Info("LiteLLM key alias already exists but Secret is missing — manual cleanup required",
+				"keyAlias", agent.Name, "expectedSecret", secretName)
+			return nil
+		}
+		return pkgerrors.Wrap(err, "failed to generate litellm virtual key")
+	}
+
+	// Store the key in a K8s Secret owned by the Agent CR.
+	desired := mattermostApp.GenerateAgentLiteLLMKeySecret(agent, keyResp.Key)
+	if err := r.Resources.CreateSecretIfNotExists(agent, desired, reqLogger); err != nil {
+		return pkgerrors.Wrap(err, "failed to create litellm key secret")
+	}
+
+	reqLogger.Info("Created LiteLLM virtual key and secret", "secret", secretName)
 	return nil
 }
 

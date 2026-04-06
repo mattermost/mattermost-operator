@@ -38,6 +38,20 @@ type liteLLMModelRequest struct {
 	LiteLLMParams liteLLMModelParams `json:"litellm_params"`
 }
 
+// liteLLMAgentModelParams contains the LiteLLM params for registering an agent
+// pod as an OpenAI-compatible model endpoint.
+type liteLLMAgentModelParams struct {
+	Model   string `json:"model"`
+	APIBase string `json:"api_base"`
+	APIKey  string `json:"api_key"`
+}
+
+// liteLLMAgentModelRequest is the POST /model/new body for agent model registration.
+type liteLLMAgentModelRequest struct {
+	ModelName     string                  `json:"model_name"`
+	LiteLLMParams liteLLMAgentModelParams `json:"litellm_params"`
+}
+
 type liteLLMCredentials struct {
 	AuthValue string `json:"auth_value"`
 }
@@ -161,6 +175,32 @@ func (c *liteLLMClient) registerModel(modelName, litellmModel, apiKeyEnvRef stri
 	}
 	if status != http.StatusOK && status != http.StatusCreated {
 		return fmt.Errorf("register model returned status %d: %s", status, string(body))
+	}
+	return nil
+}
+
+// registerAgentModel registers an agent pod endpoint as an OpenAI-compatible model
+// in LiteLLM via POST /model/new. NOT idempotent — callers must check listModels first.
+//
+// LiteLLM uses the "openai/" prefix to route via the OpenAI-compatible protocol.
+// api_base points to the agent's K8s Service, and api_key is a placeholder
+// (agent pods authenticate via virtual keys, not this value).
+func (c *liteLLMClient) registerAgentModel(modelName, apiBase string) error {
+	req := liteLLMAgentModelRequest{
+		ModelName: modelName,
+		LiteLLMParams: liteLLMAgentModelParams{
+			Model:   "openai/" + modelName,
+			APIBase: apiBase,
+			APIKey:  "agent-internal",
+		},
+	}
+
+	body, status, err := c.do("POST", "/model/new", req)
+	if err != nil {
+		return err
+	}
+	if status != http.StatusOK && status != http.StatusCreated {
+		return fmt.Errorf("register agent model returned status %d: %s", status, string(body))
 	}
 	return nil
 }

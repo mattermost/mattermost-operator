@@ -412,6 +412,132 @@ func TestReconcileLiteLLMMCPServers_ExplicitAccessGroup(t *testing.T) {
 	assert.Equal(t, []string{"shared_jira"}, capturedReq.MCPAccessGroups)
 }
 
+// ─── Virtual key reconciliation tests ──────────────────────────────────────
+
+func TestReconcileLiteLLMVirtualKey_CreatesKeyAndSecret(t *testing.T) {
+	agent := newTestAgentWithLLMGateway()
+
+	var keyReqCaptured liteLLMKeyRequest
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == "POST" && r.URL.Path == "/key/generate":
+			err := json.NewDecoder(r.Body).Decode(&keyReqCaptured)
+			require.NoError(t, err)
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(liteLLMKeyResponse{
+				Key:      "sk-virtual-key-abc",
+				KeyAlias: keyReqCaptured.KeyAlias,
+				Token:    "tok-hash-123",
+			})
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	reconciler, _ := setupReconciler(t, agent)
+	logger := testLogger()
+
+	err := reconciler.reconcileLiteLLMVirtualKey(
+		context.TODO(), agent, srv.URL, "master-key",
+		[]string{"test-agent_jira_agent_alpha"}, logger,
+	)
+	require.NoError(t, err)
+
+	// Verify the key request.
+	assert.Equal(t, agent.Name, keyReqCaptured.KeyAlias)
+	assert.Equal(t, []string{agent.Name}, keyReqCaptured.Models)
+	assert.Equal(t, []string{"test-agent_jira_agent_alpha"}, keyReqCaptured.ObjectPermission.MCPAccessGroups)
+
+	// Verify Secret was created.
+	secret := &corev1.Secret{}
+	err = reconciler.Client.Get(context.TODO(), types.NamespacedName{
+		Name:      agent.LiteLLMKeySecretName(),
+		Namespace: agent.Namespace,
+	}, secret)
+	require.NoError(t, err)
+	assert.Equal(t, []byte("sk-virtual-key-abc"), secret.Data["apiKey"])
+}
+
+func TestReconcileLiteLLMVirtualKey_SecretAlreadyExists(t *testing.T) {
+	agent := newTestAgentWithLLMGateway()
+
+	// Pre-create the Secret.
+	existingSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      agent.LiteLLMKeySecretName(),
+			Namespace: agent.Namespace,
+		},
+		Data: map[string][]byte{"apiKey": []byte("existing-key")},
+	}
+
+	// Mock server should NOT be called.
+	apiCalled := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		apiCalled = true
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	reconciler, _ := setupReconciler(t, agent, existingSecret)
+	logger := testLogger()
+
+	err := reconciler.reconcileLiteLLMVirtualKey(context.TODO(), agent, srv.URL, "master-key", nil, logger)
+	require.NoError(t, err)
+	assert.False(t, apiCalled, "expected no API calls when Secret already exists")
+}
+
+func TestReconcileLiteLLMVirtualKey_KeyAliasAlreadyExists(t *testing.T) {
+	agent := newTestAgentWithLLMGateway()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Simulate LiteLLM returning key_alias already exists.
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(`{"error": "Key with alias already exists: test-agent"}`))
+	}))
+	defer srv.Close()
+
+	reconciler, _ := setupReconciler(t, agent)
+	logger := testLogger()
+
+	// Should not error — treated as non-fatal.
+	err := reconciler.reconcileLiteLLMVirtualKey(context.TODO(), agent, srv.URL, "master-key", nil, logger)
+	require.NoError(t, err)
+
+	// Secret should NOT exist (we can't recover the key value).
+	secret := &corev1.Secret{}
+	err = reconciler.Client.Get(context.TODO(), types.NamespacedName{
+		Name:      agent.LiteLLMKeySecretName(),
+		Namespace: agent.Namespace,
+	}, secret)
+	require.Error(t, err, "secret should not exist when key alias exists but we can't recover the key")
+}
+
+func TestReconcileLiteLLMVirtualKey_NoMCPAccessGroups(t *testing.T) {
+	agent := newTestAgentWithLLMGateway()
+
+	var keyReqCaptured liteLLMKeyRequest
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "POST" && r.URL.Path == "/key/generate" {
+			json.NewDecoder(r.Body).Decode(&keyReqCaptured)
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(liteLLMKeyResponse{Key: "sk-key", KeyAlias: agent.Name})
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	reconciler, _ := setupReconciler(t, agent)
+	logger := testLogger()
+
+	err := reconciler.reconcileLiteLLMVirtualKey(context.TODO(), agent, srv.URL, "master-key", nil, logger)
+	require.NoError(t, err)
+
+	// object_permission should be zero-value (no mcp_access_groups).
+	assert.Nil(t, keyReqCaptured.ObjectPermission.MCPAccessGroups)
+}
+
 func TestReconcileLiteLLMMCPServers_CredentialResolution(t *testing.T) {
 	agent := newTestAgentWithLLMGateway()
 	agent.Spec.MCPServers = []mmv1beta.AgentMCPServer{

@@ -70,8 +70,8 @@ type AgentStatus struct {
 	// +optional
 	State RunningState `json:"state,omitempty"`
 
-	// Endpoint is the gRPC service endpoint for this agent.
-	// Format: "agent-<name>.<namespace>.svc.cluster.local:50051"
+	// Endpoint is the HTTP service endpoint for this agent.
+	// Format: "<name>.<namespace>.svc.cluster.local:8080"
 	// +optional
 	Endpoint string `json:"endpoint,omitempty"`
 
@@ -115,7 +115,7 @@ type AgentStatus struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:priority=0,name="State",type=string,JSONPath=".status.state",description="State of Agent"
 // +kubebuilder:printcolumn:priority=0,name="Image",type=string,JSONPath=".spec.image",description="Image of Agent"
-// +kubebuilder:printcolumn:priority=0,name="Endpoint",type=string,JSONPath=".status.endpoint",description="gRPC Endpoint"
+// +kubebuilder:printcolumn:priority=0,name="Endpoint",type=string,JSONPath=".status.endpoint",description="HTTP Endpoint"
 type Agent struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

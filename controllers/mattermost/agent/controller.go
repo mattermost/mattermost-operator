@@ -149,6 +149,13 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, request ctrl.Request) (
 		return reconcile.Result{}, err
 	}
 
+	// Hook Secret
+	err = r.checkHookSecret(ctx, agent, reqLogger)
+	if err != nil {
+		r.updateStatusReconcilingAndLogError(ctx, agent, status, reqLogger, err)
+		return reconcile.Result{}, err
+	}
+
 	// Service
 	err = r.checkAgentService(ctx, agent, reqLogger)
 	if err != nil {
@@ -179,6 +186,34 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, request ctrl.Request) (
 		}
 		reqLogger.Info("Agent not healthy", "msg", err.Error())
 		return reconcile.Result{RequeueAfter: healthCheckRequeueDelay}, nil
+	}
+
+	// Register agent pod endpoint as a model in LiteLLM and create virtual key
+	// (after health check confirms agent is running).
+	if agent.Spec.LLMGateway != nil && agent.Spec.LLMGateway.OperatorManaged != nil {
+		masterKey, err := r.getLiteLLMMasterKey(ctx, agent.Namespace)
+		if err != nil {
+			r.updateStatusReconcilingAndLogError(ctx, agent, status, reqLogger, err)
+			return reconcile.Result{}, err
+		}
+		litellmURL := mattermostApp.LiteLLMServiceURL(agent.Namespace)
+		if err := r.reconcileAgentModel(ctx, agent, litellmURL, masterKey, reqLogger); err != nil {
+			r.updateStatusReconcilingAndLogError(ctx, agent, status, reqLogger, err)
+			return reconcile.Result{}, err
+		}
+
+		// Collect MCP access groups from the earlier reconcileLiteLLMMCPServers call.
+		// Re-derive them here rather than threading state through the reconcile loop.
+		mcpAccessGroups, err := r.reconcileLiteLLMMCPServers(ctx, agent, litellmURL, masterKey, reqLogger)
+		if err != nil {
+			r.updateStatusReconcilingAndLogError(ctx, agent, status, reqLogger, err)
+			return reconcile.Result{}, err
+		}
+
+		if err := r.reconcileLiteLLMVirtualKey(ctx, agent, litellmURL, masterKey, mcpAccessGroups, reqLogger); err != nil {
+			r.updateStatusReconcilingAndLogError(ctx, agent, status, reqLogger, err)
+			return reconcile.Result{}, err
+		}
 	}
 
 	err = r.updateStatus(ctx, agent, status, reqLogger)

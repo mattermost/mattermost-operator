@@ -36,7 +36,7 @@ func GenerateAgentServiceAccount(agent *mmv1beta.Agent) *corev1.ServiceAccount {
 	}
 }
 
-// GenerateAgentService returns the gRPC Service for an Agent.
+// GenerateAgentService returns the HTTP Service for an Agent.
 func GenerateAgentService(agent *mmv1beta.Agent) *corev1.Service {
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -50,9 +50,9 @@ func GenerateAgentService(agent *mmv1beta.Agent) *corev1.Service {
 			Selector: mmv1beta.AgentSelectorLabels(agent.Name),
 			Ports: []corev1.ServicePort{
 				{
-					Name:       "grpc",
-					Port:       mmv1beta.AgentGRPCPort,
-					TargetPort: intstr.FromInt32(mmv1beta.AgentGRPCPort),
+					Name:       "http",
+					Port:       mmv1beta.AgentHTTPPort,
+					TargetPort: intstr.FromInt32(mmv1beta.AgentHTTPPort),
 				},
 			},
 		},
@@ -85,6 +85,17 @@ func GenerateAgentDeployment(agent *mmv1beta.Agent) *appsv1.Deployment {
 						Name: agent.BotTokenSecretName(),
 					},
 					Key: "token",
+				},
+			},
+		},
+		{
+			Name: "HOOK_SECRET",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: agent.HookSecretName(),
+					},
+					Key: "hookSecret",
 				},
 			},
 		},
@@ -177,8 +188,8 @@ func GenerateAgentDeployment(agent *mmv1beta.Agent) *appsv1.Deployment {
 							}),
 							Ports: []corev1.ContainerPort{
 								{
-									ContainerPort: mmv1beta.AgentGRPCPort,
-									Name:          "grpc",
+									ContainerPort: mmv1beta.AgentHTTPPort,
+									Name:          "http",
 								},
 							},
 							Resources: agent.Spec.Resources,
@@ -217,11 +228,46 @@ func GenerateAgentDeployment(agent *mmv1beta.Agent) *appsv1.Deployment {
 	}
 }
 
+// agentIngressRules returns the ingress rules for the Agent NetworkPolicy.
+// Always allows ingress from MM server pods. When LLMGateway is configured,
+// also allows ingress from LiteLLM pods (which proxy chat requests to agents).
+func agentIngressRules(agent *mmv1beta.Agent, protocol *corev1.Protocol, agentPort *intstr.IntOrString) []networkingv1.NetworkPolicyIngressRule {
+	ingressFrom := []networkingv1.NetworkPolicyPeer{
+		{
+			PodSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					mmv1beta.ClusterLabel: agent.Spec.MattermostRef.Name,
+				},
+			},
+		},
+	}
+
+	if agent.Spec.LLMGateway != nil {
+		ingressFrom = append(ingressFrom, networkingv1.NetworkPolicyPeer{
+			PodSelector: &metav1.LabelSelector{
+				MatchLabels: liteLLMLabels(),
+			},
+		})
+	}
+
+	return []networkingv1.NetworkPolicyIngressRule{
+		{
+			From: ingressFrom,
+			Ports: []networkingv1.NetworkPolicyPort{
+				{
+					Protocol: protocol,
+					Port:     agentPort,
+				},
+			},
+		},
+	}
+}
+
 // GenerateAgentNetworkPolicy returns the NetworkPolicy for an Agent.
 func GenerateAgentNetworkPolicy(agent *mmv1beta.Agent) *networkingv1.NetworkPolicy {
 	protocol := corev1.ProtocolTCP
 	protocolUDP := corev1.ProtocolUDP
-	grpcPort := intstr.FromInt32(mmv1beta.AgentGRPCPort)
+	agentPort := intstr.FromInt32(mmv1beta.AgentHTTPPort)
 	mmPort := intstr.FromInt32(8065)
 	dnsPort := intstr.FromInt32(53)
 	liteLLMPort := intstr.FromInt32(mmv1beta.AgentLiteLLMPort)
@@ -325,25 +371,7 @@ func GenerateAgentNetworkPolicy(agent *mmv1beta.Agent) *networkingv1.NetworkPoli
 				networkingv1.PolicyTypeIngress,
 				networkingv1.PolicyTypeEgress,
 			},
-			Ingress: []networkingv1.NetworkPolicyIngressRule{
-				{
-					From: []networkingv1.NetworkPolicyPeer{
-						{
-							PodSelector: &metav1.LabelSelector{
-								MatchLabels: map[string]string{
-									mmv1beta.ClusterLabel: agent.Spec.MattermostRef.Name,
-								},
-							},
-						},
-					},
-					Ports: []networkingv1.NetworkPolicyPort{
-						{
-							Protocol: &protocol,
-							Port:     &grpcPort,
-						},
-					},
-				},
-			},
+			Ingress: agentIngressRules(agent, &protocol, &agentPort),
 			Egress: egressRules,
 		},
 	}
@@ -359,5 +387,18 @@ func GenerateAgentBotTokenSecret(agent *mmv1beta.Agent, token string) *corev1.Se
 			OwnerReferences: AgentOwnerReference(agent),
 		},
 		Data: map[string][]byte{"token": []byte(token)},
+	}
+}
+
+// GenerateAgentHookSecret returns the Secret storing the agent's hook secret.
+func GenerateAgentHookSecret(agent *mmv1beta.Agent, secretValue string) *corev1.Secret {
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            agent.HookSecretName(),
+			Namespace:       agent.Namespace,
+			Labels:          mmv1beta.AgentLabels(agent.Name),
+			OwnerReferences: AgentOwnerReference(agent),
+		},
+		Data: map[string][]byte{"hookSecret": []byte(secretValue)},
 	}
 }

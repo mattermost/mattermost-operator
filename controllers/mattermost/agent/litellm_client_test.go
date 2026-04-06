@@ -53,6 +53,47 @@ func TestRegisterModel_Error(t *testing.T) {
 	assert.Contains(t, err.Error(), "500")
 }
 
+// ─── registerAgentModel ──────────────────────────────────────────────────
+
+func TestRegisterAgentModel_Success(t *testing.T) {
+	var capturedBody liteLLMAgentModelRequest
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "POST", r.Method)
+		require.Equal(t, "/model/new", r.URL.Path)
+		require.Equal(t, "Bearer test-master-key", r.Header.Get("Authorization"))
+
+		err := json.NewDecoder(r.Body).Decode(&capturedBody)
+		require.NoError(t, err)
+
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"model_id": "m1"})
+	}))
+	defer srv.Close()
+
+	c := newLiteLLMClient(srv.URL, "test-master-key")
+	err := c.registerAgentModel("my-agent", "http://my-agent.default.svc.cluster.local:8080/v1")
+	require.NoError(t, err)
+
+	assert.Equal(t, "my-agent", capturedBody.ModelName)
+	assert.Equal(t, "openai/my-agent", capturedBody.LiteLLMParams.Model)
+	assert.Equal(t, "http://my-agent.default.svc.cluster.local:8080/v1", capturedBody.LiteLLMParams.APIBase)
+	assert.Equal(t, "agent-internal", capturedBody.LiteLLMParams.APIKey)
+}
+
+func TestRegisterAgentModel_Error(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("internal error"))
+	}))
+	defer srv.Close()
+
+	c := newLiteLLMClient(srv.URL, "key")
+	err := c.registerAgentModel("my-agent", "http://my-agent.default.svc.cluster.local:8080/v1")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "500")
+}
+
 // ─── listModels ───────────────────────────────────────────────────────────
 
 func TestListModels_Empty(t *testing.T) {

@@ -5,6 +5,7 @@ import (
 
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -71,8 +72,8 @@ func TestGenerateAgentService(t *testing.T) {
 	assert.Len(t, svc.OwnerReferences, 1)
 
 	assert.Len(t, svc.Spec.Ports, 1)
-	assert.Equal(t, int32(50051), svc.Spec.Ports[0].Port)
-	assert.Equal(t, "grpc", svc.Spec.Ports[0].Name)
+	assert.Equal(t, int32(8080), svc.Spec.Ports[0].Port)
+	assert.Equal(t, "http", svc.Spec.Ports[0].Name)
 
 	assert.Equal(t, mmv1beta.AgentSelectorLabels("my-agent"), svc.Spec.Selector)
 }
@@ -104,7 +105,7 @@ func TestGenerateAgentDeployment(t *testing.T) {
 
 	// Ports
 	assert.Len(t, c.Ports, 1)
-	assert.Equal(t, int32(50051), c.Ports[0].ContainerPort)
+	assert.Equal(t, int32(8080), c.Ports[0].ContainerPort)
 
 	// Env vars
 	envMap := make(map[string]string)
@@ -113,6 +114,19 @@ func TestGenerateAgentDeployment(t *testing.T) {
 	}
 	assert.Equal(t, "http://mm-prod.test-ns.svc.cluster.local:8065", envMap["MM_SERVER_URL"])
 	assert.Equal(t, "MessageHasBeenPosted,UserHasJoinedChannel", envMap["AGENT_HOOKS"])
+
+	// HOOK_SECRET from secret
+	var hookSecretEnv *corev1.EnvVar
+	for i, e := range c.Env {
+		if e.Name == "HOOK_SECRET" {
+			hookSecretEnv = &c.Env[i]
+		}
+	}
+	require.NotNil(t, hookSecretEnv, "HOOK_SECRET env var must be present")
+	require.NotNil(t, hookSecretEnv.ValueFrom)
+	require.NotNil(t, hookSecretEnv.ValueFrom.SecretKeyRef)
+	assert.Equal(t, agent.HookSecretName(), hookSecretEnv.ValueFrom.SecretKeyRef.Name)
+	assert.Equal(t, "hookSecret", hookSecretEnv.ValueFrom.SecretKeyRef.Key)
 
 	// Volume mounts on main container
 	assert.Len(t, c.VolumeMounts, 2)
@@ -180,6 +194,22 @@ func TestGenerateAgentDeployment_CustomEnvVars(t *testing.T) {
 	assert.Equal(t, "should-not-override", envMap["MM_SERVER_URL"])
 }
 
+func TestGenerateAgentHookSecret(t *testing.T) {
+	agent := testAgent("my-agent", "default")
+	secret := GenerateAgentHookSecret(agent, "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890")
+
+	assert.Equal(t, agent.HookSecretName(), secret.Name)
+	assert.Equal(t, "default", secret.Namespace)
+	assert.Equal(t, mmv1beta.AgentLabels("my-agent"), secret.Labels)
+	assert.Len(t, secret.OwnerReferences, 1)
+	assert.Equal(t, "Agent", secret.OwnerReferences[0].Kind)
+	assert.Equal(t, []byte("abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"), secret.Data["hookSecret"])
+
+	// Must NOT have other keys
+	assert.NotContains(t, secret.Data, "token")
+	assert.NotContains(t, secret.Data, "apiKey")
+}
+
 func TestGenerateAgentNetworkPolicy_Deny(t *testing.T) {
 	agent := testAgent("my-agent", "default")
 	agent.Spec.EgressPolicy = mmv1beta.AgentEgressPolicyDeny
@@ -194,13 +224,13 @@ func TestGenerateAgentNetworkPolicy_Deny(t *testing.T) {
 	assert.Contains(t, np.Spec.PolicyTypes, networkingv1.PolicyTypeIngress)
 	assert.Contains(t, np.Spec.PolicyTypes, networkingv1.PolicyTypeEgress)
 
-	// Ingress: from MM pods on port 50051
+	// Ingress: from MM pods on port 8080
 	assert.Len(t, np.Spec.Ingress, 1)
 	ingress := np.Spec.Ingress[0]
 	assert.Len(t, ingress.From, 1)
 	assert.Equal(t, "mm-prod", ingress.From[0].PodSelector.MatchLabels[mmv1beta.ClusterLabel])
 	assert.Len(t, ingress.Ports, 1)
-	assert.Equal(t, int32(50051), ingress.Ports[0].Port.IntVal)
+	assert.Equal(t, int32(8080), ingress.Ports[0].Port.IntVal)
 
 	// Egress: 2 rules (MM + DNS)
 	assert.Len(t, np.Spec.Egress, 2)

@@ -327,6 +327,15 @@ func TestGenerateAgentNetworkPolicy_DenyWithLiteLLM(t *testing.T) {
 
 	np := GenerateAgentNetworkPolicy(agent)
 
+	// Ingress: single rule with 2 From peers (MM + LiteLLM) on agent port.
+	require.Len(t, np.Spec.Ingress, 1)
+	ingress := np.Spec.Ingress[0]
+	require.Len(t, ingress.From, 2, "ingress should allow both MM and LiteLLM pods")
+	assert.Equal(t, agent.Spec.MattermostRef.Name, ingress.From[0].PodSelector.MatchLabels[mmv1beta.ClusterLabel])
+	assert.Equal(t, "litellm", ingress.From[1].PodSelector.MatchLabels["app"])
+	require.Len(t, ingress.Ports, 1)
+	assert.Equal(t, mmv1beta.AgentHTTPPort, ingress.Ports[0].Port.IntVal)
+
 	// 3 egress rules: MM server (8065) + LiteLLM (4000) + DNS (53)
 	assert.Len(t, np.Spec.Egress, 3)
 

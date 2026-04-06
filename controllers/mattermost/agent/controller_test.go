@@ -164,8 +164,19 @@ func TestReconcileAgent_FullReconcile(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, mmv1beta.Stable, updatedAgent.Status.State)
 	assert.Contains(t, updatedAgent.Status.Endpoint, agent.Name)
+	assert.Contains(t, updatedAgent.Status.Endpoint, ":8080")
 	assert.Equal(t, mmv1beta.AgentPhaseReady, updatedAgent.Status.Phase)
 	assert.Equal(t, int32(1), updatedAgent.Status.ReadyReplicas)
+
+	// Verify hook secret was created.
+	hookSecret := &corev1.Secret{}
+	err = c.Get(context.TODO(), types.NamespacedName{
+		Name:      agent.HookSecretName(),
+		Namespace: agent.Namespace,
+	}, hookSecret)
+	require.NoError(t, err, "hook secret should be created during reconcile")
+	assert.Contains(t, hookSecret.Data, "hookSecret")
+	assert.Len(t, string(hookSecret.Data["hookSecret"]), 64, "hook secret should be 64-char hex")
 }
 
 func TestReconcileAgent_ImageUpdate(t *testing.T) {
@@ -373,4 +384,13 @@ func TestReconcileAgent_WithLLMGateway(t *testing.T) {
 	err = c.Get(context.TODO(), types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, np)
 	require.NoError(t, err)
 	assert.Len(t, np.Spec.Egress, 3, "deny+litellm policy must have 3 egress rules")
+
+	// Verify hook secret was created (created before Deployment, no LLM dependency).
+	hookSecret := &corev1.Secret{}
+	err = c.Get(context.TODO(), types.NamespacedName{
+		Name:      agent.HookSecretName(),
+		Namespace: agent.Namespace,
+	}, hookSecret)
+	require.NoError(t, err, "hook secret should be created during reconcile")
+	assert.Contains(t, hookSecret.Data, "hookSecret")
 }

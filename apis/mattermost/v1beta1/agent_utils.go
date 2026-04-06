@@ -12,7 +12,7 @@ const (
 	AgentEgressPolicyDeny             = "deny"
 	AgentEgressPolicyAllowList        = "allowList"
 	AgentContainerName                = "agent"
-	AgentGRPCPort                     = int32(50051)
+	AgentHTTPPort                     = int32(8080)
 	AgentBotTokenSecretNamePrefix     = "agent-"
 	AgentLiteLLMDefaultImage          = "ghcr.io/berriai/litellm-database:main-v1.82.0-stable"
 	AgentLiteLLMPort                  = int32(4000)
@@ -91,4 +91,9 @@ func (a *Agent) BotTokenSecretName() string {
 // LiteLLMKeySecretName returns the name of the K8s Secret storing this agent's LiteLLM virtual key.
 func (a *Agent) LiteLLMKeySecretName() string {
 	return "agent-" + a.Name + "-litellm-key"
+}
+
+// HookSecretName returns the name of the K8s Secret storing this agent's hook secret.
+func (a *Agent) HookSecretName() string {
+	return "agent-" + a.Name + "-hook-secret"
 }

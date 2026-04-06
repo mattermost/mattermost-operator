@@ -2,6 +2,8 @@ package agent
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 
 	"github.com/go-logr/logr"
@@ -11,6 +13,7 @@ import (
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -30,6 +33,33 @@ func (r *AgentReconciler) checkAgentServiceAccount(ctx context.Context, agent *m
 	}
 
 	return r.Resources.Update(current, desired, reqLogger)
+}
+
+func (r *AgentReconciler) checkHookSecret(ctx context.Context, agent *mmv1beta.Agent, reqLogger logr.Logger) error {
+	secretName := agent.HookSecretName()
+	existingSecret := &corev1.Secret{}
+	err := r.Client.Get(ctx, types.NamespacedName{Name: secretName, Namespace: agent.Namespace}, existingSecret)
+	if err == nil {
+		return nil // Secret already exists
+	}
+	if !k8sErrors.IsNotFound(err) {
+		return errors.Wrap(err, "failed to check for existing hook secret")
+	}
+
+	// Generate a random 32-byte hex string.
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return errors.Wrap(err, "failed to generate random hook secret")
+	}
+	secretValue := hex.EncodeToString(b)
+
+	desired := mattermostApp.GenerateAgentHookSecret(agent, secretValue)
+	if err := r.Resources.CreateSecretIfNotExists(agent, desired, reqLogger); err != nil {
+		return errors.Wrap(err, "failed to create hook secret")
+	}
+
+	reqLogger.Info("Created hook secret", "secret", secretName)
+	return nil
 }
 
 func (r *AgentReconciler) checkAgentService(ctx context.Context, agent *mmv1beta.Agent, reqLogger logr.Logger) error {
@@ -90,7 +120,7 @@ func (r *AgentReconciler) checkAgentHealth(ctx context.Context, agent *mmv1beta.
 		State:              mmv1beta.Reconciling,
 		Phase:              mmv1beta.AgentPhaseDeploying,
 		ObservedGeneration: agent.Generation,
-		Endpoint:           fmt.Sprintf("%s.%s.svc.cluster.local:%d", agent.Name, agent.Namespace, mmv1beta.AgentGRPCPort),
+		Endpoint:           fmt.Sprintf("%s.%s.svc.cluster.local:%d", agent.Name, agent.Namespace, mmv1beta.AgentHTTPPort),
 	}
 
 	deployment := &appsv1.Deployment{}

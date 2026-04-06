@@ -25,7 +25,7 @@ spec:
       jsonPath: .spec.image
       name: Image
       type: string
-    - description: gRPC Endpoint
+    - description: HTTP Endpoint
       jsonPath: .status.endpoint
       name: Endpoint
       type: string
@@ -462,8 +462,8 @@ spec:
                 type: string
               endpoint:
                 description: |-
-                  Endpoint is the gRPC service endpoint for this agent.
-                  Format: "agent-<name>.<namespace>.svc.cluster.local:50051"
+                  Endpoint is the HTTP service endpoint for this agent.
+                  Format: "<name>.<namespace>.svc.cluster.local:8080"
                 type: string
               error:
                 description: Error records the last observed error in the reconciliation
