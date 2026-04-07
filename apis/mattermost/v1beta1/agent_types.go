@@ -58,10 +58,6 @@ type AgentSpec struct {
 	// +optional
 	LLMGateway *LLMGatewayConfig `json:"llmGateway,omitempty"`
 
-	// MCPServers lists MCP servers to register in the LiteLLM gateway for this agent.
-	// Only evaluated when LLMGateway.OperatorManaged is set.
-	// +optional
-	MCPServers []AgentMCPServer `json:"mcpServers,omitempty"`
 }
 
 // AgentStatus defines the observed state of Agent
@@ -168,55 +164,6 @@ type OperatorManagedLLMGateway struct {
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 
-	// LLMProviders lists the LLM providers to register in LiteLLM.
-	// Each provider maps to a POST /model/new call during reconciliation.
-	// +optional
-	LLMProviders []LLMProvider `json:"llmProviders,omitempty"`
-}
-
-// LLMProvider defines a provider (e.g. anthropic, openai) and the models to register.
-type LLMProvider struct {
-	// Name is the provider name as recognised by LiteLLM.
-	// Examples: "anthropic", "openai", "bedrock".
-	Name string `json:"name"`
-
-	// Secret is the name of the K8s Secret containing the provider API key.
-	// The Secret must have a key "apiKey".
-	Secret string `json:"secret"`
-
-	// Models lists the model names to register for this provider.
-	// Example: ["claude-3-5-sonnet-20241022", "claude-3-opus-20240229"]
-	Models []string `json:"models"`
-}
-
-// AgentMCPServer defines an MCP server entry to register in LiteLLM for this agent.
-type AgentMCPServer struct {
-	// Name is the human-readable name for this MCP server.
-	// Will be sanitized (hyphens replaced with underscores) when registered in LiteLLM.
-	Name string `json:"name"`
-
-	// URL is the base URL of the MCP server.
-	// Example: "http://jira-mcp.tools.svc.cluster.local:8080"
-	URL string `json:"url"`
-
-	// CredentialSecret is the name of the K8s Secret containing the auth credential
-	// for this MCP server. The Secret must have a key "apiKey".
-	// +optional
-	CredentialSecret string `json:"credentialSecret,omitempty"`
-
-	// MCPAccessGroup is the access group name used to scope this server to virtual keys.
-	// If empty, the operator generates one: "<agentName>_<sanitizedServerName>".
-	// +optional
-	MCPAccessGroup string `json:"mcpAccessGroup,omitempty"`
-
-	// AllowedTools lists specific tool names to permit (in addition to server-level access).
-	// If empty, all tools on the server are accessible.
-	// +optional
-	AllowedTools []string `json:"allowedTools,omitempty"`
-
-	// DisallowedTools lists specific tool names to block.
-	// +optional
-	DisallowedTools []string `json:"disallowedTools,omitempty"`
 }
 
 func init() {

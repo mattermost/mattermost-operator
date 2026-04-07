@@ -157,26 +157,12 @@ func schema__apis_mattermost_v1beta1_AgentSpec(ref common.ReferenceCallback) com
 							Ref:         ref("./apis/mattermost/v1beta1.LLMGatewayConfig"),
 						},
 					},
-					"mcpServers": {
-						SchemaProps: spec.SchemaProps{
-							Description: "MCPServers lists MCP servers to register in the LiteLLM gateway for this agent. Only evaluated when LLMGateway.OperatorManaged is set.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("./apis/mattermost/v1beta1.AgentMCPServer"),
-									},
-								},
-							},
-						},
-					},
 				},
 				Required: []string{"image", "mattermostRef"},
 			},
 		},
 		Dependencies: []string{
-			"./apis/mattermost/v1beta1.AgentMCPServer", "./apis/mattermost/v1beta1.LLMGatewayConfig", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.LocalObjectReference", "k8s.io/api/core/v1.ResourceRequirements"},
+			"./apis/mattermost/v1beta1.LLMGatewayConfig", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.LocalObjectReference", "k8s.io/api/core/v1.ResourceRequirements"},
 	}
 }
 

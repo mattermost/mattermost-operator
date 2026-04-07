@@ -45,6 +45,11 @@ func setupScheme(t *testing.T) *runtime.Scheme {
 	return s
 }
 
+func testLogger() logr.Logger {
+	logSink := blubr.InitLogger(logrus.NewEntry(logrus.New()))
+	return logr.New(logSink.WithName("test"))
+}
+
 func setupReconciler(t *testing.T, objs ...runtime.Object) (*AgentReconciler, *runtime.Scheme) {
 	s := setupScheme(t)
 
@@ -193,13 +198,6 @@ func TestCheckAgentDeployment_WithLLMGateway(t *testing.T) {
 	agent.Spec.LLMGateway = &mmv1beta.LLMGatewayConfig{
 		OperatorManaged: &mmv1beta.OperatorManagedLLMGateway{
 			Image: mmv1beta.AgentLiteLLMDefaultImage,
-			LLMProviders: []mmv1beta.LLMProvider{
-				{
-					Name:   "anthropic",
-					Secret: "anthropic-key",
-					Models: []string{"claude-3-5-sonnet-20241022"},
-				},
-			},
 		},
 	}
 	_ = agent.SetDefaults()

@@ -31,7 +31,7 @@ func TestGenerateLiteLLMConfigMap(t *testing.T) {
 // TestGenerateLiteLLMDeployment verifies image, env vars (DATABASE_URL, MASTER_KEY,
 // STORE_MODEL_IN_DB), probes, resources, and volumes.
 func TestGenerateLiteLLMDeployment(t *testing.T) {
-	dep := GenerateLiteLLMDeployment("my-namespace", mmv1beta.AgentLiteLLMDefaultImage, nil)
+	dep := GenerateLiteLLMDeployment("my-namespace", mmv1beta.AgentLiteLLMDefaultImage)
 
 	assert.Equal(t, mmv1beta.AgentLiteLLMDeploymentName, dep.Name)
 	assert.Equal(t, "my-namespace", dep.Namespace)
@@ -111,35 +111,6 @@ func TestGenerateLiteLLMDeployment(t *testing.T) {
 	assert.Equal(t, "litellm-config", vol.Name)
 	require.NotNil(t, vol.ConfigMap)
 	assert.Equal(t, mmv1beta.AgentLiteLLMConfigMapName, vol.ConfigMap.Name)
-}
-
-// TestGenerateLiteLLMDeployment_WithProviderEnvVars verifies provider env vars are injected.
-func TestGenerateLiteLLMDeployment_WithProviderEnvVars(t *testing.T) {
-	providerEnvVars := []corev1.EnvVar{
-		{Name: "ANTHROPIC_API_KEY", Value: "sk-ant-test"},
-		{Name: "OPENAI_API_KEY", Value: "sk-oai-test"},
-	}
-
-	dep := GenerateLiteLLMDeployment("my-namespace", mmv1beta.AgentLiteLLMDefaultImage, providerEnvVars)
-	require.Len(t, dep.Spec.Template.Spec.Containers, 1)
-	c := dep.Spec.Template.Spec.Containers[0]
-
-	envMap := make(map[string]string)
-	for _, e := range c.Env {
-		envMap[e.Name] = e.Value
-	}
-
-	assert.Equal(t, "sk-ant-test", envMap["ANTHROPIC_API_KEY"])
-	assert.Equal(t, "sk-oai-test", envMap["OPENAI_API_KEY"])
-
-	// Base env vars still present
-	hasDBURL := false
-	for _, e := range c.Env {
-		if e.Name == "DATABASE_URL" {
-			hasDBURL = true
-		}
-	}
-	assert.True(t, hasDBURL, "DATABASE_URL must be present alongside provider env vars")
 }
 
 // TestGenerateLiteLLMService verifies port, selector, and labels.

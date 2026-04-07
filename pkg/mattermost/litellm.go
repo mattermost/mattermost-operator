@@ -54,11 +54,9 @@ func GenerateLiteLLMConfigMap(namespace string) *corev1.ConfigMap {
 }
 
 // GenerateLiteLLMDeployment returns the Deployment for the LiteLLM gateway.
-// providerEnvVars are injected to give LiteLLM access to provider API keys
-// (e.g. ANTHROPIC_API_KEY, OPENAI_API_KEY) sourced from K8s Secrets.
 // This resource is NOT owned by any single Agent. The caller must NOT use
 // r.Resources.Create — use r.client.Create directly.
-func GenerateLiteLLMDeployment(namespace, image string, providerEnvVars []corev1.EnvVar) *appsv1.Deployment {
+func GenerateLiteLLMDeployment(namespace, image string) *appsv1.Deployment {
 	replicas := int32(1)
 	configVolumeName := "litellm-config"
 
@@ -76,8 +74,6 @@ func GenerateLiteLLMDeployment(namespace, image string, providerEnvVars []corev1
 			Value: "True",
 		},
 	}
-	baseEnv = append(baseEnv, providerEnvVars...)
-
 	livenessProbe := &corev1.Probe{
 		ProbeHandler: corev1.ProbeHandler{
 			HTTPGet: &corev1.HTTPGetAction{
