@@ -13,8 +13,9 @@ import (
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	networkingv1 "k8s.io/api/networking/v1"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -110,6 +111,48 @@ func (r *AgentReconciler) checkAgentNetworkPolicy(ctx context.Context, agent *mm
 	err = r.Client.Get(ctx, types.NamespacedName{Name: desired.Name, Namespace: desired.Namespace}, current)
 	if err != nil {
 		return errors.Wrap(err, "failed to get agent network policy")
+	}
+
+	return r.Resources.Update(current, desired, reqLogger)
+}
+
+func (r *AgentReconciler) checkAgentPVC(ctx context.Context, agent *mmv1beta.Agent, reqLogger logr.Logger) error {
+	if agent.Spec.Storage == nil {
+		return nil
+	}
+
+	desired := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            agent.StoragePVCName(),
+			Namespace:       agent.Namespace,
+			Labels:          mmv1beta.AgentLabels(agent.Name),
+			OwnerReferences: mattermostApp.AgentOwnerReference(agent),
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			AccessModes: []corev1.PersistentVolumeAccessMode{
+				corev1.ReadWriteOnce,
+			},
+			Resources: corev1.VolumeResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceStorage: agent.Spec.Storage.Size,
+				},
+			},
+		},
+	}
+
+	if agent.Spec.Storage.StorageClassName != nil {
+		desired.Spec.StorageClassName = agent.Spec.Storage.StorageClassName
+	}
+
+	err := r.Resources.CreatePvcIfNotExists(agent, desired, reqLogger)
+	if err != nil {
+		return errors.Wrap(err, "failed to create agent storage PVC")
+	}
+
+	current := &corev1.PersistentVolumeClaim{}
+	err = r.Client.Get(ctx, types.NamespacedName{Name: desired.Name, Namespace: desired.Namespace}, current)
+	if err != nil {
+		return errors.Wrap(err, "failed to get agent storage PVC")
 	}
 
 	return r.Resources.Update(current, desired, reqLogger)

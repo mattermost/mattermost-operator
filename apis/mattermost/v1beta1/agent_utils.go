@@ -11,6 +11,7 @@ import (
 const (
 	AgentEgressPolicyDeny             = "deny"
 	AgentEgressPolicyAllowList        = "allowList"
+	AgentEgressPolicyAllow            = "allow"
 	AgentContainerName                = "agent"
 	AgentHTTPPort                     = int32(8080)
 	AgentBotTokenSecretNamePrefix     = "agent-"
@@ -21,6 +22,7 @@ const (
 	AgentLiteLLMConfigMapName         = "litellm-config"
 	AgentLiteLLMMasterKeySecretName   = "litellm-master-key"
 	AgentLiteLLMDBCredentialsSecret   = "litellm-db-credentials"
+	AgentStorageDefaultMountPath      = "/data"
 )
 
 // Agent lifecycle phases (written to AgentStatus.Phase).
@@ -55,6 +57,10 @@ func (a *Agent) SetDefaults() error {
 		if a.Spec.LLMGateway.OperatorManaged.Image == "" {
 			a.Spec.LLMGateway.OperatorManaged.Image = AgentLiteLLMDefaultImage
 		}
+	}
+
+	if a.Spec.Storage != nil && a.Spec.Storage.MountPath == "" {
+		a.Spec.Storage.MountPath = AgentStorageDefaultMountPath
 	}
 
 	return nil
@@ -96,4 +102,9 @@ func (a *Agent) LiteLLMKeySecretName() string {
 // HookSecretName returns the name of the K8s Secret storing this agent's hook secret.
 func (a *Agent) HookSecretName() string {
 	return "agent-" + a.Name + "-hook-secret"
+}
+
+// StoragePVCName returns the name of the PVC for the agent's persistent storage.
+func (a *Agent) StoragePVCName() string {
+	return a.Name + "-storage"
 }

@@ -132,6 +132,40 @@ func GenerateAgentDeployment(agent *mmv1beta.Agent) *appsv1.Deployment {
 
 	envVars := mergeEnvVars(baseEnv, agent.Spec.Env)
 
+	// Build volume and mount lists — start with bot-token, conditionally add storage.
+	volumes := []corev1.Volume{
+		{
+			Name: "bot-token",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: agent.BotTokenSecretName(),
+				},
+			},
+		},
+	}
+	volumeMounts := []corev1.VolumeMount{
+		{
+			Name:      "bot-token",
+			MountPath: "/secrets/mmctl-token",
+			ReadOnly:  true,
+		},
+	}
+
+	if agent.Spec.Storage != nil {
+		volumes = append(volumes, corev1.Volume{
+			Name: "agent-storage",
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: agent.StoragePVCName(),
+				},
+			},
+		})
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "agent-storage",
+			MountPath: agent.Spec.Storage.MountPath,
+		})
+	}
+
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            agent.Name,
@@ -150,78 +184,22 @@ func GenerateAgentDeployment(agent *mmv1beta.Agent) *appsv1.Deployment {
 				},
 				Spec: corev1.PodSpec{
 					ServiceAccountName: agent.Name,
-					InitContainers: []corev1.Container{
-						{
-							Name:    "mmctl-auth",
-							Image:   agent.Spec.Image,
-							Command: []string{"mmctl", "auth", "login", "$(MM_SERVER_URL)", "--access-token-file", "/secrets/mmctl-token/token", "--name", "local"},
-							Env: []corev1.EnvVar{
-								{
-									Name:  "MM_SERVER_URL",
-									Value: mmServerURL(agent),
-								},
-								{
-									Name:  "HOME",
-									Value: "/tmp",
-								},
-							},
-							VolumeMounts: []corev1.VolumeMount{
-								{
-									Name:      "bot-token",
-									MountPath: "/secrets/mmctl-token",
-									ReadOnly:  true,
-								},
-								{
-									Name:      "mmctl-config",
-									MountPath: "/tmp/.config/mmctl",
-								},
-							},
-						},
-					},
 					Containers: []corev1.Container{
 						{
 							Name:  mmv1beta.AgentContainerName,
 							Image: agent.Spec.Image,
-							Env: append(envVars, corev1.EnvVar{
-								Name:  "HOME",
-								Value: "/tmp",
-							}),
+							Env:   envVars,
 							Ports: []corev1.ContainerPort{
 								{
 									ContainerPort: mmv1beta.AgentHTTPPort,
 									Name:          "http",
 								},
 							},
-							Resources: agent.Spec.Resources,
-							VolumeMounts: []corev1.VolumeMount{
-								{
-									Name:      "bot-token",
-									MountPath: "/secrets/mmctl-token",
-									ReadOnly:  true,
-								},
-								{
-									Name:      "mmctl-config",
-									MountPath: "/tmp/.config/mmctl",
-								},
-							},
+							Resources:    agent.Spec.Resources,
+							VolumeMounts: volumeMounts,
 						},
 					},
-					Volumes: []corev1.Volume{
-						{
-							Name: "bot-token",
-							VolumeSource: corev1.VolumeSource{
-								Secret: &corev1.SecretVolumeSource{
-									SecretName: agent.BotTokenSecretName(),
-								},
-							},
-						},
-						{
-							Name: "mmctl-config",
-							VolumeSource: corev1.VolumeSource{
-								EmptyDir: &corev1.EmptyDirVolumeSource{},
-							},
-						},
-					},
+					Volumes: volumes,
 				},
 			},
 		},
@@ -354,6 +332,11 @@ func GenerateAgentNetworkPolicy(agent *mmv1beta.Agent) *networkingv1.NetworkPoli
 				},
 			},
 		})
+	}
+
+	// If egressPolicy is allow, permit all outbound traffic.
+	if agent.Spec.EgressPolicy == mmv1beta.AgentEgressPolicyAllow {
+		egressRules = []networkingv1.NetworkPolicyEgressRule{{}}
 	}
 
 	return &networkingv1.NetworkPolicy{

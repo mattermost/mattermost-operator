@@ -157,12 +157,18 @@ func schema__apis_mattermost_v1beta1_AgentSpec(ref common.ReferenceCallback) com
 							Ref:         ref("./apis/mattermost/v1beta1.LLMGatewayConfig"),
 						},
 					},
+					"storage": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Storage configures optional persistent storage for the agent pod. When set, the operator creates a PVC and mounts it into the agent container.",
+							Ref:         ref("./apis/mattermost/v1beta1.AgentStorageConfig"),
+						},
+					},
 				},
 				Required: []string{"image", "mattermostRef"},
 			},
 		},
 		Dependencies: []string{
-			"./apis/mattermost/v1beta1.LLMGatewayConfig", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.LocalObjectReference", "k8s.io/api/core/v1.ResourceRequirements"},
+			"./apis/mattermost/v1beta1.AgentStorageConfig", "./apis/mattermost/v1beta1.LLMGatewayConfig", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.LocalObjectReference", "k8s.io/api/core/v1.ResourceRequirements"},
 	}
 }
 

@@ -128,47 +128,25 @@ func TestGenerateAgentDeployment(t *testing.T) {
 	assert.Equal(t, agent.HookSecretName(), hookSecretEnv.ValueFrom.SecretKeyRef.Name)
 	assert.Equal(t, "hookSecret", hookSecretEnv.ValueFrom.SecretKeyRef.Key)
 
-	// Volume mounts on main container
-	assert.Len(t, c.VolumeMounts, 2)
-	var hasBotToken, hasMmctlConfig bool
-	for _, vm := range c.VolumeMounts {
-		if vm.Name == "bot-token" {
-			hasBotToken = true
-			assert.Equal(t, "/secrets/mmctl-token", vm.MountPath)
-			assert.True(t, vm.ReadOnly)
-		}
-		if vm.Name == "mmctl-config" {
-			hasMmctlConfig = true
-			assert.Equal(t, "/tmp/.config/mmctl", vm.MountPath)
-		}
+	// Volume mounts on main container — only bot-token remains
+	assert.Len(t, c.VolumeMounts, 1)
+	assert.Equal(t, "bot-token", c.VolumeMounts[0].Name)
+	assert.Equal(t, "/secrets/mmctl-token", c.VolumeMounts[0].MountPath)
+	assert.True(t, c.VolumeMounts[0].ReadOnly)
+
+	// No init containers
+	assert.Empty(t, dep.Spec.Template.Spec.InitContainers, "init containers must be removed")
+
+	// No HOME env var
+	for _, e := range c.Env {
+		assert.NotEqual(t, "HOME", e.Name, "HOME env var must not be present")
 	}
-	assert.True(t, hasBotToken, "bot-token volume mount expected")
-	assert.True(t, hasMmctlConfig, "mmctl-config volume mount expected")
 
-	// Init container
-	initContainers := dep.Spec.Template.Spec.InitContainers
-	assert.Len(t, initContainers, 1)
-	init := initContainers[0]
-	assert.Equal(t, "mmctl-auth", init.Name)
-	assert.Contains(t, init.Command, "mmctl")
-	assert.NotContains(t, init.Command, "--insecure-skip-verify")
-
-	// Volumes
+	// Volumes — only bot-token remains
 	volumes := dep.Spec.Template.Spec.Volumes
-	assert.Len(t, volumes, 2)
-	var hasBotTokenVol, hasMmctlConfigVol bool
-	for _, v := range volumes {
-		if v.Name == "bot-token" {
-			hasBotTokenVol = true
-			assert.Equal(t, agent.BotTokenSecretName(), v.Secret.SecretName)
-		}
-		if v.Name == "mmctl-config" {
-			hasMmctlConfigVol = true
-			assert.NotNil(t, v.EmptyDir)
-		}
-	}
-	assert.True(t, hasBotTokenVol, "bot-token volume expected")
-	assert.True(t, hasMmctlConfigVol, "mmctl-config emptyDir volume expected")
+	assert.Len(t, volumes, 1)
+	assert.Equal(t, "bot-token", volumes[0].Name)
+	assert.Equal(t, agent.BotTokenSecretName(), volumes[0].Secret.SecretName)
 }
 
 func TestGenerateAgentDeployment_CustomEnvVars(t *testing.T) {
@@ -192,6 +170,87 @@ func TestGenerateAgentDeployment_CustomEnvVars(t *testing.T) {
 	// mergeEnvVars overwrites base with user-specified values
 	// (this is the documented behavior of mergeEnvVars — user env wins)
 	assert.Equal(t, "should-not-override", envMap["MM_SERVER_URL"])
+}
+
+func TestGenerateAgentDeployment_WithStorage(t *testing.T) {
+	agent := testAgent("my-agent", "test-ns")
+	storageClass := "fast-ssd"
+	agent.Spec.Storage = &mmv1beta.AgentStorageConfig{
+		Size:             resource.MustParse("5Gi"),
+		StorageClassName: &storageClass,
+		MountPath:        "/workspace",
+	}
+
+	dep := GenerateAgentDeployment(agent)
+
+	// Volumes: bot-token + agent-storage
+	volumes := dep.Spec.Template.Spec.Volumes
+	assert.Len(t, volumes, 2)
+	assert.Equal(t, "bot-token", volumes[0].Name)
+	assert.Equal(t, "agent-storage", volumes[1].Name)
+	assert.Equal(t, agent.StoragePVCName(), volumes[1].PersistentVolumeClaim.ClaimName)
+
+	// Volume mounts: bot-token + agent-storage
+	mounts := dep.Spec.Template.Spec.Containers[0].VolumeMounts
+	assert.Len(t, mounts, 2)
+	assert.Equal(t, "bot-token", mounts[0].Name)
+	assert.Equal(t, "agent-storage", mounts[1].Name)
+	assert.Equal(t, "/workspace", mounts[1].MountPath)
+}
+
+func TestGenerateAgentDeployment_WithoutStorage(t *testing.T) {
+	agent := testAgent("my-agent", "test-ns")
+	// Storage is nil by default in testAgent
+
+	dep := GenerateAgentDeployment(agent)
+
+	// Only bot-token volume
+	volumes := dep.Spec.Template.Spec.Volumes
+	assert.Len(t, volumes, 1)
+	assert.Equal(t, "bot-token", volumes[0].Name)
+
+	// Only bot-token mount
+	mounts := dep.Spec.Template.Spec.Containers[0].VolumeMounts
+	assert.Len(t, mounts, 1)
+	assert.Equal(t, "bot-token", mounts[0].Name)
+}
+
+func TestSetDefaults_StorageMountPath(t *testing.T) {
+	agent := &mmv1beta.Agent{
+		Spec: mmv1beta.AgentSpec{
+			Image:         "test:latest",
+			MattermostRef: corev1.LocalObjectReference{Name: "mm"},
+			Storage: &mmv1beta.AgentStorageConfig{
+				Size: resource.MustParse("1Gi"),
+			},
+		},
+	}
+	err := agent.SetDefaults()
+	require.NoError(t, err)
+	assert.Equal(t, mmv1beta.AgentStorageDefaultMountPath, agent.Spec.Storage.MountPath)
+}
+
+func TestSetDefaults_StorageMountPathPreserved(t *testing.T) {
+	agent := &mmv1beta.Agent{
+		Spec: mmv1beta.AgentSpec{
+			Image:         "test:latest",
+			MattermostRef: corev1.LocalObjectReference{Name: "mm"},
+			Storage: &mmv1beta.AgentStorageConfig{
+				Size:      resource.MustParse("1Gi"),
+				MountPath: "/custom/path",
+			},
+		},
+	}
+	err := agent.SetDefaults()
+	require.NoError(t, err)
+	assert.Equal(t, "/custom/path", agent.Spec.Storage.MountPath)
+}
+
+func TestStoragePVCName(t *testing.T) {
+	agent := &mmv1beta.Agent{
+		ObjectMeta: metav1.ObjectMeta{Name: "my-agent"},
+	}
+	assert.Equal(t, "my-agent-storage", agent.StoragePVCName())
 }
 
 func TestGenerateAgentHookSecret(t *testing.T) {
@@ -283,6 +342,55 @@ func TestGenerateAgentNetworkPolicy_AllowList(t *testing.T) {
 	assert.Len(t, httpEgress.Ports, 1)
 	assert.Equal(t, int32(80), httpEgress.Ports[0].Port.IntVal)
 	assert.Equal(t, corev1.ProtocolTCP, *httpEgress.Ports[0].Protocol)
+}
+
+func TestGenerateAgentNetworkPolicy_Allow(t *testing.T) {
+	agent := testAgent("my-agent", "default")
+	agent.Spec.EgressPolicy = mmv1beta.AgentEgressPolicyAllow
+
+	np := GenerateAgentNetworkPolicy(agent)
+
+	assert.Equal(t, "my-agent", np.Name)
+	assert.Equal(t, "default", np.Namespace)
+	assert.Len(t, np.OwnerReferences, 1)
+
+	// Policy types include both Ingress and Egress.
+	assert.Contains(t, np.Spec.PolicyTypes, networkingv1.PolicyTypeIngress)
+	assert.Contains(t, np.Spec.PolicyTypes, networkingv1.PolicyTypeEgress)
+
+	// Ingress: from MM pods on port 8080 (unchanged from deny mode).
+	assert.Len(t, np.Spec.Ingress, 1)
+	ingress := np.Spec.Ingress[0]
+	assert.Len(t, ingress.From, 1)
+	assert.Equal(t, "mm-prod", ingress.From[0].PodSelector.MatchLabels[mmv1beta.ClusterLabel])
+
+	// Egress: 1 rule — empty (allow all).
+	require.Len(t, np.Spec.Egress, 1)
+	assert.Empty(t, np.Spec.Egress[0].To, "allow-all rule has no To selector")
+	assert.Empty(t, np.Spec.Egress[0].Ports, "allow-all rule has no Ports restriction")
+}
+
+func TestGenerateAgentNetworkPolicy_AllowWithLiteLLM(t *testing.T) {
+	agent := testAgent("my-agent", "default")
+	agent.Spec.EgressPolicy = mmv1beta.AgentEgressPolicyAllow
+	agent.Spec.LLMGateway = &mmv1beta.LLMGatewayConfig{
+		OperatorManaged: &mmv1beta.OperatorManagedLLMGateway{
+			Image: mmv1beta.AgentLiteLLMDefaultImage,
+		},
+	}
+
+	np := GenerateAgentNetworkPolicy(agent)
+
+	// Egress: still 1 rule — allow-all overrides LiteLLM-specific rules.
+	require.Len(t, np.Spec.Egress, 1)
+	assert.Empty(t, np.Spec.Egress[0].To, "allow-all rule has no To selector")
+	assert.Empty(t, np.Spec.Egress[0].Ports, "allow-all rule has no Ports restriction")
+
+	// Ingress: should have BOTH MM and LiteLLM peers (allow mode doesn't affect ingress).
+	require.Len(t, np.Spec.Ingress, 1)
+	assert.Len(t, np.Spec.Ingress[0].From, 2, "ingress should allow both MM and LiteLLM pods")
+	assert.Equal(t, "mm-prod", np.Spec.Ingress[0].From[0].PodSelector.MatchLabels[mmv1beta.ClusterLabel])
+	assert.Equal(t, "litellm", np.Spec.Ingress[0].From[1].PodSelector.MatchLabels["app"])
 }
 
 func TestGenerateAgentBotTokenSecret(t *testing.T) {

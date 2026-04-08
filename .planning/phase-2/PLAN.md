@@ -1,634 +1,775 @@
-# Phase 2: Virtual Key + Hook Secret
+# Phase 2: PVC Support — Prescriptive Plan
 
-> Prescriptive implementation plan for wiring LiteLLM virtual key creation into the reconcile loop and adding hook secret generation/injection.
-
-## Prerequisites
-
-- Phase 1 complete: agent Service uses port 8080, agent endpoint registered in LiteLLM as model
-- `generateKey` method exists on `liteLLMClient` (litellm_client.go:274) and is tested
-- `GenerateAgentLiteLLMKeySecret` exists in `pkg/mattermost/litellm.go:198` and is tested
-- `LiteLLMKeySecretName()` exists in `apis/mattermost/v1beta1/agent_utils.go:92`
-- Deployment generator already references `LiteLLMKeySecretName()` for `OPENAI_API_KEY`/`ANTHROPIC_API_KEY` env vars (pkg/mattermost/agent.go:101)
-
-## Task 2.1: Wire Virtual Key Creation into Reconcile Loop
-
-### 2.1a: Add `reconcileLiteLLMVirtualKey` to `controllers/mattermost/agent/litellm.go`
-
-Add this function after `reconcileAgentModel` (after line 219):
-
-```go
-// reconcileLiteLLMVirtualKey ensures a LiteLLM virtual key exists for the agent
-// and is stored in a K8s Secret. The key grants access to the agent's own model
-// and any MCP access groups returned by reconcileLiteLLMMCPServers.
-//
-// Idempotency: if the Secret already exists, this is a no-op. If the key_alias
-// already exists in LiteLLM (but we lost the Secret), we cannot recover the key
-// value — log a warning. A future reconcile after manual cleanup will recreate it.
-func (r *AgentReconciler) reconcileLiteLLMVirtualKey(ctx context.Context, agent *mmv1beta.Agent, litellmURL, masterKey string, mcpAccessGroups []string, reqLogger logr.Logger) error {
-	// Check if the Secret already exists — if so, nothing to do.
-	secretName := agent.LiteLLMKeySecretName()
-	existingSecret := &corev1.Secret{}
-	err := r.Client.Get(ctx, types.NamespacedName{Name: secretName, Namespace: agent.Namespace}, existingSecret)
-	if err == nil {
-		reqLogger.Info("LiteLLM virtual key secret already exists, skipping", "secret", secretName)
-		return nil
-	}
-	if !k8sErrors.IsNotFound(err) {
-		return pkgerrors.Wrap(err, "failed to check for existing litellm key secret")
-	}
-
-	// Secret does not exist — generate a virtual key via the LiteLLM API.
-	c := newLiteLLMClient(litellmURL, masterKey)
-
-	keyReq := liteLLMKeyRequest{
-		KeyAlias: agent.Name,
-		Models:   []string{agent.Name},
-		Metadata: map[string]string{"agent_name": agent.Name},
-	}
-	if len(mcpAccessGroups) > 0 {
-		keyReq.ObjectPermission = liteLLMObjectPermission{
-			MCPAccessGroups: mcpAccessGroups,
-		}
-	}
-
-	keyResp, err := c.generateKey(keyReq)
-	if err != nil {
-		if err == errKeyAliasExists {
-			reqLogger.Info("LiteLLM key alias already exists but Secret is missing — manual cleanup required",
-				"keyAlias", agent.Name, "expectedSecret", secretName)
-			return nil
-		}
-		return pkgerrors.Wrap(err, "failed to generate litellm virtual key")
-	}
-
-	// Store the key in a K8s Secret owned by the Agent CR.
-	desired := mattermostApp.GenerateAgentLiteLLMKeySecret(agent, keyResp.Key)
-	if err := r.Resources.CreateSecretIfNotExists(agent, desired, reqLogger); err != nil {
-		return pkgerrors.Wrap(err, "failed to create litellm key secret")
-	}
-
-	reqLogger.Info("Created LiteLLM virtual key and secret", "secret", secretName)
-	return nil
-}
-```
-
-**Imports required** (already present in litellm.go): `context`, `"github.com/go-logr/logr"`, `mmv1beta`, `mattermostApp`, `pkgerrors`, `corev1`, `k8sErrors`, `"k8s.io/apimachinery/pkg/types"`.
-
-### 2.1b: Wire into controller reconcile loop — `controllers/mattermost/agent/controller.go`
-
-In the `Reconcile` method, inside the post-health-check LiteLLM block (lines 185-196), add the virtual key reconciliation **after** `reconcileAgentModel`. The block currently ends at line 196. Replace the block to also call `reconcileLiteLLMVirtualKey`:
-
-**Current code (lines 184-196):**
-```go
-	// Register agent pod endpoint as a model in LiteLLM (after health check confirms agent is running).
-	if agent.Spec.LLMGateway != nil && agent.Spec.LLMGateway.OperatorManaged != nil {
-		masterKey, err := r.getLiteLLMMasterKey(ctx, agent.Namespace)
-		if err != nil {
-			r.updateStatusReconcilingAndLogError(ctx, agent, status, reqLogger, err)
-			return reconcile.Result{}, err
-		}
-		litellmURL := mattermostApp.LiteLLMServiceURL(agent.Namespace)
-		if err := r.reconcileAgentModel(ctx, agent, litellmURL, masterKey, reqLogger); err != nil {
-			r.updateStatusReconcilingAndLogError(ctx, agent, status, reqLogger, err)
-			return reconcile.Result{}, err
-		}
-	}
-```
-
-**New code:**
-```go
-	// Register agent pod endpoint as a model in LiteLLM and create virtual key
-	// (after health check confirms agent is running).
-	if agent.Spec.LLMGateway != nil && agent.Spec.LLMGateway.OperatorManaged != nil {
-		masterKey, err := r.getLiteLLMMasterKey(ctx, agent.Namespace)
-		if err != nil {
-			r.updateStatusReconcilingAndLogError(ctx, agent, status, reqLogger, err)
-			return reconcile.Result{}, err
-		}
-		litellmURL := mattermostApp.LiteLLMServiceURL(agent.Namespace)
-		if err := r.reconcileAgentModel(ctx, agent, litellmURL, masterKey, reqLogger); err != nil {
-			r.updateStatusReconcilingAndLogError(ctx, agent, status, reqLogger, err)
-			return reconcile.Result{}, err
-		}
-
-		// Collect MCP access groups from the earlier reconcileLiteLLMMCPServers call.
-		// Re-derive them here rather than threading state through the reconcile loop.
-		mcpAccessGroups, err := r.reconcileLiteLLMMCPServers(ctx, agent, litellmURL, masterKey, reqLogger)
-		if err != nil {
-			r.updateStatusReconcilingAndLogError(ctx, agent, status, reqLogger, err)
-			return reconcile.Result{}, err
-		}
-
-		if err := r.reconcileLiteLLMVirtualKey(ctx, agent, litellmURL, masterKey, mcpAccessGroups, reqLogger); err != nil {
-			r.updateStatusReconcilingAndLogError(ctx, agent, status, reqLogger, err)
-			return reconcile.Result{}, err
-		}
-	}
-```
-
-**Note on MCP access groups:** The `reconcileLiteLLMMCPServers` call is already made earlier in the reconcile loop (line 133-134). However, the return value (`mcpAccessGroups`) is discarded. We call it again here because:
-1. It's idempotent (skips already-registered servers)
-2. It returns the access groups we need for virtual key creation
-3. This avoids threading state through the reconcile loop
-
-**Alternative (cleaner):** Refactor to capture the `mcpAccessGroups` return value from the first call at line 133 and pass it through. This is a judgment call for the implementer — either approach works.
+> **Milestone:** M7 — PVC, Init Container Removal, Allow Egress
+> **Target repo:** `~/workspace/worktrees/mattermost-operator-the-trail`
+> **Phase:** 2 (PVC Support)
+> **Depends on:** Phase 1 (clean deployment without init container simplifies volume management)
+> **Goal:** Add optional persistent storage to agent pods via a new `Storage` CRD field, PVC creation in the reconciler, and Volume/VolumeMount injection in the Deployment.
 
 ---
 
-## Task 2.2: Add Hook Secret Generation
+## Context: What Already Exists
 
-### 2.2a: Add `HookSecretName()` helper — `apis/mattermost/v1beta1/agent_utils.go`
+### CRD Types
+- `apis/mattermost/v1beta1/agent_types.go` — `AgentSpec` struct (line 22). Currently has no storage field.
+- `apis/mattermost/v1beta1/agent_utils.go` — `SetDefaults()` (line 35), constants (lines 11-24), helpers like `BotTokenSecretName()` (line 87).
 
-Add after `LiteLLMKeySecretName()` (after line 94):
+### PVC Patterns in This Repo
+- `pkg/resources/create_resources.go` line 182: `CreatePvcIfNotExists(owner, pvc, reqLogger)` — follows the same create-if-not-exists pattern as other resources.
+- `pkg/mattermost/file_store.go` line 43: `ExternalVolumeFileStore.Volumes()` — returns a PVC-backed Volume + VolumeMount. **This is the exact pattern to follow** for PVC volume injection:
+  ```go
+  volumes := []corev1.Volume{
+      {
+          Name: FileStoreDefaultVolumeName,
+          VolumeSource: corev1.VolumeSource{
+              PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+                  ClaimName: fs.VolumeClaimName,
+              },
+          },
+      },
+  }
+  volumeMounts := []corev1.VolumeMount{
+      {
+          Name:      FileStoreDefaultVolumeName,
+          MountPath: mmv1beta.DefaultLocalFilePath,
+      },
+  }
+  ```
+
+### Reconciler Patterns
+- `controllers/mattermost/agent/agent.go` — check functions follow a consistent pattern:
+  1. Generate desired resource
+  2. Call `CreateXxxIfNotExists`
+  3. Get current resource
+  4. Call `r.Resources.Update(current, desired, reqLogger)`
+- `controllers/mattermost/agent/controller.go` line 43: `SetupWithManager` chains `.Owns()` calls for Deployment, Service, ServiceAccount, Secret, ConfigMap, NetworkPolicy.
+- `controllers/mattermost/agent/controller.go` lines 128-153: Reconcile loop calls check functions in order: ServiceAccount → HookSecret → Service → Deployment → NetworkPolicy.
+
+### Owner References
+- `pkg/mattermost/agent.go` line 17: `AgentOwnerReference(agent)` — used by all generated resources for cascade deletion.
+
+### RBAC
+- `config/rbac/role.yaml` line 15: `persistentvolumeclaims` already in the resource list with `['*']` verbs. **No RBAC changes needed.**
+
+---
+
+## Task 2.1: Add AgentStorageConfig Type and Storage Field to CRD
+
+**File:** `apis/mattermost/v1beta1/agent_types.go`
+
+### 2.1a: Add import for resource.Quantity
+
+The `resource` package is already imported in `agent_utils.go` but NOT in `agent_types.go`. Add it:
 
 ```go
-// HookSecretName returns the name of the K8s Secret storing this agent's hook secret.
-func (a *Agent) HookSecretName() string {
-	return "agent-" + a.Name + "-hook-secret"
-}
-```
-
-### 2.2b: Add `GenerateAgentHookSecret` — `pkg/mattermost/agent.go`
-
-Add after `GenerateAgentBotTokenSecret` (after line 363):
-
-```go
-// GenerateAgentHookSecret returns the Secret storing the agent's hook secret.
-func GenerateAgentHookSecret(agent *mmv1beta.Agent, secretValue string) *corev1.Secret {
-	return &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            agent.HookSecretName(),
-			Namespace:       agent.Namespace,
-			Labels:          mmv1beta.AgentLabels(agent.Name),
-			OwnerReferences: AgentOwnerReference(agent),
-		},
-		Data: map[string][]byte{"hookSecret": []byte(secretValue)},
-	}
-}
-```
-
-### 2.2c: Add `checkHookSecret` step — `controllers/mattermost/agent/agent.go`
-
-Add after `checkAgentServiceAccount` (after line 33). This needs `crypto/rand` and `encoding/hex` imports.
-
-**Add to imports:**
-```go
+// OLD (lines 6-9):
 import (
-	"crypto/rand"
-	"encoding/hex"
-	// ... existing imports
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+// NEW:
+import (
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 ```
 
-**Add function:**
+### 2.1b: Add AgentStorageConfig type
+
+Insert **before** the `AgentSpec` struct (before line 22), after the imports and the IMPORTANT comment block:
+
 ```go
-func (r *AgentReconciler) checkHookSecret(ctx context.Context, agent *mmv1beta.Agent, reqLogger logr.Logger) error {
-	secretName := agent.HookSecretName()
-	existingSecret := &corev1.Secret{}
-	err := r.Client.Get(ctx, types.NamespacedName{Name: secretName, Namespace: agent.Namespace}, existingSecret)
-	if err == nil {
-		return nil // Secret already exists
-	}
-	if !k8sErrors.IsNotFound(err) {
-		return errors.Wrap(err, "failed to check for existing hook secret")
-	}
+// AgentStorageConfig defines optional persistent storage for the agent pod.
+type AgentStorageConfig struct {
+	// Size is the requested PVC storage size (e.g., "1Gi", "500Mi").
+	Size resource.Quantity `json:"size"`
 
-	// Generate a random 32-byte hex string.
-	b := make([]byte, 32)
-	if _, err := rand.Read(b); err != nil {
-		return errors.Wrap(err, "failed to generate random hook secret")
-	}
-	secretValue := hex.EncodeToString(b)
+	// StorageClassName is the name of the StorageClass to use for the PVC.
+	// If omitted, the cluster default StorageClass is used.
+	// +optional
+	StorageClassName *string `json:"storageClassName,omitempty"`
 
-	desired := mattermostApp.GenerateAgentHookSecret(agent, secretValue)
-	if err := r.Resources.CreateSecretIfNotExists(agent, desired, reqLogger); err != nil {
-		return errors.Wrap(err, "failed to create hook secret")
-	}
-
-	reqLogger.Info("Created hook secret", "secret", secretName)
-	return nil
+	// MountPath is the path inside the container where the volume is mounted.
+	// Defaults to "/data".
+	// +optional
+	MountPath string `json:"mountPath,omitempty"`
 }
 ```
 
-**Add `k8sErrors` import** to `agent.go` if not already present:
+### 2.1c: Add Storage field to AgentSpec
+
+Insert after the `LLMGateway` field (after line 59, before the closing brace of AgentSpec):
+
 ```go
-k8sErrors "k8s.io/apimachinery/pkg/api/errors"
+	// Storage configures optional persistent storage for the agent pod.
+	// When set, the operator creates a PVC and mounts it into the agent container.
+	// +optional
+	Storage *AgentStorageConfig `json:"storage,omitempty"`
 ```
 
-### 2.2d: Wire `checkHookSecret` into reconcile loop — `controllers/mattermost/agent/controller.go`
-
-Add the call **after `checkAgentServiceAccount`** and **before `checkAgentService`**. This ensures the hook secret exists before the Deployment is created (since the Deployment needs to reference it).
-
-**Insert between lines 150 and 152 (after ServiceAccount, before Service):**
+### Full AgentSpec after change (key fields only):
 
 ```go
-	// Hook Secret
-	err = r.checkHookSecret(ctx, agent, reqLogger)
+type AgentSpec struct {
+	Image        string                      `json:"image"`
+	Hooks        []string                    `json:"hooks,omitempty"`
+	Resources    corev1.ResourceRequirements `json:"resources,omitempty"`
+	EgressPolicy string                      `json:"egressPolicy,omitempty"`
+	EgressAllowList []string                 `json:"egressAllowList,omitempty"`
+	MattermostRef corev1.LocalObjectReference `json:"mattermostRef"`
+	Env          []corev1.EnvVar             `json:"env,omitempty"`
+	LLMGateway   *LLMGatewayConfig           `json:"llmGateway,omitempty"`
+	Storage      *AgentStorageConfig          `json:"storage,omitempty"`  // NEW
+}
+```
+
+---
+
+## Task 2.2: Add Defaults and Helpers for Storage
+
+**File:** `apis/mattermost/v1beta1/agent_utils.go`
+
+### 2.2a: Add constant
+
+Insert after the existing constants block (after line 23, inside the `const` block):
+
+```go
+// OLD (partial, line 11-24):
+const (
+	AgentEgressPolicyDeny             = "deny"
+	AgentEgressPolicyAllowList        = "allowList"
+	// ... other constants ...
+	AgentLiteLLMDBCredentialsSecret   = "litellm-db-credentials"
+)
+
+// NEW — add this line inside the const block:
+	AgentStorageDefaultMountPath      = "/data"
+```
+
+### 2.2b: Add Storage defaults in SetDefaults()
+
+Insert after the LLMGateway defaults block (after line 58, before `return nil`):
+
+```go
+// OLD (lines 54-61):
+	if a.Spec.LLMGateway != nil && a.Spec.LLMGateway.OperatorManaged != nil {
+		if a.Spec.LLMGateway.OperatorManaged.Image == "" {
+			a.Spec.LLMGateway.OperatorManaged.Image = AgentLiteLLMDefaultImage
+		}
+	}
+
+	return nil
+
+// NEW:
+	if a.Spec.LLMGateway != nil && a.Spec.LLMGateway.OperatorManaged != nil {
+		if a.Spec.LLMGateway.OperatorManaged.Image == "" {
+			a.Spec.LLMGateway.OperatorManaged.Image = AgentLiteLLMDefaultImage
+		}
+	}
+
+	if a.Spec.Storage != nil && a.Spec.Storage.MountPath == "" {
+		a.Spec.Storage.MountPath = AgentStorageDefaultMountPath
+	}
+
+	return nil
+```
+
+### 2.2c: Add StoragePVCName helper
+
+Insert after `HookSecretName()` (after line 99):
+
+```go
+// StoragePVCName returns the name of the PVC for the agent's persistent storage.
+func (a *Agent) StoragePVCName() string {
+	return a.Name + "-storage"
+}
+```
+
+---
+
+## Task 2.3: Add checkAgentPVC Reconciler Step
+
+**File:** `controllers/mattermost/agent/agent.go`
+
+Insert after the `checkAgentNetworkPolicy` function (after line 116). This follows the same pattern as other check functions but with two PVC-specific considerations:
+
+1. **Early return if no storage** — skip entirely when `agent.Spec.Storage == nil`.
+2. **PVC spec is mostly immutable** — K8s does not allow changing `storageClassName` or `accessModes` after creation. Only `resources.requests` can be expanded if the StorageClass supports it. The `Update` call handles this via objectMatcher.
+
+```go
+func (r *AgentReconciler) checkAgentPVC(ctx context.Context, agent *mmv1beta.Agent, reqLogger logr.Logger) error {
+	if agent.Spec.Storage == nil {
+		return nil
+	}
+
+	desired := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            agent.StoragePVCName(),
+			Namespace:       agent.Namespace,
+			Labels:          mmv1beta.AgentLabels(agent.Name),
+			OwnerReferences: mattermostApp.AgentOwnerReference(agent),
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			AccessModes: []corev1.PersistentVolumeAccessMode{
+				corev1.ReadWriteOnce,
+			},
+			Resources: corev1.VolumeResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceStorage: agent.Spec.Storage.Size,
+				},
+			},
+		},
+	}
+
+	if agent.Spec.Storage.StorageClassName != nil {
+		desired.Spec.StorageClassName = agent.Spec.Storage.StorageClassName
+	}
+
+	err := r.Resources.CreatePvcIfNotExists(agent, desired, reqLogger)
+	if err != nil {
+		return errors.Wrap(err, "failed to create agent storage PVC")
+	}
+
+	current := &corev1.PersistentVolumeClaim{}
+	err = r.Client.Get(ctx, types.NamespacedName{Name: desired.Name, Namespace: desired.Namespace}, current)
+	if err != nil {
+		return errors.Wrap(err, "failed to get agent storage PVC")
+	}
+
+	return r.Resources.Update(current, desired, reqLogger)
+}
+```
+
+### Required imports
+
+Check the import block in `controllers/mattermost/agent/agent.go` (lines 1-19). The following are needed:
+- `metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"` — **NOT currently imported.** Add it.
+- `corev1` — already imported (line 16).
+- `errors` from `github.com/pkg/errors` — already imported (line 13).
+- `types` — already imported (line 18).
+- `mattermostApp` — already imported (line 11).
+- `mmv1beta` — already imported (line 9).
+
+Add `metav1` to the import block:
+
+```go
+// OLD (lines 6-19):
+import (
+	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"fmt"
+
+	"github.com/go-logr/logr"
+	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
+	mattermostApp "github.com/mattermost/mattermost-operator/pkg/mattermost"
+	"github.com/mattermost/mattermost-operator/pkg/resources"
+	"github.com/pkg/errors"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
+	networkingv1 "k8s.io/api/networking/v1"
+	"k8s.io/apimachinery/pkg/types"
+)
+
+// NEW — add metav1:
+import (
+	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"fmt"
+
+	"github.com/go-logr/logr"
+	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
+	mattermostApp "github.com/mattermost/mattermost-operator/pkg/mattermost"
+	"github.com/mattermost/mattermost-operator/pkg/resources"
+	"github.com/pkg/errors"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+)
+```
+
+> **Note:** The unused import `"github.com/mattermost/mattermost-operator/pkg/resources"` (line 12) should be verified — it's used in the `AgentReconciler` struct definition in `controller.go`, not in `agent.go`. If the compiler flags it, it can be removed from `agent.go` since `r.Resources` is accessed via the struct field, not a direct import.
+
+---
+
+## Task 2.4: Add checkAgentPVC Call to Reconciler
+
+**File:** `controllers/mattermost/agent/controller.go`
+**Lines:** 147-153
+
+Insert the PVC check **before** `checkAgentDeployment` (before line 149). The PVC must exist before the Deployment references it as a volume.
+
+```go
+// OLD (lines 147-153):
+	// Deployment
+	err = r.checkAgentDeployment(ctx, agent, reqLogger)
+	if err != nil {
+		r.updateStatusReconcilingAndLogError(ctx, agent, status, reqLogger, err)
+		return reconcile.Result{}, err
+	}
+
+// NEW:
+	// PVC (must exist before Deployment references it)
+	err = r.checkAgentPVC(ctx, agent, reqLogger)
+	if err != nil {
+		r.updateStatusReconcilingAndLogError(ctx, agent, status, reqLogger, err)
+		return reconcile.Result{}, err
+	}
+
+	// Deployment
+	err = r.checkAgentDeployment(ctx, agent, reqLogger)
 	if err != nil {
 		r.updateStatusReconcilingAndLogError(ctx, agent, status, reqLogger, err)
 		return reconcile.Result{}, err
 	}
 ```
 
-The reconcile loop order becomes:
-1. Mattermost CR readiness check
-2. LiteLLM gateway (Deployment, Service, ready check, models, MCP servers)
-3. Phase transition → Deploying
-4. **ServiceAccount**
-5. **Hook Secret** ← NEW
-6. **Service**
-7. **Deployment**
-8. **NetworkPolicy**
-9. Health check
-10. Agent model registration + virtual key ← NEW (virtual key part)
-11. Status update
+---
 
-### 2.2e: Inject `HOOK_SECRET` env var into Deployment — `pkg/mattermost/agent.go`
+## Task 2.5: Add Owns PVC to Controller Setup
 
-In `GenerateAgentDeployment`, add the `HOOK_SECRET` env var to `baseEnv` after the `MM_BOT_TOKEN` entry (after line 91, before the LiteLLM gateway block):
+**File:** `controllers/mattermost/agent/controller.go`
+**Lines:** 43-53
 
-**Insert after line 91 (the closing `}` of `MM_BOT_TOKEN`):**
+Add `.Owns(&corev1.PersistentVolumeClaim{})` to the builder chain so the controller reconciles when a PVC owned by an Agent changes:
 
 ```go
-		{
-			Name: "HOOK_SECRET",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: agent.HookSecretName(),
-					},
-					Key: "hookSecret",
-				},
-			},
-		},
-```
+// OLD (lines 43-53):
+func (r *AgentReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&mmv1beta.Agent{}).
+		Owns(&appsv1.Deployment{}).
+		Owns(&corev1.Service{}).
+		Owns(&corev1.ServiceAccount{}).
+		Owns(&corev1.Secret{}).
+		Owns(&corev1.ConfigMap{}).
+		Owns(&networkingv1.NetworkPolicy{}).
+		Complete(r)
+}
 
-This goes into `baseEnv` so it's always present and user `spec.env` can override it via `mergeEnvVars`.
+// NEW:
+func (r *AgentReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&mmv1beta.Agent{}).
+		Owns(&appsv1.Deployment{}).
+		Owns(&corev1.Service{}).
+		Owns(&corev1.ServiceAccount{}).
+		Owns(&corev1.Secret{}).
+		Owns(&corev1.ConfigMap{}).
+		Owns(&corev1.PersistentVolumeClaim{}).
+		Owns(&networkingv1.NetworkPolicy{}).
+		Complete(r)
+}
+```
 
 ---
 
-## Task 2.3: Tests
+## Task 2.6: Inject PVC Volume + VolumeMount in GenerateAgentDeployment
 
-### 2.3a: Test `reconcileLiteLLMVirtualKey` — `controllers/mattermost/agent/litellm_test.go`
+**File:** `pkg/mattermost/agent.go`
 
-Add these tests at the end of the file:
+After Phase 1, the Deployment has a single `bot-token` volume and mount defined inline. Refactor to use slices that can be conditionally extended.
+
+### Change
+
+Replace the inline Volumes and VolumeMounts in the Deployment struct with slice variables defined before the return. The exact location depends on Phase 1 output, but the pattern is:
+
+**Insert before the `return &appsv1.Deployment{` statement** (currently line 135 after Phase 1 changes):
 
 ```go
-// ─── Virtual key reconciliation tests ──────────────────────────────────────
-
-func TestReconcileLiteLLMVirtualKey_CreatesKeyAndSecret(t *testing.T) {
-	agent := newTestAgentWithLLMGateway()
-
-	var keyReqCaptured liteLLMKeyRequest
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.Method == "POST" && r.URL.Path == "/key/generate":
-			err := json.NewDecoder(r.Body).Decode(&keyReqCaptured)
-			require.NoError(t, err)
-			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(liteLLMKeyResponse{
-				Key:      "sk-virtual-key-abc",
-				KeyAlias: keyReqCaptured.KeyAlias,
-				Token:    "tok-hash-123",
-			})
-		default:
-			w.WriteHeader(http.StatusNotFound)
-		}
-	}))
-	defer srv.Close()
-
-	reconciler, _ := setupReconciler(t, agent)
-	logger := testLogger()
-
-	err := reconciler.reconcileLiteLLMVirtualKey(
-		context.TODO(), agent, srv.URL, "master-key",
-		[]string{"test-agent_jira_agent_alpha"}, logger,
-	)
-	require.NoError(t, err)
-
-	// Verify the key request.
-	assert.Equal(t, agent.Name, keyReqCaptured.KeyAlias)
-	assert.Equal(t, []string{agent.Name}, keyReqCaptured.Models)
-	assert.Equal(t, []string{"test-agent_jira_agent_alpha"}, keyReqCaptured.ObjectPermission.MCPAccessGroups)
-
-	// Verify Secret was created.
-	secret := &corev1.Secret{}
-	err = reconciler.Client.Get(context.TODO(), types.NamespacedName{
-		Name:      agent.LiteLLMKeySecretName(),
-		Namespace: agent.Namespace,
-	}, secret)
-	require.NoError(t, err)
-	assert.Equal(t, []byte("sk-virtual-key-abc"), secret.Data["apiKey"])
-}
-
-func TestReconcileLiteLLMVirtualKey_SecretAlreadyExists(t *testing.T) {
-	agent := newTestAgentWithLLMGateway()
-
-	// Pre-create the Secret.
-	existingSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      agent.LiteLLMKeySecretName(),
-			Namespace: agent.Namespace,
+	// Build volume and mount lists — start with bot-token, conditionally add storage.
+	volumes := []corev1.Volume{
+		{
+			Name: "bot-token",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: agent.BotTokenSecretName(),
+				},
+			},
 		},
-		Data: map[string][]byte{"apiKey": []byte("existing-key")},
+	}
+	volumeMounts := []corev1.VolumeMount{
+		{
+			Name:      "bot-token",
+			MountPath: "/secrets/mmctl-token",
+			ReadOnly:  true,
+		},
 	}
 
-	// Mock server should NOT be called.
-	apiCalled := false
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		apiCalled = true
-		w.WriteHeader(http.StatusInternalServerError)
-	}))
-	defer srv.Close()
+	if agent.Spec.Storage != nil {
+		volumes = append(volumes, corev1.Volume{
+			Name: "agent-storage",
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: agent.StoragePVCName(),
+				},
+			},
+		})
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "agent-storage",
+			MountPath: agent.Spec.Storage.MountPath,
+		})
+	}
+```
 
-	reconciler, _ := setupReconciler(t, agent, existingSecret)
-	logger := testLogger()
+**Then update the Deployment struct** to reference the slice variables instead of inline definitions:
 
-	err := reconciler.reconcileLiteLLMVirtualKey(context.TODO(), agent, srv.URL, "master-key", nil, logger)
+```go
+					Containers: []corev1.Container{
+						{
+							Name:         mmv1beta.AgentContainerName,
+							Image:        agent.Spec.Image,
+							Env:          envVars,
+							Ports:        []corev1.ContainerPort{{ContainerPort: mmv1beta.AgentHTTPPort, Name: "http"}},
+							Resources:    agent.Spec.Resources,
+							VolumeMounts: volumeMounts,  // was inline
+						},
+					},
+					Volumes: volumes,  // was inline
+```
+
+---
+
+## Task 2.7: Run `make generate manifests`
+
+After all type changes, run:
+
+```bash
+cd ~/workspace/worktrees/mattermost-operator-the-trail
+make generate manifests
+```
+
+This regenerates:
+- `config/crd/bases/installation.mattermost.com_agents.yaml` — will include the new `storage` field with `size`, `storageClassName`, `mountPath` subfields.
+- `apis/mattermost/v1beta1/zz_generated.deepcopy.go` — will include `DeepCopyInto` for `AgentStorageConfig`.
+
+**Verify:** `grep -A 10 'storage:' config/crd/bases/installation.mattermost.com_agents.yaml` should show the new fields.
+
+---
+
+## Task 2.8: Unit Tests for PVC Support
+
+### 2.8a: Test defaults for Storage
+
+**File:** Add to an existing test file in the `v1beta1` package, or to `pkg/mattermost/agent_test.go`.
+
+Check if there's an existing test file:
+
+```bash
+ls apis/mattermost/v1beta1/*test*
+```
+
+Add these tests wherever agent defaults are tested:
+
+```go
+func TestSetDefaults_StorageMountPath(t *testing.T) {
+	agent := &mmv1beta.Agent{
+		Spec: mmv1beta.AgentSpec{
+			Image:         "test:latest",
+			MattermostRef: corev1.LocalObjectReference{Name: "mm"},
+			Storage: &mmv1beta.AgentStorageConfig{
+				Size: resource.MustParse("1Gi"),
+			},
+		},
+	}
+	err := agent.SetDefaults()
 	require.NoError(t, err)
-	assert.False(t, apiCalled, "expected no API calls when Secret already exists")
+	assert.Equal(t, mmv1beta.AgentStorageDefaultMountPath, agent.Spec.Storage.MountPath)
 }
 
-func TestReconcileLiteLLMVirtualKey_KeyAliasAlreadyExists(t *testing.T) {
-	agent := newTestAgentWithLLMGateway()
-
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Simulate LiteLLM returning key_alias already exists.
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(`{"error": "Key with alias already exists: test-agent"}`))
-	}))
-	defer srv.Close()
-
-	reconciler, _ := setupReconciler(t, agent)
-	logger := testLogger()
-
-	// Should not error — treated as non-fatal.
-	err := reconciler.reconcileLiteLLMVirtualKey(context.TODO(), agent, srv.URL, "master-key", nil, logger)
+func TestSetDefaults_StorageMountPathPreserved(t *testing.T) {
+	agent := &mmv1beta.Agent{
+		Spec: mmv1beta.AgentSpec{
+			Image:         "test:latest",
+			MattermostRef: corev1.LocalObjectReference{Name: "mm"},
+			Storage: &mmv1beta.AgentStorageConfig{
+				Size:      resource.MustParse("1Gi"),
+				MountPath: "/custom/path",
+			},
+		},
+	}
+	err := agent.SetDefaults()
 	require.NoError(t, err)
-
-	// Secret should NOT exist (we can't recover the key value).
-	secret := &corev1.Secret{}
-	err = reconciler.Client.Get(context.TODO(), types.NamespacedName{
-		Name:      agent.LiteLLMKeySecretName(),
-		Namespace: agent.Namespace,
-	}, secret)
-	require.Error(t, err, "secret should not exist when key alias exists but we can't recover the key")
+	assert.Equal(t, "/custom/path", agent.Spec.Storage.MountPath)
 }
 
-func TestReconcileLiteLLMVirtualKey_NoMCPAccessGroups(t *testing.T) {
-	agent := newTestAgentWithLLMGateway()
-
-	var keyReqCaptured liteLLMKeyRequest
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == "POST" && r.URL.Path == "/key/generate" {
-			json.NewDecoder(r.Body).Decode(&keyReqCaptured)
-			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(liteLLMKeyResponse{Key: "sk-key", KeyAlias: agent.Name})
-		} else {
-			w.WriteHeader(http.StatusNotFound)
-		}
-	}))
-	defer srv.Close()
-
-	reconciler, _ := setupReconciler(t, agent)
-	logger := testLogger()
-
-	err := reconciler.reconcileLiteLLMVirtualKey(context.TODO(), agent, srv.URL, "master-key", nil, logger)
-	require.NoError(t, err)
-
-	// object_permission should be zero-value (no mcp_access_groups).
-	assert.Nil(t, keyReqCaptured.ObjectPermission.MCPAccessGroups)
+func TestStoragePVCName(t *testing.T) {
+	agent := &mmv1beta.Agent{
+		ObjectMeta: metav1.ObjectMeta{Name: "my-agent"},
+	}
+	assert.Equal(t, "my-agent-storage", agent.StoragePVCName())
 }
 ```
 
-**Additional imports needed in litellm_test.go:** `"net/http/httptest"` is already imported.
+### 2.8b: Test GenerateAgentDeployment with Storage
 
-### 2.3b: Test `checkHookSecret` — `controllers/mattermost/agent/agent_test.go`
+**File:** `pkg/mattermost/agent_test.go`
 
-Add at the end of the existing `agent_test.go` file (which already has `newTestAgent`, `setupReconciler`, etc.):
+Add after the existing `TestGenerateAgentDeployment_CustomEnvVars` test:
 
 ```go
-func TestCheckHookSecret_CreatesSecret(t *testing.T) {
+func TestGenerateAgentDeployment_WithStorage(t *testing.T) {
+	agent := testAgent("my-agent", "test-ns")
+	storageClass := "fast-ssd"
+	agent.Spec.Storage = &mmv1beta.AgentStorageConfig{
+		Size:             resource.MustParse("5Gi"),
+		StorageClassName: &storageClass,
+		MountPath:        "/workspace",
+	}
+
+	dep := GenerateAgentDeployment(agent)
+
+	// Volumes: bot-token + agent-storage
+	volumes := dep.Spec.Template.Spec.Volumes
+	assert.Len(t, volumes, 2)
+	assert.Equal(t, "bot-token", volumes[0].Name)
+	assert.Equal(t, "agent-storage", volumes[1].Name)
+	assert.Equal(t, agent.StoragePVCName(), volumes[1].PersistentVolumeClaim.ClaimName)
+
+	// Volume mounts: bot-token + agent-storage
+	mounts := dep.Spec.Template.Spec.Containers[0].VolumeMounts
+	assert.Len(t, mounts, 2)
+	assert.Equal(t, "bot-token", mounts[0].Name)
+	assert.Equal(t, "agent-storage", mounts[1].Name)
+	assert.Equal(t, "/workspace", mounts[1].MountPath)
+}
+
+func TestGenerateAgentDeployment_WithoutStorage(t *testing.T) {
+	agent := testAgent("my-agent", "test-ns")
+	// Storage is nil by default in testAgent
+
+	dep := GenerateAgentDeployment(agent)
+
+	// Only bot-token volume
+	volumes := dep.Spec.Template.Spec.Volumes
+	assert.Len(t, volumes, 1)
+	assert.Equal(t, "bot-token", volumes[0].Name)
+
+	// Only bot-token mount
+	mounts := dep.Spec.Template.Spec.Containers[0].VolumeMounts
+	assert.Len(t, mounts, 1)
+	assert.Equal(t, "bot-token", mounts[0].Name)
+}
+```
+
+### 2.8c: Test checkAgentPVC in reconciler
+
+**File:** `controllers/mattermost/agent/agent_test.go`
+
+Add after the existing `TestCheckAgentNetworkPolicy_DenyWithLiteLLM` test:
+
+```go
+func TestCheckAgentPVC_Creates(t *testing.T) {
 	agent := newTestAgent()
+	agent.Spec.Storage = &mmv1beta.AgentStorageConfig{
+		Size:      resource.MustParse("1Gi"),
+		MountPath: "/data",
+	}
 	_ = agent.SetDefaults()
 
 	reconciler, _ := setupReconciler(t, agent)
 	logger := testLogger()
 
-	err := reconciler.checkHookSecret(context.TODO(), agent, logger)
+	err := reconciler.checkAgentPVC(context.TODO(), agent, logger)
 	require.NoError(t, err)
 
-	// Verify Secret was created.
-	secret := &corev1.Secret{}
+	// Verify PVC was created.
+	pvc := &corev1.PersistentVolumeClaim{}
 	err = reconciler.Client.Get(context.TODO(), types.NamespacedName{
-		Name:      agent.HookSecretName(),
+		Name:      agent.StoragePVCName(),
 		Namespace: agent.Namespace,
-	}, secret)
+	}, pvc)
 	require.NoError(t, err)
-	assert.Contains(t, secret.Data, "hookSecret")
 
-	// Verify the hook secret is a 64-character hex string (32 bytes encoded).
-	hookSecret := string(secret.Data["hookSecret"])
-	assert.Len(t, hookSecret, 64)
+	assert.Equal(t, agent.StoragePVCName(), pvc.Name)
+	assert.Equal(t, agent.Namespace, pvc.Namespace)
+	assert.Equal(t, []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}, pvc.Spec.AccessModes)
+
+	storageReq := pvc.Spec.Resources.Requests[corev1.ResourceStorage]
+	assert.Equal(t, resource.MustParse("1Gi"), storageReq)
 }
 
-func TestCheckHookSecret_Idempotent(t *testing.T) {
+func TestCheckAgentPVC_Skips(t *testing.T) {
 	agent := newTestAgent()
+	// Storage is nil — PVC should not be created.
 	_ = agent.SetDefaults()
 
-	// Pre-create the hook secret.
-	existingSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      agent.HookSecretName(),
-			Namespace: agent.Namespace,
-		},
-		Data: map[string][]byte{"hookSecret": []byte("pre-existing-value")},
-	}
-
-	reconciler, _ := setupReconciler(t, agent, existingSecret)
+	reconciler, _ := setupReconciler(t, agent)
 	logger := testLogger()
 
-	err := reconciler.checkHookSecret(context.TODO(), agent, logger)
+	err := reconciler.checkAgentPVC(context.TODO(), agent, logger)
 	require.NoError(t, err)
 
-	// Verify original value is preserved.
-	secret := &corev1.Secret{}
+	// Verify no PVC exists.
+	pvc := &corev1.PersistentVolumeClaim{}
 	err = reconciler.Client.Get(context.TODO(), types.NamespacedName{
-		Name:      agent.HookSecretName(),
+		Name:      agent.Name + "-storage",
 		Namespace: agent.Namespace,
-	}, secret)
-	require.NoError(t, err)
-	assert.Equal(t, []byte("pre-existing-value"), secret.Data["hookSecret"])
+	}, pvc)
+	require.Error(t, err, "PVC should not exist when Storage is nil")
 }
-```
 
-**Additional imports needed in agent_test.go:** Add `"context"` (already present). `testLogger()` is defined in `litellm_test.go` in the same package — it's available.
-
-### 2.3c: Test `GenerateAgentHookSecret` — `pkg/mattermost/agent_test.go`
-
-Add at the end of the file:
-
-```go
-func TestGenerateAgentHookSecret(t *testing.T) {
-	agent := testAgent("my-agent", "default")
-	secret := GenerateAgentHookSecret(agent, "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890")
-
-	assert.Equal(t, agent.HookSecretName(), secret.Name)
-	assert.Equal(t, "default", secret.Namespace)
-	assert.Equal(t, mmv1beta.AgentLabels("my-agent"), secret.Labels)
-	assert.Len(t, secret.OwnerReferences, 1)
-	assert.Equal(t, "Agent", secret.OwnerReferences[0].Kind)
-	assert.Equal(t, []byte("abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"), secret.Data["hookSecret"])
-
-	// Must NOT have other keys
-	assert.NotContains(t, secret.Data, "token")
-	assert.NotContains(t, secret.Data, "apiKey")
-}
-```
-
-### 2.3d: Test `HOOK_SECRET` env var in Deployment — `pkg/mattermost/agent_test.go`
-
-Add to `TestGenerateAgentDeployment` (around line 109, after existing env var checks):
-
-```go
-	// HOOK_SECRET from secret
-	var hookSecretEnv *corev1.EnvVar
-	for i, e := range c.Env {
-		if e.Name == "HOOK_SECRET" {
-			hookSecretEnv = &c.Env[i]
-		}
+func TestCheckAgentPVC_OwnerReference(t *testing.T) {
+	agent := newTestAgent()
+	agent.Spec.Storage = &mmv1beta.AgentStorageConfig{
+		Size:      resource.MustParse("2Gi"),
+		MountPath: "/data",
 	}
-	require.NotNil(t, hookSecretEnv, "HOOK_SECRET env var must be present")
-	require.NotNil(t, hookSecretEnv.ValueFrom)
-	require.NotNil(t, hookSecretEnv.ValueFrom.SecretKeyRef)
-	assert.Equal(t, agent.HookSecretName(), hookSecretEnv.ValueFrom.SecretKeyRef.Name)
-	assert.Equal(t, "hookSecret", hookSecretEnv.ValueFrom.SecretKeyRef.Key)
+	_ = agent.SetDefaults()
+
+	reconciler, _ := setupReconciler(t, agent)
+	logger := testLogger()
+
+	err := reconciler.checkAgentPVC(context.TODO(), agent, logger)
+	require.NoError(t, err)
+
+	pvc := &corev1.PersistentVolumeClaim{}
+	err = reconciler.Client.Get(context.TODO(), types.NamespacedName{
+		Name:      agent.StoragePVCName(),
+		Namespace: agent.Namespace,
+	}, pvc)
+	require.NoError(t, err)
+
+	// Verify OwnerReference points to the Agent CR.
+	require.Len(t, pvc.OwnerReferences, 1)
+	assert.Equal(t, "Agent", pvc.OwnerReferences[0].Kind)
+	assert.Equal(t, agent.Name, pvc.OwnerReferences[0].Name)
+}
+
+func TestCheckAgentPVC_WithStorageClass(t *testing.T) {
+	agent := newTestAgent()
+	storageClass := "gp3-encrypted"
+	agent.Spec.Storage = &mmv1beta.AgentStorageConfig{
+		Size:             resource.MustParse("10Gi"),
+		StorageClassName: &storageClass,
+		MountPath:        "/workspace",
+	}
+	_ = agent.SetDefaults()
+
+	reconciler, _ := setupReconciler(t, agent)
+	logger := testLogger()
+
+	err := reconciler.checkAgentPVC(context.TODO(), agent, logger)
+	require.NoError(t, err)
+
+	pvc := &corev1.PersistentVolumeClaim{}
+	err = reconciler.Client.Get(context.TODO(), types.NamespacedName{
+		Name:      agent.StoragePVCName(),
+		Namespace: agent.Namespace,
+	}, pvc)
+	require.NoError(t, err)
+
+	require.NotNil(t, pvc.Spec.StorageClassName)
+	assert.Equal(t, "gp3-encrypted", *pvc.Spec.StorageClassName)
+}
+
+func TestCheckAgentPVC_Idempotent(t *testing.T) {
+	agent := newTestAgent()
+	agent.Spec.Storage = &mmv1beta.AgentStorageConfig{
+		Size:      resource.MustParse("1Gi"),
+		MountPath: "/data",
+	}
+	_ = agent.SetDefaults()
+
+	reconciler, _ := setupReconciler(t, agent)
+	logger := testLogger()
+
+	// First call creates.
+	err := reconciler.checkAgentPVC(context.TODO(), agent, logger)
+	require.NoError(t, err)
+
+	// Second call is idempotent.
+	err = reconciler.checkAgentPVC(context.TODO(), agent, logger)
+	require.NoError(t, err)
+}
 ```
 
-### 2.3e: Update `TestReconcileAgent_FullReconcile` — `controllers/mattermost/agent/controller_test.go`
-
-The full reconcile test (line 78) does not use LLMGateway, so the virtual key path is not exercised. The hook secret IS created for all agents. Add verification after the second reconcile (after line 166):
+**Required imports for agent_test.go** — add `resource` if not already present:
 
 ```go
-	// Verify hook secret was created.
-	hookSecret := &corev1.Secret{}
-	err = c.Get(context.TODO(), types.NamespacedName{
-		Name:      agent.HookSecretName(),
-		Namespace: agent.Namespace,
-	}, hookSecret)
-	require.NoError(t, err, "hook secret should be created during reconcile")
-	assert.Contains(t, hookSecret.Data, "hookSecret")
-	assert.Len(t, string(hookSecret.Data["hookSecret"]), 64, "hook secret should be 64-char hex")
-```
-
-### 2.3f: Update `TestReconcileAgent_WithLLMGateway` — `controllers/mattermost/agent/controller_test.go`
-
-This test verifies the LLMGateway path but doesn't simulate agent readiness (it only gets to the health-check requeue). The virtual key is created in the post-health-check block, so it won't be tested in this existing test. However, the hook secret should be verified. Add after line 376 (before the closing `}`):
-
-```go
-	// Verify hook secret was created (created before Deployment, no LLM dependency).
-	hookSecret := &corev1.Secret{}
-	err = c.Get(context.TODO(), types.NamespacedName{
-		Name:      agent.HookSecretName(),
-		Namespace: agent.Namespace,
-	}, hookSecret)
-	require.NoError(t, err, "hook secret should be created during reconcile")
-	assert.Contains(t, hookSecret.Data, "hookSecret")
+import (
+	// ... existing imports ...
+	"k8s.io/apimachinery/pkg/api/resource"
+)
 ```
 
 ---
 
 ## File Change Summary
 
-| File | Action | Summary |
-|------|--------|---------|
-| `controllers/mattermost/agent/litellm.go` | Add function | `reconcileLiteLLMVirtualKey` (~40 lines) |
-| `controllers/mattermost/agent/controller.go` | Modify | Add virtual key call in post-health-check block, add hook secret call before Service |
-| `controllers/mattermost/agent/agent.go` | Add function + imports | `checkHookSecret` (~25 lines), add `crypto/rand`, `encoding/hex`, `k8sErrors` imports |
-| `apis/mattermost/v1beta1/agent_utils.go` | Add method | `HookSecretName()` (3 lines) |
-| `pkg/mattermost/agent.go` | Add function + modify | `GenerateAgentHookSecret` (12 lines), add `HOOK_SECRET` env var to Deployment generator |
-| `controllers/mattermost/agent/litellm_test.go` | Add tests | 4 tests for `reconcileLiteLLMVirtualKey` |
-| `controllers/mattermost/agent/agent_test.go` | Add tests | 2 tests for `checkHookSecret` |
-| `pkg/mattermost/agent_test.go` | Add + modify tests | `TestGenerateAgentHookSecret`, add HOOK_SECRET assertion to `TestGenerateAgentDeployment` |
-| `controllers/mattermost/agent/controller_test.go` | Modify tests | Add hook secret verification to `TestReconcileAgent_FullReconcile` and `TestReconcileAgent_WithLLMGateway` |
-
-## Reconcile Loop Order (Final)
-
-```
-1.  Fetch Agent CR
-2.  Set initial state (Provisioning)
-3.  Apply defaults
-4.  Check Mattermost CR readiness
-5.  [if LLMGateway] LiteLLM Deployment + ConfigMap
-6.  [if LLMGateway] LiteLLM Service
-7.  [if LLMGateway] LiteLLM readiness check
-8.  [if LLMGateway] Get master key
-9.  [if LLMGateway] Reconcile LLM provider models
-10. [if LLMGateway] Reconcile MCP servers
-11. Phase → Deploying
-12. ServiceAccount
-13. Hook Secret                          ← NEW
-14. Service
-15. Deployment
-16. NetworkPolicy
-17. Health check
-18. [if LLMGateway] Get master key (post-health)
-19. [if LLMGateway] Register agent model
-20. [if LLMGateway] Reconcile MCP servers (re-derive access groups)
-21. [if LLMGateway] Create virtual key   ← NEW
-22. Update status
-```
-
-## Testing Strategy
-
-```bash
-# Unit tests — controller and client
-go test ./controllers/mattermost/agent/... -v
-
-# Unit tests — resource generators
-go test ./pkg/mattermost/... -v
-
-# Full suite
-make unittest
-```
-
-## Definition of Done
-
-- [x] Virtual key created via LiteLLM API and stored in K8s Secret during reconciliation
-- [x] Agent pod receives virtual key via existing `OPENAI_API_KEY`/`ANTHROPIC_API_KEY` env vars (plumbing already exists)
-- [x] Hook secret generated (random 32-byte hex) and stored in K8s Secret
-- [x] Hook secret injected into agent pod as `HOOK_SECRET` env var
-- [x] All tests pass (`make unittest`)
+| File | Task | Action | Summary |
+|------|------|--------|---------|
+| `apis/mattermost/v1beta1/agent_types.go` | 2.1 | Modify | Add `resource` import, `AgentStorageConfig` type, `Storage` field to `AgentSpec` |
+| `apis/mattermost/v1beta1/agent_utils.go` | 2.2 | Modify | Add `AgentStorageDefaultMountPath` constant, Storage defaults in `SetDefaults()`, `StoragePVCName()` helper |
+| `controllers/mattermost/agent/agent.go` | 2.3 | Modify | Add `metav1` import, `checkAgentPVC()` function |
+| `controllers/mattermost/agent/controller.go` | 2.4, 2.5 | Modify | Add `checkAgentPVC` call before Deployment, add `.Owns(&corev1.PersistentVolumeClaim{})` |
+| `pkg/mattermost/agent.go` | 2.6 | Modify | Refactor to slice-based volumes/mounts, conditionally add PVC volume+mount |
+| `config/crd/` (generated) | 2.7 | Generate | Regenerated CRD manifests with `storage` field |
+| `apis/mattermost/v1beta1/zz_generated.deepcopy.go` | 2.7 | Generate | Regenerated deep copy for `AgentStorageConfig` |
+| `pkg/mattermost/agent_test.go` | 2.8b | Modify | Add `TestGenerateAgentDeployment_WithStorage`, `_WithoutStorage` |
+| `controllers/mattermost/agent/agent_test.go` | 2.8c | Modify | Add `TestCheckAgentPVC_Creates`, `_Skips`, `_OwnerReference`, `_WithStorageClass`, `_Idempotent` |
 
 ---
 
-## Completion Summary
+## Build & Verify
 
-**Completed:** 2026-04-05
+```bash
+# Regenerate CRD and deep copy
+make generate manifests
 
-All tasks implemented per the prescriptive plan:
+# Verify CRD has storage field
+grep -A 10 'storage:' config/crd/bases/installation.mattermost.com_agents.yaml
 
-### Task 2.1: Virtual Key Creation
-- Added `reconcileLiteLLMVirtualKey` to `litellm.go` — checks for existing Secret, calls `generateKey` API, stores result in K8s Secret
-- Wired into controller reconcile loop after `reconcileAgentModel` in the post-health-check LiteLLM block
-- Re-derives MCP access groups via idempotent `reconcileLiteLLMMCPServers` call (avoids threading state)
+# Run affected unit tests
+go test ./apis/mattermost/v1beta1/... -v -count=1
+go test ./pkg/mattermost/... -v -count=1 -run TestGenerateAgentDeployment
+go test ./controllers/mattermost/agent/... -v -count=1 -run TestCheckAgentPVC
 
-### Task 2.2: Hook Secret Generation
-- Added `HookSecretName()` helper to `agent_utils.go`
-- Added `GenerateAgentHookSecret` resource generator to `pkg/mattermost/agent.go`
-- Added `checkHookSecret` to `controllers/mattermost/agent/agent.go` — generates random 32-byte hex, creates K8s Secret
-- Wired into reconcile loop after ServiceAccount, before Service
-- Added `HOOK_SECRET` env var to `GenerateAgentDeployment` baseEnv
+# Run full test suite
+go test ./... -count=1
 
-### Task 2.3: Tests
-- 4 tests for `reconcileLiteLLMVirtualKey` (create, idempotent, key-alias-exists, no-mcp-groups)
-- 2 tests for `checkHookSecret` (create, idempotent)
-- 1 test for `GenerateAgentHookSecret`
-- HOOK_SECRET env var assertion added to `TestGenerateAgentDeployment`
-- Hook secret verification added to `TestReconcileAgent_FullReconcile` and `TestReconcileAgent_WithLLMGateway`
-
-### Test Results
+# Verify build
+go build ./...
 ```
-go test ./controllers/mattermost/agent/... -v -count=1  → PASS (all 39 tests)
-go test ./pkg/mattermost/... -v -count=1                → PASS (all tests)
-```
+
+---
+
+## Edge Cases & Gotchas
+
+1. **PVC spec is immutable.** Once a PVC is created, K8s does not allow changing `accessModes` or `storageClassName`. Only `resources.requests` can be expanded (if the StorageClass has `allowVolumeExpansion: true`). The `r.Resources.Update()` call uses objectMatcher, which will only send a patch if there's a diff — so this is safe. But if a user changes `storageClassName` on a running Agent, the update will fail at the K8s API level. This is expected K8s behavior, not a bug.
+
+2. **PVC lifecycle.** The OwnerReference on the PVC means K8s garbage collection will delete the PVC when the Agent CR is deleted. This is intentional — if the user wants to preserve data, they should back it up before deleting the Agent.
+
+3. **`resource.Quantity` import.** The `agent_types.go` file needs `"k8s.io/apimachinery/pkg/api/resource"` imported because `AgentStorageConfig.Size` uses `resource.Quantity`. The import already exists in `agent_utils.go` but each file needs its own imports in Go.
+
+4. **Deep copy generation.** Adding a new type (`AgentStorageConfig`) with pointer fields (`*string` for StorageClassName) requires `make generate` to regenerate `zz_generated.deepcopy.go`. Without this, the operator will panic on deep copy operations.
+
+5. **Reconcile ordering.** `checkAgentPVC` MUST run before `checkAgentDeployment`. If the Deployment references a PVC that doesn't exist yet, the pod will be stuck in `Pending` with an `Unschedulable` event. The reconciler will eventually create the PVC on the next loop, but this creates unnecessary churn.
+
+6. **Existing test fixtures.** The `newTestAgent()` helper in `agent_test.go` (line 25) and `testAgent()` in `agent_test.go` (line 15 in pkg/mattermost) do NOT set Storage. This means all existing tests continue to work without changes — the no-storage path is the default.
+
+---
+
+## Definition of Done
+
+- [ ] `AgentStorageConfig` type exists in CRD with `size`, `storageClassName`, `mountPath`
+- [ ] `SetDefaults` sets mountPath to `/data` when omitted
+- [ ] `StoragePVCName()` returns `<agent-name>-storage`
+- [ ] Reconciler creates PVC before Deployment when Storage is set
+- [ ] Reconciler skips PVC when Storage is nil
+- [ ] PVC has OwnerReference on Agent CR (cascade delete)
+- [ ] PVC has correct labels, access mode (ReadWriteOnce), and requested size
+- [ ] PVC supports optional StorageClassName
+- [ ] Deployment has PVC Volume (`agent-storage`) + VolumeMount when Storage is set
+- [ ] Deployment has only `bot-token` volume when Storage is nil
+- [ ] Controller watches PVCs via `Owns(&corev1.PersistentVolumeClaim{})`
+- [ ] CRD manifests regenerated with `storage` field
+- [ ] Deep copy generated for `AgentStorageConfig`
+- [ ] All tests pass

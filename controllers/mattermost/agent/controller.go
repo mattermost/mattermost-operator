@@ -48,6 +48,7 @@ func (r *AgentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.ServiceAccount{}).
 		Owns(&corev1.Secret{}).
 		Owns(&corev1.ConfigMap{}).
+		Owns(&corev1.PersistentVolumeClaim{}).
 		Owns(&networkingv1.NetworkPolicy{}).
 		Complete(r)
 }
@@ -140,6 +141,13 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, request ctrl.Request) (
 
 	// Service
 	err = r.checkAgentService(ctx, agent, reqLogger)
+	if err != nil {
+		r.updateStatusReconcilingAndLogError(ctx, agent, status, reqLogger, err)
+		return reconcile.Result{}, err
+	}
+
+	// PVC (must exist before Deployment references it)
+	err = r.checkAgentPVC(ctx, agent, reqLogger)
 	if err != nil {
 		r.updateStatusReconcilingAndLogError(ctx, agent, status, reqLogger, err)
 		return reconcile.Result{}, err

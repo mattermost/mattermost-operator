@@ -15,6 +15,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -141,14 +142,17 @@ func TestCheckAgentDeployment(t *testing.T) {
 	assert.True(t, hasMmServerURL, "expected MM_SERVER_URL env var")
 	assert.True(t, hasAgentHooks, "expected AGENT_HOOKS env var")
 
-	// Verify volumes.
-	assert.Len(t, deployment.Spec.Template.Spec.Volumes, 2)
+	// Verify volumes — only bot-token remains.
+	assert.Len(t, deployment.Spec.Template.Spec.Volumes, 1)
 	assert.Equal(t, "bot-token", deployment.Spec.Template.Spec.Volumes[0].Name)
-	assert.Equal(t, "mmctl-config", deployment.Spec.Template.Spec.Volumes[1].Name)
 
-	// Verify init container.
-	require.Len(t, deployment.Spec.Template.Spec.InitContainers, 1)
-	assert.Equal(t, "mmctl-auth", deployment.Spec.Template.Spec.InitContainers[0].Name)
+	// Verify no init containers.
+	assert.Empty(t, deployment.Spec.Template.Spec.InitContainers, "init containers must be removed")
+
+	// Verify no HOME env var.
+	for _, e := range container.Env {
+		assert.NotEqual(t, "HOME", e.Name, "HOME env var must not be present")
+	}
 }
 
 func TestCheckAgentNetworkPolicy_Deny(t *testing.T) {
@@ -359,4 +363,187 @@ func TestCheckAgentNetworkPolicy_DenyWithLiteLLM(t *testing.T) {
 	// Rule 2: DNS (port 53, no To selector — allows all destinations).
 	require.Len(t, np.Spec.Egress[2].Ports, 2, "DNS rule should have TCP+UDP")
 	assert.Empty(t, np.Spec.Egress[2].To, "DNS rule should have no destination selector")
+}
+
+func TestCheckAgentPVC_Creates(t *testing.T) {
+	agent := newTestAgent()
+	agent.Spec.Storage = &mmv1beta.AgentStorageConfig{
+		Size:      resource.MustParse("1Gi"),
+		MountPath: "/data",
+	}
+	_ = agent.SetDefaults()
+
+	reconciler, _ := setupReconciler(t, agent)
+	logger := testLogger()
+
+	err := reconciler.checkAgentPVC(context.TODO(), agent, logger)
+	require.NoError(t, err)
+
+	// Verify PVC was created.
+	pvc := &corev1.PersistentVolumeClaim{}
+	err = reconciler.Client.Get(context.TODO(), types.NamespacedName{
+		Name:      agent.StoragePVCName(),
+		Namespace: agent.Namespace,
+	}, pvc)
+	require.NoError(t, err)
+
+	assert.Equal(t, agent.StoragePVCName(), pvc.Name)
+	assert.Equal(t, agent.Namespace, pvc.Namespace)
+	assert.Equal(t, []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}, pvc.Spec.AccessModes)
+
+	storageReq := pvc.Spec.Resources.Requests[corev1.ResourceStorage]
+	assert.Equal(t, resource.MustParse("1Gi"), storageReq)
+}
+
+func TestCheckAgentPVC_Skips(t *testing.T) {
+	agent := newTestAgent()
+	// Storage is nil — PVC should not be created.
+	_ = agent.SetDefaults()
+
+	reconciler, _ := setupReconciler(t, agent)
+	logger := testLogger()
+
+	err := reconciler.checkAgentPVC(context.TODO(), agent, logger)
+	require.NoError(t, err)
+
+	// Verify no PVC exists.
+	pvc := &corev1.PersistentVolumeClaim{}
+	err = reconciler.Client.Get(context.TODO(), types.NamespacedName{
+		Name:      agent.Name + "-storage",
+		Namespace: agent.Namespace,
+	}, pvc)
+	require.Error(t, err, "PVC should not exist when Storage is nil")
+}
+
+func TestCheckAgentPVC_OwnerReference(t *testing.T) {
+	agent := newTestAgent()
+	agent.Spec.Storage = &mmv1beta.AgentStorageConfig{
+		Size:      resource.MustParse("2Gi"),
+		MountPath: "/data",
+	}
+	_ = agent.SetDefaults()
+
+	reconciler, _ := setupReconciler(t, agent)
+	logger := testLogger()
+
+	err := reconciler.checkAgentPVC(context.TODO(), agent, logger)
+	require.NoError(t, err)
+
+	pvc := &corev1.PersistentVolumeClaim{}
+	err = reconciler.Client.Get(context.TODO(), types.NamespacedName{
+		Name:      agent.StoragePVCName(),
+		Namespace: agent.Namespace,
+	}, pvc)
+	require.NoError(t, err)
+
+	// Verify OwnerReference points to the Agent CR.
+	require.Len(t, pvc.OwnerReferences, 1)
+	assert.Equal(t, "Agent", pvc.OwnerReferences[0].Kind)
+	assert.Equal(t, agent.Name, pvc.OwnerReferences[0].Name)
+}
+
+func TestCheckAgentPVC_WithStorageClass(t *testing.T) {
+	agent := newTestAgent()
+	storageClass := "gp3-encrypted"
+	agent.Spec.Storage = &mmv1beta.AgentStorageConfig{
+		Size:             resource.MustParse("10Gi"),
+		StorageClassName: &storageClass,
+		MountPath:        "/workspace",
+	}
+	_ = agent.SetDefaults()
+
+	reconciler, _ := setupReconciler(t, agent)
+	logger := testLogger()
+
+	err := reconciler.checkAgentPVC(context.TODO(), agent, logger)
+	require.NoError(t, err)
+
+	pvc := &corev1.PersistentVolumeClaim{}
+	err = reconciler.Client.Get(context.TODO(), types.NamespacedName{
+		Name:      agent.StoragePVCName(),
+		Namespace: agent.Namespace,
+	}, pvc)
+	require.NoError(t, err)
+
+	require.NotNil(t, pvc.Spec.StorageClassName)
+	assert.Equal(t, "gp3-encrypted", *pvc.Spec.StorageClassName)
+}
+
+func TestCheckAgentPVC_Idempotent(t *testing.T) {
+	agent := newTestAgent()
+	agent.Spec.Storage = &mmv1beta.AgentStorageConfig{
+		Size:      resource.MustParse("1Gi"),
+		MountPath: "/data",
+	}
+	_ = agent.SetDefaults()
+
+	reconciler, _ := setupReconciler(t, agent)
+	logger := testLogger()
+
+	// First call creates.
+	err := reconciler.checkAgentPVC(context.TODO(), agent, logger)
+	require.NoError(t, err)
+
+	// Second call is idempotent.
+	err = reconciler.checkAgentPVC(context.TODO(), agent, logger)
+	require.NoError(t, err)
+}
+
+func TestCheckAgentNetworkPolicy_Allow(t *testing.T) {
+	agent := newTestAgent()
+	agent.Spec.EgressPolicy = mmv1beta.AgentEgressPolicyAllow
+	_ = agent.SetDefaults()
+
+	reconciler, _ := setupReconciler(t, agent)
+
+	logSink := blubr.InitLogger(logrus.NewEntry(logrus.New()))
+	logger := logr.New(logSink.WithName("test"))
+
+	err := reconciler.checkAgentNetworkPolicy(context.TODO(), agent, logger)
+	require.NoError(t, err)
+
+	np := &networkingv1.NetworkPolicy{}
+	err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, np)
+	require.NoError(t, err)
+
+	// Allow policy: 1 egress rule (empty = allow all).
+	require.Len(t, np.Spec.Egress, 1)
+	assert.Empty(t, np.Spec.Egress[0].To, "allow-all rule has no To selector")
+	assert.Empty(t, np.Spec.Egress[0].Ports, "allow-all rule has no Ports restriction")
+
+	// Ingress still restricts to MM pods.
+	require.Len(t, np.Spec.Ingress, 1)
+	assert.Len(t, np.Spec.Ingress[0].From, 1)
+}
+
+func TestCheckAgentNetworkPolicy_AllowWithLiteLLM(t *testing.T) {
+	agent := newTestAgent()
+	agent.Spec.EgressPolicy = mmv1beta.AgentEgressPolicyAllow
+	agent.Spec.LLMGateway = &mmv1beta.LLMGatewayConfig{
+		OperatorManaged: &mmv1beta.OperatorManagedLLMGateway{
+			Image: mmv1beta.AgentLiteLLMDefaultImage,
+		},
+	}
+	_ = agent.SetDefaults()
+
+	reconciler, _ := setupReconciler(t, agent)
+
+	logSink := blubr.InitLogger(logrus.NewEntry(logrus.New()))
+	logger := logr.New(logSink.WithName("test"))
+
+	err := reconciler.checkAgentNetworkPolicy(context.TODO(), agent, logger)
+	require.NoError(t, err)
+
+	np := &networkingv1.NetworkPolicy{}
+	err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, np)
+	require.NoError(t, err)
+
+	// Egress: 1 rule (allow all), even with LiteLLM configured.
+	require.Len(t, np.Spec.Egress, 1)
+	assert.Empty(t, np.Spec.Egress[0].To)
+	assert.Empty(t, np.Spec.Egress[0].Ports)
+
+	// Ingress: 2 peers (MM + LiteLLM) — allow mode does not affect ingress.
+	require.Len(t, np.Spec.Ingress, 1)
+	assert.Len(t, np.Spec.Ingress[0].From, 2, "ingress should allow both MM and LiteLLM pods")
 }

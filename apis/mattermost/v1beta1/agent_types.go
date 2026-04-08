@@ -5,6 +5,7 @@ package v1beta1
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -16,6 +17,22 @@ import (
 // Add custom validation using kubebuilder tags:                              //
 // https://book.kubebuilder.io/reference/generating-crd.html                  //
 ////////////////////////////////////////////////////////////////////////////////
+
+// AgentStorageConfig defines optional persistent storage for the agent pod.
+type AgentStorageConfig struct {
+	// Size is the requested PVC storage size (e.g., "1Gi", "500Mi").
+	Size resource.Quantity `json:"size"`
+
+	// StorageClassName is the name of the StorageClass to use for the PVC.
+	// If omitted, the cluster default StorageClass is used.
+	// +optional
+	StorageClassName *string `json:"storageClassName,omitempty"`
+
+	// MountPath is the path inside the container where the volume is mounted.
+	// Defaults to "/data".
+	// +optional
+	MountPath string `json:"mountPath,omitempty"`
+}
 
 // AgentSpec defines the desired state of Agent
 // +k8s:openapi-gen=true
@@ -58,6 +75,10 @@ type AgentSpec struct {
 	// +optional
 	LLMGateway *LLMGatewayConfig `json:"llmGateway,omitempty"`
 
+	// Storage configures optional persistent storage for the agent pod.
+	// When set, the operator creates a PVC and mounts it into the agent container.
+	// +optional
+	Storage *AgentStorageConfig `json:"storage,omitempty"`
 }
 
 // AgentStatus defines the observed state of Agent

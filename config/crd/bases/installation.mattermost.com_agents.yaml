@@ -369,6 +369,32 @@ spec:
                       More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                     type: object
                 type: object
+              storage:
+                description: |-
+                  Storage configures optional persistent storage for the agent pod.
+                  When set, the operator creates a PVC and mounts it into the agent container.
+                properties:
+                  mountPath:
+                    description: |-
+                      MountPath is the path inside the container where the volume is mounted.
+                      Defaults to "/data".
+                    type: string
+                  size:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    description: Size is the requested PVC storage size (e.g., "1Gi",
+                      "500Mi").
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
+                  storageClassName:
+                    description: |-
+                      StorageClassName is the name of the StorageClass to use for the PVC.
+                      If omitted, the cluster default StorageClass is used.
+                    type: string
+                required:
+                - size
+                type: object
             required:
             - image
             - mattermostRef
