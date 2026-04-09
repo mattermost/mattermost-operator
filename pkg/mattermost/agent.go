@@ -64,6 +64,16 @@ func mmServerURL(agent *mmv1beta.Agent) string {
 	return "http://" + agent.Spec.MattermostRef.Name + "." + agent.Namespace + ".svc.cluster.local:8065"
 }
 
+// imageTagNeedsAlwaysPull returns true if the image tag is "dev", "latest",
+// or absent (K8s treats no-tag as :latest). Used to auto-set ImagePullPolicy.
+func imageTagNeedsAlwaysPull(image string) bool {
+	if idx := strings.LastIndex(image, ":"); idx >= 0 {
+		tag := image[idx+1:]
+		return tag == "dev" || tag == "latest"
+	}
+	return true // no tag = K8s treats as :latest
+}
+
 // GenerateAgentDeployment returns the Deployment for an Agent.
 func GenerateAgentDeployment(agent *mmv1beta.Agent) *appsv1.Deployment {
 	replicas := int32(1)
@@ -166,6 +176,11 @@ func GenerateAgentDeployment(agent *mmv1beta.Agent) *appsv1.Deployment {
 		})
 	}
 
+	pullPolicy := corev1.PullIfNotPresent
+	if imageTagNeedsAlwaysPull(agent.Spec.Image) {
+		pullPolicy = corev1.PullAlways
+	}
+
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            agent.Name,
@@ -186,9 +201,10 @@ func GenerateAgentDeployment(agent *mmv1beta.Agent) *appsv1.Deployment {
 					ServiceAccountName: agent.Name,
 					Containers: []corev1.Container{
 						{
-							Name:  mmv1beta.AgentContainerName,
-							Image: agent.Spec.Image,
-							Env:   envVars,
+							Name:            mmv1beta.AgentContainerName,
+							Image:           agent.Spec.Image,
+							ImagePullPolicy: pullPolicy,
+							Env:             envVars,
 							Ports: []corev1.ContainerPort{
 								{
 									ContainerPort: mmv1beta.AgentHTTPPort,

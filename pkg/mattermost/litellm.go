@@ -98,6 +98,11 @@ func GenerateLiteLLMDeployment(namespace, image string) *appsv1.Deployment {
 		FailureThreshold:    6,
 	}
 
+	liteLLMPullPolicy := corev1.PullIfNotPresent
+	if imageTagNeedsAlwaysPull(image) {
+		liteLLMPullPolicy = corev1.PullAlways
+	}
+
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      mmv1beta.AgentLiteLLMDeploymentName,
@@ -116,9 +121,10 @@ func GenerateLiteLLMDeployment(namespace, image string) *appsv1.Deployment {
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:  "litellm",
-							Image: image,
-							Args:  []string{"--config", "/app/config/config.yaml"},
+							Name:            "litellm",
+							Image:           image,
+							ImagePullPolicy: liteLLMPullPolicy,
+							Args:            []string{"--config", "/app/config/config.yaml"},
 							Env:   baseEnv,
 							Ports: []corev1.ContainerPort{
 								{

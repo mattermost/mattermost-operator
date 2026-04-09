@@ -1,370 +1,276 @@
-# Phase 1: Remove mmctl Init Container + HOME Override — Prescriptive Plan
+# Phase 1: ImagePullPolicy Auto-Detection (Bug 6)
 
-> **Milestone:** M7 — PVC, Init Container Removal, Allow Egress
+> **Status:** ready
+> **Milestone:** M8 — Bug Bash
 > **Target repo:** `~/workspace/worktrees/mattermost-operator-the-trail`
-> **Phase:** 1 (Init Container Removal)
-> **Depends on:** nothing (first phase)
-> **Goal:** Remove the redundant `mmctl-auth` init container, `mmctl-config` EmptyDir volume, and `HOME=/tmp` env var override from `GenerateAgentDeployment`. This unblocks non-Python agents (OpenClaw) that don't use mmctl.
+> **Files changed:** 3 (`agent.go`, `litellm.go`, `agent_test.go`)
 
 ---
 
-## Context: What Already Exists
+## Context: Current State
 
-`GenerateAgentDeployment` in `pkg/mattermost/agent.go` (line 68) currently produces a Deployment with:
-- **InitContainers** (lines 153-179): A single `mmctl-auth` container that runs `mmctl auth login ...` using the bot-token volume and an mmctl-config EmptyDir.
-- **Main container VolumeMounts** (lines 196-203): Two mounts — `bot-token` at `/secrets/mmctl-token` (read-only) and `mmctl-config` at `/tmp/.config/mmctl`.
-- **Main container Env** (line 185): `append(envVars, corev1.EnvVar{Name: "HOME", Value: "/tmp"})` — HOME override so mmctl can find its config.
-- **Volumes** (lines 209-224): Two volumes — `bot-token` (Secret) and `mmctl-config` (EmptyDir).
+`GenerateAgentDeployment` in `pkg/mattermost/agent.go` (line 68) builds a Deployment with no `ImagePullPolicy` on the agent container (line 190). `GenerateLiteLLMDeployment` in `pkg/mattermost/litellm.go` (line 59) similarly omits `ImagePullPolicy` on the LiteLLM container (line 120). K8s defaults non-`:latest` tags to `IfNotPresent`, causing stale `:dev` images on k3d nodes.
 
-The init container and mmctl-config volume exist solely for mmctl authentication. With Trail moving to framework-agnostic agents that authenticate via `MM_BOT_TOKEN` env var (SecretKeyRef), these are dead code. The `HOME=/tmp` override also breaks agents that expect their image's default HOME.
-
-The `bot-token` Secret volume + mount is **kept** — some agent images may still want to read the token from a file at `/secrets/mmctl-token`. The `MM_BOT_TOKEN` env var (lines 82-91) reads from the same Secret via SecretKeyRef, so it works regardless.
+**Key facts from codebase research:**
+- `strings` is already imported in `agent.go` (line 4) — no import changes needed
+- Both files are in `package mattermost` — a helper in `agent.go` is callable from `litellm.go`
+- `testAgent` helper (line 15 of `agent_test.go`) uses image `"mattermost/test-agent:latest"`
+- The existing `TestGenerateAgentDeployment` (line 81) does NOT assert `ImagePullPolicy` — needs update
+- `MattermostSpec` already has an `ImagePullPolicy` field (line 91 of `mattermost_types.go`) as precedent
 
 ---
 
-## Task 1.1: Remove Init Container from GenerateAgentDeployment
+## Task 1.1: Add `imageTagNeedsAlwaysPull` helper
 
 **File:** `pkg/mattermost/agent.go`
-**Lines:** 151-179
+**Action:** Insert new function between `mmServerURL` (ends line 65) and `GenerateAgentDeployment` (starts line 68).
+**Import changes:** None — `strings` is already imported at line 4.
 
-### Change
-
-Remove the entire `InitContainers` field from the PodSpec:
+**Insert at line 67** (add a blank line after line 65, then the function):
 
 ```go
-// REMOVE these lines (151-179):
-					InitContainers: []corev1.Container{
-						{
-							Name:    "mmctl-auth",
-							Image:   agent.Spec.Image,
-							Command: []string{"mmctl", "auth", "login", "$(MM_SERVER_URL)", "--access-token-file", "/secrets/mmctl-token/token", "--name", "local"},
-							Env: []corev1.EnvVar{
-								{
-									Name:  "MM_SERVER_URL",
-									Value: mmServerURL(agent),
-								},
-								{
-									Name:  "HOME",
-									Value: "/tmp",
-								},
-							},
-							VolumeMounts: []corev1.VolumeMount{
-								{
-									Name:      "bot-token",
-									MountPath: "/secrets/mmctl-token",
-									ReadOnly:  true,
-								},
-								{
-									Name:      "mmctl-config",
-									MountPath: "/tmp/.config/mmctl",
-								},
-							},
-						},
-					},
+// imageTagNeedsAlwaysPull returns true if the image tag is "dev", "latest",
+// or absent (K8s treats no-tag as :latest). Used to auto-set ImagePullPolicy.
+func imageTagNeedsAlwaysPull(image string) bool {
+	if idx := strings.LastIndex(image, ":"); idx >= 0 {
+		tag := image[idx+1:]
+		return tag == "dev" || tag == "latest"
+	}
+	return true // no tag = K8s treats as :latest
+}
 ```
 
-After removal, the PodSpec goes directly from `ServiceAccountName` to `Containers`.
+After insertion, `GenerateAgentDeployment` shifts to approximately line 77.
 
 ---
 
-## Task 1.2: Remove mmctl-config EmptyDir Volume
+## Task 1.2: Apply ImagePullPolicy in `GenerateAgentDeployment`
 
 **File:** `pkg/mattermost/agent.go`
-**Lines:** 218-222
+**Action:** Two modifications inside `GenerateAgentDeployment`.
 
-### Change
+### Step A — Compute pull policy
 
-Remove the `mmctl-config` entry from the `Volumes` slice, keeping only `bot-token`:
+Insert 4 lines immediately before the `return &appsv1.Deployment{` statement (currently line 169):
 
 ```go
-// OLD (lines 209-224):
-					Volumes: []corev1.Volume{
-						{
-							Name: "bot-token",
-							VolumeSource: corev1.VolumeSource{
-								Secret: &corev1.SecretVolumeSource{
-									SecretName: agent.BotTokenSecretName(),
-								},
-							},
-						},
-						{
-							Name: "mmctl-config",
-							VolumeSource: corev1.VolumeSource{
-								EmptyDir: &corev1.EmptyDirVolumeSource{},
-							},
-						},
-					},
-
-// NEW:
-					Volumes: []corev1.Volume{
-						{
-							Name: "bot-token",
-							VolumeSource: corev1.VolumeSource{
-								Secret: &corev1.SecretVolumeSource{
-									SecretName: agent.BotTokenSecretName(),
-								},
-							},
-						},
-					},
+	pullPolicy := corev1.PullIfNotPresent
+	if imageTagNeedsAlwaysPull(agent.Spec.Image) {
+		pullPolicy = corev1.PullAlways
+	}
 ```
 
-Also remove the `mmctl-config` VolumeMount from the main container (lines 200-203):
+### Step B — Add `ImagePullPolicy` field to container struct
 
+In the `corev1.Container` literal, add `ImagePullPolicy: pullPolicy` after the `Image` field.
+
+**Current code** (lines 188-191):
 ```go
-// OLD (lines 196-203):
-							VolumeMounts: []corev1.VolumeMount{
-								{
-									Name:      "bot-token",
-									MountPath: "/secrets/mmctl-token",
-									ReadOnly:  true,
-								},
-								{
-									Name:      "mmctl-config",
-									MountPath: "/tmp/.config/mmctl",
-								},
-							},
+						{
+							Name:  mmv1beta.AgentContainerName,
+							Image: agent.Spec.Image,
+							Env:   envVars,
+```
 
-// NEW:
-							VolumeMounts: []corev1.VolumeMount{
-								{
-									Name:      "bot-token",
-									MountPath: "/secrets/mmctl-token",
-									ReadOnly:  true,
-								},
-							},
+**Replace with:**
+```go
+						{
+							Name:            mmv1beta.AgentContainerName,
+							Image:           agent.Spec.Image,
+							ImagePullPolicy: pullPolicy,
+							Env:             envVars,
 ```
 
 ---
 
-## Task 1.3: Remove HOME=/tmp Env Var Override
+## Task 1.3: Apply ImagePullPolicy in `GenerateLiteLLMDeployment`
 
-**File:** `pkg/mattermost/agent.go`
-**Line:** 185
+**File:** `pkg/mattermost/litellm.go`
+**Action:** Two modifications inside `GenerateLiteLLMDeployment`.
+**Import changes:** None — `imageTagNeedsAlwaysPull` is in the same package, `strings` is not needed in this file.
 
-### Change
+### Step A — Compute pull policy
+
+Insert 4 lines immediately before the `return &appsv1.Deployment{` statement (currently line 101):
 
 ```go
-// OLD (line 185):
-							Env: append(envVars, corev1.EnvVar{
-								Name:  "HOME",
-								Value: "/tmp",
-							}),
-
-// NEW:
-							Env: envVars,
+	liteLLMPullPolicy := corev1.PullIfNotPresent
+	if imageTagNeedsAlwaysPull(image) {
+		liteLLMPullPolicy = corev1.PullAlways
+	}
 ```
 
-Each agent image now owns its own HOME directory.
+### Step B — Add `ImagePullPolicy` field to container struct
+
+In the `corev1.Container` literal, add `ImagePullPolicy: liteLLMPullPolicy` after the `Image` field.
+
+**Current code** (lines 119-121):
+```go
+							Name:  "litellm",
+							Image: image,
+							Args:  []string{"--config", "/app/config/config.yaml"},
+```
+
+**Replace with:**
+```go
+							Name:            "litellm",
+							Image:           image,
+							ImagePullPolicy: liteLLMPullPolicy,
+							Args:            []string{"--config", "/app/config/config.yaml"},
+```
+
+**Note:** LiteLLM is currently pinned to `ghcr.io/berriai/litellm:v1.82.0-stable` — this will correctly resolve to `PullIfNotPresent`.
 
 ---
 
-## Task 1.4: Update Unit Tests
-
-### 1.4a: Update `TestGenerateAgentDeployment`
+## Task 1.4: Add and update unit tests
 
 **File:** `pkg/mattermost/agent_test.go`
-**Lines:** 132-172
 
-Replace the volume mount, init container, and volume assertion blocks:
+### 1.4a: Update existing `TestGenerateAgentDeployment`
+
+**Insert after line 104** (after `assert.Equal(t, agent.Spec.Resources, c.Resources)`):
 
 ```go
-// OLD (lines 132-172):
-	// Volume mounts on main container
-	assert.Len(t, c.VolumeMounts, 2)
-	var hasBotToken, hasMmctlConfig bool
-	for _, vm := range c.VolumeMounts {
-		if vm.Name == "bot-token" {
-			hasBotToken = true
-			assert.Equal(t, "/secrets/mmctl-token", vm.MountPath)
-			assert.True(t, vm.ReadOnly)
-		}
-		if vm.Name == "mmctl-config" {
-			hasMmctlConfig = true
-			assert.Equal(t, "/tmp/.config/mmctl", vm.MountPath)
-		}
-	}
-	assert.True(t, hasBotToken, "bot-token volume mount expected")
-	assert.True(t, hasMmctlConfig, "mmctl-config volume mount expected")
-
-	// Init container
-	initContainers := dep.Spec.Template.Spec.InitContainers
-	assert.Len(t, initContainers, 1)
-	init := initContainers[0]
-	assert.Equal(t, "mmctl-auth", init.Name)
-	assert.Contains(t, init.Command, "mmctl")
-	assert.NotContains(t, init.Command, "--insecure-skip-verify")
-
-	// Volumes
-	volumes := dep.Spec.Template.Spec.Volumes
-	assert.Len(t, volumes, 2)
-	var hasBotTokenVol, hasMmctlConfigVol bool
-	for _, v := range volumes {
-		if v.Name == "bot-token" {
-			hasBotTokenVol = true
-			assert.Equal(t, agent.BotTokenSecretName(), v.Secret.SecretName)
-		}
-		if v.Name == "mmctl-config" {
-			hasMmctlConfigVol = true
-			assert.NotNil(t, v.EmptyDir)
-		}
-	}
-	assert.True(t, hasBotTokenVol, "bot-token volume expected")
-	assert.True(t, hasMmctlConfigVol, "mmctl-config emptyDir volume expected")
-
-// NEW:
-	// Volume mounts on main container — only bot-token remains
-	assert.Len(t, c.VolumeMounts, 1)
-	assert.Equal(t, "bot-token", c.VolumeMounts[0].Name)
-	assert.Equal(t, "/secrets/mmctl-token", c.VolumeMounts[0].MountPath)
-	assert.True(t, c.VolumeMounts[0].ReadOnly)
-
-	// No init containers
-	assert.Empty(t, dep.Spec.Template.Spec.InitContainers, "init containers must be removed")
-
-	// No HOME env var
-	for _, e := range c.Env {
-		assert.NotEqual(t, "HOME", e.Name, "HOME env var must not be present")
-	}
-
-	// Volumes — only bot-token remains
-	volumes := dep.Spec.Template.Spec.Volumes
-	assert.Len(t, volumes, 1)
-	assert.Equal(t, "bot-token", volumes[0].Name)
-	assert.Equal(t, agent.BotTokenSecretName(), volumes[0].Secret.SecretName)
+	// ImagePullPolicy — testAgent uses :latest, should be PullAlways
+	assert.Equal(t, corev1.PullAlways, c.ImagePullPolicy, "latest tag should get PullAlways")
 ```
 
-### 1.4b: Update `TestCheckAgentDeployment`
+### 1.4b: Add `TestImageTagNeedsAlwaysPull` — table-driven
 
-**File:** `controllers/mattermost/agent/agent_test.go`
-**Lines:** 144-151
-
-Replace the volume and init container assertions:
+**Append after the last test function** (after `TestGenerateAgentNetworkPolicy_AllowWithLiteLLM` ending at line 394):
 
 ```go
-// OLD (lines 144-151):
-	// Verify volumes.
-	assert.Len(t, deployment.Spec.Template.Spec.Volumes, 2)
-	assert.Equal(t, "bot-token", deployment.Spec.Template.Spec.Volumes[0].Name)
-	assert.Equal(t, "mmctl-config", deployment.Spec.Template.Spec.Volumes[1].Name)
-
-	// Verify init container.
-	require.Len(t, deployment.Spec.Template.Spec.InitContainers, 1)
-	assert.Equal(t, "mmctl-auth", deployment.Spec.Template.Spec.InitContainers[0].Name)
-
-// NEW:
-	// Verify volumes — only bot-token remains.
-	assert.Len(t, deployment.Spec.Template.Spec.Volumes, 1)
-	assert.Equal(t, "bot-token", deployment.Spec.Template.Spec.Volumes[0].Name)
-
-	// Verify no init containers.
-	assert.Empty(t, deployment.Spec.Template.Spec.InitContainers, "init containers must be removed")
-
-	// Verify no HOME env var.
-	for _, e := range container.Env {
-		assert.NotEqual(t, "HOME", e.Name, "HOME env var must not be present")
+func TestImageTagNeedsAlwaysPull(t *testing.T) {
+	tests := []struct {
+		image    string
+		expected bool
+	}{
+		{"myimage:dev", true},
+		{"myimage:latest", true},
+		{"myimage", true},                       // no tag → treat as :latest
+		{"registry:5000/path/img:dev", true},     // registry with port + :dev tag
+		{"myimage:v1.2.3", false},
+		{"myimage:stable", false},
+		{"ghcr.io/org/litellm:v1.82.0-stable", false},
 	}
+	for _, tt := range tests {
+		t.Run(tt.image, func(t *testing.T) {
+			assert.Equal(t, tt.expected, imageTagNeedsAlwaysPull(tt.image))
+		})
+	}
+}
 ```
 
----
+### 1.4c: Add `TestGenerateAgentDeployment_ImagePullPolicy`
 
-## Complete `GenerateAgentDeployment` After Phase 1
-
-For the implementing agent's reference, the Deployment returned after all Phase 1 changes:
+**Append after `TestImageTagNeedsAlwaysPull`:**
 
 ```go
-func GenerateAgentDeployment(agent *mmv1beta.Agent) *appsv1.Deployment {
-	replicas := int32(1)
+func TestGenerateAgentDeployment_ImagePullPolicy(t *testing.T) {
+	t.Run("dev tag gets PullAlways", func(t *testing.T) {
+		agent := testAgent("my-agent", "default")
+		agent.Spec.Image = "mattermost/test-agent:dev"
+		dep := GenerateAgentDeployment(agent)
+		assert.Equal(t, corev1.PullAlways, dep.Spec.Template.Spec.Containers[0].ImagePullPolicy)
+	})
 
-	baseEnv := []corev1.EnvVar{
-		// ... MM_SERVER_URL, AGENT_HOOKS, MM_BOT_TOKEN, HOOK_SECRET (unchanged)
-	}
+	t.Run("latest tag gets PullAlways", func(t *testing.T) {
+		agent := testAgent("my-agent", "default")
+		// testAgent already uses :latest
+		dep := GenerateAgentDeployment(agent)
+		assert.Equal(t, corev1.PullAlways, dep.Spec.Template.Spec.Containers[0].ImagePullPolicy)
+	})
 
-	// LiteLLM gateway env vars (unchanged)
-	if agent.Spec.LLMGateway != nil { ... }
+	t.Run("no tag gets PullAlways", func(t *testing.T) {
+		agent := testAgent("my-agent", "default")
+		agent.Spec.Image = "mattermost/test-agent"
+		dep := GenerateAgentDeployment(agent)
+		assert.Equal(t, corev1.PullAlways, dep.Spec.Template.Spec.Containers[0].ImagePullPolicy)
+	})
 
-	envVars := mergeEnvVars(baseEnv, agent.Spec.Env)
-
-	return &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{ /* unchanged */ },
-		Spec: appsv1.DeploymentSpec{
-			Replicas: &replicas,
-			Selector: &metav1.LabelSelector{ /* unchanged */ },
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{ /* unchanged */ },
-				Spec: corev1.PodSpec{
-					ServiceAccountName: agent.Name,
-					// NO InitContainers
-					Containers: []corev1.Container{
-						{
-							Name:      mmv1beta.AgentContainerName,
-							Image:     agent.Spec.Image,
-							Env:       envVars,  // NO HOME=/tmp appended
-							Ports:     []corev1.ContainerPort{{ContainerPort: mmv1beta.AgentHTTPPort, Name: "http"}},
-							Resources: agent.Spec.Resources,
-							VolumeMounts: []corev1.VolumeMount{
-								{Name: "bot-token", MountPath: "/secrets/mmctl-token", ReadOnly: true},
-								// NO mmctl-config mount
-							},
-						},
-					},
-					Volumes: []corev1.Volume{
-						{Name: "bot-token", VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: agent.BotTokenSecretName()}}},
-						// NO mmctl-config EmptyDir
-					},
-				},
-			},
-		},
-	}
+	t.Run("versioned tag gets PullIfNotPresent", func(t *testing.T) {
+		agent := testAgent("my-agent", "default")
+		agent.Spec.Image = "mattermost/test-agent:v1.0.0"
+		dep := GenerateAgentDeployment(agent)
+		assert.Equal(t, corev1.PullIfNotPresent, dep.Spec.Template.Spec.Containers[0].ImagePullPolicy)
+	})
 }
 ```
 
 ---
 
-## File Change Summary
-
-| File | Task | Action | Summary |
-|------|------|--------|---------|
-| `pkg/mattermost/agent.go` | 1.1, 1.2, 1.3 | Modify | Remove InitContainers block, mmctl-config Volume/VolumeMount, HOME=/tmp append |
-| `pkg/mattermost/agent_test.go` | 1.4a | Modify | Assert 0 init containers, 1 volume, 1 volume mount, no HOME env |
-| `controllers/mattermost/agent/agent_test.go` | 1.4b | Modify | Assert 1 volume (not 2), 0 init containers (not 1), no HOME env |
-
----
-
-## Build & Verify
+## Verification
 
 ```bash
-# Run affected unit tests
-go test ./pkg/mattermost/... -v -count=1 -run TestGenerateAgentDeployment
-go test ./controllers/mattermost/agent/... -v -count=1 -run TestCheckAgentDeployment
+cd ~/workspace/worktrees/mattermost-operator-the-trail
 
-# Run full test suite
-go test ./... -count=1
+# Run targeted tests
+go test ./pkg/mattermost/... -v -run "TestImageTagNeedsAlwaysPull|TestGenerateAgentDeployment"
 
-# Verify build
-go build ./...
+# Run full package tests to catch regressions
+go test ./pkg/mattermost/... -count=1
 ```
+
+**Expected results:**
+- `TestImageTagNeedsAlwaysPull` — 7 subtests pass
+- `TestGenerateAgentDeployment` — passes with new `ImagePullPolicy` assertion
+- `TestGenerateAgentDeployment_ImagePullPolicy` — 4 subtests pass
+- All existing tests unchanged and passing
 
 ---
 
 ## Edge Cases & Gotchas
 
-1. **bot-token mount kept intentionally.** The `MM_BOT_TOKEN` env var uses SecretKeyRef (reads from secret directly, not from mounted file). However, the volume mount at `/secrets/mmctl-token` is preserved because some agent images may read the token file directly. Removing it is a separate decision.
+1. **`registry:5000/path/img:dev`** — `strings.LastIndex(image, ":")` correctly finds the `:dev` tag (not the `:5000` port separator), because LastIndex returns the rightmost `:`.
 
-2. **No CRD changes.** This phase only touches Go code and tests — no `make generate manifests` needed.
+2. **No CRD changes needed.** This is auto-detection logic only — no new fields on AgentSpec.
 
-3. **TestGenerateAgentDeployment_CustomEnvVars** (line 174 in `agent_test.go`) does NOT assert on volumes, init containers, or HOME, so it **passes without changes**.
+3. **Existing tests that don't need changes:**
+   - `TestGenerateAgentDeployment_CustomEnvVars` (line 152) — doesn't assert ImagePullPolicy
+   - `TestGenerateAgentDeployment_WithStorage` (line 175) — doesn't assert ImagePullPolicy
+   - `TestGenerateAgentDeployment_WithoutStorage` (line 201) — doesn't assert ImagePullPolicy
 
-4. **TestCheckAgentDeployment_WithLLMGateway** (line 196 in `agent_test.go`) does NOT assert on volumes or init containers — it only checks env vars. **Passes without changes**.
+4. **`litellm.go` has no tests for `GenerateLiteLLMDeployment`.** Adding LiteLLM deployment tests is out of scope for this bug fix. The `TestGenerateAgentDeployment_ImagePullPolicy` tests validate the helper logic; LiteLLM just calls the same helper.
 
-5. **TestReconcileAgent_FullReconcile** (line 78 in `controller_test.go`) does not assert on init containers or volume count. **Passes without changes**.
+---
+
+## Commit
+
+After all tests pass, create a single local commit. Do **not** push.
+
+```
+fix(agent): auto-detect imagePullPolicy for agent and LiteLLM deployments
+
+Set imagePullPolicy to Always for :dev, :latest, and untagged images.
+Versioned tags default to IfNotPresent. Fixes stale image pulls on k3d
+nodes during development.
+```
 
 ---
 
 ## Definition of Done
 
-- [ ] `GenerateAgentDeployment` produces a Deployment with zero init containers
-- [ ] Only `bot-token` volume remains; `mmctl-config` EmptyDir is gone
-- [ ] Only `bot-token` volume mount on main container; `mmctl-config` mount is gone
-- [ ] No `HOME=/tmp` env var in the main container
-- [ ] All existing tests pass with updated assertions
-- [ ] `go build ./...` succeeds
+- [x] `imageTagNeedsAlwaysPull` returns correct policy for dev/latest/versioned/no-tag images
+- [x] Agent Deployment container has `ImagePullPolicy: Always` for `:dev`/`:latest`/no-tag
+- [x] Agent Deployment container has `ImagePullPolicy: IfNotPresent` for versioned tags
+- [x] LiteLLM Deployment container has correct `ImagePullPolicy` based on its image tag
+- [x] All new and existing tests pass: `go test ./pkg/mattermost/...`
+
+---
+
+## Implementation Summary
+
+**Implemented on:** 2026-04-08
+
+### Changes Made
+
+1. **`pkg/mattermost/agent.go`** — Added `imageTagNeedsAlwaysPull(image string) bool` helper between `mmServerURL` and `GenerateAgentDeployment`. Computes `pullPolicy` before the Deployment return statement and sets `ImagePullPolicy: pullPolicy` on the agent container.
+
+2. **`pkg/mattermost/litellm.go`** — Computes `liteLLMPullPolicy` before the Deployment return statement using the same `imageTagNeedsAlwaysPull` helper (same package). Sets `ImagePullPolicy: liteLLMPullPolicy` on the LiteLLM container.
+
+3. **`pkg/mattermost/agent_test.go`** — Added `ImagePullPolicy` assertion to existing `TestGenerateAgentDeployment`. Added `TestImageTagNeedsAlwaysPull` (7 table-driven subtests) and `TestGenerateAgentDeployment_ImagePullPolicy` (4 subtests covering dev/latest/no-tag/versioned).
+
+### Test Results
+
+All tests pass: `go test ./pkg/mattermost/... -count=1` — 0 failures, no regressions.

@@ -103,6 +103,9 @@ func TestGenerateAgentDeployment(t *testing.T) {
 	assert.Equal(t, "mattermost/test-agent:latest", c.Image)
 	assert.Equal(t, agent.Spec.Resources, c.Resources)
 
+	// ImagePullPolicy — testAgent uses :latest, should be PullAlways
+	assert.Equal(t, corev1.PullAlways, c.ImagePullPolicy, "latest tag should get PullAlways")
+
 	// Ports
 	assert.Len(t, c.Ports, 1)
 	assert.Equal(t, int32(8080), c.Ports[0].ContainerPort)
@@ -391,6 +394,56 @@ func TestGenerateAgentNetworkPolicy_AllowWithLiteLLM(t *testing.T) {
 	assert.Len(t, np.Spec.Ingress[0].From, 2, "ingress should allow both MM and LiteLLM pods")
 	assert.Equal(t, "mm-prod", np.Spec.Ingress[0].From[0].PodSelector.MatchLabels[mmv1beta.ClusterLabel])
 	assert.Equal(t, "litellm", np.Spec.Ingress[0].From[1].PodSelector.MatchLabels["app"])
+}
+
+func TestImageTagNeedsAlwaysPull(t *testing.T) {
+	tests := []struct {
+		image    string
+		expected bool
+	}{
+		{"myimage:dev", true},
+		{"myimage:latest", true},
+		{"myimage", true},                       // no tag → treat as :latest
+		{"registry:5000/path/img:dev", true},     // registry with port + :dev tag
+		{"myimage:v1.2.3", false},
+		{"myimage:stable", false},
+		{"ghcr.io/org/litellm:v1.82.0-stable", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.image, func(t *testing.T) {
+			assert.Equal(t, tt.expected, imageTagNeedsAlwaysPull(tt.image))
+		})
+	}
+}
+
+func TestGenerateAgentDeployment_ImagePullPolicy(t *testing.T) {
+	t.Run("dev tag gets PullAlways", func(t *testing.T) {
+		agent := testAgent("my-agent", "default")
+		agent.Spec.Image = "mattermost/test-agent:dev"
+		dep := GenerateAgentDeployment(agent)
+		assert.Equal(t, corev1.PullAlways, dep.Spec.Template.Spec.Containers[0].ImagePullPolicy)
+	})
+
+	t.Run("latest tag gets PullAlways", func(t *testing.T) {
+		agent := testAgent("my-agent", "default")
+		// testAgent already uses :latest
+		dep := GenerateAgentDeployment(agent)
+		assert.Equal(t, corev1.PullAlways, dep.Spec.Template.Spec.Containers[0].ImagePullPolicy)
+	})
+
+	t.Run("no tag gets PullAlways", func(t *testing.T) {
+		agent := testAgent("my-agent", "default")
+		agent.Spec.Image = "mattermost/test-agent"
+		dep := GenerateAgentDeployment(agent)
+		assert.Equal(t, corev1.PullAlways, dep.Spec.Template.Spec.Containers[0].ImagePullPolicy)
+	})
+
+	t.Run("versioned tag gets PullIfNotPresent", func(t *testing.T) {
+		agent := testAgent("my-agent", "default")
+		agent.Spec.Image = "mattermost/test-agent:v1.0.0"
+		dep := GenerateAgentDeployment(agent)
+		assert.Equal(t, corev1.PullIfNotPresent, dep.Spec.Template.Spec.Containers[0].ImagePullPolicy)
+	})
 }
 
 func TestGenerateAgentBotTokenSecret(t *testing.T) {
