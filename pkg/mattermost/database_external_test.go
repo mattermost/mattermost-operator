@@ -388,3 +388,16 @@ func TestExternalDBConfig_ConnectionStringKey(t *testing.T) {
 	})
 }
 
+func TestValidateDBCheckURL_PostgreSQLScheme(t *testing.T) {
+	t.Run("postgresql:// scheme is accepted for postgres db type", func(t *testing.T) {
+		assert.NoError(t,
+			validateDBCheckURL("postgresql://user:pass@my-db:5432/mydb", database.PostgreSQLDatabase),
+			"postgresql:// scheme should be treated equivalently to postgres://")
+	})
+
+	t.Run("postgresql:// scheme is accepted for unknown db type", func(t *testing.T) {
+		assert.NoError(t,
+			validateDBCheckURL("postgresql://user:pass@my-db:5432/mydb", "unknown"))
+	})
+}
+

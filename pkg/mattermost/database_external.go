@@ -152,11 +152,12 @@ func getDBCheckInitContainer(secretName, dbType string) *corev1.Container {
 }
 
 // allowedDBCheckSchemesByType defines URL schemes permitted per database type.
-// MySQL uses curl for readiness checks (http/https only); PostgreSQL uses pg_isready (postgres URI).
+// MySQL uses curl for readiness checks (http/https only); PostgreSQL uses pg_isready
+// (which accepts both "postgres://" and the officially-named "postgresql://" URI).
 var allowedDBCheckSchemesByType = map[string]map[string]bool{
 	database.MySQLDatabase:      {"http": true, "https": true},
-	database.PostgreSQLDatabase: {"http": true, "https": true, "postgres": true},
-	"unknown":                   {"http": true, "https": true, "mysql": true, "postgres": true},
+	database.PostgreSQLDatabase: {"http": true, "https": true, "postgres": true, "postgresql": true},
+	"unknown":                   {"http": true, "https": true, "mysql": true, "postgres": true, "postgresql": true},
 }
 
 func isAllowedDBCheckScheme(dbType, scheme string) bool {
