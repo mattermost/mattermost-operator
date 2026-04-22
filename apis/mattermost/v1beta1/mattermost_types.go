@@ -335,6 +335,12 @@ type Database struct {
 	// +optional
 	OperatorManaged *OperatorManagedDatabase `json:"operatorManaged,omitempty"`
 
+	// Unmanaged disables all operator database configuration. The user is
+	// responsible for supplying MM_SQLSETTINGS_* via spec.mattermostEnv.
+	// When true, External and OperatorManaged are ignored.
+	// +optional
+	Unmanaged bool `json:"unmanaged,omitempty"`
+
 	// DisableReadinessCheck instructs Operator to not add init container responsible for checking DB access.
 	// Can be used to define custom init containers specified in `spec.PodExtensions.InitContainers`.
 	// +optional
@@ -345,12 +351,24 @@ type Database struct {
 type ExternalDatabase struct {
 	// Secret contains data necessary to connect to the external database.
 	// The Kubernetes Secret should contain:
-	//   - Key: DB_CONNECTION_STRING | Value: Full database connection string.
+	//   - Key: DB_CONNECTION_STRING (or the key configured via connectionStringKey) | Value: Full database connection string.
 	// It can also contain optional fields, such as:
 	//   - Key: MM_SQLSETTINGS_DATASOURCEREPLICAS | Value: Connection string to read replicas of the database.
 	//   - Key: DB_CONNECTION_CHECK_URL | Value: The URL used for checking that the database is accessible.
 	//     Omitting this value in the secret will cause Operator to skip adding init container for database check.
 	Secret string `json:"secret,omitempty"`
+
+	// ConnectionStringKey overrides the Secret key used to resolve the database
+	// connection string. Defaults to "DB_CONNECTION_STRING". Useful when the
+	// referenced Secret is produced by another operator (e.g. cloudnative-pg
+	// exposes the URI under the "uri" key). When set, the Operator will also
+	// fall back to this key for MM_SQLSETTINGS_DATASOURCE when no
+	// MM_SQLSETTINGS_DATASOURCE entry is present in the Secret.
+	// +optional
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	// +kubebuilder:validation:Pattern=^[-._a-zA-Z0-9]+$
+	ConnectionStringKey string `json:"connectionStringKey,omitempty"`
 }
 
 // OperatorManagedDatabase defines the configuration of a database managed by Kubernetes Operator.

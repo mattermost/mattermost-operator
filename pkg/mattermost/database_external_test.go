@@ -301,3 +301,90 @@ func findEnvVar(envs []corev1.EnvVar, name string) *corev1.EnvVar {
 	}
 	return nil
 }
+
+func TestExternalDBConfig_ConnectionStringKey(t *testing.T) {
+	t.Run("custom key is honored for both MM_CONFIG and MM_SQLSETTINGS_DATASOURCE fallback", func(t *testing.T) {
+		mattermost := &mmv1beta.Mattermost{
+			ObjectMeta: metav1.ObjectMeta{Name: "mm-test"},
+			Spec: mmv1beta.MattermostSpec{
+				Database: mmv1beta.Database{
+					External: &mmv1beta.ExternalDatabase{
+						Secret:              "cnpg-secret",
+						ConnectionStringKey: "uri",
+					},
+				},
+			},
+		}
+		secret := corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: "cnpg-secret"},
+			Data: map[string][]byte{
+				"uri": []byte("postgresql://app:pass@host:5432/app"),
+			},
+		}
+
+		config, err := NewExternalDBConfig(mattermost, secret)
+		require.NoError(t, err)
+		assert.Equal(t, "postgres", config.dbType, "postgresql:// prefix should resolve to postgres type")
+		assert.Equal(t, "uri", config.connectionStringKey)
+
+		envs := config.EnvVars(mattermost)
+		mmConfig := findEnvVar(envs, "MM_CONFIG")
+		require.NotNil(t, mmConfig)
+		assert.Equal(t, "uri", mmConfig.ValueFrom.SecretKeyRef.Key)
+
+		datasource := findEnvVar(envs, "MM_SQLSETTINGS_DATASOURCE")
+		require.NotNil(t, datasource)
+		assert.Equal(t, "uri", datasource.ValueFrom.SecretKeyRef.Key,
+			"when no separate MM_SQLSETTINGS_DATASOURCE is in secret, should fall back to the custom connection string key")
+	})
+
+	t.Run("error message references the configured key", func(t *testing.T) {
+		mattermost := &mmv1beta.Mattermost{
+			ObjectMeta: metav1.ObjectMeta{Name: "mm-test"},
+			Spec: mmv1beta.MattermostSpec{
+				Database: mmv1beta.Database{
+					External: &mmv1beta.ExternalDatabase{
+						Secret:              "secret",
+						ConnectionStringKey: "uri",
+					},
+				},
+			},
+		}
+		secret := corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: "secret"},
+			Data: map[string][]byte{
+				"DB_CONNECTION_STRING": []byte("postgres://my-postgres"),
+			},
+		}
+		_, err := NewExternalDBConfig(mattermost, secret)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), `"uri"`)
+	})
+
+	t.Run("default behavior unchanged when key not set", func(t *testing.T) {
+		mattermost := &mmv1beta.Mattermost{
+			ObjectMeta: metav1.ObjectMeta{Name: "mm-test"},
+			Spec: mmv1beta.MattermostSpec{
+				Database: mmv1beta.Database{
+					External: &mmv1beta.ExternalDatabase{Secret: "secret"},
+				},
+			},
+		}
+		secret := corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: "secret"},
+			Data: map[string][]byte{
+				"DB_CONNECTION_STRING": []byte("postgres://my-postgres"),
+			},
+		}
+
+		config, err := NewExternalDBConfig(mattermost, secret)
+		require.NoError(t, err)
+		assert.Equal(t, DefaultExternalDBConnectionStringKey, config.connectionStringKey)
+
+		envs := config.EnvVars(mattermost)
+		mmConfig := findEnvVar(envs, "MM_CONFIG")
+		require.NotNil(t, mmConfig)
+		assert.Equal(t, "DB_CONNECTION_STRING", mmConfig.ValueFrom.SecretKeyRef.Key)
+	})
+}
+
