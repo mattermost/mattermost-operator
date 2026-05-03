@@ -1,7 +1,6 @@
 module github.com/mattermost/mattermost-operator
 
-go 1.24.13
-
+go 1.25.9
 
 require (
 	github.com/banzaicloud/k8s-objectmatcher v1.8.0
