@@ -339,6 +339,60 @@ type Database struct {
 	// Can be used to define custom init containers specified in `spec.PodExtensions.InitContainers`.
 	// +optional
 	DisableReadinessCheck bool `json:"disableReadinessCheck,omitempty"`
+
+	// ReadinessCheck configures *how* the readiness init container is built.
+	// When nil (default), the Operator uses the legacy "external" mode
+	// (postgres:13 / appropriate/curl images). Ignored when
+	// DisableReadinessCheck is true. Currently only consulted for the
+	// external-database path; operator-managed databases always use the
+	// legacy probe.
+	// +optional
+	ReadinessCheck *DatabaseReadinessCheck `json:"readinessCheck,omitempty"`
+}
+
+// DatabaseReadinessCheckMode constants select which readiness check the
+// Operator injects as an init container in front of the Mattermost pod.
+const (
+	// DatabaseReadinessCheckModeExternal uses the legacy stand-alone
+	// images (postgres:13 / appropriate/curl) to probe the database.
+	// This is the default for backward compatibility.
+	//
+	// Deprecated: this mode requires pulling third-party images
+	// (postgres:13 / appropriate/curl) which is often impossible in
+	// air-gapped environments and is past upstream EOL for Postgres 13.
+	// Prefer DatabaseReadinessCheckModeBuiltin when running a Mattermost
+	// version that ships `mattermost db ping`. The default will flip in
+	// a future major release of the Operator.
+	DatabaseReadinessCheckModeExternal = "external"
+
+	// DatabaseReadinessCheckModeBuiltin reuses the main Mattermost image
+	// and runs `mattermost db ping`, removing the dependency on external
+	// probe images. Requires a Mattermost release that ships the
+	// `mattermost db ping` subcommand.
+	DatabaseReadinessCheckModeBuiltin = "builtin"
+)
+
+// DatabaseReadinessCheck configures the database readiness init container
+// the Operator injects before the Mattermost main container starts.
+type DatabaseReadinessCheck struct {
+	// Mode selects the readiness check implementation.
+	//   "external" (default): use postgres:13 / appropriate/curl images
+	//                         and probe via pg_isready / curl. Current
+	//                         behavior; will be deprecated in a future
+	//                         release.
+	//   "builtin":  reuse the main Mattermost image and run
+	//               `mattermost db ping --timeout=<Timeout>`. Requires
+	//               a Mattermost version that ships `mattermost db ping`.
+	// +kubebuilder:validation:Enum=external;builtin
+	// +optional
+	Mode string `json:"mode,omitempty"`
+
+	// Timeout for the readiness check. When Mode=builtin this value is
+	// passed to `mattermost db ping --timeout`. Ignored when Mode=external
+	// (the legacy `until pg_isready ...; sleep 5; done` loop has no
+	// timeout). Defaults to 5m.
+	// +optional
+	Timeout *metav1.Duration `json:"timeout,omitempty"`
 }
 
 // ExternalDatabase defines the configuration of the external database that should be used by Mattermost.

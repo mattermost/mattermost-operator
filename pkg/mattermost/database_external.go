@@ -5,11 +5,16 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"time"
 
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	"github.com/mattermost/mattermost-operator/pkg/database"
 	corev1 "k8s.io/api/core/v1"
 )
+
+// defaultBuiltinReadinessTimeout is the default for
+// `mattermost db ping --timeout` when the user does not supply one.
+const defaultBuiltinReadinessTimeout = 5 * time.Minute
 
 type ExternalDBConfig struct {
 	secretName               string
@@ -91,20 +96,56 @@ func (e *ExternalDBConfig) InitContainers(mattermost *mmv1beta.Mattermost) []cor
 		return nil
 	}
 
-	var initContainers []corev1.Container
-	if e.hasDBCheckURL {
-		container := getDBCheckInitContainer(e.secretName, e.dbType)
-		if container != nil {
-			initContainers = append(initContainers, *container)
+	mode := mmv1beta.DatabaseReadinessCheckModeExternal
+	if rc := mattermost.Spec.Database.ReadinessCheck; rc != nil && rc.Mode != "" {
+		mode = rc.Mode
+	}
+
+	// External mode requires the optional DB_CONNECTION_CHECK_URL secret key.
+	// Builtin mode uses MM_CONFIG/MM_SQLSETTINGS_DATASOURCE and does not
+	// require that key.
+	if mode == mmv1beta.DatabaseReadinessCheckModeExternal && !e.hasDBCheckURL {
+		return nil
+	}
+
+	container := getDBCheckInitContainer(mattermost, e.secretName, e.dbType, e.hasSeparateDatasourceKey)
+	if container == nil {
+		return nil
+	}
+	return []corev1.Container{*container}
+}
+
+// getDBCheckInitContainer prepares the init container that checks database
+// readiness. It dispatches between the legacy external-image mode and the
+// builtin mode that reuses the Mattermost image to run `mattermost db ping`.
+// Returns nil if no init container can be produced (for example, an unknown
+// database type when running in external mode).
+func getDBCheckInitContainer(
+	mattermost *mmv1beta.Mattermost,
+	secretName, dbType string,
+	hasSeparateDatasourceKey bool,
+) *corev1.Container {
+	mode := mmv1beta.DatabaseReadinessCheckModeExternal
+	timeout := defaultBuiltinReadinessTimeout
+	if rc := mattermost.Spec.Database.ReadinessCheck; rc != nil {
+		if rc.Mode != "" {
+			mode = rc.Mode
+		}
+		if rc.Timeout != nil {
+			timeout = rc.Timeout.Duration
 		}
 	}
 
-	return initContainers
+	if mode == mmv1beta.DatabaseReadinessCheckModeBuiltin {
+		return builtinDBCheckInitContainer(mattermost, secretName, hasSeparateDatasourceKey, timeout)
+	}
+	return externalDBCheckInitContainer(secretName, dbType)
 }
 
-// getDBCheckInitContainer prepares init container that checks database readiness based on db type.
-// Returns nil if database type is unknown.
-func getDBCheckInitContainer(secretName, dbType string) *corev1.Container {
+// externalDBCheckInitContainer returns the legacy postgres:13 / curl-based
+// init container. Behavior must remain byte-for-byte identical to the
+// pre-readinessCheck implementation.
+func externalDBCheckInitContainer(secretName, dbType string) *corev1.Container {
 	envVars := []corev1.EnvVar{
 		{
 			Name:      "DB_CONNECTION_CHECK_URL",
@@ -138,6 +179,45 @@ func getDBCheckInitContainer(secretName, dbType string) *corev1.Container {
 	}
 
 	return nil
+}
+
+// builtinDBCheckInitContainer returns an init container built from the same
+// Mattermost image as the main container. It runs `mattermost db ping` with
+// the configured timeout, removing the runtime dependency on postgres:13 /
+// appropriate/curl.
+func builtinDBCheckInitContainer(
+	mattermost *mmv1beta.Mattermost,
+	secretName string,
+	hasSeparateDatasourceKey bool,
+	timeout time.Duration,
+) *corev1.Container {
+	datasourceKey := "DB_CONNECTION_STRING"
+	if hasSeparateDatasourceKey {
+		datasourceKey = "MM_SQLSETTINGS_DATASOURCE"
+	}
+
+	envVars := []corev1.EnvVar{
+		{
+			Name:      "MM_CONFIG",
+			ValueFrom: EnvSourceFromSecret(secretName, "DB_CONNECTION_STRING"),
+		},
+		{
+			Name:      "MM_SQLSETTINGS_DATASOURCE",
+			ValueFrom: EnvSourceFromSecret(secretName, datasourceKey),
+		},
+	}
+
+	return &corev1.Container{
+		Name:            "init-check-database",
+		Image:           mattermost.GetImageName(),
+		ImagePullPolicy: mattermost.Spec.ImagePullPolicy,
+		Env:             envVars,
+		Command:         []string{"/mattermost/bin/mattermost"},
+		Args: []string{
+			"db", "ping",
+			fmt.Sprintf("--timeout=%s", timeout),
+		},
+	}
 }
 
 // allowedDBCheckSchemesByType defines URL schemes permitted per database type.

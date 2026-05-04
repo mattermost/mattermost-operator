@@ -221,6 +221,37 @@ spec:
                           to use
                         type: string
                     type: object
+                  readinessCheck:
+                    description: |-
+                      ReadinessCheck configures *how* the readiness init container is built.
+                      When nil (default), the Operator uses the legacy "external" mode
+                      (postgres:13 / appropriate/curl images). Ignored when
+                      DisableReadinessCheck is true. Currently only consulted for the
+                      external-database path; operator-managed databases always use the
+                      legacy probe.
+                    properties:
+                      mode:
+                        description: |-
+                          Mode selects the readiness check implementation.
+                            "external" (default): use postgres:13 / appropriate/curl images
+                                                  and probe via pg_isready / curl. Current
+                                                  behavior; will be deprecated in a future
+                                                  release.
+                            "builtin":  reuse the main Mattermost image and run
+                                        `mattermost db ping --timeout=<Timeout>`. Requires
+                                        a Mattermost version that ships `mattermost db ping`.
+                        enum:
+                        - external
+                        - builtin
+                        type: string
+                      timeout:
+                        description: |-
+                          Timeout for the readiness check. When Mode=builtin this value is
+                          passed to `mattermost db ping --timeout`. Ignored when Mode=external
+                          (the legacy `until pg_isready ...; sleep 5; done` loop has no
+                          timeout). Defaults to 5m.
+                        type: string
+                    type: object
                 type: object
               deploymentTemplate:
                 description: DeploymentTemplate defines configuration for the template
