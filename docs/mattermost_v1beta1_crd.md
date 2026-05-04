@@ -69,7 +69,7 @@ _Appears in:_
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
 | `mode` _string_ | Mode selects the readiness check implementation.<br />  "external" (default): use postgres:13 / appropriate/curl images<br />                        and probe via pg_isready / curl. Current<br />                        behavior; will be deprecated in a future<br />                        release.<br />  "builtin":  reuse the main Mattermost image and run<br />              `mattermost db ping --timeout=<Timeout>`. Requires<br />              a Mattermost version that ships `mattermost db ping`. |  | Enum: [external builtin] <br />Optional: \{\} <br /> |
-| `timeout` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#duration-v1-meta)_ | Timeout for the readiness check. When Mode=builtin this value is<br />passed to `mattermost db ping --timeout`. Ignored when Mode=external<br />(the legacy `until pg_isready ...; sleep 5; done` loop has no<br />timeout). Defaults to 5m. |  | Optional: \{\} <br /> |
+| `timeout` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#duration-v1-meta)_ | Timeout for the readiness check. When Mode=builtin this value is<br />passed to `mattermost db ping --timeout`. Ignored when Mode=external<br />(the legacy `until pg_isready ...; sleep 5; done` loop has no<br />timeout). Defaults to 5m. |  | Pattern: `^([0-9]+(\.[0-9]+)?(ns\|us\|µs\|ms\|s\|m\|h))+$` <br />Type: string <br />Optional: \{\} <br /> |
 
 
 #### DeploymentTemplate
@@ -229,7 +229,7 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `dedicatedJobServer` _boolean_ | Determines whether to create a dedicated Mattermost server deployment<br />which is configured to run scheduled jobs. This deployment will recieve<br />no user traffic and the primary Mattermost deployment will no longer be<br />configured to run jobs. |  | Optional: \{\} <br /> |
+| `dedicatedJobServer` _boolean_ | Determines whether to create a dedicated Mattermost server deployment<br />which is configured to run scheduled jobs. This deployment will receive<br />no user traffic and the primary Mattermost deployment will no longer be<br />configured to run jobs. |  | Optional: \{\} <br /> |
 
 
 #### LocalFileStore

@@ -300,7 +300,7 @@ type UpdateJob struct {
 // JobServer defines configuration for the Mattermost job server.
 type JobServer struct {
 	// Determines whether to create a dedicated Mattermost server deployment
-	// which is configured to run scheduled jobs. This deployment will recieve
+	// which is configured to run scheduled jobs. This deployment will receive
 	// no user traffic and the primary Mattermost deployment will no longer be
 	// configured to run jobs.
 	// +optional
@@ -391,6 +391,8 @@ type DatabaseReadinessCheck struct {
 	// passed to `mattermost db ping --timeout`. Ignored when Mode=external
 	// (the legacy `until pg_isready ...; sleep 5; done` loop has no
 	// timeout). Defaults to 5m.
+	// +kubebuilder:validation:Type=string
+	// +kubebuilder:validation:Pattern=`^([0-9]+(\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$`
 	// +optional
 	Timeout *metav1.Duration `json:"timeout,omitempty"`
 }
