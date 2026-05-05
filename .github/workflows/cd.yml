@@ -35,6 +35,22 @@ jobs:
         env:
           OPERATOR_IMAGE_TAG: ${{ github.ref_name }}
 
+      # Mirror the operator image to the Gamewarden Harbor registry on every
+      # tag push.
+      - name: cd/gamewarden-login
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        with:
+          registry: registry.gamewarden.io
+          username: ${{ secrets.GAMEWARDEN_REGISTRY_USERNAME }}
+          password: ${{ secrets.GAMEWARDEN_REGISTRY_PASSWORD }}
+
+      - name: cd/push-operator-to-gamewarden
+        run: |
+          echo "Copying mattermost-operator:${{ github.ref_name }} to registry.gamewarden.io ..."
+          docker buildx imagetools create \
+            --tag registry.gamewarden.io/mattermost/mattermost-operator:${{ github.ref_name }} \
+            mattermost/mattermost-operator:${{ github.ref_name }}
+
   build-fips:
     continue-on-error: true
     permissions:
