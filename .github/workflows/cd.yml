@@ -46,10 +46,13 @@ jobs:
 
       - name: cd/push-operator-to-gamewarden
         run: |
-          echo "Copying mattermost-operator:${{ github.ref_name }} to registry.gamewarden.io ..."
-          docker buildx imagetools create \
-            --tag registry.gamewarden.io/mattermost/mattermost-operator:${{ github.ref_name }} \
-            mattermost/mattermost-operator:${{ github.ref_name }}
+          SRC="mattermost/mattermost-operator:${{ github.ref_name }}"
+          DST="registry.gamewarden.io/mattermost/mattermost-operator:${{ github.ref_name }}"
+
+          echo "Mirroring ${SRC} (linux/amd64) to ${DST} ..."
+          docker pull --platform linux/amd64 "${SRC}"
+          docker tag "${SRC}" "${DST}"
+          docker push "${DST}"
 
   build-fips:
     continue-on-error: true
