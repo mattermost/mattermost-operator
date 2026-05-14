@@ -39,6 +39,14 @@ func testAgent(name, ns string) *mmv1beta.Agent {
 	}
 }
 
+func envVarsByName(env []corev1.EnvVar) map[string]*corev1.EnvVar {
+	envMap := make(map[string]*corev1.EnvVar)
+	for i := range env {
+		envMap[env[i].Name] = &env[i]
+	}
+	return envMap
+}
+
 func TestAgentOwnerReference(t *testing.T) {
 	agent := testAgent("my-agent", "default")
 	refs := AgentOwnerReference(agent)
@@ -86,16 +94,12 @@ func TestGenerateAgentDeployment(t *testing.T) {
 	assert.Equal(t, "test-ns", dep.Namespace)
 	assert.Len(t, dep.OwnerReferences, 1)
 
-	// Replicas
 	assert.Equal(t, int32(1), *dep.Spec.Replicas)
 
-	// Selector
 	assert.Equal(t, mmv1beta.AgentSelectorLabels("my-agent"), dep.Spec.Selector.MatchLabels)
 
-	// Service account
 	assert.Equal(t, "my-agent", dep.Spec.Template.Spec.ServiceAccountName)
 
-	// Main container
 	containers := dep.Spec.Template.Spec.Containers
 	assert.Len(t, containers, 1)
 	c := containers[0]
@@ -103,49 +107,35 @@ func TestGenerateAgentDeployment(t *testing.T) {
 	assert.Equal(t, "mattermost/test-agent:latest", c.Image)
 	assert.Equal(t, agent.Spec.Resources, c.Resources)
 
-	// ImagePullPolicy — testAgent uses :latest, should be PullAlways
 	assert.Equal(t, corev1.PullAlways, c.ImagePullPolicy, "latest tag should get PullAlways")
 
-	// Ports
 	assert.Len(t, c.Ports, 1)
 	assert.Equal(t, int32(8080), c.Ports[0].ContainerPort)
 
-	// Env vars
-	envMap := make(map[string]string)
-	for _, e := range c.Env {
-		envMap[e.Name] = e.Value
-	}
-	assert.Equal(t, "http://mm-prod.test-ns.svc.cluster.local:8065", envMap["MM_SERVER_URL"])
-	assert.Equal(t, "MessageHasBeenPosted,UserHasJoinedChannel", envMap["AGENT_HOOKS"])
+	envMap := envVarsByName(c.Env)
+	require.Contains(t, envMap, "MM_SERVER_URL")
+	require.Contains(t, envMap, "AGENT_HOOKS")
+	assert.Equal(t, "http://mm-prod.test-ns.svc.cluster.local:8065", envMap["MM_SERVER_URL"].Value)
+	assert.Equal(t, "MessageHasBeenPosted,UserHasJoinedChannel", envMap["AGENT_HOOKS"].Value)
 
-	// HOOK_SECRET from secret
-	var hookSecretEnv *corev1.EnvVar
-	for i, e := range c.Env {
-		if e.Name == "HOOK_SECRET" {
-			hookSecretEnv = &c.Env[i]
-		}
-	}
+	hookSecretEnv := envMap["HOOK_SECRET"]
 	require.NotNil(t, hookSecretEnv, "HOOK_SECRET env var must be present")
 	require.NotNil(t, hookSecretEnv.ValueFrom)
 	require.NotNil(t, hookSecretEnv.ValueFrom.SecretKeyRef)
 	assert.Equal(t, agent.HookSecretName(), hookSecretEnv.ValueFrom.SecretKeyRef.Name)
 	assert.Equal(t, "hookSecret", hookSecretEnv.ValueFrom.SecretKeyRef.Key)
 
-	// Volume mounts on main container — only bot-token remains
 	assert.Len(t, c.VolumeMounts, 1)
 	assert.Equal(t, "bot-token", c.VolumeMounts[0].Name)
 	assert.Equal(t, "/secrets/mmctl-token", c.VolumeMounts[0].MountPath)
 	assert.True(t, c.VolumeMounts[0].ReadOnly)
 
-	// No init containers
 	assert.Empty(t, dep.Spec.Template.Spec.InitContainers, "init containers must be removed")
 
-	// No HOME env var
 	for _, e := range c.Env {
 		assert.NotEqual(t, "HOME", e.Name, "HOME env var must not be present")
 	}
 
-	// Volumes — only bot-token remains
 	volumes := dep.Spec.Template.Spec.Volumes
 	assert.Len(t, volumes, 1)
 	assert.Equal(t, "bot-token", volumes[0].Name)
@@ -162,17 +152,12 @@ func TestGenerateAgentDeployment_CustomEnvVars(t *testing.T) {
 	dep := GenerateAgentDeployment(agent)
 	c := dep.Spec.Template.Spec.Containers[0]
 
-	envMap := make(map[string]string)
-	for _, e := range c.Env {
-		envMap[e.Name] = e.Value
-	}
+	envMap := envVarsByName(c.Env)
 
-	// Custom env var is present
-	assert.Equal(t, "custom-value", envMap["CUSTOM_VAR"])
-
-	// mergeEnvVars overwrites base with user-specified values
-	// (this is the documented behavior of mergeEnvVars — user env wins)
-	assert.Equal(t, "should-not-override", envMap["MM_SERVER_URL"])
+	require.Contains(t, envMap, "CUSTOM_VAR")
+	require.Contains(t, envMap, "MM_SERVER_URL")
+	assert.Equal(t, "custom-value", envMap["CUSTOM_VAR"].Value)
+	assert.Equal(t, "should-not-override", envMap["MM_SERVER_URL"].Value)
 }
 
 func TestGenerateAgentDeployment_WithStorage(t *testing.T) {
@@ -186,14 +171,12 @@ func TestGenerateAgentDeployment_WithStorage(t *testing.T) {
 
 	dep := GenerateAgentDeployment(agent)
 
-	// Volumes: bot-token + agent-storage
 	volumes := dep.Spec.Template.Spec.Volumes
 	assert.Len(t, volumes, 2)
 	assert.Equal(t, "bot-token", volumes[0].Name)
 	assert.Equal(t, "agent-storage", volumes[1].Name)
 	assert.Equal(t, agent.StoragePVCName(), volumes[1].PersistentVolumeClaim.ClaimName)
 
-	// Volume mounts: bot-token + agent-storage
 	mounts := dep.Spec.Template.Spec.Containers[0].VolumeMounts
 	assert.Len(t, mounts, 2)
 	assert.Equal(t, "bot-token", mounts[0].Name)
@@ -207,12 +190,10 @@ func TestGenerateAgentDeployment_WithoutStorage(t *testing.T) {
 
 	dep := GenerateAgentDeployment(agent)
 
-	// Only bot-token volume
 	volumes := dep.Spec.Template.Spec.Volumes
 	assert.Len(t, volumes, 1)
 	assert.Equal(t, "bot-token", volumes[0].Name)
 
-	// Only bot-token mount
 	mounts := dep.Spec.Template.Spec.Containers[0].VolumeMounts
 	assert.Len(t, mounts, 1)
 	assert.Equal(t, "bot-token", mounts[0].Name)
@@ -267,7 +248,6 @@ func TestGenerateAgentHookSecret(t *testing.T) {
 	assert.Equal(t, "Agent", secret.OwnerReferences[0].Kind)
 	assert.Equal(t, []byte("abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"), secret.Data["hookSecret"])
 
-	// Must NOT have other keys
 	assert.NotContains(t, secret.Data, "token")
 	assert.NotContains(t, secret.Data, "apiKey")
 }
@@ -282,11 +262,9 @@ func TestGenerateAgentNetworkPolicy_Deny(t *testing.T) {
 	assert.Equal(t, "default", np.Namespace)
 	assert.Len(t, np.OwnerReferences, 1)
 
-	// Policy types
 	assert.Contains(t, np.Spec.PolicyTypes, networkingv1.PolicyTypeIngress)
 	assert.Contains(t, np.Spec.PolicyTypes, networkingv1.PolicyTypeEgress)
 
-	// Ingress: from MM pods on port 8080
 	assert.Len(t, np.Spec.Ingress, 1)
 	ingress := np.Spec.Ingress[0]
 	assert.Len(t, ingress.From, 1)
@@ -294,17 +272,14 @@ func TestGenerateAgentNetworkPolicy_Deny(t *testing.T) {
 	assert.Len(t, ingress.Ports, 1)
 	assert.Equal(t, int32(8080), ingress.Ports[0].Port.IntVal)
 
-	// Egress: 2 rules (MM + DNS)
 	assert.Len(t, np.Spec.Egress, 2)
 
-	// First egress rule: MM pods on 8065
 	mmEgress := np.Spec.Egress[0]
 	assert.Len(t, mmEgress.To, 1)
 	assert.Equal(t, "mm-prod", mmEgress.To[0].PodSelector.MatchLabels[mmv1beta.ClusterLabel])
 	assert.Len(t, mmEgress.Ports, 1)
 	assert.Equal(t, int32(8065), mmEgress.Ports[0].Port.IntVal)
 
-	// Second egress rule: DNS (UDP + TCP 53)
 	dnsEgress := np.Spec.Egress[1]
 	assert.Len(t, dnsEgress.Ports, 2)
 }
@@ -316,30 +291,25 @@ func TestGenerateAgentNetworkPolicy_AllowList(t *testing.T) {
 
 	np := GenerateAgentNetworkPolicy(agent)
 
-	// 4 egress rules: MM server (8065) + DNS (53) + HTTPS (443) + HTTP (80)
 	assert.Len(t, np.Spec.Egress, 4)
 
-	// First egress rule: MM pods on 8065
 	mmEgress := np.Spec.Egress[0]
 	assert.Len(t, mmEgress.To, 1)
 	assert.Equal(t, "mm-prod", mmEgress.To[0].PodSelector.MatchLabels[mmv1beta.ClusterLabel])
 	assert.Len(t, mmEgress.Ports, 1)
 	assert.Equal(t, int32(8065), mmEgress.Ports[0].Port.IntVal)
 
-	// Second egress rule: DNS (UDP + TCP 53)
 	dnsEgress := np.Spec.Egress[1]
 	assert.Len(t, dnsEgress.Ports, 2)
 	assert.Equal(t, int32(53), dnsEgress.Ports[0].Port.IntVal)
 	assert.Equal(t, int32(53), dnsEgress.Ports[1].Port.IntVal)
 
-	// Third egress rule: HTTPS (port 443) to any destination
 	httpsEgress := np.Spec.Egress[2]
 	assert.Empty(t, httpsEgress.To, "no To selector means any destination")
 	assert.Len(t, httpsEgress.Ports, 1)
 	assert.Equal(t, int32(443), httpsEgress.Ports[0].Port.IntVal)
 	assert.Equal(t, corev1.ProtocolTCP, *httpsEgress.Ports[0].Protocol)
 
-	// Fourth egress rule: HTTP (port 80) to any destination
 	httpEgress := np.Spec.Egress[3]
 	assert.Empty(t, httpEgress.To, "no To selector means any destination")
 	assert.Len(t, httpEgress.Ports, 1)
@@ -357,17 +327,14 @@ func TestGenerateAgentNetworkPolicy_Allow(t *testing.T) {
 	assert.Equal(t, "default", np.Namespace)
 	assert.Len(t, np.OwnerReferences, 1)
 
-	// Policy types include both Ingress and Egress.
 	assert.Contains(t, np.Spec.PolicyTypes, networkingv1.PolicyTypeIngress)
 	assert.Contains(t, np.Spec.PolicyTypes, networkingv1.PolicyTypeEgress)
 
-	// Ingress: from MM pods on port 8080 (unchanged from deny mode).
 	assert.Len(t, np.Spec.Ingress, 1)
 	ingress := np.Spec.Ingress[0]
 	assert.Len(t, ingress.From, 1)
 	assert.Equal(t, "mm-prod", ingress.From[0].PodSelector.MatchLabels[mmv1beta.ClusterLabel])
 
-	// Egress: 1 rule — empty (allow all).
 	require.Len(t, np.Spec.Egress, 1)
 	assert.Empty(t, np.Spec.Egress[0].To, "allow-all rule has no To selector")
 	assert.Empty(t, np.Spec.Egress[0].Ports, "allow-all rule has no Ports restriction")
@@ -384,12 +351,10 @@ func TestGenerateAgentNetworkPolicy_AllowWithLiteLLM(t *testing.T) {
 
 	np := GenerateAgentNetworkPolicy(agent)
 
-	// Egress: still 1 rule — allow-all overrides LiteLLM-specific rules.
 	require.Len(t, np.Spec.Egress, 1)
 	assert.Empty(t, np.Spec.Egress[0].To, "allow-all rule has no To selector")
 	assert.Empty(t, np.Spec.Egress[0].Ports, "allow-all rule has no Ports restriction")
 
-	// Ingress: should have BOTH MM and LiteLLM peers (allow mode doesn't affect ingress).
 	require.Len(t, np.Spec.Ingress, 1)
 	assert.Len(t, np.Spec.Ingress[0].From, 2, "ingress should allow both MM and LiteLLM pods")
 	assert.Equal(t, "mm-prod", np.Spec.Ingress[0].From[0].PodSelector.MatchLabels[mmv1beta.ClusterLabel])
@@ -403,8 +368,9 @@ func TestImageTagNeedsAlwaysPull(t *testing.T) {
 	}{
 		{"myimage:dev", true},
 		{"myimage:latest", true},
-		{"myimage", true},                       // no tag → treat as :latest
-		{"registry:5000/path/img:dev", true},     // registry with port + :dev tag
+		{"myimage", true},
+		{"registry:5000/path/img", true},
+		{"registry:5000/path/img:dev", true},
 		{"myimage:v1.2.3", false},
 		{"myimage:stable", false},
 		{"ghcr.io/org/litellm:v1.82.0-stable", false},
@@ -426,7 +392,6 @@ func TestGenerateAgentDeployment_ImagePullPolicy(t *testing.T) {
 
 	t.Run("latest tag gets PullAlways", func(t *testing.T) {
 		agent := testAgent("my-agent", "default")
-		// testAgent already uses :latest
 		dep := GenerateAgentDeployment(agent)
 		assert.Equal(t, corev1.PullAlways, dep.Spec.Template.Spec.Containers[0].ImagePullPolicy)
 	})

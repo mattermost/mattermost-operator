@@ -50,8 +50,7 @@ type AgentSpec struct {
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 
 	// EgressPolicy controls outbound network access from the agent pod.
-	// Accepted values are "deny" (default, blocks all egress except Mattermost)
-	// and "allowList" (permits additional domains listed in EgressAllowList).
+	// Accepted values are "deny", "allowList", and "allow".
 	// +optional
 	EgressPolicy string `json:"egressPolicy,omitempty"`
 
@@ -151,7 +150,6 @@ type AgentList struct {
 }
 
 // LLMGatewayConfig defines how the agent connects to an LLM gateway.
-// Exactly one of External or OperatorManaged must be set.
 type LLMGatewayConfig struct {
 	// External configures the agent to use an existing LiteLLM instance.
 	// +optional
@@ -184,7 +182,6 @@ type OperatorManagedLLMGateway struct {
 	// Resources defines the CPU/memory requests and limits for the LiteLLM pod.
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
-
 }
 
 func init() {

@@ -41,7 +41,7 @@ func (r *AgentReconciler) checkHookSecret(ctx context.Context, agent *mmv1beta.A
 	existingSecret := &corev1.Secret{}
 	err := r.Client.Get(ctx, types.NamespacedName{Name: secretName, Namespace: agent.Namespace}, existingSecret)
 	if err == nil {
-		return nil // Secret already exists
+		return nil
 	}
 	if !k8sErrors.IsNotFound(err) {
 		return errors.Wrap(err, "failed to check for existing hook secret")
@@ -158,7 +158,7 @@ func (r *AgentReconciler) checkAgentPVC(ctx context.Context, agent *mmv1beta.Age
 	return r.Resources.Update(current, desired, reqLogger)
 }
 
-func (r *AgentReconciler) checkAgentHealth(ctx context.Context, agent *mmv1beta.Agent, currentStatus mmv1beta.AgentStatus, reqLogger logr.Logger) (mmv1beta.AgentStatus, error) {
+func (r *AgentReconciler) checkAgentHealth(ctx context.Context, agent *mmv1beta.Agent, reqLogger logr.Logger) (mmv1beta.AgentStatus, error) {
 	status := mmv1beta.AgentStatus{
 		State:              mmv1beta.Reconciling,
 		Phase:              mmv1beta.AgentPhaseDeploying,

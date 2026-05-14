@@ -19,8 +19,8 @@ import (
 )
 
 const (
-	healthCheckRequeueDelay   = 6 * time.Second
-	mattermostNotReadyDelay   = 15 * time.Second
+	healthCheckRequeueDelay = 6 * time.Second
+	dependencyRequeueDelay  = 15 * time.Second
 )
 
 // AgentReconciler reconciles an Agent object.
@@ -96,7 +96,7 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, request ctrl.Request) (
 	}
 	if mm.Status.State != mmv1beta.Stable {
 		reqLogger.Info("Mattermost not stable, requeuing", "mmState", mm.Status.State)
-		return reconcile.Result{RequeueAfter: mattermostNotReadyDelay}, nil
+		return reconcile.Result{RequeueAfter: dependencyRequeueDelay}, nil
 	}
 
 	// LiteLLM gateway (operator-managed).
@@ -116,7 +116,7 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, request ctrl.Request) (
 			return reconcile.Result{}, err
 		}
 		if !ready {
-			return reconcile.Result{RequeueAfter: mattermostNotReadyDelay}, nil
+			return reconcile.Result{RequeueAfter: dependencyRequeueDelay}, nil
 		}
 	}
 
@@ -125,21 +125,18 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, request ctrl.Request) (
 		status.Phase = mmv1beta.AgentPhaseDeploying
 	}
 
-	// ServiceAccount
 	err = r.checkAgentServiceAccount(ctx, agent, reqLogger)
 	if err != nil {
 		r.updateStatusReconcilingAndLogError(ctx, agent, status, reqLogger, err)
 		return reconcile.Result{}, err
 	}
 
-	// Hook Secret
 	err = r.checkHookSecret(ctx, agent, reqLogger)
 	if err != nil {
 		r.updateStatusReconcilingAndLogError(ctx, agent, status, reqLogger, err)
 		return reconcile.Result{}, err
 	}
 
-	// Service
 	err = r.checkAgentService(ctx, agent, reqLogger)
 	if err != nil {
 		r.updateStatusReconcilingAndLogError(ctx, agent, status, reqLogger, err)
@@ -153,22 +150,19 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, request ctrl.Request) (
 		return reconcile.Result{}, err
 	}
 
-	// Deployment
 	err = r.checkAgentDeployment(ctx, agent, reqLogger)
 	if err != nil {
 		r.updateStatusReconcilingAndLogError(ctx, agent, status, reqLogger, err)
 		return reconcile.Result{}, err
 	}
 
-	// NetworkPolicy
 	err = r.checkAgentNetworkPolicy(ctx, agent, reqLogger)
 	if err != nil {
 		r.updateStatusReconcilingAndLogError(ctx, agent, status, reqLogger, err)
 		return reconcile.Result{}, err
 	}
 
-	// Health check
-	status, err = r.checkAgentHealth(ctx, agent, status, reqLogger)
+	status, err = r.checkAgentHealth(ctx, agent, reqLogger)
 	if err != nil {
 		statusErr := r.updateStatus(ctx, agent, status, reqLogger)
 		if statusErr != nil {

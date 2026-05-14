@@ -21,9 +21,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-const lastAppliedConfig = "mattermost.com/last-applied"
+// LastAppliedConfig is the objectmatcher annotation key used for resource diffs.
+const LastAppliedConfig = "mattermost.com/last-applied"
 
-var defaultAnnotator = objectMatcher.NewAnnotator(lastAppliedConfig)
+var defaultAnnotator = objectMatcher.NewAnnotator(LastAppliedConfig)
 
 // Object combines the interfaces that all Kubernetes objects must implement.
 type Object interface {
@@ -285,20 +286,6 @@ func (r *ResourceHelper) DeleteService(key types.NamespacedName, reqLogger logr.
 	err = r.client.Delete(context.TODO(), foundService)
 	if err != nil {
 		return errors.Wrap(err, "failed to delete service")
-	}
-
-	return nil
-}
-
-// NOTE: This sets an OwnerReference via controllerutil. For shared (ownerless) resources like the LiteLLM ConfigMap, call r.client.Create directly instead.
-func (r *ResourceHelper) CreateConfigMapIfNotExists(owner v1.Object, cm *corev1.ConfigMap, reqLogger logr.Logger) error {
-	foundCM := &corev1.ConfigMap{}
-	err := r.client.Get(context.TODO(), types.NamespacedName{Name: cm.Name, Namespace: cm.Namespace}, foundCM)
-	if err != nil && k8sErrors.IsNotFound(err) {
-		reqLogger.Info("Creating configmap", "name", cm.Name)
-		return r.Create(owner, cm, reqLogger)
-	} else if err != nil {
-		return errors.Wrap(err, "failed to check if configmap exists")
 	}
 
 	return nil

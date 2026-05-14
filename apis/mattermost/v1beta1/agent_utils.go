@@ -9,20 +9,20 @@ import (
 )
 
 const (
-	AgentEgressPolicyDeny             = "deny"
-	AgentEgressPolicyAllowList        = "allowList"
-	AgentEgressPolicyAllow            = "allow"
-	AgentContainerName                = "agent"
-	AgentHTTPPort                     = int32(8080)
-	AgentBotTokenSecretNamePrefix     = "agent-"
-	AgentLiteLLMDefaultImage          = "ghcr.io/berriai/litellm-database:main-v1.82.0-stable"
-	AgentLiteLLMPort                  = int32(4000)
-	AgentLiteLLMDeploymentName        = "litellm"
-	AgentLiteLLMServiceName           = "litellm"
-	AgentLiteLLMConfigMapName         = "litellm-config"
-	AgentLiteLLMMasterKeySecretName   = "litellm-master-key"
-	AgentLiteLLMDBCredentialsSecret   = "litellm-db-credentials"
-	AgentStorageDefaultMountPath      = "/data"
+	AgentEgressPolicyDeny           = "deny"
+	AgentEgressPolicyAllowList      = "allowList"
+	AgentEgressPolicyAllow          = "allow"
+	AgentContainerName              = "agent"
+	AgentHTTPPort                   = int32(8080)
+	AgentBotTokenSecretNamePrefix   = "agent-"
+	AgentLiteLLMDefaultImage        = "ghcr.io/berriai/litellm-database:main-v1.82.0-stable"
+	AgentLiteLLMPort                = int32(4000)
+	AgentLiteLLMDeploymentName      = "litellm"
+	AgentLiteLLMServiceName         = "litellm"
+	AgentLiteLLMConfigMapName       = "litellm-config"
+	AgentLiteLLMMasterKeySecretName = "litellm-master-key"
+	AgentLiteLLMDBCredentialsSecret = "litellm-db-credentials"
+	AgentStorageDefaultMountPath    = "/data"
 )
 
 // Agent lifecycle phases (written to AgentStatus.Phase).
@@ -74,9 +74,7 @@ func AgentLabels(name string) map[string]string {
 	return l
 }
 
-// AgentSelectorLabels returns the minimal label set used as a pod selector.
-// Today this is identical to AgentLabels; the two are kept separate so that
-// selector labels can be narrowed in the future without changing resource labels.
+// AgentSelectorLabels returns labels used as the pod selector.
 func AgentSelectorLabels(name string) map[string]string {
 	l := AgentResourceLabels(name)
 	l[ClusterLabel] = name

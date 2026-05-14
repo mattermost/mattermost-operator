@@ -67,11 +67,29 @@ func mmServerURL(agent *mmv1beta.Agent) string {
 // imageTagNeedsAlwaysPull returns true if the image tag is "dev", "latest",
 // or absent (K8s treats no-tag as :latest). Used to auto-set ImagePullPolicy.
 func imageTagNeedsAlwaysPull(image string) bool {
-	if idx := strings.LastIndex(image, ":"); idx >= 0 {
+	idx := strings.LastIndex(image, ":")
+	if idx > strings.LastIndex(image, "/") {
 		tag := image[idx+1:]
 		return tag == "dev" || tag == "latest"
 	}
 	return true // no tag = K8s treats as :latest
+}
+
+func appendLiteLLMEnvVars(env []corev1.EnvVar, baseURL, keySecretName string) []corev1.EnvVar {
+	if baseURL == "" || keySecretName == "" {
+		return env
+	}
+
+	keyEnvSource := secretEnvSource(keySecretName, "apiKey")
+	return append(env,
+		corev1.EnvVar{Name: "LITELLM_BASE_URL", Value: baseURL},
+		corev1.EnvVar{Name: "LITELLM_MCP_URL", Value: baseURL + "/mcp"},
+		corev1.EnvVar{Name: "OPENAI_BASE_URL", Value: baseURL + "/v1"},
+		corev1.EnvVar{Name: "OPENAI_API_KEY", ValueFrom: keyEnvSource},
+		// The Anthropic SDK already prepends /v1/ to its API paths.
+		corev1.EnvVar{Name: "ANTHROPIC_BASE_URL", Value: baseURL},
+		corev1.EnvVar{Name: "ANTHROPIC_API_KEY", ValueFrom: keyEnvSource},
+	)
 }
 
 // GenerateAgentDeployment returns the Deployment for an Agent.
@@ -111,38 +129,17 @@ func GenerateAgentDeployment(agent *mmv1beta.Agent) *appsv1.Deployment {
 		},
 	}
 
-	// Inject LiteLLM gateway env vars when llmGateway is configured.
-	// These go into baseEnv so user's spec.env can override them via mergeEnvVars.
-	if agent.Spec.LLMGateway != nil {
-		var baseURL string
-		var keySecretName string
-
-		if agent.Spec.LLMGateway.OperatorManaged != nil {
-			baseURL = LiteLLMServiceURL(agent.Namespace)
-			keySecretName = agent.LiteLLMKeySecretName()
-		} else if agent.Spec.LLMGateway.External != nil {
-			baseURL = agent.Spec.LLMGateway.External.URL
-			keySecretName = agent.Spec.LLMGateway.External.VirtualKeySecret
-		}
-
-		if baseURL != "" && keySecretName != "" {
-			keyEnvSource := secretEnvSource(keySecretName, "apiKey")
-			baseEnv = append(baseEnv,
-				corev1.EnvVar{Name: "LITELLM_BASE_URL", Value: baseURL},
-				corev1.EnvVar{Name: "LITELLM_MCP_URL", Value: baseURL + "/mcp"},
-				corev1.EnvVar{Name: "OPENAI_BASE_URL", Value: baseURL + "/v1"},
-				corev1.EnvVar{Name: "OPENAI_API_KEY", ValueFrom: keyEnvSource},
-				// The Anthropic SDK already prepends /v1/ to its API paths,
-				// so ANTHROPIC_BASE_URL must NOT include /v1.
-				corev1.EnvVar{Name: "ANTHROPIC_BASE_URL", Value: baseURL},
-				corev1.EnvVar{Name: "ANTHROPIC_API_KEY", ValueFrom: keyEnvSource},
-			)
+	if gateway := agent.Spec.LLMGateway; gateway != nil {
+		switch {
+		case gateway.OperatorManaged != nil:
+			baseEnv = appendLiteLLMEnvVars(baseEnv, LiteLLMServiceURL(agent.Namespace), agent.LiteLLMKeySecretName())
+		case gateway.External != nil:
+			baseEnv = appendLiteLLMEnvVars(baseEnv, gateway.External.URL, gateway.External.VirtualKeySecret)
 		}
 	}
 
 	envVars := mergeEnvVars(baseEnv, agent.Spec.Env)
 
-	// Build volume and mount lists — start with bot-token, conditionally add storage.
 	volumes := []corev1.Volume{
 		{
 			Name: "bot-token",
@@ -267,7 +264,6 @@ func GenerateAgentNetworkPolicy(agent *mmv1beta.Agent) *networkingv1.NetworkPoli
 	liteLLMPort := intstr.FromInt32(mmv1beta.AgentLiteLLMPort)
 
 	egressRules := []networkingv1.NetworkPolicyEgressRule{
-		// Allow egress to Mattermost pods on port 8065
 		{
 			To: []networkingv1.NetworkPolicyPeer{
 				{
@@ -285,25 +281,10 @@ func GenerateAgentNetworkPolicy(agent *mmv1beta.Agent) *networkingv1.NetworkPoli
 				},
 			},
 		},
-		// Allow DNS
-		{
-			Ports: []networkingv1.NetworkPolicyPort{
-				{
-					Protocol: &protocolUDP,
-					Port:     &dnsPort,
-				},
-				{
-					Protocol: &protocol,
-					Port:     &dnsPort,
-				},
-			},
-		},
 	}
 
-	// When llmGateway is configured, agents must be able to reach LiteLLM on port 4000.
-	// Insert before DNS rule so deny-mode agents route LLM calls through the gateway.
 	if agent.Spec.LLMGateway != nil {
-		liteLLMEgressRule := networkingv1.NetworkPolicyEgressRule{
+		egressRules = append(egressRules, networkingv1.NetworkPolicyEgressRule{
 			To: []networkingv1.NetworkPolicyPeer{
 				{
 					PodSelector: &metav1.LabelSelector{
@@ -317,10 +298,21 @@ func GenerateAgentNetworkPolicy(agent *mmv1beta.Agent) *networkingv1.NetworkPoli
 					Port:     &liteLLMPort,
 				},
 			},
-		}
-		// Insert after MM rule (index 0), before DNS rule (index 1).
-		egressRules = append(egressRules[:1], append([]networkingv1.NetworkPolicyEgressRule{liteLLMEgressRule}, egressRules[1:]...)...)
+		})
 	}
+
+	egressRules = append(egressRules, networkingv1.NetworkPolicyEgressRule{
+		Ports: []networkingv1.NetworkPolicyPort{
+			{
+				Protocol: &protocolUDP,
+				Port:     &dnsPort,
+			},
+			{
+				Protocol: &protocol,
+				Port:     &dnsPort,
+			},
+		},
+	})
 
 	// If egressPolicy is allowList, add specific egress rules for HTTPS, HTTP,
 	// and other required outbound traffic. This avoids a catch-all that would
@@ -329,7 +321,6 @@ func GenerateAgentNetworkPolicy(agent *mmv1beta.Agent) *networkingv1.NetworkPoli
 		httpsPort := intstr.FromInt32(443)
 		httpPort := intstr.FromInt32(80)
 
-		// Allow egress to any IP on port 443 (HTTPS) — external APIs
 		egressRules = append(egressRules, networkingv1.NetworkPolicyEgressRule{
 			Ports: []networkingv1.NetworkPolicyPort{
 				{
@@ -339,7 +330,6 @@ func GenerateAgentNetworkPolicy(agent *mmv1beta.Agent) *networkingv1.NetworkPoli
 			},
 		})
 
-		// Allow egress to any IP on port 80 (HTTP)
 		egressRules = append(egressRules, networkingv1.NetworkPolicyEgressRule{
 			Ports: []networkingv1.NetworkPolicyPort{
 				{
@@ -371,7 +361,7 @@ func GenerateAgentNetworkPolicy(agent *mmv1beta.Agent) *networkingv1.NetworkPoli
 				networkingv1.PolicyTypeEgress,
 			},
 			Ingress: agentIngressRules(agent, &protocol, &agentPort),
-			Egress: egressRules,
+			Egress:  egressRules,
 		},
 	}
 }

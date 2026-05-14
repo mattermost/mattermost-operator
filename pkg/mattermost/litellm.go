@@ -37,9 +37,7 @@ func secretEnvSource(secretName, key string) *corev1.EnvVarSource {
 }
 
 // GenerateLiteLLMConfigMap returns the ConfigMap for LiteLLM general settings.
-// It contains only general_settings — all models are registered via API.
-// This resource is NOT owned by any single Agent (it is shared), so the caller
-// must NOT use r.Resources.Create (which sets OwnerReference). Use r.client.Create directly.
+// Models are registered via API.
 func GenerateLiteLLMConfigMap(namespace string) *corev1.ConfigMap {
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -54,8 +52,6 @@ func GenerateLiteLLMConfigMap(namespace string) *corev1.ConfigMap {
 }
 
 // GenerateLiteLLMDeployment returns the Deployment for the LiteLLM gateway.
-// This resource is NOT owned by any single Agent. The caller must NOT use
-// r.Resources.Create — use r.client.Create directly.
 func GenerateLiteLLMDeployment(namespace, image string) *appsv1.Deployment {
 	replicas := int32(1)
 	configVolumeName := "litellm-config"
@@ -125,7 +121,7 @@ func GenerateLiteLLMDeployment(namespace, image string) *appsv1.Deployment {
 							Image:           image,
 							ImagePullPolicy: liteLLMPullPolicy,
 							Args:            []string{"--config", "/app/config/config.yaml"},
-							Env:   baseEnv,
+							Env:             baseEnv,
 							Ports: []corev1.ContainerPort{
 								{
 									ContainerPort: mmv1beta.AgentLiteLLMPort,
@@ -172,8 +168,6 @@ func GenerateLiteLLMDeployment(namespace, image string) *appsv1.Deployment {
 }
 
 // GenerateLiteLLMService returns the ClusterIP Service for the LiteLLM gateway.
-// This resource is NOT owned by any single Agent. The caller must NOT use
-// r.Resources.Create — use r.client.Create directly.
 func GenerateLiteLLMService(namespace string) *corev1.Service {
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -196,7 +190,6 @@ func GenerateLiteLLMService(namespace string) *corev1.Service {
 }
 
 // GenerateAgentLiteLLMKeySecret returns the Secret storing an agent's LiteLLM virtual key.
-// Follows the same pattern as GenerateAgentBotTokenSecret.
 func GenerateAgentLiteLLMKeySecret(agent *mmv1beta.Agent, keyValue string) *corev1.Secret {
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{

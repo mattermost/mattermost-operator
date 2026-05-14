@@ -10,6 +10,7 @@ import (
 	"github.com/go-logr/logr"
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	mattermostApp "github.com/mattermost/mattermost-operator/pkg/mattermost"
+	"github.com/mattermost/mattermost-operator/pkg/resources"
 	pkgerrors "github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -17,18 +18,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-// litellmAnnotator sets the last-applied annotation used by objectMatcher on
-// shared LiteLLM resources that have no OwnerReference (ConfigMap, Deployment, Service).
-// The annotation key matches the one in pkg/resources/create_resources.go so that
-// r.Resources.Update() can correctly diff shared resources created here.
-var litellmAnnotator = objectMatcher.NewAnnotator("mattermost.com/last-applied")
+var litellmAnnotator = objectMatcher.NewAnnotator(resources.LastAppliedConfig)
 
 // checkLiteLLMDeployment ensures the LiteLLM ConfigMap and Deployment exist and are up to date.
-// These are shared resources — no OwnerReference is set, so r.Client.Create is used directly.
 func (r *AgentReconciler) checkLiteLLMDeployment(ctx context.Context, agent *mmv1beta.Agent, reqLogger logr.Logger) error {
 	om := agent.Spec.LLMGateway.OperatorManaged
 
-	// ── ConfigMap ──────────────────────────────────────────────────────────────
 	desiredCM := mattermostApp.GenerateLiteLLMConfigMap(agent.Namespace)
 	foundCM := &corev1.ConfigMap{}
 	err := r.Client.Get(ctx, types.NamespacedName{Name: desiredCM.Name, Namespace: desiredCM.Namespace}, foundCM)
@@ -48,7 +43,6 @@ func (r *AgentReconciler) checkLiteLLMDeployment(ctx context.Context, agent *mmv
 		}
 	}
 
-	// ── Deployment ─────────────────────────────────────────────────────────────
 	desiredDeploy := mattermostApp.GenerateLiteLLMDeployment(agent.Namespace, om.Image)
 	foundDeploy := &appsv1.Deployment{}
 	err = r.Client.Get(ctx, types.NamespacedName{Name: desiredDeploy.Name, Namespace: desiredDeploy.Namespace}, foundDeploy)
@@ -72,7 +66,6 @@ func (r *AgentReconciler) checkLiteLLMDeployment(ctx context.Context, agent *mmv
 }
 
 // checkLiteLLMService ensures the LiteLLM Service exists and is up to date.
-// Shared resource — no OwnerReference.
 func (r *AgentReconciler) checkLiteLLMService(ctx context.Context, agent *mmv1beta.Agent, reqLogger logr.Logger) error {
 	desiredSvc := mattermostApp.GenerateLiteLLMService(agent.Namespace)
 	foundSvc := &corev1.Service{}
@@ -93,8 +86,7 @@ func (r *AgentReconciler) checkLiteLLMService(ctx context.Context, agent *mmv1be
 	return r.Resources.Update(foundSvc, desiredSvc, reqLogger)
 }
 
-// checkLiteLLMReady returns (true, nil) when LiteLLM has at least one ready replica.
-// Returns (false, nil) — not an error — when not yet ready; the caller requeues.
+// checkLiteLLMReady reports whether LiteLLM has at least one ready replica.
 func (r *AgentReconciler) checkLiteLLMReady(ctx context.Context, agent *mmv1beta.Agent, reqLogger logr.Logger) (bool, error) {
 	deploy := &appsv1.Deployment{}
 	err := r.Client.Get(ctx, types.NamespacedName{
@@ -110,4 +102,3 @@ func (r *AgentReconciler) checkLiteLLMReady(ctx context.Context, agent *mmv1beta
 	}
 	return true, nil
 }
-
