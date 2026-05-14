@@ -3,6 +3,11 @@ build/_output
 build/_test
 build/operator-sdk
 build/operator-sdk.asc
+
+# Local planning and development scaffolding
+/.planning/
+/hack/
+
 # Created by https://www.gitignore.io/api/go,vim,emacs,visualstudiocode
 ### Emacs ###
 # -*- mode: gitignore; -*-
