@@ -15,8 +15,8 @@ BUILD_IMAGE = golang:$(GOLANG_VERSION)
 BASE_IMAGE = gcr.io/distroless/static:nonroot
 
 ## FIPS Docker Build Versions
-BUILD_IMAGE_FIPS = cgr.dev/mattermost.com/go-msft-fips:1.25
-BASE_IMAGE_FIPS = cgr.dev/mattermost.com/glibc-openssl-fips:15.1
+BUILD_IMAGE_FIPS = cgr.dev/mattermost.com/go-msft-fips:1.26.3@sha256:90017f556002f392c7eb21a96bf845e1b0675cb32a43ac8c85c25cbb80e848cc
+BASE_IMAGE_FIPS = cgr.dev/mattermost.com/glibc-openssl-fips:16.1.0@sha256:3ffd0b8b652a95f17764ff4cd3abf5a424651ebae407fb98085e01ff40e5de7c
 
 ################################################################################
 
