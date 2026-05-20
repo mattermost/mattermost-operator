@@ -1,8 +1,6 @@
 # Build the mattermost operator (FIPS version)
 ARG BUILD_IMAGE=cgr.dev/mattermost.com/go-msft-fips:1.26.3@sha256:90017f556002f392c7eb21a96bf845e1b0675cb32a43ac8c85c25cbb80e848cc
-# TODO: Pin BASE_IMAGE to digest for supply-chain safety (registry requires auth to resolve).
-# Matching BUILD_IMAGE above when digest becomes available.
-ARG BASE_IMAGE=cgr.dev/mattermost.com/glibc-openssl-fips:15.2@sha256:ffcaa014791edcc8635785336fe42eb5cdebacfa88221a2af319fcdf3e82ab6d
+ARG BASE_IMAGE=cgr.dev/mattermost.com/glibc-openssl-fips:16.1.0@sha256:3ffd0b8b652a95f17764ff4cd3abf5a424651ebae407fb98085e01ff40e5de7c
 
 FROM ${BUILD_IMAGE} as builder
 
