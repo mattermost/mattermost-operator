@@ -101,11 +101,23 @@ spec:
                   external:
                     description: Defines the configuration of and external database.
                     properties:
+                      connectionStringKey:
+                        description: |-
+                          ConnectionStringKey overrides the Secret key used to resolve the database
+                          connection string. Defaults to "DB_CONNECTION_STRING". Useful when the
+                          referenced Secret is produced by another operator (e.g. cloudnative-pg
+                          exposes the URI under the "uri" key). When set, the Operator will also
+                          fall back to this key for MM_SQLSETTINGS_DATASOURCE when no
+                          MM_SQLSETTINGS_DATASOURCE entry is present in the Secret.
+                        maxLength: 253
+                        minLength: 1
+                        pattern: ^[-._a-zA-Z0-9]+$
+                        type: string
                       secret:
                         description: |-
                           Secret contains data necessary to connect to the external database.
                           The Kubernetes Secret should contain:
-                            - Key: DB_CONNECTION_STRING | Value: Full database connection string.
+                            - Key: DB_CONNECTION_STRING (or the key configured via connectionStringKey) | Value: Full database connection string.
                           It can also contain optional fields, such as:
                             - Key: MM_SQLSETTINGS_DATASOURCEREPLICAS | Value: Connection string to read replicas of the database.
                             - Key: DB_CONNECTION_CHECK_URL | Value: The URL used for checking that the database is accessible.
@@ -221,6 +233,12 @@ spec:
                           to use
                         type: string
                     type: object
+                  unmanaged:
+                    description: |-
+                      Unmanaged disables all operator database configuration. The user is
+                      responsible for supplying MM_SQLSETTINGS_* via spec.mattermostEnv.
+                      When true, External and OperatorManaged are ignored.
+                    type: boolean
                 type: object
               deploymentTemplate:
                 description: DeploymentTemplate defines configuration for the template

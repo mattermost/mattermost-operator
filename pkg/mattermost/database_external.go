@@ -13,11 +13,16 @@ import (
 
 type ExternalDBConfig struct {
 	secretName               string
+	connectionStringKey      string
 	dbType                   string
 	hasReaderEndpoints       bool
 	hasDBCheckURL            bool
 	hasSeparateDatasourceKey bool
 }
+
+// DefaultExternalDBConnectionStringKey is the Secret key used when the user
+// has not overridden ExternalDatabase.ConnectionStringKey.
+const DefaultExternalDBConnectionStringKey = "DB_CONNECTION_STRING"
 
 func NewExternalDBConfig(mattermost *mmv1beta.Mattermost, secret corev1.Secret) (*ExternalDBConfig, error) {
 	if mattermost.Spec.Database.External == nil {
@@ -27,17 +32,23 @@ func NewExternalDBConfig(mattermost *mmv1beta.Mattermost, secret corev1.Secret) 
 		return nil, errors.New("external database Secret not provided")
 	}
 
-	connectionStr, ok := secret.Data["DB_CONNECTION_STRING"]
+	connectionStringKey := mattermost.Spec.Database.External.ConnectionStringKey
+	if connectionStringKey == "" {
+		connectionStringKey = DefaultExternalDBConnectionStringKey
+	}
+
+	connectionStr, ok := secret.Data[connectionStringKey]
 	if !ok {
-		return nil, errors.New("external database Secret does not containt DB_CONNECTION_STRING key")
+		return nil, fmt.Errorf("external database Secret does not contain %q key", connectionStringKey)
 	}
 	if len(connectionStr) == 0 {
 		return nil, errors.New("external database connection string is empty")
 	}
 
 	externalDB := &ExternalDBConfig{
-		secretName: mattermost.Spec.Database.External.Secret,
-		dbType:     database.GetTypeFromConnectionString(string(connectionStr)),
+		secretName:          mattermost.Spec.Database.External.Secret,
+		connectionStringKey: connectionStringKey,
+		dbType:              database.GetTypeFromConnectionString(string(connectionStr)),
 	}
 
 	if _, ok := secret.Data["MM_SQLSETTINGS_DATASOURCEREPLICAS"]; ok {
@@ -60,13 +71,13 @@ func (e *ExternalDBConfig) EnvVars(_ *mmv1beta.Mattermost) []corev1.EnvVar {
 	dbEnvVars := []corev1.EnvVar{
 		{
 			Name:      "MM_CONFIG",
-			ValueFrom: EnvSourceFromSecret(e.secretName, "DB_CONNECTION_STRING"),
+			ValueFrom: EnvSourceFromSecret(e.secretName, e.connectionStringKey),
 		},
 	}
 
 	// If the secret has a separate MM_SQLSETTINGS_DATASOURCE key (without protocol prefix),
-	// use it. Otherwise fall back to DB_CONNECTION_STRING for backward compatibility.
-	datasourceKey := "DB_CONNECTION_STRING"
+	// use it. Otherwise fall back to the connection string key for backward compatibility.
+	datasourceKey := e.connectionStringKey
 	if e.hasSeparateDatasourceKey {
 		datasourceKey = "MM_SQLSETTINGS_DATASOURCE"
 	}
@@ -141,11 +152,12 @@ func getDBCheckInitContainer(secretName, dbType string) *corev1.Container {
 }
 
 // allowedDBCheckSchemesByType defines URL schemes permitted per database type.
-// MySQL uses curl for readiness checks (http/https only); PostgreSQL uses pg_isready (postgres URI).
+// MySQL uses curl for readiness checks (http/https only); PostgreSQL uses pg_isready
+// (which accepts both "postgres://" and the officially-named "postgresql://" URI).
 var allowedDBCheckSchemesByType = map[string]map[string]bool{
 	database.MySQLDatabase:      {"http": true, "https": true},
-	database.PostgreSQLDatabase: {"http": true, "https": true, "postgres": true},
-	"unknown":                   {"http": true, "https": true, "mysql": true, "postgres": true},
+	database.PostgreSQLDatabase: {"http": true, "https": true, "postgres": true, "postgresql": true},
+	"unknown":                   {"http": true, "https": true, "mysql": true, "postgres": true, "postgresql": true},
 }
 
 func isAllowedDBCheckScheme(dbType, scheme string) bool {

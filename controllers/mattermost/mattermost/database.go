@@ -18,6 +18,10 @@ import (
 func (r *MattermostReconciler) checkDatabase(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) (mattermostApp.DatabaseConfig, error) {
 	reqLogger = reqLogger.WithValues("Reconcile", "database")
 
+	if mattermost.Spec.Database.IsUnmanaged() {
+		return nil, nil
+	}
+
 	if mattermost.Spec.Database.IsExternal() {
 		return r.readExternalDBSecret(mattermost)
 	}
