@@ -136,7 +136,9 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbIn
 		}
 
 		if dbInfo.HasDatabaseCheckURL() {
-			dbCheckContainer := getDBCheckInitContainer(dbInfo.SecretName, dbInfo.ExternalDBType)
+			// v1alpha1 always uses the legacy external-image readiness check.
+			// The opt-in builtin mode is a v1beta1-only feature.
+			dbCheckContainer := externalDBCheckInitContainer(dbInfo.SecretName, dbInfo.ExternalDBType)
 			if dbCheckContainer != nil {
 				initContainers = append(initContainers, *dbCheckContainer)
 			}

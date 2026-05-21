@@ -1032,6 +1032,53 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 				dbConfig:               &ExternalDBConfig{dbType: database.PostgreSQLDatabase, hasDBCheckURL: false},
 				expectedInitContainers: nil,
 			},
+			{
+				description: "builtin readiness check mode produces in-image init container",
+				mmSpec: mmv1beta.MattermostSpec{
+					Image:   "mattermost/mattermost",
+					Version: "10.8.1",
+					Database: mmv1beta.Database{
+						External: &mmv1beta.ExternalDatabase{Secret: "secret"},
+						ReadinessCheck: &mmv1beta.DatabaseReadinessCheck{
+							Mode: mmv1beta.DatabaseReadinessCheckModeBuiltin,
+						},
+					},
+				},
+				dbConfig: &ExternalDBConfig{
+					secretName:    "secret",
+					dbType:        database.PostgreSQLDatabase,
+					hasDBCheckURL: false, // builtin mode doesn't need it
+				},
+				expectedInitContainers: []corev1.Container{
+					{
+						Name:    "init-check-database",
+						Image:   "mattermost/mattermost:10.8.1",
+						Command: []string{"/mattermost/bin/mattermost"},
+						Args:    []string{"db", "ping", "--timeout=5m0s"},
+						Env: []corev1.EnvVar{
+							{Name: "MM_CONFIG", ValueFrom: EnvSourceFromSecret("secret", "DB_CONNECTION_STRING")},
+							{Name: "MM_SQLSETTINGS_DATASOURCE", ValueFrom: EnvSourceFromSecret("secret", "DB_CONNECTION_STRING")},
+						},
+					},
+				},
+			},
+			{
+				description: "external mode explicit still produces legacy postgres container",
+				mmSpec: mmv1beta.MattermostSpec{
+					Database: mmv1beta.Database{
+						External: &mmv1beta.ExternalDatabase{Secret: "secret"},
+						ReadinessCheck: &mmv1beta.DatabaseReadinessCheck{
+							Mode: mmv1beta.DatabaseReadinessCheckModeExternal,
+						},
+					},
+				},
+				dbConfig: &ExternalDBConfig{
+					secretName:    "secret",
+					dbType:        database.PostgreSQLDatabase,
+					hasDBCheckURL: true,
+				},
+				expectedInitContainers: defaultExternalPostgresInitContainers,
+			},
 		} {
 			t.Run(testCase.description, func(t *testing.T) {
 				mattermost := &mmv1beta.Mattermost{
