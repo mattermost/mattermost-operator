@@ -2,6 +2,7 @@ package mattermost
 
 import (
 	"testing"
+	"time"
 
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	"github.com/mattermost/mattermost-operator/pkg/database"
@@ -279,16 +280,269 @@ func TestNewExternalDBConfig_InvalidCheckURL(t *testing.T) {
 
 func TestGetDBCheckInitContainer_QuotedURL(t *testing.T) {
 	t.Run("mysql container quotes URL variable", func(t *testing.T) {
-		container := getDBCheckInitContainer("secret", "mysql")
+		container := getDBCheckInitContainer(&mmv1beta.Mattermost{}, "secret", "mysql", false)
 		require.NotNil(t, container)
 		// Verify the command uses double-quoted variable to prevent shell injection
 		assert.Contains(t, container.Command[2], `"$DB_CONNECTION_CHECK_URL"`)
 	})
 
 	t.Run("postgres container quotes URL variable", func(t *testing.T) {
-		container := getDBCheckInitContainer("secret", "postgres")
+		container := getDBCheckInitContainer(&mmv1beta.Mattermost{}, "secret", "postgres", false)
 		require.NotNil(t, container)
 		assert.Contains(t, container.Command[2], `"$DB_CONNECTION_CHECK_URL"`)
+	})
+}
+
+func TestGetDBCheckInitContainer_BuiltinMode(t *testing.T) {
+	makeMattermost := func(rc *mmv1beta.DatabaseReadinessCheck) *mmv1beta.Mattermost {
+		return &mmv1beta.Mattermost{
+			Spec: mmv1beta.MattermostSpec{
+				Image:   "mattermost/mattermost",
+				Version: "10.8.1",
+				Database: mmv1beta.Database{
+					ReadinessCheck: rc,
+				},
+			},
+		}
+	}
+
+	t.Run("builtin mode for postgres", func(t *testing.T) {
+		mm := makeMattermost(&mmv1beta.DatabaseReadinessCheck{
+			Mode: mmv1beta.DatabaseReadinessCheckModeBuiltin,
+		})
+
+		container := getDBCheckInitContainer(mm, "secret", database.PostgreSQLDatabase, false)
+		require.NotNil(t, container)
+
+		assert.Equal(t, "init-check-database", container.Name)
+		assert.Equal(t, "mattermost/mattermost:10.8.1", container.Image)
+		assert.Equal(t, []string{"/mattermost/bin/mattermost"}, container.Command)
+		assert.Equal(t, []string{"db", "ping", "--timeout=5m0s"}, container.Args)
+
+		mmConfigEnv := findEnvVar(container.Env, "MM_CONFIG")
+		require.NotNil(t, mmConfigEnv)
+		require.NotNil(t, mmConfigEnv.ValueFrom)
+		require.NotNil(t, mmConfigEnv.ValueFrom.SecretKeyRef)
+		assert.Equal(t, "secret", mmConfigEnv.ValueFrom.SecretKeyRef.Name)
+		assert.Equal(t, "DB_CONNECTION_STRING", mmConfigEnv.ValueFrom.SecretKeyRef.Key)
+
+		datasourceEnv := findEnvVar(container.Env, "MM_SQLSETTINGS_DATASOURCE")
+		require.NotNil(t, datasourceEnv)
+		require.NotNil(t, datasourceEnv.ValueFrom)
+		require.NotNil(t, datasourceEnv.ValueFrom.SecretKeyRef)
+		assert.Equal(t, "secret", datasourceEnv.ValueFrom.SecretKeyRef.Name)
+		assert.Equal(t, "DB_CONNECTION_STRING", datasourceEnv.ValueFrom.SecretKeyRef.Key)
+	})
+
+	t.Run("builtin mode honors separate datasource key", func(t *testing.T) {
+		mm := makeMattermost(&mmv1beta.DatabaseReadinessCheck{
+			Mode: mmv1beta.DatabaseReadinessCheckModeBuiltin,
+		})
+
+		container := getDBCheckInitContainer(mm, "secret", database.PostgreSQLDatabase, true)
+		require.NotNil(t, container)
+
+		datasourceEnv := findEnvVar(container.Env, "MM_SQLSETTINGS_DATASOURCE")
+		require.NotNil(t, datasourceEnv)
+		require.NotNil(t, datasourceEnv.ValueFrom)
+		require.NotNil(t, datasourceEnv.ValueFrom.SecretKeyRef)
+		assert.Equal(t, "MM_SQLSETTINGS_DATASOURCE", datasourceEnv.ValueFrom.SecretKeyRef.Key)
+	})
+
+	t.Run("builtin mode honors custom timeout", func(t *testing.T) {
+		mm := makeMattermost(&mmv1beta.DatabaseReadinessCheck{
+			Mode:    mmv1beta.DatabaseReadinessCheckModeBuiltin,
+			Timeout: &metav1.Duration{Duration: 10 * time.Minute},
+		})
+
+		container := getDBCheckInitContainer(mm, "secret", database.PostgreSQLDatabase, false)
+		require.NotNil(t, container)
+
+		assert.Contains(t, container.Args, "--timeout=10m0s")
+	})
+
+	t.Run("builtin mode for mysql", func(t *testing.T) {
+		mm := makeMattermost(&mmv1beta.DatabaseReadinessCheck{
+			Mode: mmv1beta.DatabaseReadinessCheckModeBuiltin,
+		})
+
+		container := getDBCheckInitContainer(mm, "secret", database.MySQLDatabase, false)
+		require.NotNil(t, container)
+
+		// builtin mode is dbType-agnostic: it always uses the Mattermost image,
+		// not appropriate/curl:latest.
+		assert.Equal(t, "mattermost/mattermost:10.8.1", container.Image)
+		assert.NotEqual(t, "appropriate/curl:latest", container.Image)
+		assert.Equal(t, []string{"/mattermost/bin/mattermost"}, container.Command)
+		assert.Equal(t, []string{"db", "ping", "--timeout=5m0s"}, container.Args)
+	})
+
+	t.Run("builtin mode honors imagePullPolicy", func(t *testing.T) {
+		mm := makeMattermost(&mmv1beta.DatabaseReadinessCheck{
+			Mode: mmv1beta.DatabaseReadinessCheckModeBuiltin,
+		})
+		mm.Spec.ImagePullPolicy = corev1.PullAlways
+
+		container := getDBCheckInitContainer(mm, "secret", database.PostgreSQLDatabase, false)
+		require.NotNil(t, container)
+
+		assert.Equal(t, corev1.PullAlways, container.ImagePullPolicy)
+	})
+
+	t.Run("builtin mode digest version", func(t *testing.T) {
+		mm := makeMattermost(&mmv1beta.DatabaseReadinessCheck{
+			Mode: mmv1beta.DatabaseReadinessCheckModeBuiltin,
+		})
+		mm.Spec.Version = "sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
+
+		container := getDBCheckInitContainer(mm, "secret", database.PostgreSQLDatabase, false)
+		require.NotNil(t, container)
+
+		assert.Equal(
+			t,
+			"mattermost/mattermost@sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+			container.Image,
+		)
+	})
+
+	t.Run("external mode explicit", func(t *testing.T) {
+		mm := makeMattermost(&mmv1beta.DatabaseReadinessCheck{
+			Mode: mmv1beta.DatabaseReadinessCheckModeExternal,
+		})
+
+		container := getDBCheckInitContainer(mm, "secret", database.PostgreSQLDatabase, false)
+		require.NotNil(t, container)
+		assert.Equal(t, "postgres:13", container.Image)
+	})
+
+	t.Run("empty readiness check mode falls back to external", func(t *testing.T) {
+		mm := makeMattermost(&mmv1beta.DatabaseReadinessCheck{Mode: ""})
+
+		container := getDBCheckInitContainer(mm, "secret", database.PostgreSQLDatabase, false)
+		require.NotNil(t, container)
+		assert.Equal(t, "postgres:13", container.Image)
+	})
+
+	t.Run("nil readiness check falls back to external", func(t *testing.T) {
+		mm := makeMattermost(nil)
+
+		container := getDBCheckInitContainer(mm, "secret", database.PostgreSQLDatabase, false)
+		require.NotNil(t, container)
+		assert.Equal(t, "postgres:13", container.Image)
+	})
+}
+
+func TestExternalDBConfig_InitContainers_BuiltinMode(t *testing.T) {
+	t.Run("builtin mode emits init container without DB_CONNECTION_CHECK_URL", func(t *testing.T) {
+		mm := &mmv1beta.Mattermost{
+			Spec: mmv1beta.MattermostSpec{
+				Image:   "mattermost/mattermost",
+				Version: "10.8.1",
+				Database: mmv1beta.Database{
+					External: &mmv1beta.ExternalDatabase{Secret: "db-secret"},
+					ReadinessCheck: &mmv1beta.DatabaseReadinessCheck{
+						Mode: mmv1beta.DatabaseReadinessCheckModeBuiltin,
+					},
+				},
+			},
+		}
+		secret := corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: "db-secret"},
+			Data: map[string][]byte{
+				"DB_CONNECTION_STRING": []byte("postgres://user:pass@host:5432/db"),
+			},
+		}
+
+		config, err := NewExternalDBConfig(mm, secret)
+		require.NoError(t, err)
+
+		containers := config.InitContainers(mm)
+		require.Len(t, containers, 1)
+		assert.Equal(t, "mattermost/mattermost:10.8.1", containers[0].Image)
+		assert.Equal(t, []string{"/mattermost/bin/mattermost"}, containers[0].Command)
+	})
+
+	t.Run("builtin mode + DB_CONNECTION_CHECK_URL still uses mattermost image", func(t *testing.T) {
+		mm := &mmv1beta.Mattermost{
+			Spec: mmv1beta.MattermostSpec{
+				Image:   "mattermost/mattermost",
+				Version: "10.8.1",
+				Database: mmv1beta.Database{
+					External: &mmv1beta.ExternalDatabase{Secret: "db-secret"},
+					ReadinessCheck: &mmv1beta.DatabaseReadinessCheck{
+						Mode: mmv1beta.DatabaseReadinessCheckModeBuiltin,
+					},
+				},
+			},
+		}
+		secret := corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: "db-secret"},
+			Data: map[string][]byte{
+				"DB_CONNECTION_STRING":    []byte("postgres://user:pass@host:5432/db"),
+				"DB_CONNECTION_CHECK_URL": []byte("postgres://host:5432/db"),
+			},
+		}
+
+		config, err := NewExternalDBConfig(mm, secret)
+		require.NoError(t, err)
+
+		containers := config.InitContainers(mm)
+		require.Len(t, containers, 1)
+		assert.Equal(t, "mattermost/mattermost:10.8.1", containers[0].Image)
+		assert.NotEqual(t, "postgres:13", containers[0].Image)
+	})
+
+	t.Run("external mode skips init container when DB_CONNECTION_CHECK_URL absent", func(t *testing.T) {
+		mm := &mmv1beta.Mattermost{
+			Spec: mmv1beta.MattermostSpec{
+				Database: mmv1beta.Database{
+					External: &mmv1beta.ExternalDatabase{Secret: "db-secret"},
+					ReadinessCheck: &mmv1beta.DatabaseReadinessCheck{
+						Mode: mmv1beta.DatabaseReadinessCheckModeExternal,
+					},
+				},
+			},
+		}
+		secret := corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: "db-secret"},
+			Data: map[string][]byte{
+				"DB_CONNECTION_STRING": []byte("postgres://user:pass@host:5432/db"),
+			},
+		}
+
+		config, err := NewExternalDBConfig(mm, secret)
+		require.NoError(t, err)
+
+		containers := config.InitContainers(mm)
+		assert.Empty(t, containers)
+	})
+
+	t.Run("disableReadinessCheck overrides builtin", func(t *testing.T) {
+		mm := &mmv1beta.Mattermost{
+			Spec: mmv1beta.MattermostSpec{
+				Image:   "mattermost/mattermost",
+				Version: "10.8.1",
+				Database: mmv1beta.Database{
+					External:              &mmv1beta.ExternalDatabase{Secret: "db-secret"},
+					DisableReadinessCheck: true,
+					ReadinessCheck: &mmv1beta.DatabaseReadinessCheck{
+						Mode: mmv1beta.DatabaseReadinessCheckModeBuiltin,
+					},
+				},
+			},
+		}
+		secret := corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: "db-secret"},
+			Data: map[string][]byte{
+				"DB_CONNECTION_STRING": []byte("postgres://user:pass@host:5432/db"),
+			},
+		}
+
+		config, err := NewExternalDBConfig(mm, secret)
+		require.NoError(t, err)
+
+		containers := config.InitContainers(mm)
+		assert.Empty(t, containers)
 	})
 }
 
