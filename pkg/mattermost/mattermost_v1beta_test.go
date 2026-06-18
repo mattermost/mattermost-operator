@@ -1045,9 +1045,10 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 					},
 				},
 				dbConfig: &ExternalDBConfig{
-					secretName:    "secret",
-					dbType:        database.PostgreSQLDatabase,
-					hasDBCheckURL: false, // builtin mode doesn't need it
+					secretName:          "secret",
+					connectionStringKey: DefaultExternalDBConnectionStringKey,
+					dbType:              database.PostgreSQLDatabase,
+					hasDBCheckURL:       false, // builtin mode doesn't need it
 				},
 				expectedInitContainers: []corev1.Container{
 					{
