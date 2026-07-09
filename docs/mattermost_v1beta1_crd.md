@@ -109,6 +109,7 @@ _Appears in:_
 | `egressPolicy` _string_ | EgressPolicy controls outbound network access from the agent pod.<br />  - "deny" (default): only Mattermost server, DNS, and LiteLLM gateway<br />  - "allowWeb": additionally permits outbound TCP 80/443 to any destination (port-based; domain-level filtering is future work)<br />  - "allow": permits all outbound traffic |  | Enum: [deny allowWeb allow] <br />Optional: \{\} <br /> |
 | `mattermostRef` _[AgentMattermostRef](#agentmattermostref)_ | MattermostRef is a reference to the Mattermost CR in the same namespace<br />that this agent is associated with. |  |  |
 | `env` _[EnvVar](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#envvar-v1-core) array_ | Env defines optional environment variables to inject into the agent pod. |  | Optional: \{\} <br /> |
+| `llmGateway` _[LLMGatewayConfig](#llmgatewayconfig)_ | LLMGateway configures the LLM gateway for this agent.<br />When OperatorManaged is set, the operator deploys the shared LiteLLM<br />infrastructure only. When External is set, the agent uses an existing<br />LiteLLM instance. |  | Optional: \{\} <br /> |
 | `storage` _[AgentStorageConfig](#agentstorageconfig)_ | Storage configures optional persistent storage for the agent pod.<br />When set, the operator creates a PVC and mounts it into the agent container. |  | Optional: \{\} <br /> |
 
 
@@ -239,6 +240,23 @@ _Appears in:_
 | `useServiceAccount` _boolean_ | Optionally use service account with IAM role to access AWS services, like S3. |  |  |
 
 
+#### ExternalLLMGateway
+
+
+
+ExternalLLMGateway configures the agent to use an externally managed LiteLLM instance.
+
+
+
+_Appears in:_
+- [LLMGatewayConfig](#llmgatewayconfig)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `url` _string_ | URL is the base URL of the external LiteLLM instance.<br />Example: "http://litellm.my-namespace.svc.cluster.local:4000" |  | MinLength: 1 <br /> |
+| `virtualKeySecret` _string_ | VirtualKeySecret is the name of the K8s Secret containing the virtual key<br />for this agent. The Secret must have a key "apiKey". |  | MinLength: 1 <br /> |
+
+
 #### ExternalVolumeFileStore
 
 
@@ -327,6 +345,23 @@ _Appears in:_
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
 | `dedicatedJobServer` _boolean_ | Determines whether to create a dedicated Mattermost server deployment<br />which is configured to run scheduled jobs. This deployment will receive<br />no user traffic and the primary Mattermost deployment will no longer be<br />configured to run jobs. |  | Optional: \{\} <br /> |
+
+
+#### LLMGatewayConfig
+
+
+
+LLMGatewayConfig defines how the agent connects to an LLM gateway.
+
+
+
+_Appears in:_
+- [AgentSpec](#agentspec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `external` _[ExternalLLMGateway](#externalllmgateway)_ | External configures the agent to use an existing LiteLLM instance. |  | Optional: \{\} <br /> |
+| `operatorManaged` _[OperatorManagedLLMGateway](#operatormanagedllmgateway)_ | OperatorManaged configures the operator to deploy and manage a shared<br />LiteLLM instance in the agent's namespace. |  | Optional: \{\} <br /> |
 
 
 #### LocalFileStore
@@ -473,6 +508,32 @@ _Appears in:_
 | `backupSecretName` _string_ | Defines the secret to be used for uploading/restoring backup. |  | Optional: \{\} <br /> |
 | `backupRestoreSecretName` _string_ | Defines the secret to be used when performing a database restore. |  | Optional: \{\} <br /> |
 | `version` _string_ | Defines the cluster version for the database to use |  | Optional: \{\} <br /> |
+
+
+#### OperatorManagedLLMGateway
+
+
+
+OperatorManagedLLMGateway configures the operator to deploy and manage LiteLLM
+infrastructure only (Deployment/Service/ConfigMap/master-key Secret). Model
+registration and per-agent virtual-key creation are the responsibility of the
+Mattermost agents plugin, which must create the Secret named by
+Agent.LiteLLMKeySecretName() (key "apiKey") before the agent pod can start.
+
+Prerequisite: the namespace MUST contain a Secret named
+"mm-agent-litellm-db-credentials" with key "connectionString" containing a
+PostgreSQL DSN. The operator does not provision this database. The master-key
+Secret ("mm-agent-litellm-master-key") is auto-created if missing.
+
+
+
+_Appears in:_
+- [LLMGatewayConfig](#llmgatewayconfig)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `image` _string_ | Image is the LiteLLM container image to use.<br />Defaults to "ghcr.io/berriai/litellm-database:main-v1.82.0-stable". |  | Optional: \{\} <br /> |
+| `resources` _[ResourceRequirements](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#resourcerequirements-v1-core)_ | Resources defines the CPU/memory requests and limits for the LiteLLM pod. |  | Optional: \{\} <br /> |
 
 
 #### OperatorManagedMinio

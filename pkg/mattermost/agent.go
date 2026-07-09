@@ -80,6 +80,23 @@ func imageTagNeedsAlwaysPull(image string) bool {
 	return true // no tag = K8s treats as :latest
 }
 
+func appendLiteLLMEnvVars(env []corev1.EnvVar, baseURL, keySecretName string) []corev1.EnvVar {
+	if baseURL == "" || keySecretName == "" {
+		return env
+	}
+
+	keyEnvSource := secretEnvSource(keySecretName, "apiKey")
+	return append(env,
+		corev1.EnvVar{Name: "LITELLM_BASE_URL", Value: baseURL},
+		corev1.EnvVar{Name: "LITELLM_MCP_URL", Value: baseURL + "/mcp"},
+		corev1.EnvVar{Name: "OPENAI_BASE_URL", Value: baseURL + "/v1"},
+		corev1.EnvVar{Name: "OPENAI_API_KEY", ValueFrom: keyEnvSource},
+		// The Anthropic SDK already prepends /v1/ to its API paths.
+		corev1.EnvVar{Name: "ANTHROPIC_BASE_URL", Value: baseURL},
+		corev1.EnvVar{Name: "ANTHROPIC_API_KEY", ValueFrom: keyEnvSource},
+	)
+}
+
 // GenerateAgentDeployment returns the Deployment for an Agent.
 func GenerateAgentDeployment(agent *mmv1beta.Agent) *appsv1.Deployment {
 	replicas := int32(1)
@@ -115,6 +132,15 @@ func GenerateAgentDeployment(agent *mmv1beta.Agent) *appsv1.Deployment {
 				},
 			},
 		},
+	}
+
+	if agent.HasLLMGateway() {
+		switch {
+		case agent.HasOperatorManagedGateway():
+			baseEnv = appendLiteLLMEnvVars(baseEnv, LiteLLMServiceURL(agent.Namespace), agent.LiteLLMKeySecretName())
+		case agent.Spec.LLMGateway.External != nil:
+			baseEnv = appendLiteLLMEnvVars(baseEnv, agent.Spec.LLMGateway.External.URL, agent.Spec.LLMGateway.External.VirtualKeySecret)
+		}
 	}
 
 	envVars := mergeEnvVars(baseEnv, agent.Spec.Env)
@@ -199,7 +225,8 @@ func GenerateAgentDeployment(agent *mmv1beta.Agent) *appsv1.Deployment {
 }
 
 // agentIngressRules returns the ingress rules for the Agent NetworkPolicy.
-// Always allows ingress from MM server pods.
+// Always allows ingress from MM server pods. When LLMGateway is configured,
+// also allows ingress from LiteLLM pods (which proxy chat requests to agents).
 func agentIngressRules(agent *mmv1beta.Agent, protocol *corev1.Protocol, agentPort *intstr.IntOrString) []networkingv1.NetworkPolicyIngressRule {
 	ingressFrom := []networkingv1.NetworkPolicyPeer{
 		{
@@ -209,6 +236,14 @@ func agentIngressRules(agent *mmv1beta.Agent, protocol *corev1.Protocol, agentPo
 				},
 			},
 		},
+	}
+
+	if agent.HasLLMGateway() {
+		ingressFrom = append(ingressFrom, networkingv1.NetworkPolicyPeer{
+			PodSelector: &metav1.LabelSelector{
+				MatchLabels: LiteLLMLabels(),
+			},
+		})
 	}
 
 	return []networkingv1.NetworkPolicyIngressRule{
@@ -231,6 +266,7 @@ func GenerateAgentNetworkPolicy(agent *mmv1beta.Agent) *networkingv1.NetworkPoli
 	agentPort := intstr.FromInt32(mmv1beta.AgentHTTPPort)
 	mmPort := intstr.FromInt32(8065)
 	dnsPort := intstr.FromInt32(53)
+	liteLLMPort := intstr.FromInt32(mmv1beta.AgentLiteLLMPort)
 
 	egressRules := []networkingv1.NetworkPolicyEgressRule{
 		{
@@ -250,6 +286,24 @@ func GenerateAgentNetworkPolicy(agent *mmv1beta.Agent) *networkingv1.NetworkPoli
 				},
 			},
 		},
+	}
+
+	if agent.HasLLMGateway() {
+		egressRules = append(egressRules, networkingv1.NetworkPolicyEgressRule{
+			To: []networkingv1.NetworkPolicyPeer{
+				{
+					PodSelector: &metav1.LabelSelector{
+						MatchLabels: LiteLLMLabels(),
+					},
+				},
+			},
+			Ports: []networkingv1.NetworkPolicyPort{
+				{
+					Protocol: &protocol,
+					Port:     &liteLLMPort,
+				},
+			},
+		})
 	}
 
 	egressRules = append(egressRules, networkingv1.NetworkPolicyEgressRule{

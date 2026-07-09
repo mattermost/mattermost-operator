@@ -83,6 +83,15 @@ func (r *AgentReconciler) checkAgentService(ctx context.Context, agent *mmv1beta
 func (r *AgentReconciler) checkExternallyProvisionedSecrets(ctx context.Context, agent *mmv1beta.Agent) error {
 	required := []string{agent.BotTokenSecretName()}
 
+	if agent.HasLLMGateway() {
+		switch {
+		case agent.HasOperatorManagedGateway():
+			required = append(required, agent.LiteLLMKeySecretName())
+		case agent.Spec.LLMGateway.External != nil:
+			required = append(required, agent.Spec.LLMGateway.External.VirtualKeySecret)
+		}
+	}
+
 	for _, name := range required {
 		existing := &corev1.Secret{}
 		err := r.Client.Get(ctx, types.NamespacedName{Name: name, Namespace: agent.Namespace}, existing)

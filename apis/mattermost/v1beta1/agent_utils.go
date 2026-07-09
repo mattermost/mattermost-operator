@@ -9,13 +9,20 @@ import (
 )
 
 const (
-	AgentEgressPolicyDeny         = "deny"
-	AgentEgressPolicyAllowWeb     = "allowWeb"
-	AgentEgressPolicyAllow        = "allow"
-	AgentContainerName            = "agent"
-	AgentHTTPPort                 = int32(8080)
-	AgentBotTokenSecretNamePrefix = "agent-"
-	AgentStorageDefaultMountPath  = "/data"
+	AgentEgressPolicyDeny           = "deny"
+	AgentEgressPolicyAllowWeb       = "allowWeb"
+	AgentEgressPolicyAllow          = "allow"
+	AgentContainerName              = "agent"
+	AgentHTTPPort                   = int32(8080)
+	AgentBotTokenSecretNamePrefix   = "agent-"
+	AgentLiteLLMDefaultImage        = "ghcr.io/berriai/litellm-database:main-v1.82.0-stable"
+	AgentLiteLLMPort                = int32(4000)
+	AgentLiteLLMDeploymentName      = "mm-agent-litellm"
+	AgentLiteLLMServiceName         = "mm-agent-litellm"
+	AgentLiteLLMConfigMapName       = "mm-agent-litellm-config"
+	AgentLiteLLMMasterKeySecretName = "mm-agent-litellm-master-key"
+	AgentLiteLLMDBCredentialsSecret = "mm-agent-litellm-db-credentials"
+	AgentStorageDefaultMountPath    = "/data"
 )
 
 // SetDefaults sets missing values in the Agent manifest to their defaults.
@@ -38,11 +45,27 @@ func (a *Agent) SetDefaults() error {
 		}
 	}
 
+	if a.HasOperatorManagedGateway() {
+		if a.Spec.LLMGateway.OperatorManaged.Image == "" {
+			a.Spec.LLMGateway.OperatorManaged.Image = AgentLiteLLMDefaultImage
+		}
+	}
+
 	if a.Spec.Storage != nil && a.Spec.Storage.MountPath == "" {
 		a.Spec.Storage.MountPath = AgentStorageDefaultMountPath
 	}
 
 	return nil
+}
+
+// HasLLMGateway reports whether any LLM gateway configuration is set.
+func (a *Agent) HasLLMGateway() bool {
+	return a.Spec.LLMGateway != nil
+}
+
+// HasOperatorManagedGateway reports whether the operator should manage LiteLLM.
+func (a *Agent) HasOperatorManagedGateway() bool {
+	return a.Spec.LLMGateway != nil && a.Spec.LLMGateway.OperatorManaged != nil
 }
 
 // AgentLabels returns the full set of labels for all resources belonging to the agent.
@@ -71,6 +94,11 @@ func AgentResourceLabels(name string) map[string]string {
 // BotTokenSecretName returns the name of the K8s Secret storing the agent's bot token.
 func (a *Agent) BotTokenSecretName() string {
 	return AgentBotTokenSecretNamePrefix + a.Name + "-token"
+}
+
+// LiteLLMKeySecretName returns the name of the K8s Secret storing this agent's LiteLLM virtual key.
+func (a *Agent) LiteLLMKeySecretName() string {
+	return "agent-" + a.Name + "-litellm-key"
 }
 
 // HookSecretName returns the name of the K8s Secret storing this agent's hook secret.

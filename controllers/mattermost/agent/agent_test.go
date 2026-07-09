@@ -197,6 +197,73 @@ func TestCheckAgentNetworkPolicy_AllowWeb(t *testing.T) {
 	assert.Len(t, np.Spec.Egress, 4)
 }
 
+func TestCheckAgentDeployment_WithLLMGateway(t *testing.T) {
+	agent := newTestAgent()
+	agent.Spec.LLMGateway = &mmv1beta.LLMGatewayConfig{
+		OperatorManaged: &mmv1beta.OperatorManagedLLMGateway{
+			Image: mmv1beta.AgentLiteLLMDefaultImage,
+		},
+	}
+	_ = agent.SetDefaults()
+
+	botSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      agent.BotTokenSecretName(),
+			Namespace: agent.Namespace,
+		},
+		Data: map[string][]byte{"token": []byte("test-token")},
+	}
+
+	reconciler, _ := setupReconciler(t, agent, botSecret)
+
+	logSink := blubr.InitLogger(logrus.NewEntry(logrus.New()))
+	logger := logr.New(logSink.WithName("test"))
+
+	err := reconciler.checkAgentDeployment(context.TODO(), agent, logger)
+	require.NoError(t, err)
+
+	deployment := &appsv1.Deployment{}
+	err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, deployment)
+	require.NoError(t, err)
+
+	container := deployment.Spec.Template.Spec.Containers[0]
+
+	// Build a map of env vars for easy lookup.
+	envMap := make(map[string]corev1.EnvVar, len(container.Env))
+	for _, e := range container.Env {
+		envMap[e.Name] = e
+	}
+
+	// All 6 LiteLLM env vars must be present.
+	expectedLiteLLMBaseURL := "http://mm-agent-litellm." + agent.Namespace + ".svc.cluster.local:4000"
+	assert.Equal(t, expectedLiteLLMBaseURL, envMap["LITELLM_BASE_URL"].Value, "LITELLM_BASE_URL")
+	assert.Equal(t, expectedLiteLLMBaseURL+"/mcp", envMap["LITELLM_MCP_URL"].Value, "LITELLM_MCP_URL")
+	assert.Equal(t, expectedLiteLLMBaseURL+"/v1", envMap["OPENAI_BASE_URL"].Value, "OPENAI_BASE_URL")
+	assert.Equal(t, expectedLiteLLMBaseURL, envMap["ANTHROPIC_BASE_URL"].Value, "ANTHROPIC_BASE_URL")
+
+	// OPENAI_API_KEY and ANTHROPIC_API_KEY must be secretKeyRefs (not plain values).
+	expectedKeySecretName := agent.LiteLLMKeySecretName()
+
+	openAIKey, ok := envMap["OPENAI_API_KEY"]
+	require.True(t, ok, "OPENAI_API_KEY must be present")
+	require.NotNil(t, openAIKey.ValueFrom, "OPENAI_API_KEY must use ValueFrom")
+	require.NotNil(t, openAIKey.ValueFrom.SecretKeyRef, "OPENAI_API_KEY must use SecretKeyRef")
+	assert.Equal(t, expectedKeySecretName, openAIKey.ValueFrom.SecretKeyRef.Name)
+	assert.Equal(t, "apiKey", openAIKey.ValueFrom.SecretKeyRef.Key)
+
+	anthropicKey, ok := envMap["ANTHROPIC_API_KEY"]
+	require.True(t, ok, "ANTHROPIC_API_KEY must be present")
+	require.NotNil(t, anthropicKey.ValueFrom, "ANTHROPIC_API_KEY must use ValueFrom")
+	require.NotNil(t, anthropicKey.ValueFrom.SecretKeyRef, "ANTHROPIC_API_KEY must use SecretKeyRef")
+	assert.Equal(t, expectedKeySecretName, anthropicKey.ValueFrom.SecretKeyRef.Name)
+	assert.Equal(t, "apiKey", anthropicKey.ValueFrom.SecretKeyRef.Key)
+
+	// Standard env vars must still be present (backwards compat check).
+	assert.Contains(t, envMap, "MM_SERVER_URL")
+	assert.Contains(t, envMap, "MM_BOT_TOKEN")
+	assert.Contains(t, envMap, "AGENT_HOOKS")
+}
+
 func TestCheckHookSecret_CreatesSecret(t *testing.T) {
 	agent := newTestAgent()
 	_ = agent.SetDefaults()
@@ -248,6 +315,54 @@ func TestCheckHookSecret_Idempotent(t *testing.T) {
 	}, secret)
 	require.NoError(t, err)
 	assert.Equal(t, []byte("pre-existing-value"), secret.Data["hookSecret"])
+}
+
+func TestCheckAgentNetworkPolicy_DenyWithLiteLLM(t *testing.T) {
+	agent := newTestAgent()
+	agent.Spec.EgressPolicy = mmv1beta.AgentEgressPolicyDeny
+	agent.Spec.LLMGateway = &mmv1beta.LLMGatewayConfig{
+		OperatorManaged: &mmv1beta.OperatorManagedLLMGateway{
+			Image: mmv1beta.AgentLiteLLMDefaultImage,
+		},
+	}
+	_ = agent.SetDefaults()
+
+	reconciler, _ := setupReconciler(t, agent)
+
+	logSink := blubr.InitLogger(logrus.NewEntry(logrus.New()))
+	logger := logr.New(logSink.WithName("test"))
+
+	err := reconciler.checkAgentNetworkPolicy(context.TODO(), agent, logger)
+	require.NoError(t, err)
+
+	np := &networkingv1.NetworkPolicy{}
+	err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, np)
+	require.NoError(t, err)
+
+	// Ingress: MM + LiteLLM pods on agent port 8080.
+	require.Len(t, np.Spec.Ingress, 1)
+	require.Len(t, np.Spec.Ingress[0].From, 2, "ingress should allow both MM and LiteLLM pods")
+	assert.Equal(t, agent.Spec.MattermostRef.Name, np.Spec.Ingress[0].From[0].PodSelector.MatchLabels[mmv1beta.ClusterLabel])
+	assert.Equal(t, "mm-agent-litellm", np.Spec.Ingress[0].From[1].PodSelector.MatchLabels["app"])
+
+	// Deny + LiteLLM: 3 egress rules (MM + LiteLLM + DNS).
+	assert.Len(t, np.Spec.Egress, 3, "deny+litellm should have 3 egress rules: MM, LiteLLM, DNS")
+
+	// Rule 0: MM server (port 8065, has PodSelector).
+	require.Len(t, np.Spec.Egress[0].Ports, 1)
+	assert.Equal(t, int32(8065), np.Spec.Egress[0].Ports[0].Port.IntVal, "rule 0 should be MM port 8065")
+	require.NotEmpty(t, np.Spec.Egress[0].To, "rule 0 should have a To selector (MM)")
+
+	// Rule 1: LiteLLM (port 4000, has PodSelector with app: litellm).
+	require.Len(t, np.Spec.Egress[1].Ports, 1)
+	assert.Equal(t, int32(4000), np.Spec.Egress[1].Ports[0].Port.IntVal, "rule 1 should be LiteLLM port 4000")
+	require.NotEmpty(t, np.Spec.Egress[1].To)
+	require.NotNil(t, np.Spec.Egress[1].To[0].PodSelector)
+	assert.Equal(t, "mm-agent-litellm", np.Spec.Egress[1].To[0].PodSelector.MatchLabels["app"])
+
+	// Rule 2: DNS (port 53, no To selector — allows all destinations).
+	require.Len(t, np.Spec.Egress[2].Ports, 2, "DNS rule should have TCP+UDP")
+	assert.Empty(t, np.Spec.Egress[2].To, "DNS rule should have no destination selector")
 }
 
 func TestCheckAgentHealth_CarriesForwardPriorStatus(t *testing.T) {
@@ -429,4 +544,36 @@ func TestCheckAgentNetworkPolicy_Allow(t *testing.T) {
 	// Ingress still restricts to MM pods.
 	require.Len(t, np.Spec.Ingress, 1)
 	assert.Len(t, np.Spec.Ingress[0].From, 1)
+}
+
+func TestCheckAgentNetworkPolicy_AllowWithLiteLLM(t *testing.T) {
+	agent := newTestAgent()
+	agent.Spec.EgressPolicy = mmv1beta.AgentEgressPolicyAllow
+	agent.Spec.LLMGateway = &mmv1beta.LLMGatewayConfig{
+		OperatorManaged: &mmv1beta.OperatorManagedLLMGateway{
+			Image: mmv1beta.AgentLiteLLMDefaultImage,
+		},
+	}
+	_ = agent.SetDefaults()
+
+	reconciler, _ := setupReconciler(t, agent)
+
+	logSink := blubr.InitLogger(logrus.NewEntry(logrus.New()))
+	logger := logr.New(logSink.WithName("test"))
+
+	err := reconciler.checkAgentNetworkPolicy(context.TODO(), agent, logger)
+	require.NoError(t, err)
+
+	np := &networkingv1.NetworkPolicy{}
+	err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, np)
+	require.NoError(t, err)
+
+	// Egress: 1 rule (allow all), even with LiteLLM configured.
+	require.Len(t, np.Spec.Egress, 1)
+	assert.Empty(t, np.Spec.Egress[0].To)
+	assert.Empty(t, np.Spec.Egress[0].Ports)
+
+	// Ingress: 2 peers (MM + LiteLLM) — allow mode does not affect ingress.
+	require.Len(t, np.Spec.Ingress, 1)
+	assert.Len(t, np.Spec.Ingress[0].From, 2, "ingress should allow both MM and LiteLLM pods")
 }

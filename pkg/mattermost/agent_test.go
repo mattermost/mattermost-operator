@@ -339,6 +339,27 @@ func TestGenerateAgentNetworkPolicy_Allow(t *testing.T) {
 	assert.Empty(t, np.Spec.Egress[0].Ports, "allow-all rule has no Ports restriction")
 }
 
+func TestGenerateAgentNetworkPolicy_AllowWithLiteLLM(t *testing.T) {
+	agent := testAgent("my-agent", "default")
+	agent.Spec.EgressPolicy = mmv1beta.AgentEgressPolicyAllow
+	agent.Spec.LLMGateway = &mmv1beta.LLMGatewayConfig{
+		OperatorManaged: &mmv1beta.OperatorManagedLLMGateway{
+			Image: mmv1beta.AgentLiteLLMDefaultImage,
+		},
+	}
+
+	np := GenerateAgentNetworkPolicy(agent)
+
+	require.Len(t, np.Spec.Egress, 1)
+	assert.Empty(t, np.Spec.Egress[0].To, "allow-all rule has no To selector")
+	assert.Empty(t, np.Spec.Egress[0].Ports, "allow-all rule has no Ports restriction")
+
+	require.Len(t, np.Spec.Ingress, 1)
+	assert.Len(t, np.Spec.Ingress[0].From, 2, "ingress should allow both MM and LiteLLM pods")
+	assert.Equal(t, "mm-prod", np.Spec.Ingress[0].From[0].PodSelector.MatchLabels[mmv1beta.ClusterLabel])
+	assert.Equal(t, "mm-agent-litellm", np.Spec.Ingress[0].From[1].PodSelector.MatchLabels["app"])
+}
+
 func TestGenerateAgentNetworkPolicy_EgressPolicy_TableDriven(t *testing.T) {
 	tests := []struct {
 		name             string

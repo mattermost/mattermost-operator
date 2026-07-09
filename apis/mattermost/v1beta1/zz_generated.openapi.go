@@ -136,6 +136,12 @@ func schema_mattermost_operator_apis_mattermost_v1beta1_AgentSpec(ref common.Ref
 							},
 						},
 					},
+					"llmGateway": {
+						SchemaProps: spec.SchemaProps{
+							Description: "LLMGateway configures the LLM gateway for this agent. When OperatorManaged is set, the operator deploys the shared LiteLLM infrastructure only. When External is set, the agent uses an existing LiteLLM instance.",
+							Ref:         ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.LLMGatewayConfig"),
+						},
+					},
 					"storage": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Storage configures optional persistent storage for the agent pod. When set, the operator creates a PVC and mounts it into the agent container.",
@@ -147,7 +153,7 @@ func schema_mattermost_operator_apis_mattermost_v1beta1_AgentSpec(ref common.Ref
 			},
 		},
 		Dependencies: []string{
-			"github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.AgentMattermostRef", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.AgentStorageConfig", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.ResourceRequirements"},
+			"github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.AgentMattermostRef", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.AgentStorageConfig", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.LLMGatewayConfig", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.ResourceRequirements"},
 	}
 }
 
