@@ -282,11 +282,12 @@ func makeIngressRules(hosts []string, mattermost *mmv1beta.Mattermost) []network
 // GenerateDeploymentV1Beta returns the deployment for Mattermost app.
 func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig, fileStore FileStoreConfig, deploymentName, ingressHost, serviceAccountName, containerImage string) *appsv1.Deployment {
 	// DB
-	// When the database is unmanaged the user is expected to supply
-	// MM_SQLSETTINGS_* via spec.mattermostEnv, so skip operator injection.
+	// The DatabaseConfig decides what to inject; unmanaged databases use a
+	// no-op config (UnmanagedDBConfig) that returns nothing, so no operator
+	// injection happens for them.
 	var envVarDB []corev1.EnvVar
 	var initContainers []corev1.Container
-	if !mattermost.Spec.Database.IsUnmanaged() && db != nil {
+	if db != nil {
 		envVarDB = db.EnvVars(mattermost)
 		initContainers = db.InitContainers(mattermost)
 	}

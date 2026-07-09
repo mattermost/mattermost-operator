@@ -1170,15 +1170,9 @@ func TestGenerateDeployment_V1Beta_UnmanagedDatabase(t *testing.T) {
 	}
 	fileStore := &ExternalFileStore{fsInfo: FileStoreInfo{secretName: "fs", bucketName: "b", url: "s3.example.com"}}
 
-	// Pass a fully-configured DB config to prove the operator respects
-	// Database.Unmanaged rather than merely defending against a nil config.
-	dbConfig := &ExternalDBConfig{
-		secretName:          "db-secret",
-		connectionStringKey: DefaultExternalDBConnectionStringKey,
-		dbType:              database.PostgreSQLDatabase,
-		hasDBCheckURL:       true,
-	}
-	deployment := GenerateDeploymentV1Beta(mattermost, dbConfig, fileStore, "mm", "", "sa", "")
+	// checkDatabase returns a no-op UnmanagedDBConfig for unmanaged databases,
+	// which injects neither env vars nor init containers.
+	deployment := GenerateDeploymentV1Beta(mattermost, &UnmanagedDBConfig{}, fileStore, "mm", "", "sa", "")
 	require.NotNil(t, deployment)
 
 	container := mmv1beta.GetMattermostAppContainer(deployment.Spec.Template.Spec.Containers)

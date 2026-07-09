@@ -119,7 +119,7 @@ func (e *ExternalDBConfig) InitContainers(mattermost *mmv1beta.Mattermost) []cor
 		return nil
 	}
 
-	container := getDBCheckInitContainer(mattermost, e.secretName, e.dbType, e.hasSeparateDatasourceKey, e.connectionStringKey)
+	container := getDBCheckInitContainer(mattermost, e)
 	if container == nil {
 		return nil
 	}
@@ -133,9 +133,7 @@ func (e *ExternalDBConfig) InitContainers(mattermost *mmv1beta.Mattermost) []cor
 // database type when running in external mode).
 func getDBCheckInitContainer(
 	mattermost *mmv1beta.Mattermost,
-	secretName, dbType string,
-	hasSeparateDatasourceKey bool,
-	connectionStringKey string,
+	e *ExternalDBConfig,
 ) *corev1.Container {
 	mode := mmv1beta.DatabaseReadinessCheckModeExternal
 	timeout := defaultBuiltinReadinessTimeout
@@ -149,9 +147,9 @@ func getDBCheckInitContainer(
 	}
 
 	if mode == mmv1beta.DatabaseReadinessCheckModeBuiltin {
-		return builtinDBCheckInitContainer(mattermost, secretName, hasSeparateDatasourceKey, timeout, connectionStringKey)
+		return builtinDBCheckInitContainer(mattermost, e, timeout)
 	}
-	return externalDBCheckInitContainer(secretName, dbType)
+	return externalDBCheckInitContainer(e.secretName, e.dbType)
 }
 
 // externalDBCheckInitContainer returns the legacy postgres:13 / curl-based
@@ -200,24 +198,22 @@ func externalDBCheckInitContainer(secretName, dbType string) *corev1.Container {
 // custom connectionStringKey (e.g. cloudnative-pg's "uri") is honored here too.
 func builtinDBCheckInitContainer(
 	mattermost *mmv1beta.Mattermost,
-	secretName string,
-	hasSeparateDatasourceKey bool,
+	e *ExternalDBConfig,
 	timeout time.Duration,
-	connectionStringKey string,
 ) *corev1.Container {
-	datasourceKey := connectionStringKey
-	if hasSeparateDatasourceKey {
+	datasourceKey := e.connectionStringKey
+	if e.hasSeparateDatasourceKey {
 		datasourceKey = "MM_SQLSETTINGS_DATASOURCE"
 	}
 
 	envVars := []corev1.EnvVar{
 		{
 			Name:      "MM_CONFIG",
-			ValueFrom: EnvSourceFromSecret(secretName, connectionStringKey),
+			ValueFrom: EnvSourceFromSecret(e.secretName, e.connectionStringKey),
 		},
 		{
 			Name:      "MM_SQLSETTINGS_DATASOURCE",
-			ValueFrom: EnvSourceFromSecret(secretName, datasourceKey),
+			ValueFrom: EnvSourceFromSecret(e.secretName, datasourceKey),
 		},
 	}
 
