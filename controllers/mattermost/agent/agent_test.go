@@ -34,6 +34,7 @@ func newTestAgent() *mmv1beta.Agent {
 			Image:         "mattermost/agent:latest",
 			Hooks:         []string{"MessageHasBeenPosted"},
 			MattermostRef: mmv1beta.AgentMattermostRef{Name: "mm-test"},
+			EgressPolicy:  mmv1beta.AgentEgressPolicyDeny,
 		},
 	}
 }
@@ -156,6 +157,7 @@ func TestCheckAgentDeployment(t *testing.T) {
 
 func TestCheckAgentNetworkPolicy_Deny(t *testing.T) {
 	agent := newTestAgent()
+	agent.Spec.EgressPolicy = mmv1beta.AgentEgressPolicyDeny
 	_ = agent.SetDefaults()
 
 	reconciler, _ := setupReconciler(t, agent)
@@ -172,6 +174,27 @@ func TestCheckAgentNetworkPolicy_Deny(t *testing.T) {
 
 	// Deny policy: MM egress + DNS = 2 egress rules.
 	assert.Len(t, np.Spec.Egress, 2)
+}
+
+func TestCheckAgentNetworkPolicy_AllowWeb(t *testing.T) {
+	agent := newTestAgent()
+	agent.Spec.EgressPolicy = mmv1beta.AgentEgressPolicyAllowWeb
+	_ = agent.SetDefaults()
+
+	reconciler, _ := setupReconciler(t, agent)
+
+	logSink := blubr.InitLogger(logrus.NewEntry(logrus.New()))
+	logger := logr.New(logSink.WithName("test"))
+
+	err := reconciler.checkAgentNetworkPolicy(context.TODO(), agent, logger)
+	require.NoError(t, err)
+
+	np := &networkingv1.NetworkPolicy{}
+	err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, np)
+	require.NoError(t, err)
+
+	// AllowWeb policy: MM egress (8065) + DNS (53) + HTTPS (443) + HTTP (80) = 4 egress rules.
+	assert.Len(t, np.Spec.Egress, 4)
 }
 
 func TestCheckHookSecret_CreatesSecret(t *testing.T) {
@@ -379,4 +402,31 @@ func TestCheckAgentPVC_Idempotent(t *testing.T) {
 	// Second call is idempotent.
 	err = reconciler.checkAgentPVC(context.TODO(), agent, logger)
 	require.NoError(t, err)
+}
+
+func TestCheckAgentNetworkPolicy_Allow(t *testing.T) {
+	agent := newTestAgent()
+	agent.Spec.EgressPolicy = mmv1beta.AgentEgressPolicyAllow
+	_ = agent.SetDefaults()
+
+	reconciler, _ := setupReconciler(t, agent)
+
+	logSink := blubr.InitLogger(logrus.NewEntry(logrus.New()))
+	logger := logr.New(logSink.WithName("test"))
+
+	err := reconciler.checkAgentNetworkPolicy(context.TODO(), agent, logger)
+	require.NoError(t, err)
+
+	np := &networkingv1.NetworkPolicy{}
+	err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, np)
+	require.NoError(t, err)
+
+	// Allow policy: 1 egress rule (empty = allow all).
+	require.Len(t, np.Spec.Egress, 1)
+	assert.Empty(t, np.Spec.Egress[0].To, "allow-all rule has no To selector")
+	assert.Empty(t, np.Spec.Egress[0].Ports, "allow-all rule has no Ports restriction")
+
+	// Ingress still restricts to MM pods.
+	require.Len(t, np.Spec.Ingress, 1)
+	assert.Len(t, np.Spec.Ingress[0].From, 1)
 }

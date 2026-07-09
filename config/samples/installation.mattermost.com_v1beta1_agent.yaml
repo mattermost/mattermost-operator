@@ -15,6 +15,7 @@ spec:
     limits:
       cpu: 500m
       memory: 512Mi
+  egressPolicy: allowWeb
   mattermostRef:
     name: my-mattermost
   env:

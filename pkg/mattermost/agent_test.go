@@ -31,6 +31,7 @@ func testAgent(name, ns string) *mmv1beta.Agent {
 					corev1.ResourceMemory: resource.MustParse("512Mi"),
 				},
 			},
+			EgressPolicy: mmv1beta.AgentEgressPolicyDeny,
 			MattermostRef: mmv1beta.AgentMattermostRef{
 				Name: "mm-prod",
 			},
@@ -106,7 +107,7 @@ func TestGenerateAgentDeployment(t *testing.T) {
 	assert.Equal(t, "mattermost/test-agent:latest", c.Image)
 	assert.Equal(t, agent.Spec.Resources, c.Resources)
 
-	assert.Equal(t, corev1.PullIfNotPresent, c.ImagePullPolicy)
+	assert.Equal(t, corev1.PullAlways, c.ImagePullPolicy, "latest tag should get PullAlways")
 
 	assert.Len(t, c.Ports, 1)
 	assert.Equal(t, int32(8080), c.Ports[0].ContainerPort)
@@ -253,6 +254,7 @@ func TestGenerateAgentHookSecret(t *testing.T) {
 
 func TestGenerateAgentNetworkPolicy_Deny(t *testing.T) {
 	agent := testAgent("my-agent", "default")
+	agent.Spec.EgressPolicy = mmv1beta.AgentEgressPolicyDeny
 
 	np := GenerateAgentNetworkPolicy(agent)
 
@@ -280,6 +282,139 @@ func TestGenerateAgentNetworkPolicy_Deny(t *testing.T) {
 
 	dnsEgress := np.Spec.Egress[1]
 	assert.Len(t, dnsEgress.Ports, 2)
+}
+
+func TestGenerateAgentNetworkPolicy_AllowWeb(t *testing.T) {
+	agent := testAgent("my-agent", "default")
+	agent.Spec.EgressPolicy = mmv1beta.AgentEgressPolicyAllowWeb
+
+	np := GenerateAgentNetworkPolicy(agent)
+
+	assert.Len(t, np.Spec.Egress, 4)
+
+	mmEgress := np.Spec.Egress[0]
+	assert.Len(t, mmEgress.To, 1)
+	assert.Equal(t, "mm-prod", mmEgress.To[0].PodSelector.MatchLabels[mmv1beta.ClusterLabel])
+	assert.Len(t, mmEgress.Ports, 1)
+	assert.Equal(t, int32(8065), mmEgress.Ports[0].Port.IntVal)
+
+	dnsEgress := np.Spec.Egress[1]
+	assert.Len(t, dnsEgress.Ports, 2)
+	assert.Equal(t, int32(53), dnsEgress.Ports[0].Port.IntVal)
+	assert.Equal(t, int32(53), dnsEgress.Ports[1].Port.IntVal)
+
+	httpsEgress := np.Spec.Egress[2]
+	assert.Empty(t, httpsEgress.To, "no To selector means any destination")
+	assert.Len(t, httpsEgress.Ports, 1)
+	assert.Equal(t, int32(443), httpsEgress.Ports[0].Port.IntVal)
+	assert.Equal(t, corev1.ProtocolTCP, *httpsEgress.Ports[0].Protocol)
+
+	httpEgress := np.Spec.Egress[3]
+	assert.Empty(t, httpEgress.To, "no To selector means any destination")
+	assert.Len(t, httpEgress.Ports, 1)
+	assert.Equal(t, int32(80), httpEgress.Ports[0].Port.IntVal)
+	assert.Equal(t, corev1.ProtocolTCP, *httpEgress.Ports[0].Protocol)
+}
+
+func TestGenerateAgentNetworkPolicy_Allow(t *testing.T) {
+	agent := testAgent("my-agent", "default")
+	agent.Spec.EgressPolicy = mmv1beta.AgentEgressPolicyAllow
+
+	np := GenerateAgentNetworkPolicy(agent)
+
+	assert.Equal(t, "my-agent", np.Name)
+	assert.Equal(t, "default", np.Namespace)
+	assert.Len(t, np.OwnerReferences, 1)
+
+	assert.Contains(t, np.Spec.PolicyTypes, networkingv1.PolicyTypeIngress)
+	assert.Contains(t, np.Spec.PolicyTypes, networkingv1.PolicyTypeEgress)
+
+	assert.Len(t, np.Spec.Ingress, 1)
+	ingress := np.Spec.Ingress[0]
+	assert.Len(t, ingress.From, 1)
+	assert.Equal(t, "mm-prod", ingress.From[0].PodSelector.MatchLabels[mmv1beta.ClusterLabel])
+
+	require.Len(t, np.Spec.Egress, 1)
+	assert.Empty(t, np.Spec.Egress[0].To, "allow-all rule has no To selector")
+	assert.Empty(t, np.Spec.Egress[0].Ports, "allow-all rule has no Ports restriction")
+}
+
+func TestGenerateAgentNetworkPolicy_EgressPolicy_TableDriven(t *testing.T) {
+	tests := []struct {
+		name             string
+		egressPolicy     string
+		expectedEgresses int
+	}{
+		{name: "empty", egressPolicy: "", expectedEgresses: 2},
+		{name: "deny", egressPolicy: mmv1beta.AgentEgressPolicyDeny, expectedEgresses: 2},
+		{name: "allowWeb", egressPolicy: mmv1beta.AgentEgressPolicyAllowWeb, expectedEgresses: 4},
+		{name: "allow", egressPolicy: mmv1beta.AgentEgressPolicyAllow, expectedEgresses: 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			agent := testAgent("my-agent", "default")
+			agent.Spec.EgressPolicy = tt.egressPolicy
+
+			np := GenerateAgentNetworkPolicy(agent)
+
+			assert.Equal(t, []networkingv1.PolicyType{
+				networkingv1.PolicyTypeIngress,
+				networkingv1.PolicyTypeEgress,
+			}, np.Spec.PolicyTypes)
+			assert.Len(t, np.Spec.Egress, tt.expectedEgresses)
+		})
+	}
+}
+
+func TestImageTagNeedsAlwaysPull(t *testing.T) {
+	tests := []struct {
+		image    string
+		expected bool
+	}{
+		{"myimage:dev", true},
+		{"myimage:latest", true},
+		{"myimage", true},
+		{"registry:5000/path/img", true},
+		{"registry:5000/path/img:dev", true},
+		{"myimage:v1.2.3", false},
+		{"myimage:stable", false},
+		{"ghcr.io/org/litellm:v1.82.0-stable", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.image, func(t *testing.T) {
+			assert.Equal(t, tt.expected, imageTagNeedsAlwaysPull(tt.image))
+		})
+	}
+}
+
+func TestGenerateAgentDeployment_ImagePullPolicy(t *testing.T) {
+	t.Run("dev tag gets PullAlways", func(t *testing.T) {
+		agent := testAgent("my-agent", "default")
+		agent.Spec.Image = "mattermost/test-agent:dev"
+		dep := GenerateAgentDeployment(agent)
+		assert.Equal(t, corev1.PullAlways, dep.Spec.Template.Spec.Containers[0].ImagePullPolicy)
+	})
+
+	t.Run("latest tag gets PullAlways", func(t *testing.T) {
+		agent := testAgent("my-agent", "default")
+		dep := GenerateAgentDeployment(agent)
+		assert.Equal(t, corev1.PullAlways, dep.Spec.Template.Spec.Containers[0].ImagePullPolicy)
+	})
+
+	t.Run("no tag gets PullAlways", func(t *testing.T) {
+		agent := testAgent("my-agent", "default")
+		agent.Spec.Image = "mattermost/test-agent"
+		dep := GenerateAgentDeployment(agent)
+		assert.Equal(t, corev1.PullAlways, dep.Spec.Template.Spec.Containers[0].ImagePullPolicy)
+	})
+
+	t.Run("versioned tag gets PullIfNotPresent", func(t *testing.T) {
+		agent := testAgent("my-agent", "default")
+		agent.Spec.Image = "mattermost/test-agent:v1.0.0"
+		dep := GenerateAgentDeployment(agent)
+		assert.Equal(t, corev1.PullIfNotPresent, dep.Spec.Template.Spec.Containers[0].ImagePullPolicy)
+	})
 }
 
 func TestGenerateAgentPVC(t *testing.T) {

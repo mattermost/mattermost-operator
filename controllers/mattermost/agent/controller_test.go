@@ -301,3 +301,70 @@ func TestReconcileAgent_MissingBotTokenSecret(t *testing.T) {
 	assert.Contains(t, updated.Status.Error, agent.BotTokenSecretName())
 	assert.Contains(t, updated.Status.Error, "provisioned externally")
 }
+
+func newReadyMattermost() *mmv1beta.Mattermost {
+	return &mmv1beta.Mattermost{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "mm-test",
+			Namespace: "default",
+			UID:       types.UID("mm-uid"),
+		},
+		Status: mmv1beta.MattermostStatus{State: mmv1beta.Stable},
+	}
+}
+
+func TestReconcileAgent_AllowEgressPolicy(t *testing.T) {
+	logger := testLogger()
+	logf.SetLogger(logger)
+
+	agent := newTestAgent()
+	agent.Spec.EgressPolicy = mmv1beta.AgentEgressPolicyAllow
+
+	botTokenSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      agent.BotTokenSecretName(),
+			Namespace: agent.Namespace,
+		},
+		Data: map[string][]byte{"token": []byte("bot-secret-token")},
+	}
+
+	s := setupScheme(t)
+	c := fake.NewClientBuilder().
+		WithScheme(s).
+		WithStatusSubresource(&mmv1beta.Agent{}, &appsv1.Deployment{}, &mmv1beta.Mattermost{}).
+		WithRuntimeObjects(agent, newReadyMattermost(), botTokenSecret).
+		Build()
+
+	r := &AgentReconciler{
+		Client:    c,
+		Log:       logger,
+		Scheme:    s,
+		Resources: resources.NewResourceHelper(c, s),
+	}
+
+	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}}
+
+	res, err := r.Reconcile(context.Background(), req)
+	require.NoError(t, err)
+	assert.Equal(t, 6*time.Second, res.RequeueAfter)
+
+	deploy := &appsv1.Deployment{}
+	require.NoError(t, c.Get(context.TODO(), types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, deploy))
+	deploy.Status.ReadyReplicas = 1
+	deploy.Status.Replicas = 1
+	require.NoError(t, c.Status().Update(context.TODO(), deploy))
+
+	res, err = r.Reconcile(context.Background(), req)
+	require.NoError(t, err)
+	assert.Equal(t, reconcile.Result{}, res)
+
+	updated := &mmv1beta.Agent{}
+	require.NoError(t, c.Get(context.TODO(), req.NamespacedName, updated))
+	assert.Equal(t, mmv1beta.Stable, updated.Status.State)
+
+	np := &networkingv1.NetworkPolicy{}
+	require.NoError(t, c.Get(context.TODO(), types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, np))
+	require.Len(t, np.Spec.Egress, 1, "allow policy must have a single catch-all egress rule")
+	assert.Empty(t, np.Spec.Egress[0].To)
+	assert.Empty(t, np.Spec.Egress[0].Ports)
+}

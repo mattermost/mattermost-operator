@@ -54,6 +54,17 @@ spec:
           spec:
             description: AgentSpec defines the desired state of Agent
             properties:
+              egressPolicy:
+                description: |-
+                  EgressPolicy controls outbound network access from the agent pod.
+                    - "deny" (default): only Mattermost server, DNS, and LiteLLM gateway
+                    - "allowWeb": additionally permits outbound TCP 80/443 to any destination (port-based; domain-level filtering is future work)
+                    - "allow": permits all outbound traffic
+                enum:
+                - deny
+                - allowWeb
+                - allow
+                type: string
               env:
                 description: Env defines optional environment variables to inject
                   into the agent pod.

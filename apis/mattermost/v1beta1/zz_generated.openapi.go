@@ -108,6 +108,13 @@ func schema_mattermost_operator_apis_mattermost_v1beta1_AgentSpec(ref common.Ref
 							Ref:         ref("k8s.io/api/core/v1.ResourceRequirements"),
 						},
 					},
+					"egressPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "EgressPolicy controls outbound network access from the agent pod.\n  - \"deny\" (default): only Mattermost server, DNS, and LiteLLM gateway\n  - \"allowWeb\": additionally permits outbound TCP 80/443 to any destination (port-based; domain-level filtering is future work)\n  - \"allow\": permits all outbound traffic",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 					"mattermostRef": {
 						SchemaProps: spec.SchemaProps{
 							Description: "MattermostRef is a reference to the Mattermost CR in the same namespace that this agent is associated with.",

@@ -57,6 +57,14 @@ type AgentSpec struct {
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 
+	// EgressPolicy controls outbound network access from the agent pod.
+	//   - "deny" (default): only Mattermost server, DNS, and LiteLLM gateway
+	//   - "allowWeb": additionally permits outbound TCP 80/443 to any destination (port-based; domain-level filtering is future work)
+	//   - "allow": permits all outbound traffic
+	// +kubebuilder:validation:Enum=deny;allowWeb;allow
+	// +optional
+	EgressPolicy string `json:"egressPolicy,omitempty"`
+
 	// MattermostRef is a reference to the Mattermost CR in the same namespace
 	// that this agent is associated with.
 	MattermostRef AgentMattermostRef `json:"mattermostRef"`

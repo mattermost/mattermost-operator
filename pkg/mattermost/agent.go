@@ -69,6 +69,17 @@ func mmServerURL(agent *mmv1beta.Agent) string {
 		agent.Spec.MattermostRef.Name, agent.Namespace, MattermostServerPort)
 }
 
+// imageTagNeedsAlwaysPull returns true if the image tag is "dev", "latest",
+// or absent (K8s treats no-tag as :latest). Used to auto-set ImagePullPolicy.
+func imageTagNeedsAlwaysPull(image string) bool {
+	idx := strings.LastIndex(image, ":")
+	if idx > strings.LastIndex(image, "/") {
+		tag := image[idx+1:]
+		return tag == "dev" || tag == "latest"
+	}
+	return true // no tag = K8s treats as :latest
+}
+
 // GenerateAgentDeployment returns the Deployment for an Agent.
 func GenerateAgentDeployment(agent *mmv1beta.Agent) *appsv1.Deployment {
 	replicas := int32(1)
@@ -141,6 +152,11 @@ func GenerateAgentDeployment(agent *mmv1beta.Agent) *appsv1.Deployment {
 		})
 	}
 
+	pullPolicy := corev1.PullIfNotPresent
+	if imageTagNeedsAlwaysPull(agent.Spec.Image) {
+		pullPolicy = corev1.PullAlways
+	}
+
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            agent.Name,
@@ -163,7 +179,7 @@ func GenerateAgentDeployment(agent *mmv1beta.Agent) *appsv1.Deployment {
 						{
 							Name:            mmv1beta.AgentContainerName,
 							Image:           agent.Spec.Image,
-							ImagePullPolicy: corev1.PullIfNotPresent,
+							ImagePullPolicy: pullPolicy,
 							Env:             envVars,
 							Ports: []corev1.ContainerPort{
 								{
@@ -248,6 +264,37 @@ func GenerateAgentNetworkPolicy(agent *mmv1beta.Agent) *networkingv1.NetworkPoli
 			},
 		},
 	})
+
+	// If egressPolicy is allowWeb, add specific egress rules for HTTPS, HTTP,
+	// and other required outbound traffic. This avoids a catch-all that would
+	// let the agent reach internal services (e.g., PostgreSQL) it shouldn't access.
+	if agent.Spec.EgressPolicy == mmv1beta.AgentEgressPolicyAllowWeb {
+		httpsPort := intstr.FromInt32(443)
+		httpPort := intstr.FromInt32(80)
+
+		egressRules = append(egressRules, networkingv1.NetworkPolicyEgressRule{
+			Ports: []networkingv1.NetworkPolicyPort{
+				{
+					Protocol: &protocol,
+					Port:     &httpsPort,
+				},
+			},
+		})
+
+		egressRules = append(egressRules, networkingv1.NetworkPolicyEgressRule{
+			Ports: []networkingv1.NetworkPolicyPort{
+				{
+					Protocol: &protocol,
+					Port:     &httpPort,
+				},
+			},
+		})
+	}
+
+	// If egressPolicy is allow, permit all outbound traffic.
+	if agent.Spec.EgressPolicy == mmv1beta.AgentEgressPolicyAllow {
+		egressRules = []networkingv1.NetworkPolicyEgressRule{{}}
+	}
 
 	return &networkingv1.NetworkPolicy{
 		ObjectMeta: metav1.ObjectMeta{

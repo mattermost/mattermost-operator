@@ -9,6 +9,9 @@ import (
 )
 
 const (
+	AgentEgressPolicyDeny         = "deny"
+	AgentEgressPolicyAllowWeb     = "allowWeb"
+	AgentEgressPolicyAllow        = "allow"
 	AgentContainerName            = "agent"
 	AgentHTTPPort                 = int32(8080)
 	AgentBotTokenSecretNamePrefix = "agent-"
@@ -17,6 +20,10 @@ const (
 
 // SetDefaults sets missing values in the Agent manifest to their defaults.
 func (a *Agent) SetDefaults() error {
+	if a.Spec.EgressPolicy == "" {
+		a.Spec.EgressPolicy = AgentEgressPolicyDeny
+	}
+
 	if a.Spec.Resources.Requests == nil {
 		a.Spec.Resources.Requests = corev1.ResourceList{
 			corev1.ResourceCPU:    resource.MustParse("100m"),
