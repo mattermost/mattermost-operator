@@ -58,6 +58,19 @@ spec:
           spec:
             description: MattermostSpec defines the desired state of Mattermost
             properties:
+              agents:
+                description: |-
+                  Agents configures support for Mattermost AI agents managed by the
+                  mattermost-operator Agent CRD.
+                properties:
+                  enabled:
+                    description: |-
+                      Enabled grants the Mattermost server ServiceAccount the RBAC required
+                      to manage Agent CRs and their externally provisioned Secrets (bot
+                      tokens, LiteLLM virtual keys). Required for the agents plugin to
+                      provision remote agents. Defaults to false.
+                    type: boolean
+                type: object
               awsLoadBalancerController:
                 properties:
                   annotations:

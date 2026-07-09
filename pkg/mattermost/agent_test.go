@@ -1,0 +1,206 @@
+package mattermost
+
+import (
+	"testing"
+
+	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+func testAgent(name, ns string) *mmv1beta.Agent {
+	return &mmv1beta.Agent{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: ns,
+		},
+		Spec: mmv1beta.AgentSpec{
+			Image: "mattermost/test-agent:latest",
+			Hooks: []string{"MessageHasBeenPosted", "UserHasJoinedChannel"},
+			Resources: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("100m"),
+					corev1.ResourceMemory: resource.MustParse("128Mi"),
+				},
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("500m"),
+					corev1.ResourceMemory: resource.MustParse("512Mi"),
+				},
+			},
+			MattermostRef: mmv1beta.AgentMattermostRef{
+				Name: "mm-prod",
+			},
+		},
+	}
+}
+
+func envVarsByName(env []corev1.EnvVar) map[string]*corev1.EnvVar {
+	envMap := make(map[string]*corev1.EnvVar)
+	for i := range env {
+		envMap[env[i].Name] = &env[i]
+	}
+	return envMap
+}
+
+func TestAgentOwnerReference(t *testing.T) {
+	agent := testAgent("my-agent", "default")
+	refs := AgentOwnerReference(agent)
+
+	assert.Len(t, refs, 1)
+	ref := refs[0]
+	assert.Equal(t, "Agent", ref.Kind)
+	assert.Equal(t, "installation.mattermost.com/v1beta1", ref.APIVersion)
+	assert.True(t, *ref.Controller)
+	assert.Equal(t, agent.Name, ref.Name)
+}
+
+func TestGenerateAgentServiceAccount(t *testing.T) {
+	agent := testAgent("my-agent", "default")
+	sa := GenerateAgentServiceAccount(agent)
+
+	assert.Equal(t, "my-agent", sa.Name)
+	assert.Equal(t, "default", sa.Namespace)
+	assert.Equal(t, mmv1beta.AgentLabels("my-agent"), sa.Labels)
+	assert.Len(t, sa.OwnerReferences, 1)
+	assert.Equal(t, "Agent", sa.OwnerReferences[0].Kind)
+}
+
+func TestGenerateAgentService(t *testing.T) {
+	agent := testAgent("my-agent", "default")
+	svc := GenerateAgentService(agent)
+
+	assert.Equal(t, "my-agent", svc.Name)
+	assert.Equal(t, "default", svc.Namespace)
+	assert.Equal(t, corev1.ServiceTypeClusterIP, svc.Spec.Type)
+	assert.Len(t, svc.OwnerReferences, 1)
+
+	assert.Len(t, svc.Spec.Ports, 1)
+	assert.Equal(t, int32(8080), svc.Spec.Ports[0].Port)
+	assert.Equal(t, "http", svc.Spec.Ports[0].Name)
+
+	assert.Equal(t, mmv1beta.AgentSelectorLabels("my-agent"), svc.Spec.Selector)
+}
+
+func TestGenerateAgentDeployment(t *testing.T) {
+	agent := testAgent("my-agent", "test-ns")
+	dep := GenerateAgentDeployment(agent)
+
+	assert.Equal(t, "my-agent", dep.Name)
+	assert.Equal(t, "test-ns", dep.Namespace)
+	assert.Len(t, dep.OwnerReferences, 1)
+
+	assert.Equal(t, int32(1), *dep.Spec.Replicas)
+
+	assert.Equal(t, mmv1beta.AgentSelectorLabels("my-agent"), dep.Spec.Selector.MatchLabels)
+
+	assert.Equal(t, "my-agent", dep.Spec.Template.Spec.ServiceAccountName)
+
+	containers := dep.Spec.Template.Spec.Containers
+	assert.Len(t, containers, 1)
+	c := containers[0]
+	assert.Equal(t, mmv1beta.AgentContainerName, c.Name)
+	assert.Equal(t, "mattermost/test-agent:latest", c.Image)
+	assert.Equal(t, agent.Spec.Resources, c.Resources)
+
+	assert.Equal(t, corev1.PullIfNotPresent, c.ImagePullPolicy)
+
+	assert.Len(t, c.Ports, 1)
+	assert.Equal(t, int32(8080), c.Ports[0].ContainerPort)
+
+	envMap := envVarsByName(c.Env)
+	require.Contains(t, envMap, "MM_SERVER_URL")
+	require.Contains(t, envMap, "AGENT_HOOKS")
+	assert.Equal(t, "http://mm-prod.test-ns.svc.cluster.local:8065", envMap["MM_SERVER_URL"].Value)
+	assert.Equal(t, "MessageHasBeenPosted,UserHasJoinedChannel", envMap["AGENT_HOOKS"].Value)
+
+	hookSecretEnv := envMap["HOOK_SECRET"]
+	require.NotNil(t, hookSecretEnv, "HOOK_SECRET env var must be present")
+	require.NotNil(t, hookSecretEnv.ValueFrom)
+	require.NotNil(t, hookSecretEnv.ValueFrom.SecretKeyRef)
+	assert.Equal(t, agent.HookSecretName(), hookSecretEnv.ValueFrom.SecretKeyRef.Name)
+	assert.Equal(t, "hookSecret", hookSecretEnv.ValueFrom.SecretKeyRef.Key)
+
+	assert.Len(t, c.VolumeMounts, 1)
+	assert.Equal(t, "bot-token", c.VolumeMounts[0].Name)
+	assert.Equal(t, "/secrets/mmctl-token", c.VolumeMounts[0].MountPath)
+	assert.True(t, c.VolumeMounts[0].ReadOnly)
+
+	assert.Empty(t, dep.Spec.Template.Spec.InitContainers, "init containers must be removed")
+
+	for _, e := range c.Env {
+		assert.NotEqual(t, "HOME", e.Name, "HOME env var must not be present")
+	}
+
+	volumes := dep.Spec.Template.Spec.Volumes
+	assert.Len(t, volumes, 1)
+	assert.Equal(t, "bot-token", volumes[0].Name)
+	assert.Equal(t, agent.BotTokenSecretName(), volumes[0].Secret.SecretName)
+}
+
+func TestGenerateAgentDeployment_CustomEnvVars(t *testing.T) {
+	agent := testAgent("my-agent", "default")
+	agent.Spec.Env = []corev1.EnvVar{
+		{Name: "CUSTOM_VAR", Value: "custom-value"},
+		{Name: "MM_SERVER_URL", Value: "should-not-override"},
+	}
+
+	dep := GenerateAgentDeployment(agent)
+	c := dep.Spec.Template.Spec.Containers[0]
+
+	envMap := envVarsByName(c.Env)
+
+	require.Contains(t, envMap, "CUSTOM_VAR")
+	require.Contains(t, envMap, "MM_SERVER_URL")
+	assert.Equal(t, "custom-value", envMap["CUSTOM_VAR"].Value)
+	assert.Equal(t, "should-not-override", envMap["MM_SERVER_URL"].Value)
+}
+
+func TestGenerateAgentHookSecret(t *testing.T) {
+	agent := testAgent("my-agent", "default")
+	secret := GenerateAgentHookSecret(agent, "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890")
+
+	assert.Equal(t, agent.HookSecretName(), secret.Name)
+	assert.Equal(t, "default", secret.Namespace)
+	assert.Equal(t, mmv1beta.AgentLabels("my-agent"), secret.Labels)
+	assert.Len(t, secret.OwnerReferences, 1)
+	assert.Equal(t, "Agent", secret.OwnerReferences[0].Kind)
+	assert.Equal(t, []byte("abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"), secret.Data["hookSecret"])
+
+	assert.NotContains(t, secret.Data, "token")
+	assert.NotContains(t, secret.Data, "apiKey")
+}
+
+func TestGenerateAgentNetworkPolicy_Deny(t *testing.T) {
+	agent := testAgent("my-agent", "default")
+
+	np := GenerateAgentNetworkPolicy(agent)
+
+	assert.Equal(t, "my-agent", np.Name)
+	assert.Equal(t, "default", np.Namespace)
+	assert.Len(t, np.OwnerReferences, 1)
+
+	assert.Contains(t, np.Spec.PolicyTypes, networkingv1.PolicyTypeIngress)
+	assert.Contains(t, np.Spec.PolicyTypes, networkingv1.PolicyTypeEgress)
+
+	assert.Len(t, np.Spec.Ingress, 1)
+	ingress := np.Spec.Ingress[0]
+	assert.Len(t, ingress.From, 1)
+	assert.Equal(t, "mm-prod", ingress.From[0].PodSelector.MatchLabels[mmv1beta.ClusterLabel])
+	assert.Len(t, ingress.Ports, 1)
+	assert.Equal(t, int32(8080), ingress.Ports[0].Port.IntVal)
+
+	assert.Len(t, np.Spec.Egress, 2)
+
+	mmEgress := np.Spec.Egress[0]
+	assert.Len(t, mmEgress.To, 1)
+	assert.Equal(t, "mm-prod", mmEgress.To[0].PodSelector.MatchLabels[mmv1beta.ClusterLabel])
+	assert.Len(t, mmEgress.Ports, 1)
+	assert.Equal(t, int32(8065), mmEgress.Ports[0].Port.IntVal)
+
+	dnsEgress := np.Spec.Egress[1]
+	assert.Len(t, dnsEgress.Ports, 2)
+}

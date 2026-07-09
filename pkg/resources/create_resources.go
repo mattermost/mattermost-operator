@@ -21,9 +21,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-const lastAppliedConfig = "mattermost.com/last-applied"
+// LastAppliedConfig is the objectmatcher annotation key used for resource diffs.
+const LastAppliedConfig = "mattermost.com/last-applied"
 
-var defaultAnnotator = objectMatcher.NewAnnotator(lastAppliedConfig)
+var defaultAnnotator = objectMatcher.NewAnnotator(LastAppliedConfig)
 
 // Object combines the interfaces that all Kubernetes objects must implement.
 type Object interface {
@@ -187,6 +188,32 @@ func (r *ResourceHelper) CreatePvcIfNotExists(owner v1.Object, pvc *corev1.Persi
 		return r.Create(owner, pvc, reqLogger)
 	} else if err != nil {
 		return errors.Wrap(err, "failed to check if pvc exists")
+	}
+
+	return nil
+}
+
+func (r *ResourceHelper) CreateNetworkPolicyIfNotExists(owner v1.Object, networkPolicy *networkingv1.NetworkPolicy, reqLogger logr.Logger) error {
+	foundNetworkPolicy := &networkingv1.NetworkPolicy{}
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: networkPolicy.Name, Namespace: networkPolicy.Namespace}, foundNetworkPolicy)
+	if err != nil && k8sErrors.IsNotFound(err) {
+		reqLogger.Info("Creating network policy", "name", networkPolicy.Name)
+		return r.Create(owner, networkPolicy, reqLogger)
+	} else if err != nil {
+		return errors.Wrap(err, "failed to check if network policy exists")
+	}
+
+	return nil
+}
+
+func (r *ResourceHelper) CreateSecretIfNotExists(owner v1.Object, secret *corev1.Secret, reqLogger logr.Logger) error {
+	foundSecret := &corev1.Secret{}
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: secret.Name, Namespace: secret.Namespace}, foundSecret)
+	if err != nil && k8sErrors.IsNotFound(err) {
+		reqLogger.Info("Creating secret", "name", secret.Name)
+		return r.Create(owner, secret, reqLogger)
+	} else if err != nil {
+		return errors.Wrap(err, "failed to check if secret exists")
 	}
 
 	return nil

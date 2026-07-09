@@ -9,6 +9,8 @@
 Package v1beta1 contains API Schema definitions for the mattermost v1beta1 API group
 
 ### Resource Types
+- [Agent](#agent)
+- [AgentList](#agentlist)
 - [Mattermost](#mattermost)
 - [MattermostList](#mattermostlist)
 
@@ -33,6 +35,81 @@ _Appears in:_
 | `hosts` _[IngressHost](#ingresshost) array_ | Hosts allows specifying additional domain names for Mattermost to use. |  | Optional: \{\} <br /> |
 | `ingressClassName` _string_ | IngressClassName for your ingress |  | Optional: \{\} <br /> |
 | `annotations` _object (keys:string, values:string)_ | Annotations defines annotations passed to the Ingress associated with Mattermost. |  | Optional: \{\} <br /> |
+
+
+#### Agent
+
+
+
+Agent is the Schema for the agents API
+
+
+
+_Appears in:_
+- [AgentList](#agentlist)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `apiVersion` _string_ | `installation.mattermost.com/v1beta1` | | |
+| `kind` _string_ | `Agent` | | |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
+| `spec` _[AgentSpec](#agentspec)_ |  |  |  |
+
+
+#### AgentList
+
+
+
+AgentList contains a list of Agent
+
+
+
+
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `apiVersion` _string_ | `installation.mattermost.com/v1beta1` | | |
+| `kind` _string_ | `AgentList` | | |
+| `metadata` _[ListMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#listmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
+| `items` _[Agent](#agent) array_ |  |  |  |
+
+
+#### AgentMattermostRef
+
+
+
+AgentMattermostRef references a Mattermost CR by name.
+
+
+
+_Appears in:_
+- [AgentSpec](#agentspec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `name` _string_ | Name of the Mattermost CR in the same namespace. |  | MinLength: 1 <br /> |
+
+
+#### AgentSpec
+
+
+
+AgentSpec defines the desired state of Agent
+
+
+
+_Appears in:_
+- [Agent](#agent)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `image` _string_ | Image defines the agent container image. |  | MinLength: 1 <br /> |
+| `hooks` _string array_ | Hooks lists the Mattermost plugin hook names this agent subscribes to.<br />Example: ["MessageHasBeenPosted", "UserHasJoinedChannel"] |  | Optional: \{\} <br /> |
+| `resources` _[ResourceRequirements](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#resourcerequirements-v1-core)_ | Resources defines the CPU/memory requests and limits for the agent pod. |  | Optional: \{\} <br /> |
+| `mattermostRef` _[AgentMattermostRef](#agentmattermostref)_ | MattermostRef is a reference to the Mattermost CR in the same namespace<br />that this agent is associated with. |  |  |
+| `env` _[EnvVar](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#envvar-v1-core) array_ | Env defines optional environment variables to inject into the agent pod. |  | Optional: \{\} <br /> |
+
+
 
 
 #### Database
@@ -269,6 +346,22 @@ _Appears in:_
 | `spec` _[MattermostSpec](#mattermostspec)_ |  |  |  |
 
 
+#### MattermostAgents
+
+
+
+MattermostAgents configures Agent CR integration for this installation.
+
+
+
+_Appears in:_
+- [MattermostSpec](#mattermostspec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `enabled` _boolean_ | Enabled grants the Mattermost server ServiceAccount the RBAC required<br />to manage Agent CRs and their externally provisioned Secrets (bot<br />tokens, LiteLLM virtual keys). Required for the agents plugin to<br />provision remote agents. Defaults to false. |  | Optional: \{\} <br /> |
+
+
 #### MattermostList
 
 
@@ -330,6 +423,7 @@ _Appears in:_
 | `updateJob` _[UpdateJob](#updatejob)_ | UpdateJob defines configuration for the template for the update job. |  | Optional: \{\} <br /> |
 | `jobServer` _[JobServer](#jobserver)_ | JobServer defines configuration for the Mattermost job server. |  | Optional: \{\} <br /> |
 | `podExtensions` _[PodExtensions](#podextensions)_ | PodExtensions specify custom extensions for Mattermost pods.<br />This can be used for custom readiness checks etc.<br />These settings generally don't need to be changed. |  | Optional: \{\} <br /> |
+| `agents` _[MattermostAgents](#mattermostagents)_ | Agents configures support for Mattermost AI agents managed by the<br />mattermost-operator Agent CRD. |  | Optional: \{\} <br /> |
 | `resourcePatch` _[ResourcePatch](#resourcepatch)_ | ResourcePatch specifies JSON patches that can be applied to resources created by Mattermost Operator.<br />WARNING: ResourcePatch is highly experimental and subject to change.<br />Some patches may be impossible to perform or may impact the stability of Mattermost server.<br />Use at your own risk when no other options are available. |  |  |
 
 
@@ -511,6 +605,7 @@ RunningState is the state of the Mattermost instance
 
 
 _Appears in:_
+- [AgentStatus](#agentstatus)
 - [MattermostStatus](#mattermoststatus)
 
 | Field | Description |

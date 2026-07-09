@@ -1169,6 +1169,11 @@ func TestGenerateRBACResources_V1Beta(t *testing.T) {
 	require.Equal(t, 1, len(role.OwnerReferences))
 	require.Equal(t, 1, len(role.Rules))
 
+	// Default: agents not enabled — only batch/jobs.
+	assert.Equal(t, []string{"get", "list", "watch"}, role.Rules[0].Verbs)
+	assert.Equal(t, []string{"batch"}, role.Rules[0].APIGroups)
+	assert.Equal(t, []string{"jobs"}, role.Rules[0].Resources)
+
 	roleBinding := GenerateRoleBindingV1Beta(mattermost, roleName, saName)
 	require.Equal(t, roleName, roleBinding.Name)
 	require.Equal(t, mattermost.Namespace, roleBinding.Namespace)
@@ -1176,6 +1181,42 @@ func TestGenerateRBACResources_V1Beta(t *testing.T) {
 	require.Equal(t, 1, len(roleBinding.Subjects))
 	require.Equal(t, saName, roleBinding.Subjects[0].Name)
 	require.Equal(t, roleName, roleBinding.RoleRef.Name)
+}
+
+func TestGenerateRBACResources_V1Beta_AgentsEnabled(t *testing.T) {
+	roleName := "role"
+	mattermost := &mmv1beta.Mattermost{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-mm",
+			Namespace: "test-namespace",
+		},
+		Spec: mmv1beta.MattermostSpec{
+			Agents: &mmv1beta.MattermostAgents{Enabled: true},
+		},
+	}
+
+	role := GenerateRoleV1Beta(mattermost, roleName)
+	require.Equal(t, 4, len(role.Rules))
+
+	// Rule 0: batch/jobs — get,list,watch (unchanged).
+	assert.Equal(t, []string{"get", "list", "watch"}, role.Rules[0].Verbs)
+	assert.Equal(t, []string{"batch"}, role.Rules[0].APIGroups)
+	assert.Equal(t, []string{"jobs"}, role.Rules[0].Resources)
+
+	// Rule 1: agents — full CRUD.
+	assert.Equal(t, []string{"get", "list", "watch", "create", "update", "patch", "delete"}, role.Rules[1].Verbs)
+	assert.Equal(t, []string{"installation.mattermost.com"}, role.Rules[1].APIGroups)
+	assert.Equal(t, []string{"agents"}, role.Rules[1].Resources)
+
+	// Rule 2: agents/status — get only.
+	assert.Equal(t, []string{"get"}, role.Rules[2].Verbs)
+	assert.Equal(t, []string{"installation.mattermost.com"}, role.Rules[2].APIGroups)
+	assert.Equal(t, []string{"agents/status"}, role.Rules[2].Resources)
+
+	// Rule 3: secrets — get, create, update, delete.
+	assert.Equal(t, []string{"get", "create", "update", "delete"}, role.Rules[3].Verbs)
+	assert.Equal(t, []string{""}, role.Rules[3].APIGroups)
+	assert.Equal(t, []string{"secrets"}, role.Rules[3].Resources)
 }
 
 func fixVolume() corev1.Volume {
@@ -1266,11 +1307,11 @@ func TestSanitizeIngressAnnotations(t *testing.T) {
 		{
 			name: "mixed safe and dangerous annotations",
 			input: map[string]string{
-				"nginx.ingress.kubernetes.io/proxy-body-size":         "1000M",
-				"nginx.ingress.kubernetes.io/configuration-snippet":   "dangerous",
-				"nginx.ingress.kubernetes.io/ssl-redirect":            "true",
-				"nginx.ingress.kubernetes.io/server-snippet":          "also-dangerous",
-				"safe-key-with-newline":                               "value\ninjected",
+				"nginx.ingress.kubernetes.io/proxy-body-size":       "1000M",
+				"nginx.ingress.kubernetes.io/configuration-snippet": "dangerous",
+				"nginx.ingress.kubernetes.io/ssl-redirect":          "true",
+				"nginx.ingress.kubernetes.io/server-snippet":        "also-dangerous",
+				"safe-key-with-newline":                             "value\ninjected",
 			},
 			expected: map[string]string{
 				"nginx.ingress.kubernetes.io/proxy-body-size": "1000M",

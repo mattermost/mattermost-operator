@@ -139,6 +139,11 @@ type MattermostSpec struct {
 	// +optional
 	PodExtensions PodExtensions `json:"podExtensions,omitempty"`
 
+	// Agents configures support for Mattermost AI agents managed by the
+	// mattermost-operator Agent CRD.
+	// +optional
+	Agents *MattermostAgents `json:"agents,omitempty"`
+
 	// ResourcePatch specifies JSON patches that can be applied to resources created by Mattermost Operator.
 	//
 	// WARNING: ResourcePatch is highly experimental and subject to change.
@@ -324,6 +329,16 @@ type PodExtensions struct {
 	// Additional Container Ports injected into pod's main container.
 	// The setting does not override ContainerPorts defined by the Operator.
 	ContainerPorts []v1.ContainerPort `json:"containerPorts,omitempty"`
+}
+
+// MattermostAgents configures Agent CR integration for this installation.
+type MattermostAgents struct {
+	// Enabled grants the Mattermost server ServiceAccount the RBAC required
+	// to manage Agent CRs and their externally provisioned Secrets (bot
+	// tokens, LiteLLM virtual keys). Required for the agents plugin to
+	// provision remote agents. Defaults to false.
+	// +optional
+	Enabled bool `json:"enabled,omitempty"`
 }
 
 // Database defines the database configuration for Mattermost.

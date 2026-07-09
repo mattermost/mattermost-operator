@@ -102,6 +102,12 @@ func validateVolumes(volumes []corev1.Volume) error {
 	return nil
 }
 
+// AgentsEnabled reports whether Agent CR RBAC should be granted to the
+// Mattermost server ServiceAccount.
+func (mm *Mattermost) AgentsEnabled() bool {
+	return mm.Spec.Agents != nil && mm.Spec.Agents.Enabled
+}
+
 // IngressEnabled determines whether Mattermost Ingress should be created.
 func (mm *Mattermost) IngressEnabled() bool {
 	if mm.Spec.Ingress != nil {
