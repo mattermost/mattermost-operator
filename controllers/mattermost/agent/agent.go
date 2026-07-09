@@ -132,6 +132,20 @@ func (r *AgentReconciler) checkAgentNetworkPolicy(ctx context.Context, agent *mm
 	return r.Resources.Update(current, desired, reqLogger)
 }
 
+// checkAgentPVC creates the agent storage PVC if configured. PVCs are create-only;
+// size/class changes require manual intervention (PVC specs are mostly immutable).
+func (r *AgentReconciler) checkAgentPVC(ctx context.Context, agent *mmv1beta.Agent, reqLogger logr.Logger) error {
+	if agent.Spec.Storage == nil {
+		return nil
+	}
+
+	desired := mattermostApp.GenerateAgentPVC(agent)
+	if err := r.Resources.CreatePvcIfNotExists(agent, desired, reqLogger); err != nil {
+		return errors.Wrap(err, "failed to create agent storage PVC")
+	}
+	return nil
+}
+
 func (r *AgentReconciler) checkAgentHealth(ctx context.Context, agent *mmv1beta.Agent, prior mmv1beta.AgentStatus, reqLogger logr.Logger) (mmv1beta.AgentStatus, error) {
 	status := prior
 	status.State = mmv1beta.Reconciling

@@ -5,6 +5,7 @@ package v1beta1
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -22,6 +23,22 @@ type AgentMattermostRef struct {
 	// Name of the Mattermost CR in the same namespace.
 	// +kubebuilder:validation:MinLength=1
 	Name string `json:"name"`
+}
+
+// AgentStorageConfig defines optional persistent storage for the agent pod.
+type AgentStorageConfig struct {
+	// Size is the requested PVC storage size (e.g., "1Gi", "500Mi").
+	Size resource.Quantity `json:"size"`
+
+	// StorageClassName is the name of the StorageClass to use for the PVC.
+	// If omitted, the cluster default StorageClass is used.
+	// +optional
+	StorageClassName *string `json:"storageClassName,omitempty"`
+
+	// MountPath is the path inside the container where the volume is mounted.
+	// Defaults to "/data".
+	// +optional
+	MountPath string `json:"mountPath,omitempty"`
 }
 
 // AgentSpec defines the desired state of Agent
@@ -47,6 +64,11 @@ type AgentSpec struct {
 	// Env defines optional environment variables to inject into the agent pod.
 	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty"`
+
+	// Storage configures optional persistent storage for the agent pod.
+	// When set, the operator creates a PVC and mounts it into the agent container.
+	// +optional
+	Storage *AgentStorageConfig `json:"storage,omitempty"`
 }
 
 // AgentStatus defines the observed state of Agent

@@ -129,12 +129,18 @@ func schema_mattermost_operator_apis_mattermost_v1beta1_AgentSpec(ref common.Ref
 							},
 						},
 					},
+					"storage": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Storage configures optional persistent storage for the agent pod. When set, the operator creates a PVC and mounts it into the agent container.",
+							Ref:         ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.AgentStorageConfig"),
+						},
+					},
 				},
 				Required: []string{"image", "mattermostRef"},
 			},
 		},
 		Dependencies: []string{
-			"github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.AgentMattermostRef", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.ResourceRequirements"},
+			"github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.AgentMattermostRef", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.AgentStorageConfig", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.ResourceRequirements"},
 	}
 }
 

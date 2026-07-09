@@ -126,6 +126,21 @@ func GenerateAgentDeployment(agent *mmv1beta.Agent) *appsv1.Deployment {
 		},
 	}
 
+	if agent.Spec.Storage != nil {
+		volumes = append(volumes, corev1.Volume{
+			Name: "agent-storage",
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: agent.StoragePVCName(),
+				},
+			},
+		})
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "agent-storage",
+			MountPath: agent.Spec.Storage.MountPath,
+		})
+	}
+
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            agent.Name,
@@ -266,4 +281,32 @@ func GenerateAgentHookSecret(agent *mmv1beta.Agent, secretValue string) *corev1.
 		},
 		Data: map[string][]byte{"hookSecret": []byte(secretValue)},
 	}
+}
+
+// GenerateAgentPVC returns the PersistentVolumeClaim for an Agent's storage.
+func GenerateAgentPVC(agent *mmv1beta.Agent) *corev1.PersistentVolumeClaim {
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            agent.StoragePVCName(),
+			Namespace:       agent.Namespace,
+			Labels:          mmv1beta.AgentLabels(agent.Name),
+			OwnerReferences: AgentOwnerReference(agent),
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			AccessModes: []corev1.PersistentVolumeAccessMode{
+				corev1.ReadWriteOnce,
+			},
+			Resources: corev1.VolumeResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceStorage: agent.Spec.Storage.Size,
+				},
+			},
+		},
+	}
+
+	if agent.Spec.Storage.StorageClassName != nil {
+		pvc.Spec.StorageClassName = agent.Spec.Storage.StorageClassName
+	}
+
+	return pvc
 }

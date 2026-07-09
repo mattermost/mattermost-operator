@@ -15,6 +15,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -254,4 +255,128 @@ func TestCheckAgentHealth_CarriesForwardPriorStatus(t *testing.T) {
 	assert.Equal(t, agent.Generation, status.ObservedGeneration)
 	assert.Empty(t, status.Error)
 	assert.Contains(t, status.Endpoint, "http://")
+}
+
+func TestCheckAgentPVC_Creates(t *testing.T) {
+	agent := newTestAgent()
+	agent.Spec.Storage = &mmv1beta.AgentStorageConfig{
+		Size:      resource.MustParse("1Gi"),
+		MountPath: "/data",
+	}
+	_ = agent.SetDefaults()
+
+	reconciler, _ := setupReconciler(t, agent)
+	logger := testLogger()
+
+	err := reconciler.checkAgentPVC(context.TODO(), agent, logger)
+	require.NoError(t, err)
+
+	// Verify PVC was created.
+	pvc := &corev1.PersistentVolumeClaim{}
+	err = reconciler.Client.Get(context.TODO(), types.NamespacedName{
+		Name:      agent.StoragePVCName(),
+		Namespace: agent.Namespace,
+	}, pvc)
+	require.NoError(t, err)
+
+	assert.Equal(t, agent.StoragePVCName(), pvc.Name)
+	assert.Equal(t, agent.Namespace, pvc.Namespace)
+	assert.Equal(t, []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}, pvc.Spec.AccessModes)
+
+	storageReq := pvc.Spec.Resources.Requests[corev1.ResourceStorage]
+	assert.Equal(t, resource.MustParse("1Gi"), storageReq)
+}
+
+func TestCheckAgentPVC_Skips(t *testing.T) {
+	agent := newTestAgent()
+	// Storage is nil — PVC should not be created.
+	_ = agent.SetDefaults()
+
+	reconciler, _ := setupReconciler(t, agent)
+	logger := testLogger()
+
+	err := reconciler.checkAgentPVC(context.TODO(), agent, logger)
+	require.NoError(t, err)
+
+	// Verify no PVC exists.
+	pvc := &corev1.PersistentVolumeClaim{}
+	err = reconciler.Client.Get(context.TODO(), types.NamespacedName{
+		Name:      agent.Name + "-storage",
+		Namespace: agent.Namespace,
+	}, pvc)
+	require.Error(t, err, "PVC should not exist when Storage is nil")
+}
+
+func TestCheckAgentPVC_OwnerReference(t *testing.T) {
+	agent := newTestAgent()
+	agent.Spec.Storage = &mmv1beta.AgentStorageConfig{
+		Size:      resource.MustParse("2Gi"),
+		MountPath: "/data",
+	}
+	_ = agent.SetDefaults()
+
+	reconciler, _ := setupReconciler(t, agent)
+	logger := testLogger()
+
+	err := reconciler.checkAgentPVC(context.TODO(), agent, logger)
+	require.NoError(t, err)
+
+	pvc := &corev1.PersistentVolumeClaim{}
+	err = reconciler.Client.Get(context.TODO(), types.NamespacedName{
+		Name:      agent.StoragePVCName(),
+		Namespace: agent.Namespace,
+	}, pvc)
+	require.NoError(t, err)
+
+	// Verify OwnerReference points to the Agent CR.
+	require.Len(t, pvc.OwnerReferences, 1)
+	assert.Equal(t, "Agent", pvc.OwnerReferences[0].Kind)
+	assert.Equal(t, agent.Name, pvc.OwnerReferences[0].Name)
+}
+
+func TestCheckAgentPVC_WithStorageClass(t *testing.T) {
+	agent := newTestAgent()
+	storageClass := "gp3-encrypted"
+	agent.Spec.Storage = &mmv1beta.AgentStorageConfig{
+		Size:             resource.MustParse("10Gi"),
+		StorageClassName: &storageClass,
+		MountPath:        "/workspace",
+	}
+	_ = agent.SetDefaults()
+
+	reconciler, _ := setupReconciler(t, agent)
+	logger := testLogger()
+
+	err := reconciler.checkAgentPVC(context.TODO(), agent, logger)
+	require.NoError(t, err)
+
+	pvc := &corev1.PersistentVolumeClaim{}
+	err = reconciler.Client.Get(context.TODO(), types.NamespacedName{
+		Name:      agent.StoragePVCName(),
+		Namespace: agent.Namespace,
+	}, pvc)
+	require.NoError(t, err)
+
+	require.NotNil(t, pvc.Spec.StorageClassName)
+	assert.Equal(t, "gp3-encrypted", *pvc.Spec.StorageClassName)
+}
+
+func TestCheckAgentPVC_Idempotent(t *testing.T) {
+	agent := newTestAgent()
+	agent.Spec.Storage = &mmv1beta.AgentStorageConfig{
+		Size:      resource.MustParse("1Gi"),
+		MountPath: "/data",
+	}
+	_ = agent.SetDefaults()
+
+	reconciler, _ := setupReconciler(t, agent)
+	logger := testLogger()
+
+	// First call creates.
+	err := reconciler.checkAgentPVC(context.TODO(), agent, logger)
+	require.NoError(t, err)
+
+	// Second call is idempotent.
+	err = reconciler.checkAgentPVC(context.TODO(), agent, logger)
+	require.NoError(t, err)
 }

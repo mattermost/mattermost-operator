@@ -12,6 +12,7 @@ const (
 	AgentContainerName            = "agent"
 	AgentHTTPPort                 = int32(8080)
 	AgentBotTokenSecretNamePrefix = "agent-"
+	AgentStorageDefaultMountPath  = "/data"
 )
 
 // SetDefaults sets missing values in the Agent manifest to their defaults.
@@ -28,6 +29,10 @@ func (a *Agent) SetDefaults() error {
 			corev1.ResourceCPU:    resource.MustParse("500m"),
 			corev1.ResourceMemory: resource.MustParse("512Mi"),
 		}
+	}
+
+	if a.Spec.Storage != nil && a.Spec.Storage.MountPath == "" {
+		a.Spec.Storage.MountPath = AgentStorageDefaultMountPath
 	}
 
 	return nil
@@ -64,4 +69,9 @@ func (a *Agent) BotTokenSecretName() string {
 // HookSecretName returns the name of the K8s Secret storing this agent's hook secret.
 func (a *Agent) HookSecretName() string {
 	return "agent-" + a.Name + "-hook-secret"
+}
+
+// StoragePVCName returns the name of the PVC for the agent's persistent storage.
+func (a *Agent) StoragePVCName() string {
+	return "agent-" + a.Name + "-storage"
 }

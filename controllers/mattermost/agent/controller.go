@@ -130,6 +130,13 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, request ctrl.Request) (
 		return reconcile.Result{}, err
 	}
 
+	// PVC (must exist before Deployment references it)
+	err = r.checkAgentPVC(ctx, agent, reqLogger)
+	if err != nil {
+		r.updateStatusReconcilingAndLogError(ctx, agent, status, reqLogger, err)
+		return reconcile.Result{}, err
+	}
+
 	// Bot token Secret is provisioned by the agents plugin, not the operator.
 	if err = r.checkExternallyProvisionedSecrets(ctx, agent); err != nil {
 		r.updateStatusReconcilingAndLogError(ctx, agent, status, reqLogger, err)

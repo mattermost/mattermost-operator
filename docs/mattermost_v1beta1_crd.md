@@ -108,8 +108,27 @@ _Appears in:_
 | `resources` _[ResourceRequirements](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#resourcerequirements-v1-core)_ | Resources defines the CPU/memory requests and limits for the agent pod. |  | Optional: \{\} <br /> |
 | `mattermostRef` _[AgentMattermostRef](#agentmattermostref)_ | MattermostRef is a reference to the Mattermost CR in the same namespace<br />that this agent is associated with. |  |  |
 | `env` _[EnvVar](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#envvar-v1-core) array_ | Env defines optional environment variables to inject into the agent pod. |  | Optional: \{\} <br /> |
+| `storage` _[AgentStorageConfig](#agentstorageconfig)_ | Storage configures optional persistent storage for the agent pod.<br />When set, the operator creates a PVC and mounts it into the agent container. |  | Optional: \{\} <br /> |
 
 
+
+
+#### AgentStorageConfig
+
+
+
+AgentStorageConfig defines optional persistent storage for the agent pod.
+
+
+
+_Appears in:_
+- [AgentSpec](#agentspec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `size` _[Quantity](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#quantity-resource-api)_ | Size is the requested PVC storage size (e.g., "1Gi", "500Mi"). |  |  |
+| `storageClassName` _string_ | StorageClassName is the name of the StorageClass to use for the PVC.<br />If omitted, the cluster default StorageClass is used. |  | Optional: \{\} <br /> |
+| `mountPath` _string_ | MountPath is the path inside the container where the volume is mounted.<br />Defaults to "/data". |  | Optional: \{\} <br /> |
 
 
 #### Database

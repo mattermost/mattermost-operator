@@ -159,6 +159,83 @@ func TestGenerateAgentDeployment_CustomEnvVars(t *testing.T) {
 	assert.Equal(t, "should-not-override", envMap["MM_SERVER_URL"].Value)
 }
 
+func TestGenerateAgentDeployment_WithStorage(t *testing.T) {
+	agent := testAgent("my-agent", "test-ns")
+	storageClass := "fast-ssd"
+	agent.Spec.Storage = &mmv1beta.AgentStorageConfig{
+		Size:             resource.MustParse("5Gi"),
+		StorageClassName: &storageClass,
+		MountPath:        "/workspace",
+	}
+
+	dep := GenerateAgentDeployment(agent)
+
+	volumes := dep.Spec.Template.Spec.Volumes
+	assert.Len(t, volumes, 2)
+	assert.Equal(t, "bot-token", volumes[0].Name)
+	assert.Equal(t, "agent-storage", volumes[1].Name)
+	assert.Equal(t, agent.StoragePVCName(), volumes[1].PersistentVolumeClaim.ClaimName)
+
+	mounts := dep.Spec.Template.Spec.Containers[0].VolumeMounts
+	assert.Len(t, mounts, 2)
+	assert.Equal(t, "bot-token", mounts[0].Name)
+	assert.Equal(t, "agent-storage", mounts[1].Name)
+	assert.Equal(t, "/workspace", mounts[1].MountPath)
+}
+
+func TestGenerateAgentDeployment_WithoutStorage(t *testing.T) {
+	agent := testAgent("my-agent", "test-ns")
+	// Storage is nil by default in testAgent
+
+	dep := GenerateAgentDeployment(agent)
+
+	volumes := dep.Spec.Template.Spec.Volumes
+	assert.Len(t, volumes, 1)
+	assert.Equal(t, "bot-token", volumes[0].Name)
+
+	mounts := dep.Spec.Template.Spec.Containers[0].VolumeMounts
+	assert.Len(t, mounts, 1)
+	assert.Equal(t, "bot-token", mounts[0].Name)
+}
+
+func TestSetDefaults_StorageMountPath(t *testing.T) {
+	agent := &mmv1beta.Agent{
+		Spec: mmv1beta.AgentSpec{
+			Image:         "test:latest",
+			MattermostRef: mmv1beta.AgentMattermostRef{Name: "mm"},
+			Storage: &mmv1beta.AgentStorageConfig{
+				Size: resource.MustParse("1Gi"),
+			},
+		},
+	}
+	err := agent.SetDefaults()
+	require.NoError(t, err)
+	assert.Equal(t, mmv1beta.AgentStorageDefaultMountPath, agent.Spec.Storage.MountPath)
+}
+
+func TestSetDefaults_StorageMountPathPreserved(t *testing.T) {
+	agent := &mmv1beta.Agent{
+		Spec: mmv1beta.AgentSpec{
+			Image:         "test:latest",
+			MattermostRef: mmv1beta.AgentMattermostRef{Name: "mm"},
+			Storage: &mmv1beta.AgentStorageConfig{
+				Size:      resource.MustParse("1Gi"),
+				MountPath: "/custom/path",
+			},
+		},
+	}
+	err := agent.SetDefaults()
+	require.NoError(t, err)
+	assert.Equal(t, "/custom/path", agent.Spec.Storage.MountPath)
+}
+
+func TestStoragePVCName(t *testing.T) {
+	agent := &mmv1beta.Agent{
+		ObjectMeta: metav1.ObjectMeta{Name: "my-agent"},
+	}
+	assert.Equal(t, "agent-my-agent-storage", agent.StoragePVCName())
+}
+
 func TestGenerateAgentHookSecret(t *testing.T) {
 	agent := testAgent("my-agent", "default")
 	secret := GenerateAgentHookSecret(agent, "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890")
@@ -203,4 +280,26 @@ func TestGenerateAgentNetworkPolicy_Deny(t *testing.T) {
 
 	dnsEgress := np.Spec.Egress[1]
 	assert.Len(t, dnsEgress.Ports, 2)
+}
+
+func TestGenerateAgentPVC(t *testing.T) {
+	agent := testAgent("my-agent", "default")
+	storageClass := "fast-ssd"
+	agent.Spec.Storage = &mmv1beta.AgentStorageConfig{
+		Size:             resource.MustParse("5Gi"),
+		StorageClassName: &storageClass,
+		MountPath:        "/workspace",
+	}
+
+	pvc := GenerateAgentPVC(agent)
+
+	assert.Equal(t, agent.StoragePVCName(), pvc.Name)
+	assert.Equal(t, "default", pvc.Namespace)
+	assert.Equal(t, mmv1beta.AgentLabels("my-agent"), pvc.Labels)
+	assert.Len(t, pvc.OwnerReferences, 1)
+	assert.Equal(t, "Agent", pvc.OwnerReferences[0].Kind)
+	assert.Equal(t, []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}, pvc.Spec.AccessModes)
+	assert.Equal(t, resource.MustParse("5Gi"), pvc.Spec.Resources.Requests[corev1.ResourceStorage])
+	require.NotNil(t, pvc.Spec.StorageClassName)
+	assert.Equal(t, "fast-ssd", *pvc.Spec.StorageClassName)
 }
