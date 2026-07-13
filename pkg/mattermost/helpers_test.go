@@ -129,6 +129,13 @@ func TestDetermineMaxBodySize(t *testing.T) {
 			expectedSize: defaultSize,
 		},
 		{
+			description: "use default size (no panic) when annotation is empty",
+			ingressAnnotations: map[string]string{
+				"nginx.ingress.kubernetes.io/proxy-body-size": "",
+			},
+			expectedSize: defaultSize,
+		},
+		{
 			description: "use default size when unit not recognized",
 			ingressAnnotations: map[string]string{
 				"nginx.ingress.kubernetes.io/proxy-body-size": "800K",
