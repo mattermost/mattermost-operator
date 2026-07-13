@@ -10,6 +10,7 @@ import (
 	"github.com/mattermost/mattermost-operator/pkg/utils"
 	appsv1 "k8s.io/api/apps/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/stretchr/testify/assert"
@@ -1151,72 +1152,81 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 func TestGenerateRBACResources_V1Beta(t *testing.T) {
 	roleName := "role"
 	saName := "service-account"
-	mattermost := &mmv1beta.Mattermost{
+	baseMattermost := &mmv1beta.Mattermost{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-mm",
 			Namespace: "test-namespace",
 		},
 	}
 
-	serviceAccount := GenerateServiceAccountV1Beta(mattermost, saName)
+	serviceAccount := GenerateServiceAccountV1Beta(baseMattermost, saName)
 	require.Equal(t, saName, serviceAccount.Name)
-	require.Equal(t, mattermost.Namespace, serviceAccount.Namespace)
+	require.Equal(t, baseMattermost.Namespace, serviceAccount.Namespace)
 	require.Equal(t, 1, len(serviceAccount.OwnerReferences))
 
-	role := GenerateRoleV1Beta(mattermost, roleName)
-	require.Equal(t, roleName, role.Name)
-	require.Equal(t, mattermost.Namespace, role.Namespace)
-	require.Equal(t, 1, len(role.OwnerReferences))
-	require.Equal(t, 1, len(role.Rules))
-
-	// Default: agents not enabled — only batch/jobs.
-	assert.Equal(t, []string{"get", "list", "watch"}, role.Rules[0].Verbs)
-	assert.Equal(t, []string{"batch"}, role.Rules[0].APIGroups)
-	assert.Equal(t, []string{"jobs"}, role.Rules[0].Resources)
-
-	roleBinding := GenerateRoleBindingV1Beta(mattermost, roleName, saName)
+	roleBinding := GenerateRoleBindingV1Beta(baseMattermost, roleName, saName)
 	require.Equal(t, roleName, roleBinding.Name)
-	require.Equal(t, mattermost.Namespace, roleBinding.Namespace)
+	require.Equal(t, baseMattermost.Namespace, roleBinding.Namespace)
 	require.Equal(t, 1, len(roleBinding.OwnerReferences))
 	require.Equal(t, 1, len(roleBinding.Subjects))
 	require.Equal(t, saName, roleBinding.Subjects[0].Name)
 	require.Equal(t, roleName, roleBinding.RoleRef.Name)
-}
 
-func TestGenerateRBACResources_V1Beta_AgentsEnabled(t *testing.T) {
-	roleName := "role"
-	mattermost := &mmv1beta.Mattermost{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-mm",
-			Namespace: "test-namespace",
+	jobRule := rbacv1.PolicyRule{
+		Verbs:         []string{"get", "list", "watch"},
+		APIGroups:     []string{"batch"},
+		Resources:     []string{"jobs"},
+		ResourceNames: []string{SetupJobName},
+	}
+	agentRules := []rbacv1.PolicyRule{
+		{
+			Verbs:     []string{"get", "list", "watch", "create", "update", "patch", "delete"},
+			APIGroups: []string{"installation.mattermost.com"},
+			Resources: []string{"agents"},
 		},
-		Spec: mmv1beta.MattermostSpec{
-			Agents: &mmv1beta.MattermostAgents{Enabled: true},
+		{
+			Verbs:     []string{"get"},
+			APIGroups: []string{"installation.mattermost.com"},
+			Resources: []string{"agents/status"},
+		},
+		{
+			Verbs:     []string{"get", "create", "update", "delete"},
+			APIGroups: []string{""},
+			Resources: []string{"secrets"},
 		},
 	}
 
-	role := GenerateRoleV1Beta(mattermost, roleName)
-	require.Equal(t, 4, len(role.Rules))
+	tests := []struct {
+		name     string
+		agents   *mmv1beta.MattermostAgents
+		expected []rbacv1.PolicyRule
+	}{
+		{name: "agents nil", expected: []rbacv1.PolicyRule{jobRule}},
+		{
+			name:     "agents disabled",
+			agents:   &mmv1beta.MattermostAgents{Enabled: false},
+			expected: []rbacv1.PolicyRule{jobRule},
+		},
+		{
+			name:     "agents enabled",
+			agents:   &mmv1beta.MattermostAgents{Enabled: true},
+			expected: append([]rbacv1.PolicyRule{jobRule}, agentRules...),
+		},
+	}
 
-	// Rule 0: batch/jobs — get,list,watch (unchanged).
-	assert.Equal(t, []string{"get", "list", "watch"}, role.Rules[0].Verbs)
-	assert.Equal(t, []string{"batch"}, role.Rules[0].APIGroups)
-	assert.Equal(t, []string{"jobs"}, role.Rules[0].Resources)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mattermost := baseMattermost.DeepCopy()
+			mattermost.Spec.Agents = tt.agents
 
-	// Rule 1: agents — full CRUD.
-	assert.Equal(t, []string{"get", "list", "watch", "create", "update", "patch", "delete"}, role.Rules[1].Verbs)
-	assert.Equal(t, []string{"installation.mattermost.com"}, role.Rules[1].APIGroups)
-	assert.Equal(t, []string{"agents"}, role.Rules[1].Resources)
+			role := GenerateRoleV1Beta(mattermost, roleName)
 
-	// Rule 2: agents/status — get only.
-	assert.Equal(t, []string{"get"}, role.Rules[2].Verbs)
-	assert.Equal(t, []string{"installation.mattermost.com"}, role.Rules[2].APIGroups)
-	assert.Equal(t, []string{"agents/status"}, role.Rules[2].Resources)
-
-	// Rule 3: secrets — get, create, update, delete.
-	assert.Equal(t, []string{"get", "create", "update", "delete"}, role.Rules[3].Verbs)
-	assert.Equal(t, []string{""}, role.Rules[3].APIGroups)
-	assert.Equal(t, []string{"secrets"}, role.Rules[3].Resources)
+			assert.Equal(t, roleName, role.Name)
+			assert.Equal(t, mattermost.Namespace, role.Namespace)
+			assert.Len(t, role.OwnerReferences, 1)
+			assert.ElementsMatch(t, tt.expected, role.Rules)
+		})
+	}
 }
 
 func fixVolume() corev1.Volume {

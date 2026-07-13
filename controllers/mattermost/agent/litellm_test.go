@@ -7,93 +7,81 @@ import (
 	"context"
 	"testing"
 
-	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	appsv1 "k8s.io/api/apps/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func newLiteLLMDeployment(namespace string, readyReplicas int32) *appsv1.Deployment {
-	return &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      mmv1beta.AgentLiteLLMDeploymentName,
-			Namespace: namespace,
+func TestCheckLiteLLMReady(t *testing.T) {
+	tests := []struct {
+		name       string
+		deployment func(namespace string) client.Object
+		wantReady  bool
+	}{
+		{
+			name: "rollout complete",
+			deployment: func(namespace string) client.Object {
+				return newReadyLiteLLMDeployment(namespace)
+			},
+			wantReady: true,
 		},
-		Status: appsv1.DeploymentStatus{
-			ReadyReplicas:   readyReplicas,
-			UpdatedReplicas: readyReplicas,
-			Replicas:        1,
+		{
+			name: "no ready replicas",
+			deployment: func(namespace string) client.Object {
+				deployment := newReadyLiteLLMDeployment(namespace)
+				deployment.Status.ReadyReplicas = 0
+				return deployment
+			},
 		},
+		{
+			name: "generation not observed",
+			deployment: func(namespace string) client.Object {
+				deployment := newReadyLiteLLMDeployment(namespace)
+				deployment.Generation = 2
+				return deployment
+			},
+		},
+		{name: "deployment missing"},
 	}
-}
 
-func TestCheckLiteLLMReady_Ready(t *testing.T) {
-	agent := newTestAgent()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			agent := newTestAgent()
+			var objects []client.Object
+			if tt.deployment != nil {
+				objects = append(objects, tt.deployment(agent.Namespace))
+			}
+			reconciler := setupReconciler(t, objects...)
 
-	reconciler, _ := setupReconciler(t, agent, newLiteLLMDeployment(agent.Namespace, 1))
-
-	ready, err := reconciler.checkLiteLLMReady(context.TODO(), agent, testLogger())
-	require.NoError(t, err)
-	assert.True(t, ready)
-}
-
-func TestCheckLiteLLMReady_NoReadyReplicas(t *testing.T) {
-	agent := newTestAgent()
-
-	reconciler, _ := setupReconciler(t, agent, newLiteLLMDeployment(agent.Namespace, 0))
-
-	ready, err := reconciler.checkLiteLLMReady(context.TODO(), agent, testLogger())
-	require.NoError(t, err)
-	assert.False(t, ready)
-}
-
-func TestCheckLiteLLMReady_MidRolloutNotReady(t *testing.T) {
-	agent := newTestAgent()
-
-	// The Deployment controller has not observed the latest generation yet;
-	// the ready replica may belong to the old ReplicaSet.
-	deploy := newLiteLLMDeployment(agent.Namespace, 1)
-	deploy.Generation = 2
-	deploy.Status.ObservedGeneration = 1
-
-	reconciler, _ := setupReconciler(t, agent, deploy)
-
-	ready, err := reconciler.checkLiteLLMReady(context.TODO(), agent, testLogger())
-	require.NoError(t, err)
-	assert.False(t, ready, "a deployment mid-rollout is not ready")
-}
-
-func TestCheckLiteLLMReady_DeploymentMissing(t *testing.T) {
-	agent := newTestAgent()
-
-	reconciler, _ := setupReconciler(t, agent)
-
-	ready, err := reconciler.checkLiteLLMReady(context.TODO(), agent, testLogger())
-	require.NoError(t, err, "missing deployment is not-ready, not an error")
-	assert.False(t, ready)
+			ready, err := reconciler.checkLiteLLMReady(
+				context.Background(), agent, reconciler.Log,
+			)
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantReady, ready)
+		})
+	}
 }
 
 func TestCheckLiteLLMGateway_PassthroughWithoutOperatorManagedGateway(t *testing.T) {
 	agent := newTestAgent()
+	reconciler := setupReconciler(t)
 
-	reconciler, _ := setupReconciler(t, agent)
-
-	ready, err := reconciler.checkLiteLLMGateway(context.TODO(), agent, newReadyMattermost(), testLogger())
+	ready, err := reconciler.checkLiteLLMGateway(
+		context.Background(), agent, newReadyMattermost(), reconciler.Log,
+	)
 	require.NoError(t, err)
-	assert.True(t, ready, "agents without the operator-managed gateway are not gated")
+	assert.True(t, ready)
 }
 
 func TestCheckLiteLLMGateway_UnconfiguredInstallationIsConfigIssue(t *testing.T) {
 	agent := newTestAgent()
-	agent.Spec.LLMGateway = &mmv1beta.LLMGatewayConfig{
-		OperatorManaged: &mmv1beta.OperatorManagedGateway{},
-	}
+	agent.Spec.LLMGateway = operatorManagedGatewayConfig()
+	reconciler := setupReconciler(t)
 
-	reconciler, _ := setupReconciler(t, agent)
-
-	ready, err := reconciler.checkLiteLLMGateway(context.TODO(), agent, newReadyMattermost(), testLogger())
+	ready, err := reconciler.checkLiteLLMGateway(
+		context.Background(), agent, newReadyMattermost(), reconciler.Log,
+	)
 	require.Error(t, err)
 	assert.False(t, ready)
 	assert.True(t, errors.Is(err, errConfigIssue))

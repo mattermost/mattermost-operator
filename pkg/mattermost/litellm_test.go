@@ -1,13 +1,13 @@
 package mattermost
 
 import (
+	"fmt"
 	"testing"
 
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
-	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -101,10 +101,6 @@ func TestGenerateLiteLLMDeployment(t *testing.T) {
 	require.NotNil(t, c.ReadinessProbe.HTTPGet)
 	assert.Equal(t, "/health/readiness", c.ReadinessProbe.HTTPGet.Path)
 	assert.Equal(t, mmv1beta.AgentLiteLLMPort, c.ReadinessProbe.HTTPGet.Port.IntVal)
-
-	// The config file/ConfigMap was removed; STORE_MODEL_IN_DB covers it.
-	assert.Empty(t, c.VolumeMounts)
-	assert.Empty(t, dep.Spec.Template.Spec.Volumes)
 }
 
 func TestGenerateLiteLLMDeployment_CustomImageAndResources(t *testing.T) {
@@ -164,206 +160,10 @@ func TestGenerateLiteLLMService(t *testing.T) {
 
 func TestLiteLLMServiceURL(t *testing.T) {
 	url := mmv1beta.LiteLLMServiceURL("my-namespace")
-	expected := "http://mm-agent-litellm.my-namespace.svc.cluster.local:4000"
+	expected := fmt.Sprintf(
+		"http://%s.my-namespace.svc.cluster.local:%d",
+		mmv1beta.AgentLiteLLMServiceName,
+		mmv1beta.AgentLiteLLMPort,
+	)
 	assert.Equal(t, expected, url)
-}
-
-func TestGenerateAgentDeployment_WithLLMGateway(t *testing.T) {
-	agent := testAgent("my-agent", "my-namespace")
-	agent.Spec.LLMGateway = &mmv1beta.LLMGatewayConfig{
-		OperatorManaged: &mmv1beta.OperatorManagedGateway{},
-	}
-
-	dep := GenerateAgentDeployment(agent)
-	require.Len(t, dep.Spec.Template.Spec.Containers, 1)
-	c := dep.Spec.Template.Spec.Containers[0]
-
-	envMap := envVarsByName(c.Env)
-
-	expectedBaseURL := mmv1beta.LiteLLMServiceURL("my-namespace")
-	expectedKeySecretName := agent.LiteLLMKeySecretName()
-
-	require.Contains(t, envMap, "LITELLM_BASE_URL")
-	assert.Equal(t, expectedBaseURL, envMap["LITELLM_BASE_URL"].Value)
-
-	require.Contains(t, envMap, "LITELLM_MCP_URL")
-	assert.Equal(t, expectedBaseURL+"/mcp", envMap["LITELLM_MCP_URL"].Value)
-
-	require.Contains(t, envMap, "OPENAI_BASE_URL")
-	assert.Equal(t, expectedBaseURL+"/v1", envMap["OPENAI_BASE_URL"].Value)
-
-	require.Contains(t, envMap, "OPENAI_API_KEY")
-	require.NotNil(t, envMap["OPENAI_API_KEY"].ValueFrom)
-	require.NotNil(t, envMap["OPENAI_API_KEY"].ValueFrom.SecretKeyRef)
-	assert.Equal(t, expectedKeySecretName, envMap["OPENAI_API_KEY"].ValueFrom.SecretKeyRef.Name)
-	assert.Equal(t, mmv1beta.SecretKeyAPIKey, envMap["OPENAI_API_KEY"].ValueFrom.SecretKeyRef.Key)
-
-	require.Contains(t, envMap, "ANTHROPIC_BASE_URL")
-	assert.Equal(t, expectedBaseURL, envMap["ANTHROPIC_BASE_URL"].Value)
-
-	require.Contains(t, envMap, "ANTHROPIC_API_KEY")
-	require.NotNil(t, envMap["ANTHROPIC_API_KEY"].ValueFrom)
-	require.NotNil(t, envMap["ANTHROPIC_API_KEY"].ValueFrom.SecretKeyRef)
-	assert.Equal(t, expectedKeySecretName, envMap["ANTHROPIC_API_KEY"].ValueFrom.SecretKeyRef.Name)
-	assert.Equal(t, mmv1beta.SecretKeyAPIKey, envMap["ANTHROPIC_API_KEY"].ValueFrom.SecretKeyRef.Key)
-}
-
-func TestGenerateAgentDeployment_WithLLMGateway_External(t *testing.T) {
-	agent := testAgent("my-agent", "my-namespace")
-	agent.Spec.LLMGateway = &mmv1beta.LLMGatewayConfig{
-		External: &mmv1beta.ExternalLLMGateway{
-			URL:              "http://litellm.external.svc.cluster.local:4000",
-			VirtualKeySecret: "my-external-key-secret",
-		},
-	}
-
-	dep := GenerateAgentDeployment(agent)
-	require.Len(t, dep.Spec.Template.Spec.Containers, 1)
-	c := dep.Spec.Template.Spec.Containers[0]
-
-	envMap := envVarsByName(c.Env)
-
-	require.Contains(t, envMap, "LITELLM_BASE_URL")
-	assert.Equal(t, "http://litellm.external.svc.cluster.local:4000", envMap["LITELLM_BASE_URL"].Value)
-
-	require.Contains(t, envMap, "OPENAI_API_KEY")
-	require.NotNil(t, envMap["OPENAI_API_KEY"].ValueFrom)
-	assert.Equal(t, "my-external-key-secret", envMap["OPENAI_API_KEY"].ValueFrom.SecretKeyRef.Name)
-}
-
-func TestGenerateAgentDeployment_WithoutLLMGateway(t *testing.T) {
-	agent := testAgent("my-agent", "my-namespace")
-	dep := GenerateAgentDeployment(agent)
-	require.Len(t, dep.Spec.Template.Spec.Containers, 1)
-	c := dep.Spec.Template.Spec.Containers[0]
-
-	liteLLMEnvVarNames := []string{
-		"LITELLM_BASE_URL",
-		"LITELLM_MCP_URL",
-		"OPENAI_BASE_URL",
-		"OPENAI_API_KEY",
-		"ANTHROPIC_BASE_URL",
-		"ANTHROPIC_API_KEY",
-	}
-
-	envMap := envVarsByName(c.Env)
-
-	for _, name := range liteLLMEnvVarNames {
-		assert.NotContains(t, envMap, name)
-	}
-}
-
-func TestGenerateAgentNetworkPolicy_DenyWithLiteLLM(t *testing.T) {
-	agent := testAgent("my-agent", "my-namespace")
-	agent.Spec.EgressPolicy = mmv1beta.AgentEgressPolicyDeny
-	agent.Spec.LLMGateway = &mmv1beta.LLMGatewayConfig{
-		OperatorManaged: &mmv1beta.OperatorManagedGateway{},
-	}
-
-	np := GenerateAgentNetworkPolicy(agent)
-
-	require.Len(t, np.Spec.Ingress, 1)
-	ingress := np.Spec.Ingress[0]
-	require.Len(t, ingress.From, 2, "ingress should allow both MM and LiteLLM pods")
-	assert.Equal(t, agent.Spec.MattermostRef.Name, ingress.From[0].PodSelector.MatchLabels[mmv1beta.ClusterLabel])
-	assert.Equal(t, mmv1beta.MattermostAppContainerName, ingress.From[0].PodSelector.MatchLabels["app"])
-	assert.Equal(t, mmv1beta.AgentLiteLLMDeploymentName, ingress.From[1].PodSelector.MatchLabels["app"])
-	require.Len(t, ingress.Ports, 1)
-	assert.Equal(t, mmv1beta.AgentHTTPPort, ingress.Ports[0].Port.IntVal)
-
-	assert.Len(t, np.Spec.Egress, 3)
-
-	mmEgress := np.Spec.Egress[0]
-	require.Len(t, mmEgress.To, 1)
-	assert.Equal(t, agent.Spec.MattermostRef.Name, mmEgress.To[0].PodSelector.MatchLabels[mmv1beta.ClusterLabel])
-	assert.Equal(t, mmv1beta.MattermostAppContainerName, mmEgress.To[0].PodSelector.MatchLabels["app"])
-	require.Len(t, mmEgress.Ports, 1)
-	assert.Equal(t, int32(8065), mmEgress.Ports[0].Port.IntVal)
-
-	liteLLMEgress := np.Spec.Egress[1]
-	require.Len(t, liteLLMEgress.To, 1)
-	assert.Equal(t, LiteLLMSelectorLabels(), liteLLMEgress.To[0].PodSelector.MatchLabels)
-	require.Len(t, liteLLMEgress.Ports, 1)
-	assert.Equal(t, mmv1beta.AgentLiteLLMPort, liteLLMEgress.Ports[0].Port.IntVal)
-	assert.Equal(t, corev1.ProtocolTCP, *liteLLMEgress.Ports[0].Protocol)
-
-	dnsEgress := np.Spec.Egress[2]
-	assert.Len(t, dnsEgress.Ports, 2)
-	assert.Equal(t, int32(53), dnsEgress.Ports[0].Port.IntVal)
-}
-
-func TestGenerateAgentNetworkPolicy_DenyWithoutLiteLLM(t *testing.T) {
-	agent := testAgent("my-agent", "my-namespace")
-	agent.Spec.EgressPolicy = mmv1beta.AgentEgressPolicyDeny
-
-	np := GenerateAgentNetworkPolicy(agent)
-
-	assert.Len(t, np.Spec.Egress, 2)
-
-	for _, rule := range np.Spec.Egress {
-		for _, p := range rule.Ports {
-			assert.NotEqual(t, mmv1beta.AgentLiteLLMPort, p.Port.IntVal,
-				"expected no LiteLLM egress rule when LLMGateway is nil")
-		}
-	}
-}
-
-func TestGenerateAgentNetworkPolicy_AllowWebWithLiteLLM(t *testing.T) {
-	agent := testAgent("my-agent", "my-namespace")
-	agent.Spec.EgressPolicy = mmv1beta.AgentEgressPolicyAllowWeb
-	agent.Spec.LLMGateway = &mmv1beta.LLMGatewayConfig{
-		OperatorManaged: &mmv1beta.OperatorManagedGateway{},
-	}
-
-	np := GenerateAgentNetworkPolicy(agent)
-
-	assert.Len(t, np.Spec.Egress, 4)
-}
-
-func TestGenerateAgentNetworkPolicy_ExternalGatewayUsesUnrestrictedPort(t *testing.T) {
-	agent := testAgent("my-agent", "my-namespace")
-	agent.Spec.LLMGateway = &mmv1beta.LLMGatewayConfig{
-		External: &mmv1beta.ExternalLLMGateway{
-			URL:              "http://litellm:4000",
-			VirtualKeySecret: "key-secret",
-		},
-	}
-
-	np := GenerateAgentNetworkPolicy(agent)
-
-	require.Len(t, np.Spec.Ingress, 1)
-	assert.Len(t, np.Spec.Ingress[0].From, 1, "external gateways must not add a LiteLLM pod peer")
-
-	var externalGatewayRule *networkingv1.NetworkPolicyEgressRule
-	for i := range np.Spec.Egress {
-		for _, p := range np.Spec.Egress[i].Ports {
-			if p.Port.IntVal == mmv1beta.AgentLiteLLMPort {
-				externalGatewayRule = &np.Spec.Egress[i]
-			}
-		}
-	}
-	require.NotNil(t, externalGatewayRule, "expected external gateway port egress")
-	assert.Empty(t, externalGatewayRule.To, "external gateway egress cannot use a pod selector")
-}
-
-func TestExternalGatewayPort(t *testing.T) {
-	tests := []struct {
-		name     string
-		url      string
-		port     int32
-		expected bool
-	}{
-		{name: "explicit", url: "https://gateway.example.com:8443", port: 8443, expected: true},
-		{name: "https default", url: "https://gateway.example.com", port: 443, expected: true},
-		{name: "http default", url: "http://gateway.example.com/path", port: 80, expected: true},
-		{name: "invalid", url: "http://[::1", expected: false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			port, ok := externalGatewayPort(tt.url)
-			assert.Equal(t, tt.expected, ok)
-			assert.Equal(t, tt.port, port)
-		})
-	}
 }

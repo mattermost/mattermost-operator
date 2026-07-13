@@ -142,23 +142,52 @@ func TestCheckLiteLLM_MissingDBCredentials(t *testing.T) {
 	assert.True(t, k8sErrors.IsNotFound(err), "deployment must not be created without db credentials")
 }
 
-func TestCheckLiteLLM_MissingConnectionStringKey(t *testing.T) {
-	logger, fakeClient, reconciler := setupTestDeps(t)
-
-	mm := newLiteLLMTestMattermost(t)
-
-	emptySecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      mmv1beta.AgentLiteLLMDBCredentialsSecret,
-			Namespace: mm.Namespace,
-		},
-		Data: map[string][]byte{"other": []byte("value")},
+func TestCheckLiteLLM_InvalidConnectionString(t *testing.T) {
+	tests := []struct {
+		name string
+		data map[string][]byte
+	}{
+		{name: "key missing", data: map[string][]byte{"other": []byte("value")}},
+		{name: "key empty", data: map[string][]byte{mmv1beta.SecretKeyConnectionString: nil}},
 	}
-	require.NoError(t, fakeClient.Create(context.TODO(), emptySecret))
 
-	err := reconciler.checkLiteLLM(mm, logger)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), mmv1beta.SecretKeyConnectionString)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger, fakeClient, reconciler := setupTestDeps(t)
+			mm := newLiteLLMTestMattermost(t)
+			secret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      mmv1beta.AgentLiteLLMDBCredentialsSecret,
+					Namespace: mm.Namespace,
+				},
+				Data: tt.data,
+			}
+			require.NoError(t, fakeClient.Create(context.TODO(), secret))
+
+			err := reconciler.checkLiteLLM(mm, logger)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), mmv1beta.SecretKeyConnectionString)
+		})
+	}
+}
+
+func TestCheckLiteLLM_RecreatesDeletedService(t *testing.T) {
+	logger, fakeClient, reconciler := setupTestDeps(t)
+	mm := newLiteLLMTestMattermost(t)
+	require.NoError(t, fakeClient.Create(
+		context.TODO(), newLiteLLMDBCredentialsSecret(mm.Namespace),
+	))
+	require.NoError(t, reconciler.checkLiteLLM(mm, logger))
+
+	service := &corev1.Service{}
+	key := types.NamespacedName{
+		Name: mmv1beta.AgentLiteLLMServiceName, Namespace: mm.Namespace,
+	}
+	require.NoError(t, fakeClient.Get(context.TODO(), key, service))
+	require.NoError(t, fakeClient.Delete(context.TODO(), service))
+
+	require.NoError(t, reconciler.checkLiteLLM(mm, logger))
+	require.NoError(t, fakeClient.Get(context.TODO(), key, &corev1.Service{}))
 }
 
 func TestCheckLiteLLM_DisableTransition(t *testing.T) {

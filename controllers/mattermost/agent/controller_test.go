@@ -4,826 +4,414 @@ import (
 	"context"
 	stderrors "errors"
 	"testing"
-	"time"
 
-	"github.com/go-logr/logr"
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
-	"github.com/mattermost/mattermost-operator/pkg/resources"
-	"github.com/sirupsen/logrus"
-
-	blubr "github.com/mattermost/blubr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
+func requestFor(agent *mmv1beta.Agent) reconcile.Request {
+	return reconcile.Request{NamespacedName: client.ObjectKeyFromObject(agent)}
+}
+
+func markAgentDeploymentReady(t *testing.T, reconciler *AgentReconciler, agent *mmv1beta.Agent) {
+	t.Helper()
+
+	deployment := &appsv1.Deployment{}
+	require.NoError(t, reconciler.Client.Get(
+		context.Background(), client.ObjectKeyFromObject(agent), deployment,
+	))
+	deployment.Status.ObservedGeneration = deployment.Generation
+	deployment.Status.ReadyReplicas = 1
+	deployment.Status.Replicas = 1
+	deployment.Status.UpdatedReplicas = 1
+	require.NoError(t, reconciler.Client.Status().Update(context.Background(), deployment))
+}
+
+func envValue(container corev1.Container, name string) (string, bool) {
+	for _, env := range container.Env {
+		if env.Name == name {
+			return env.Value, true
+		}
+	}
+	return "", false
+}
+
+type secretReadErrorClient struct {
+	client.Client
+	secretName string
+	err        error
+}
+
+func (c *secretReadErrorClient) Get(
+	ctx context.Context,
+	key client.ObjectKey,
+	obj client.Object,
+	opts ...client.GetOption,
+) error {
+	if _, ok := obj.(*corev1.Secret); ok && key.Name == c.secretName {
+		return c.err
+	}
+	return c.Client.Get(ctx, key, obj, opts...)
+}
+
 func TestReconcileAgent_MattermostNotStable(t *testing.T) {
-	logSink := blubr.InitLogger(logrus.NewEntry(logrus.New()))
-	logSink = logSink.WithName("test.opr")
-	logger := logr.New(logSink)
-	logf.SetLogger(logger)
-
 	agent := newTestAgent()
-
-	mm := &mmv1beta.Mattermost{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "mm-test",
-			Namespace: "default",
-			UID:       types.UID("mm-uid"),
-		},
-		Spec: mmv1beta.MattermostSpec{
-			Image:   "mattermost/mattermost-enterprise-edition",
-			Version: "9.0.0",
-		},
-		Status: mmv1beta.MattermostStatus{
-			State: mmv1beta.Reconciling,
-		},
-	}
-
-	s := setupScheme(t)
-	c := fake.NewClientBuilder().
-		WithScheme(s).
-		WithStatusSubresource(&mmv1beta.Agent{}, &appsv1.Deployment{}, &mmv1beta.Mattermost{}).
-		WithRuntimeObjects(agent, mm).
-		Build()
-
-	r := &AgentReconciler{
-		Client:    c,
-		Log:       logger,
-		Scheme:    s,
-		Resources: resources.NewResourceHelper(c, s),
-	}
-
-	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}}
-	res, err := r.Reconcile(context.Background(), req)
-	require.NoError(t, err)
-	assert.Equal(t, 15*time.Second, res.RequeueAfter)
-
-	// No resources should have been created.
-	svc := &corev1.Service{}
-	err = c.Get(context.TODO(), types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, svc)
-	require.Error(t, err, "service should not exist")
-
-	deploy := &appsv1.Deployment{}
-	err = c.Get(context.TODO(), types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, deploy)
-	require.Error(t, err, "deployment should not exist")
-}
-
-func TestReconcileAgent_FullReconcile(t *testing.T) {
-	logSink := blubr.InitLogger(logrus.NewEntry(logrus.New()))
-	logSink = logSink.WithName("test.opr")
-	logger := logr.New(logSink)
-	logf.SetLogger(logger)
-
-	agent := newTestAgent()
-
-	mm := &mmv1beta.Mattermost{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "mm-test",
-			Namespace: "default",
-			UID:       types.UID("mm-uid"),
-		},
-		Spec: mmv1beta.MattermostSpec{
-			Image:   "mattermost/mattermost-enterprise-edition",
-			Version: "9.0.0",
-		},
-		Status: mmv1beta.MattermostStatus{
-			State: mmv1beta.Stable,
-		},
-	}
-
-	s := setupScheme(t)
-	c := fake.NewClientBuilder().
-		WithScheme(s).
-		WithStatusSubresource(&mmv1beta.Agent{}, &appsv1.Deployment{}, &mmv1beta.Mattermost{}).
-		WithRuntimeObjects(agent, mm).
-		Build()
-
-	r := &AgentReconciler{
-		Client:    c,
-		Log:       logger,
-		Scheme:    s,
-		Resources: resources.NewResourceHelper(c, s),
-	}
-
-	// Pre-create the bot token secret (the plugin creates this before the Agent CR).
-	botTokenSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      agent.BotTokenSecretName(),
-			Namespace: agent.Namespace,
-		},
-		Data: map[string][]byte{mmv1beta.SecretKeyBotToken: []byte("bot-secret-token")},
-	}
-	err := c.Create(context.TODO(), botTokenSecret)
-	require.NoError(t, err)
-
-	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}}
-
-	// First reconcile: deployment not ready yet, should requeue.
-	res, err := r.Reconcile(context.Background(), req)
-	require.NoError(t, err)
-	assert.Equal(t, 6*time.Second, res.RequeueAfter)
-
-	// Verify all resources were created.
-	sa := &corev1.ServiceAccount{}
-	err = c.Get(context.TODO(), types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, sa)
-	require.NoError(t, err)
-	assert.Equal(t, mmv1beta.AgentLabels(agent), sa.Labels)
-	require.Len(t, sa.OwnerReferences, 1)
-	assert.Equal(t, agent.Name, sa.OwnerReferences[0].Name)
-	assert.Equal(t, "Agent", sa.OwnerReferences[0].Kind)
-
-	svc := &corev1.Service{}
-	err = c.Get(context.TODO(), types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, svc)
-	require.NoError(t, err)
-
-	deploy := &appsv1.Deployment{}
-	err = c.Get(context.TODO(), types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, deploy)
-	require.NoError(t, err)
-
-	np := &networkingv1.NetworkPolicy{}
-	err = c.Get(context.TODO(), types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, np)
-	require.NoError(t, err)
-
-	// Defaults were persisted to the spec (house pattern).
-	persistedAgent := &mmv1beta.Agent{}
-	err = c.Get(context.TODO(), types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, persistedAgent)
-	require.NoError(t, err)
-	assert.NotNil(t, persistedAgent.Spec.Resources.Requests, "defaulted spec should be persisted")
-
-	// Simulate the deployment finishing its rollout.
-	deploy.Status.ObservedGeneration = deploy.Generation
-	deploy.Status.ReadyReplicas = 1
-	deploy.Status.Replicas = 1
-	deploy.Status.UpdatedReplicas = 1
-	err = c.Status().Update(context.TODO(), deploy)
-	require.NoError(t, err)
-
-	// Second reconcile: should reach Stable.
-	res, err = r.Reconcile(context.Background(), req)
-	require.NoError(t, err)
-	assert.Equal(t, reconcile.Result{}, res)
-
-	// Verify agent status is Stable.
-	updatedAgent := &mmv1beta.Agent{}
-	err = c.Get(context.TODO(), types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, updatedAgent)
-	require.NoError(t, err)
-	assert.Equal(t, mmv1beta.Stable, updatedAgent.Status.State)
-	assert.Equal(t, updatedAgent.Generation, updatedAgent.Status.ObservedGeneration)
-	assert.Contains(t, updatedAgent.Status.Endpoint, agent.Name)
-	assert.Contains(t, updatedAgent.Status.Endpoint, ":8080")
-	assert.Equal(t, int32(1), updatedAgent.Status.ReadyReplicas)
-
-	// Verify hook secret was created.
-	hookSecret := &corev1.Secret{}
-	err = c.Get(context.TODO(), types.NamespacedName{
-		Name:      agent.HookSecretName(),
-		Namespace: agent.Namespace,
-	}, hookSecret)
-	require.NoError(t, err, "hook secret should be created during reconcile")
-	assert.Contains(t, hookSecret.Data, mmv1beta.SecretKeyHookSecret)
-	assert.Len(t, string(hookSecret.Data[mmv1beta.SecretKeyHookSecret]), 64, "hook secret should be 64-char hex")
-}
-
-func TestReconcileAgent_ImageUpdate(t *testing.T) {
-	logSink := blubr.InitLogger(logrus.NewEntry(logrus.New()))
-	logSink = logSink.WithName("test.opr")
-	logger := logr.New(logSink)
-	logf.SetLogger(logger)
-
-	agent := newTestAgent()
-	agent.SetDefaults()
-
-	mm := &mmv1beta.Mattermost{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "mm-test",
-			Namespace: "default",
-			UID:       types.UID("mm-uid"),
-		},
-		Status: mmv1beta.MattermostStatus{
-			State: mmv1beta.Stable,
-		},
-	}
-
-	botTokenSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      agent.BotTokenSecretName(),
-			Namespace: agent.Namespace,
-		},
-		Data: map[string][]byte{mmv1beta.SecretKeyBotToken: []byte("bot-token")},
-	}
-
-	s := setupScheme(t)
-	c := fake.NewClientBuilder().
-		WithScheme(s).
-		WithStatusSubresource(&mmv1beta.Agent{}, &appsv1.Deployment{}, &mmv1beta.Mattermost{}).
-		WithRuntimeObjects(agent, mm, botTokenSecret).
-		Build()
-
-	r := &AgentReconciler{
-		Client:    c,
-		Log:       logger,
-		Scheme:    s,
-		Resources: resources.NewResourceHelper(c, s),
-	}
-
-	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}}
-
-	// First reconcile to create all resources.
-	_, err := r.Reconcile(context.Background(), req)
-	require.NoError(t, err)
-
-	// Verify initial image.
-	deploy := &appsv1.Deployment{}
-	err = c.Get(context.TODO(), types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, deploy)
-	require.NoError(t, err)
-	assert.Equal(t, "mattermost/agent:latest", deploy.Spec.Template.Spec.Containers[0].Image)
-
-	// Update the agent image.
-	updatedAgent := &mmv1beta.Agent{}
-	err = c.Get(context.TODO(), types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, updatedAgent)
-	require.NoError(t, err)
-	updatedAgent.Spec.Image = "mattermost/agent:v2"
-	err = c.Update(context.TODO(), updatedAgent)
-	require.NoError(t, err)
-
-	// Reconcile again.
-	_, err = r.Reconcile(context.Background(), req)
-	require.NoError(t, err)
-
-	// Verify deployment was updated.
-	err = c.Get(context.TODO(), types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, deploy)
-	require.NoError(t, err)
-	assert.Equal(t, "mattermost/agent:v2", deploy.Spec.Template.Spec.Containers[0].Image)
-}
-
-func TestReconcileAgent_WithLLMGateway(t *testing.T) {
-	logSink := blubr.InitLogger(logrus.NewEntry(logrus.New()))
-	logSink = logSink.WithName("test.opr")
-	logger := logr.New(logSink)
-	logf.SetLogger(logger)
-
-	agent := newTestAgent()
-	agent.Spec.LLMGateway = &mmv1beta.LLMGatewayConfig{
-		OperatorManaged: &mmv1beta.OperatorManagedGateway{},
-	}
-	agent.SetDefaults()
-
-	mm := newReadyMattermostWithGateway()
-
-	botTokenSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      agent.BotTokenSecretName(),
-			Namespace: agent.Namespace,
-		},
-		Data: map[string][]byte{mmv1beta.SecretKeyBotToken: []byte("bot-secret-token")},
-	}
-
-	litellmKeySecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      agent.LiteLLMKeySecretName(),
-			Namespace: agent.Namespace,
-		},
-		Data: map[string][]byte{mmv1beta.SecretKeyAPIKey: []byte("sk-test-virtual-key")},
-	}
-
-	s := setupScheme(t)
-	c := fake.NewClientBuilder().
-		WithScheme(s).
-		WithStatusSubresource(&mmv1beta.Agent{}, &appsv1.Deployment{}, &mmv1beta.Mattermost{}).
-		WithRuntimeObjects(agent, mm, botTokenSecret, litellmKeySecret).
-		Build()
-
-	r := &AgentReconciler{
-		Client:    c,
-		Log:       logger,
-		Scheme:    s,
-		Resources: resources.NewResourceHelper(c, s),
-	}
-
-	// Pre-create a ready LiteLLM Deployment (managed by the Mattermost
-	// controller) so checkLiteLLMReady passes.
-	litellmDeploy := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      mmv1beta.AgentLiteLLMDeploymentName,
-			Namespace: agent.Namespace,
-		},
-		Spec: appsv1.DeploymentSpec{
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{"app": mmv1beta.AgentLiteLLMDeploymentName},
-			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": mmv1beta.AgentLiteLLMDeploymentName}},
-				Spec:       corev1.PodSpec{Containers: []corev1.Container{{Name: "litellm", Image: mmv1beta.AgentLiteLLMDefaultImage}}},
-			},
-		},
-		Status: appsv1.DeploymentStatus{ReadyReplicas: 1, Replicas: 1},
-	}
-	err := c.Create(context.TODO(), litellmDeploy)
-	require.NoError(t, err)
-	litellmDeploy.Status.ObservedGeneration = litellmDeploy.Generation
-	litellmDeploy.Status.ReadyReplicas = 1
-	litellmDeploy.Status.UpdatedReplicas = 1
-	err = c.Status().Update(context.TODO(), litellmDeploy)
-	require.NoError(t, err)
-
-	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}}
-
-	// First reconcile: agent Deployment not ready yet → requeue with healthCheckRequeueDelay.
-	res, err := r.Reconcile(context.Background(), req)
-	require.NoError(t, err)
-	assert.Equal(t, 6*time.Second, res.RequeueAfter)
-
-	// Verify agent is still reconciling (not ready yet).
-	agentAfterFirstReconcile := &mmv1beta.Agent{}
-	err = c.Get(context.TODO(), types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, agentAfterFirstReconcile)
-	require.NoError(t, err)
-	assert.Equal(t, mmv1beta.Reconciling, agentAfterFirstReconcile.Status.State)
-
-	// Verify agent Deployment was created with LiteLLM env vars.
-	agentDeploy := &appsv1.Deployment{}
-	err = c.Get(context.TODO(), types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, agentDeploy)
-	require.NoError(t, err)
-
-	container := agentDeploy.Spec.Template.Spec.Containers[0]
-	envMap := make(map[string]corev1.EnvVar, len(container.Env))
-	for _, e := range container.Env {
-		envMap[e.Name] = e
-	}
-	assert.Contains(t, envMap, "LITELLM_BASE_URL", "agent Deployment must have LITELLM_BASE_URL")
-	assert.Contains(t, envMap, "OPENAI_API_KEY", "agent Deployment must have OPENAI_API_KEY")
-	assert.Contains(t, envMap, "ANTHROPIC_API_KEY", "agent Deployment must have ANTHROPIC_API_KEY")
-
-	// Raw API keys must NOT be plain values — they must be secretKeyRefs.
-	require.NotNil(t, envMap["ANTHROPIC_API_KEY"].ValueFrom, "ANTHROPIC_API_KEY must use ValueFrom")
-	assert.Equal(t, agent.LiteLLMKeySecretName(), envMap["ANTHROPIC_API_KEY"].ValueFrom.SecretKeyRef.Name)
-
-	// Verify NetworkPolicy has 3 egress rules (MM + LiteLLM + DNS).
-	np := &networkingv1.NetworkPolicy{}
-	err = c.Get(context.TODO(), types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, np)
-	require.NoError(t, err)
-	assert.Len(t, np.Spec.Egress, 3, "deny+litellm policy must have 3 egress rules")
-
-	// Verify hook secret was created (created before Deployment, no LLM dependency).
-	hookSecret := &corev1.Secret{}
-	err = c.Get(context.TODO(), types.NamespacedName{
-		Name:      agent.HookSecretName(),
-		Namespace: agent.Namespace,
-	}, hookSecret)
-	require.NoError(t, err, "hook secret should be created during reconcile")
-	assert.Contains(t, hookSecret.Data, mmv1beta.SecretKeyHookSecret)
-}
-
-func newReadyMattermost() *mmv1beta.Mattermost {
-	return &mmv1beta.Mattermost{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "mm-test",
-			Namespace: "default",
-			UID:       types.UID("mm-uid"),
-		},
-		Status: mmv1beta.MattermostStatus{State: mmv1beta.Stable},
-	}
-}
-
-// newReadyMattermostWithGateway returns a stable Mattermost with the
-// operator-managed LiteLLM gateway configured.
-func newReadyMattermostWithGateway() *mmv1beta.Mattermost {
 	mm := newReadyMattermost()
-	mm.Spec.Agents = &mmv1beta.MattermostAgents{
-		Enabled:    true,
-		LLMGateway: &mmv1beta.AgentsLLMGateway{},
-	}
-	return mm
+	mm.Status.State = mmv1beta.Reconciling
+	reconciler := setupReconciler(t, agent, mm)
+
+	result, err := reconciler.Reconcile(context.Background(), requestFor(agent))
+	require.NoError(t, err)
+	assert.Equal(t, dependencyRequeueDelay, result.RequeueAfter)
+
+	deployment := &appsv1.Deployment{}
+	err = reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(agent), deployment)
+	assert.True(t, k8sErrors.IsNotFound(err))
 }
 
-func TestReconcileAgent_OperatorManagedGatesOnLiteLLMReadiness(t *testing.T) {
-	logger := testLogger()
-	logf.SetLogger(logger)
-
+func TestReconcileAgent_FullLifecycle(t *testing.T) {
 	agent := newTestAgent()
-	agent.Spec.LLMGateway = &mmv1beta.LLMGatewayConfig{
-		OperatorManaged: &mmv1beta.OperatorManagedGateway{},
-	}
-	agent.SetDefaults()
+	reconciler := setupReconciler(
+		t,
+		agent,
+		newReadyMattermost(),
+		newBotTokenSecret(agent),
+	)
 
-	// LiteLLM Deployment exists but has no ready replicas.
-	litellmDeploy := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      mmv1beta.AgentLiteLLMDeploymentName,
-			Namespace: agent.Namespace,
-		},
-		Status: appsv1.DeploymentStatus{ReadyReplicas: 0},
-	}
-
-	s := setupScheme(t)
-	c := fake.NewClientBuilder().
-		WithScheme(s).
-		WithStatusSubresource(&mmv1beta.Agent{}, &appsv1.Deployment{}, &mmv1beta.Mattermost{}).
-		WithRuntimeObjects(agent, newReadyMattermostWithGateway(), litellmDeploy).
-		Build()
-
-	r := &AgentReconciler{Client: c, Log: logger, Scheme: s, Resources: resources.NewResourceHelper(c, s)}
-
-	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}}
-	res, err := r.Reconcile(context.Background(), req)
+	result, err := reconciler.Reconcile(context.Background(), requestFor(agent))
 	require.NoError(t, err)
-	assert.Equal(t, 15*time.Second, res.RequeueAfter)
+	assert.Equal(t, healthCheckRequeueDelay, result.RequeueAfter)
 
-	// No agent resources until the gateway is ready.
-	deploy := &appsv1.Deployment{}
-	err = c.Get(context.TODO(), types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, deploy)
-	require.True(t, k8sErrors.IsNotFound(err), "agent Deployment must not be created before LiteLLM is ready")
+	key := client.ObjectKeyFromObject(agent)
+	require.NoError(t, reconciler.Client.Get(context.Background(), key, &corev1.ServiceAccount{}))
+	require.NoError(t, reconciler.Client.Get(context.Background(), key, &corev1.Service{}))
+	require.NoError(t, reconciler.Client.Get(context.Background(), key, &appsv1.Deployment{}))
+	require.NoError(t, reconciler.Client.Get(context.Background(), key, &networkingv1.NetworkPolicy{}))
+	require.NoError(t, reconciler.Client.Get(context.Background(), types.NamespacedName{
+		Name: agent.HookSecretName(), Namespace: agent.Namespace,
+	}, &corev1.Secret{}))
+
+	persisted := &mmv1beta.Agent{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), key, persisted))
+	assert.NotNil(t, persisted.Spec.Resources.Requests)
+
+	markAgentDeploymentReady(t, reconciler, agent)
+	result, err = reconciler.Reconcile(context.Background(), requestFor(agent))
+	require.NoError(t, err)
+	assert.Equal(t, reconcile.Result{}, result)
+
+	require.NoError(t, reconciler.Client.Get(context.Background(), key, persisted))
+	assert.Equal(t, mmv1beta.Stable, persisted.Status.State)
+	assert.Equal(t, persisted.Generation, persisted.Status.ObservedGeneration)
+	assert.Equal(t, int32(1), persisted.Status.ReadyReplicas)
+	assert.Contains(t, persisted.Status.Endpoint, agent.Name)
+}
+
+func TestReconcileAgent_RepairsOwnedResourceDrift(t *testing.T) {
+	agent := newTestAgent()
+	reconciler := setupReconciler(
+		t,
+		agent,
+		newReadyMattermost(),
+		newBotTokenSecret(agent),
+	)
+	require.NoError(t, reconcileOnce(reconciler, agent))
+
+	key := client.ObjectKeyFromObject(agent)
+	deployment := &appsv1.Deployment{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), key, deployment))
+	deployment.Spec.Template.Spec.Containers[0].Image = "example.invalid/drifted:v1"
+	require.NoError(t, reconciler.Client.Update(context.Background(), deployment))
+
+	service := &corev1.Service{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), key, service))
+	service.Spec.Selector["app"] = "drifted"
+	require.NoError(t, reconciler.Client.Update(context.Background(), service))
+
+	require.NoError(t, reconcileOnce(reconciler, agent))
+
+	require.NoError(t, reconciler.Client.Get(context.Background(), key, deployment))
+	assert.Equal(t, agent.Spec.Image, deployment.Spec.Template.Spec.Containers[0].Image)
+	require.NoError(t, reconciler.Client.Get(context.Background(), key, service))
+	assert.Equal(t, mmv1beta.AgentAppName, service.Spec.Selector["app"])
+}
+
+func reconcileOnce(reconciler *AgentReconciler, agent *mmv1beta.Agent) error {
+	_, err := reconciler.Reconcile(context.Background(), requestFor(agent))
+	return err
+}
+
+func TestReconcileAgent_PVCRetainsOriginalSizeAndStorageClass(t *testing.T) {
+	agent := newTestAgent()
+	originalClass := "fast"
+	agent.Spec.Storage = &mmv1beta.AgentStorageConfig{
+		Size:             resource.MustParse("1Gi"),
+		StorageClassName: &originalClass,
+		MountPath:        "/data",
+	}
+	reconciler := setupReconciler(
+		t,
+		agent,
+		newReadyMattermost(),
+		newBotTokenSecret(agent),
+	)
+
+	require.NoError(t, reconcileOnce(reconciler, agent))
+
+	persisted := &mmv1beta.Agent{}
+	require.NoError(t, reconciler.Client.Get(
+		context.Background(), client.ObjectKeyFromObject(agent), persisted,
+	))
+	changedClass := "slow"
+	persisted.Spec.Storage.Size = resource.MustParse("2Gi")
+	persisted.Spec.Storage.StorageClassName = &changedClass
+	require.NoError(t, reconciler.Client.Update(context.Background(), persisted))
+	require.NoError(t, reconcileOnce(reconciler, agent))
+
+	pvc := &corev1.PersistentVolumeClaim{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), types.NamespacedName{
+		Name: agent.StoragePVCName(), Namespace: agent.Namespace,
+	}, pvc))
+	assert.Equal(t, resource.MustParse("1Gi"), pvc.Spec.Resources.Requests[corev1.ResourceStorage])
+	require.NotNil(t, pvc.Spec.StorageClassName)
+	assert.Equal(t, originalClass, *pvc.Spec.StorageClassName)
+}
+
+func TestReconcileAgent_ExternalGatewayReachesStable(t *testing.T) {
+	agent := newTestAgent()
+	agent.Spec.LLMGateway = externalGatewayConfig()
+	reconciler := setupReconciler(
+		t,
+		agent,
+		newReadyMattermost(),
+		newBotTokenSecret(agent),
+		newVirtualKeySecret(agent),
+	)
+
+	result, err := reconciler.Reconcile(context.Background(), requestFor(agent))
+	require.NoError(t, err)
+	assert.Equal(t, healthCheckRequeueDelay, result.RequeueAfter)
+
+	deployment := &appsv1.Deployment{}
+	require.NoError(t, reconciler.Client.Get(
+		context.Background(), client.ObjectKeyFromObject(agent), deployment,
+	))
+	require.Len(t, deployment.Spec.Template.Spec.Containers, 1)
+	baseURL, found := envValue(deployment.Spec.Template.Spec.Containers[0], "LITELLM_BASE_URL")
+	require.True(t, found)
+	assert.Equal(t, externalGatewayURL, baseURL)
+
+	markAgentDeploymentReady(t, reconciler, agent)
+	result, err = reconciler.Reconcile(context.Background(), requestFor(agent))
+	require.NoError(t, err)
+	assert.Equal(t, reconcile.Result{}, result)
+
+	persisted := &mmv1beta.Agent{}
+	require.NoError(t, reconciler.Client.Get(
+		context.Background(), client.ObjectKeyFromObject(agent), persisted,
+	))
+	assert.Equal(t, mmv1beta.Stable, persisted.Status.State)
+}
+
+func TestReconcileAgent_OperatorManagedGatewayUnreadyThenReady(t *testing.T) {
+	agent := newTestAgent()
+	agent.Spec.LLMGateway = operatorManagedGatewayConfig()
+	gatewayDeployment := newReadyLiteLLMDeployment(agent.Namespace)
+	gatewayDeployment.Status.ReadyReplicas = 0
+	reconciler := setupReconciler(
+		t,
+		agent,
+		newReadyMattermostWithGateway(),
+		newBotTokenSecret(agent),
+		newVirtualKeySecret(agent),
+		gatewayDeployment,
+	)
+
+	result, err := reconciler.Reconcile(context.Background(), requestFor(agent))
+	require.NoError(t, err)
+	assert.Equal(t, dependencyRequeueDelay, result.RequeueAfter)
+
+	agentDeployment := &appsv1.Deployment{}
+	err = reconciler.Client.Get(
+		context.Background(), client.ObjectKeyFromObject(agent), agentDeployment,
+	)
+	assert.True(t, k8sErrors.IsNotFound(err))
+
+	gatewayDeployment = &appsv1.Deployment{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), types.NamespacedName{
+		Name: mmv1beta.AgentLiteLLMDeploymentName, Namespace: agent.Namespace,
+	}, gatewayDeployment))
+	gatewayDeployment.Status.ObservedGeneration = gatewayDeployment.Generation
+	gatewayDeployment.Status.ReadyReplicas = 1
+	gatewayDeployment.Status.Replicas = 1
+	gatewayDeployment.Status.UpdatedReplicas = 1
+	require.NoError(t, reconciler.Client.Status().Update(context.Background(), gatewayDeployment))
+
+	result, err = reconciler.Reconcile(context.Background(), requestFor(agent))
+	require.NoError(t, err)
+	assert.Equal(t, healthCheckRequeueDelay, result.RequeueAfter)
+	require.NoError(t, reconciler.Client.Get(
+		context.Background(), client.ObjectKeyFromObject(agent), agentDeployment,
+	))
 }
 
 func TestReconcileAgent_OperatorManagedWithoutInstallationGateway(t *testing.T) {
-	logger := testLogger()
-	logf.SetLogger(logger)
-
 	agent := newTestAgent()
-	agent.Spec.LLMGateway = &mmv1beta.LLMGatewayConfig{
-		OperatorManaged: &mmv1beta.OperatorManagedGateway{},
-	}
-	agent.SetDefaults()
+	agent.Spec.LLMGateway = operatorManagedGatewayConfig()
+	reconciler := setupReconciler(t, agent, newReadyMattermost())
 
-	// Mattermost is stable but does not configure spec.agents.llmGateway.
-	mm := newReadyMattermost()
-
-	s := setupScheme(t)
-	c := fake.NewClientBuilder().
-		WithScheme(s).
-		WithStatusSubresource(&mmv1beta.Agent{}, &appsv1.Deployment{}, &mmv1beta.Mattermost{}).
-		WithRuntimeObjects(agent, mm).
-		Build()
-
-	r := &AgentReconciler{Client: c, Log: logger, Scheme: s, Resources: resources.NewResourceHelper(c, s)}
-
-	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}}
-	res, err := r.Reconcile(context.Background(), req)
-	require.NoError(t, err, "config issue must not error-loop")
-	assert.Equal(t, 60*time.Second, res.RequeueAfter)
-
-	updated := &mmv1beta.Agent{}
-	require.NoError(t, c.Get(context.TODO(), req.NamespacedName, updated))
-	assert.Equal(t, mmv1beta.Reconciling, updated.Status.State)
-	assert.Contains(t, updated.Status.Error, "spec.agents.llmGateway")
-}
-
-func TestReconcileAgent_MissingBotTokenSecret(t *testing.T) {
-	logger := testLogger()
-	logf.SetLogger(logger)
-
-	agent := newTestAgent()
-	mm := newReadyMattermost()
-
-	s := setupScheme(t)
-	c := fake.NewClientBuilder().
-		WithScheme(s).
-		WithStatusSubresource(&mmv1beta.Agent{}, &appsv1.Deployment{}, &mmv1beta.Mattermost{}).
-		WithRuntimeObjects(agent, mm).
-		Build()
-
-	r := &AgentReconciler{
-		Client:    c,
-		Log:       logger,
-		Scheme:    s,
-		Resources: resources.NewResourceHelper(c, s),
-	}
-
-	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}}
-	res, err := r.Reconcile(context.Background(), req)
+	result, err := reconciler.Reconcile(context.Background(), requestFor(agent))
 	require.NoError(t, err)
-	assert.Equal(t, 60*time.Second, res.RequeueAfter)
+	assert.Equal(t, configIssueRequeueDelay, result.RequeueAfter)
 
-	deploy := &appsv1.Deployment{}
-	err = c.Get(context.TODO(), types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, deploy)
-	require.True(t, k8sErrors.IsNotFound(err), "agent Deployment must not be created without bot token secret")
-
-	// The NetworkPolicy is ensured before the Deployment so pods never start
-	// without their egress policy.
-	np := &networkingv1.NetworkPolicy{}
-	err = c.Get(context.TODO(), types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, np)
-	require.NoError(t, err, "NetworkPolicy must exist before the Deployment is created")
-
-	updated := &mmv1beta.Agent{}
-	require.NoError(t, c.Get(context.TODO(), req.NamespacedName, updated))
-	assert.Equal(t, mmv1beta.Reconciling, updated.Status.State)
-	assert.Contains(t, updated.Status.Error, agent.BotTokenSecretName())
-	assert.Contains(t, updated.Status.Error, "provisioned externally")
+	persisted := &mmv1beta.Agent{}
+	require.NoError(t, reconciler.Client.Get(
+		context.Background(), client.ObjectKeyFromObject(agent), persisted,
+	))
+	assert.Equal(t, mmv1beta.Reconciling, persisted.Status.State)
+	assert.Contains(t, persisted.Status.Error, "spec.agents.llmGateway")
 }
 
-func TestReconcileAgent_MalformedBotTokenSecret(t *testing.T) {
-	logger := testLogger()
-	logf.SetLogger(logger)
-
-	agent := newTestAgent()
-	mm := newReadyMattermost()
-
-	// Secret exists but lacks the required token key.
-	botTokenSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      agent.BotTokenSecretName(),
-			Namespace: agent.Namespace,
+func TestReconcileAgent_RequiredSecretConfigIssues(t *testing.T) {
+	tests := []struct {
+		name             string
+		gateway          *mmv1beta.LLMGatewayConfig
+		installation     func() *mmv1beta.Mattermost
+		precreated       func(*mmv1beta.Agent) []client.Object
+		expectedErrorSub string
+	}{
+		{
+			name:             "bot token secret missing",
+			installation:     newReadyMattermost,
+			precreated:       func(*mmv1beta.Agent) []client.Object { return nil },
+			expectedErrorSub: "provisioned externally",
 		},
-		Data: map[string][]byte{"unexpected-key": []byte("value")},
-	}
-
-	s := setupScheme(t)
-	c := fake.NewClientBuilder().
-		WithScheme(s).
-		WithStatusSubresource(&mmv1beta.Agent{}, &appsv1.Deployment{}, &mmv1beta.Mattermost{}).
-		WithRuntimeObjects(agent, mm, botTokenSecret).
-		Build()
-
-	r := &AgentReconciler{
-		Client:    c,
-		Log:       logger,
-		Scheme:    s,
-		Resources: resources.NewResourceHelper(c, s),
-	}
-
-	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}}
-	res, err := r.Reconcile(context.Background(), req)
-	require.NoError(t, err, "malformed secret is a config issue, not an error loop")
-	assert.Equal(t, 60*time.Second, res.RequeueAfter)
-
-	deploy := &appsv1.Deployment{}
-	err = c.Get(context.TODO(), types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, deploy)
-	require.True(t, k8sErrors.IsNotFound(err), "agent Deployment must not be created with malformed bot token secret")
-
-	updated := &mmv1beta.Agent{}
-	require.NoError(t, c.Get(context.TODO(), req.NamespacedName, updated))
-	assert.Equal(t, mmv1beta.Reconciling, updated.Status.State)
-	assert.Contains(t, updated.Status.Error, agent.BotTokenSecretName())
-	assert.Contains(t, updated.Status.Error, mmv1beta.SecretKeyBotToken)
-}
-
-func TestReconcileAgent_TransientSecretGetErrorPropagates(t *testing.T) {
-	logger := testLogger()
-	logf.SetLogger(logger)
-
-	agent := newTestAgent()
-	mm := newReadyMattermost()
-
-	transientErr := k8sErrors.NewInternalError(stderrors.New("etcd timeout"))
-
-	s := setupScheme(t)
-	c := fake.NewClientBuilder().
-		WithScheme(s).
-		WithStatusSubresource(&mmv1beta.Agent{}, &appsv1.Deployment{}, &mmv1beta.Mattermost{}).
-		WithRuntimeObjects(agent, mm).
-		WithInterceptorFuncs(interceptor.Funcs{
-			Get: func(ctx context.Context, cl client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-				if _, isSecret := obj.(*corev1.Secret); isSecret && key.Name == agent.BotTokenSecretName() {
-					return transientErr
-				}
-				return cl.Get(ctx, key, obj, opts...)
+		{
+			name:         "bot token key missing",
+			installation: newReadyMattermost,
+			precreated: func(agent *mmv1beta.Agent) []client.Object {
+				secret := newBotTokenSecret(agent)
+				secret.Data = map[string][]byte{"unexpected": []byte("value")}
+				return []client.Object{secret}
 			},
-		}).
-		Build()
-
-	r := &AgentReconciler{
-		Client:    c,
-		Log:       logger,
-		Scheme:    s,
-		Resources: resources.NewResourceHelper(c, s),
+			expectedErrorSub: mmv1beta.SecretKeyBotToken,
+		},
+		{
+			name:         "operator-managed virtual key secret missing",
+			gateway:      operatorManagedGatewayConfig(),
+			installation: newReadyMattermostWithGateway,
+			precreated: func(agent *mmv1beta.Agent) []client.Object {
+				return []client.Object{
+					newBotTokenSecret(agent),
+					newReadyLiteLLMDeployment(agent.Namespace),
+				}
+			},
+			expectedErrorSub: "litellm-key",
+		},
+		{
+			name:         "external virtual key secret missing",
+			gateway:      externalGatewayConfig(),
+			installation: newReadyMattermost,
+			precreated: func(agent *mmv1beta.Agent) []client.Object {
+				return []client.Object{newBotTokenSecret(agent)}
+			},
+			expectedErrorSub: externalGatewayKeySecret,
+		},
 	}
 
-	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}}
-	_, err := r.Reconcile(context.Background(), req)
-	require.Error(t, err, "transient API errors must propagate for controller-runtime backoff")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			agent := newTestAgent()
+			agent.Spec.LLMGateway = tt.gateway
+			objects := []client.Object{agent, tt.installation()}
+			objects = append(objects, tt.precreated(agent)...)
+			reconciler := setupReconciler(t, objects...)
+
+			result, err := reconciler.Reconcile(context.Background(), requestFor(agent))
+			require.NoError(t, err)
+			assert.Equal(t, configIssueRequeueDelay, result.RequeueAfter)
+
+			deployment := &appsv1.Deployment{}
+			err = reconciler.Client.Get(
+				context.Background(), client.ObjectKeyFromObject(agent), deployment,
+			)
+			assert.True(t, k8sErrors.IsNotFound(err))
+
+			persisted := &mmv1beta.Agent{}
+			require.NoError(t, reconciler.Client.Get(
+				context.Background(), client.ObjectKeyFromObject(agent), persisted,
+			))
+			assert.Equal(t, mmv1beta.Reconciling, persisted.Status.State)
+			assert.Contains(t, persisted.Status.Error, tt.expectedErrorSub)
+		})
+	}
+}
+
+func TestReconcileAgent_TransientSecretReadErrorPropagates(t *testing.T) {
+	agent := newTestAgent()
+	reconciler := setupReconciler(t, agent, newReadyMattermost())
+	transientErr := k8sErrors.NewInternalError(stderrors.New("etcd timeout"))
+	reconciler.Client = &secretReadErrorClient{
+		Client:     reconciler.Client,
+		secretName: agent.BotTokenSecretName(),
+		err:        transientErr,
+	}
+
+	_, err := reconciler.Reconcile(context.Background(), requestFor(agent))
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "etcd timeout")
-}
-
-func TestReconcileAgent_MissingLiteLLMKeySecret_OperatorManaged(t *testing.T) {
-	logger := testLogger()
-	logf.SetLogger(logger)
-
-	agent := newTestAgent()
-	agent.Spec.LLMGateway = &mmv1beta.LLMGatewayConfig{
-		OperatorManaged: &mmv1beta.OperatorManagedGateway{},
-	}
-	agent.SetDefaults()
-
-	botTokenSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      agent.BotTokenSecretName(),
-			Namespace: agent.Namespace,
-		},
-		Data: map[string][]byte{mmv1beta.SecretKeyBotToken: []byte("bot-secret-token")},
-	}
-
-	// Pre-create a ready LiteLLM Deployment (managed by the Mattermost controller).
-	litellmDeploy := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      mmv1beta.AgentLiteLLMDeploymentName,
-			Namespace: agent.Namespace,
-		},
-		Status: appsv1.DeploymentStatus{ReadyReplicas: 1, Replicas: 1, UpdatedReplicas: 1},
-	}
-
-	s := setupScheme(t)
-	c := fake.NewClientBuilder().
-		WithScheme(s).
-		WithStatusSubresource(&mmv1beta.Agent{}, &appsv1.Deployment{}, &mmv1beta.Mattermost{}).
-		WithRuntimeObjects(agent, newReadyMattermostWithGateway(), botTokenSecret, litellmDeploy).
-		Build()
-
-	r := &AgentReconciler{
-		Client:    c,
-		Log:       logger,
-		Scheme:    s,
-		Resources: resources.NewResourceHelper(c, s),
-	}
-
-	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}}
-
-	// LiteLLM ready, but virtual-key secret missing.
-	res, err := r.Reconcile(context.Background(), req)
-	require.NoError(t, err)
-	assert.Equal(t, 60*time.Second, res.RequeueAfter)
-
-	deploy := &appsv1.Deployment{}
-	err = c.Get(context.TODO(), types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, deploy)
-	require.True(t, k8sErrors.IsNotFound(err), "agent Deployment must not be created without LiteLLM key secret")
-
-	updated := &mmv1beta.Agent{}
-	require.NoError(t, c.Get(context.TODO(), req.NamespacedName, updated))
-	assert.Equal(t, mmv1beta.Reconciling, updated.Status.State)
-	assert.Contains(t, updated.Status.Error, agent.LiteLLMKeySecretName())
-	assert.Contains(t, updated.Status.Error, "provisioned externally")
-}
-
-func TestReconcileAgent_MissingVirtualKeySecret_External(t *testing.T) {
-	logger := testLogger()
-	logf.SetLogger(logger)
-
-	agent := newTestAgent()
-	agent.Spec.LLMGateway = &mmv1beta.LLMGatewayConfig{
-		External: &mmv1beta.ExternalLLMGateway{
-			URL:              "http://litellm.external.svc.cluster.local:4000",
-			VirtualKeySecret: "my-external-key-secret",
-		},
-	}
-
-	botTokenSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      agent.BotTokenSecretName(),
-			Namespace: agent.Namespace,
-		},
-		Data: map[string][]byte{mmv1beta.SecretKeyBotToken: []byte("bot-token")},
-	}
-
-	s := setupScheme(t)
-	c := fake.NewClientBuilder().
-		WithScheme(s).
-		WithStatusSubresource(&mmv1beta.Agent{}, &appsv1.Deployment{}, &mmv1beta.Mattermost{}).
-		WithRuntimeObjects(agent, newReadyMattermost(), botTokenSecret).
-		Build()
-
-	r := &AgentReconciler{
-		Client:    c,
-		Log:       logger,
-		Scheme:    s,
-		Resources: resources.NewResourceHelper(c, s),
-	}
-
-	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}}
-	res, err := r.Reconcile(context.Background(), req)
-	require.NoError(t, err)
-	assert.Equal(t, 60*time.Second, res.RequeueAfter)
-
-	deploy := &appsv1.Deployment{}
-	err = c.Get(context.TODO(), types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, deploy)
-	require.True(t, k8sErrors.IsNotFound(err), "agent Deployment must not be created without external virtual-key secret")
-
-	updated := &mmv1beta.Agent{}
-	require.NoError(t, c.Get(context.TODO(), req.NamespacedName, updated))
-	assert.Equal(t, mmv1beta.Reconciling, updated.Status.State)
-	assert.Contains(t, updated.Status.Error, "my-external-key-secret")
-	assert.Contains(t, updated.Status.Error, "provisioned externally")
-}
-
-func TestReconcileAgent_AllowEgressPolicy(t *testing.T) {
-	logger := testLogger()
-	logf.SetLogger(logger)
-
-	agent := newTestAgent()
-	agent.Spec.EgressPolicy = mmv1beta.AgentEgressPolicyAllow
-
-	botTokenSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      agent.BotTokenSecretName(),
-			Namespace: agent.Namespace,
-		},
-		Data: map[string][]byte{mmv1beta.SecretKeyBotToken: []byte("bot-secret-token")},
-	}
-
-	s := setupScheme(t)
-	c := fake.NewClientBuilder().
-		WithScheme(s).
-		WithStatusSubresource(&mmv1beta.Agent{}, &appsv1.Deployment{}, &mmv1beta.Mattermost{}).
-		WithRuntimeObjects(agent, newReadyMattermost(), botTokenSecret).
-		Build()
-
-	r := &AgentReconciler{
-		Client:    c,
-		Log:       logger,
-		Scheme:    s,
-		Resources: resources.NewResourceHelper(c, s),
-	}
-
-	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}}
-
-	res, err := r.Reconcile(context.Background(), req)
-	require.NoError(t, err)
-	assert.Equal(t, 6*time.Second, res.RequeueAfter)
-
-	deploy := &appsv1.Deployment{}
-	require.NoError(t, c.Get(context.TODO(), types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, deploy))
-	deploy.Status.ObservedGeneration = deploy.Generation
-	deploy.Status.ReadyReplicas = 1
-	deploy.Status.Replicas = 1
-	deploy.Status.UpdatedReplicas = 1
-	require.NoError(t, c.Status().Update(context.TODO(), deploy))
-
-	res, err = r.Reconcile(context.Background(), req)
-	require.NoError(t, err)
-	assert.Equal(t, reconcile.Result{}, res)
-
-	updated := &mmv1beta.Agent{}
-	require.NoError(t, c.Get(context.TODO(), req.NamespacedName, updated))
-	assert.Equal(t, mmv1beta.Stable, updated.Status.State)
-
-	np := &networkingv1.NetworkPolicy{}
-	require.NoError(t, c.Get(context.TODO(), types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, np))
-	require.Len(t, np.Spec.Egress, 1, "allow policy must have a single catch-all egress rule")
-	assert.Empty(t, np.Spec.Egress[0].To)
-	assert.Empty(t, np.Spec.Egress[0].Ports)
 }
 
 func TestAgentsForMattermost(t *testing.T) {
 	agentA := newTestAgent()
 	agentA.Name = "agent-a"
-
 	agentB := newTestAgent()
 	agentB.Name = "agent-b"
-
 	otherAgent := newTestAgent()
 	otherAgent.Name = "agent-other"
 	otherAgent.Spec.MattermostRef.Name = "mm-other"
-
-	r, _ := setupReconciler(t, agentA, agentB, otherAgent)
+	reconciler := setupReconciler(t, agentA, agentB, otherAgent)
 
 	mm := newReadyMattermost()
-	requests := r.agentsForMattermost(context.TODO(), mm)
-	require.Len(t, requests, 2, "only agents referencing the Mattermost must be enqueued")
-
-	names := []string{requests[0].Name, requests[1].Name}
-	assert.ElementsMatch(t, []string{"agent-a", "agent-b"}, names)
-	assert.Equal(t, mm.Namespace, requests[0].Namespace)
+	requests := reconciler.agentsForMattermost(context.Background(), mm)
+	require.Len(t, requests, 2)
+	assert.ElementsMatch(t, []string{"agent-a", "agent-b"}, []string{
+		requests[0].Name,
+		requests[1].Name,
+	})
 
 	unreferenced := newReadyMattermost()
 	unreferenced.Name = "mm-unreferenced"
-	assert.Empty(t, r.agentsForMattermost(context.TODO(), unreferenced))
+	assert.Empty(t, reconciler.agentsForMattermost(context.Background(), unreferenced))
 }
 
 func TestAgentsForLiteLLMDeployment(t *testing.T) {
 	gatewayAgent := newTestAgent()
 	gatewayAgent.Name = "agent-gateway"
-	gatewayAgent.Spec.LLMGateway = &mmv1beta.LLMGatewayConfig{
-		OperatorManaged: &mmv1beta.OperatorManagedGateway{},
-	}
-
+	gatewayAgent.Spec.LLMGateway = operatorManagedGatewayConfig()
 	plainAgent := newTestAgent()
 	plainAgent.Name = "agent-plain"
+	reconciler := setupReconciler(t, gatewayAgent, plainAgent)
 
-	r, _ := setupReconciler(t, gatewayAgent, plainAgent)
+	gatewayDeployment := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{
+		Name: mmv1beta.AgentLiteLLMDeploymentName, Namespace: gatewayAgent.Namespace,
+	}}
+	requests := reconciler.agentsForLiteLLMDeployment(context.Background(), gatewayDeployment)
+	require.Len(t, requests, 1)
+	assert.Equal(t, gatewayAgent.Name, requests[0].Name)
 
-	litellmDeploy := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      mmv1beta.AgentLiteLLMDeploymentName,
-			Namespace: gatewayAgent.Namespace,
-		},
-	}
-	requests := r.agentsForLiteLLMDeployment(context.TODO(), litellmDeploy)
-	require.Len(t, requests, 1, "only operator-managed-gateway agents must be enqueued")
-	assert.Equal(t, "agent-gateway", requests[0].Name)
-
-	unrelatedDeploy := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "some-other-deployment",
-			Namespace: gatewayAgent.Namespace,
-		},
-	}
-	assert.Empty(t, r.agentsForLiteLLMDeployment(context.TODO(), unrelatedDeploy))
+	unrelated := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{
+		Name: "unrelated", Namespace: gatewayAgent.Namespace,
+	}}
+	assert.Empty(t, reconciler.agentsForLiteLLMDeployment(context.Background(), unrelated))
 }

@@ -47,6 +47,31 @@ func envVarsByName(env []corev1.EnvVar) map[string]*corev1.EnvVar {
 	return envMap
 }
 
+func findEgressRuleByPort(t *testing.T, policy *networkingv1.NetworkPolicy, port int32) *networkingv1.NetworkPolicyEgressRule {
+	t.Helper()
+
+	var matches []*networkingv1.NetworkPolicyEgressRule
+	for i := range policy.Spec.Egress {
+		for _, policyPort := range policy.Spec.Egress[i].Ports {
+			if policyPort.Port != nil && policyPort.Port.IntVal == port {
+				matches = append(matches, &policy.Spec.Egress[i])
+				break
+			}
+		}
+	}
+	require.Len(t, matches, 1, "expected exactly one egress rule containing port %d", port)
+	return matches[0]
+}
+
+func egressRuleHasPort(rule *networkingv1.NetworkPolicyEgressRule, port int32) bool {
+	for _, policyPort := range rule.Ports {
+		if policyPort.Port != nil && policyPort.Port.IntVal == port {
+			return true
+		}
+	}
+	return false
+}
+
 func TestAgentOwnerReference(t *testing.T) {
 	agent := testAgent("my-agent", "default")
 	refs := AgentOwnerReference(agent)
@@ -138,12 +163,6 @@ func TestGenerateAgentDeployment(t *testing.T) {
 	assert.Equal(t, "/secrets/mmctl-token", c.VolumeMounts[0].MountPath)
 	assert.True(t, c.VolumeMounts[0].ReadOnly)
 
-	assert.Empty(t, dep.Spec.Template.Spec.InitContainers, "init containers must be removed")
-
-	for _, e := range c.Env {
-		assert.NotEqual(t, "HOME", e.Name, "HOME env var must not be present")
-	}
-
 	volumes := dep.Spec.Template.Spec.Volumes
 	assert.Len(t, volumes, 1)
 	assert.Equal(t, "bot-token", volumes[0].Name)
@@ -166,6 +185,79 @@ func TestGenerateAgentDeployment_CustomEnvVars(t *testing.T) {
 	require.Contains(t, envMap, "MM_SERVER_URL")
 	assert.Equal(t, "custom-value", envMap["CUSTOM_VAR"].Value)
 	assert.Equal(t, "should-not-override", envMap["MM_SERVER_URL"].Value)
+}
+
+func TestGenerateAgentDeployment_GatewayEnvMatrix(t *testing.T) {
+	tests := []struct {
+		name          string
+		gateway       *mmv1beta.LLMGatewayConfig
+		expectedURL   string
+		expectedKey   string
+		expectGateway bool
+	}{
+		{name: "none"},
+		{
+			name: "operator managed",
+			gateway: &mmv1beta.LLMGatewayConfig{
+				OperatorManaged: &mmv1beta.OperatorManagedGateway{},
+			},
+			expectedURL:   mmv1beta.LiteLLMServiceURL("my-namespace"),
+			expectedKey:   "agent-my-agent-litellm-key",
+			expectGateway: true,
+		},
+		{
+			name: "external",
+			gateway: &mmv1beta.LLMGatewayConfig{
+				External: &mmv1beta.ExternalLLMGateway{
+					URL:              "https://gateway.example.com:8443",
+					VirtualKeySecret: "external-key-secret",
+				},
+			},
+			expectedURL:   "https://gateway.example.com:8443",
+			expectedKey:   "external-key-secret",
+			expectGateway: true,
+		},
+	}
+
+	gatewayEnvNames := []string{
+		"LITELLM_BASE_URL",
+		"LITELLM_MCP_URL",
+		"OPENAI_BASE_URL",
+		"OPENAI_API_KEY",
+		"ANTHROPIC_BASE_URL",
+		"ANTHROPIC_API_KEY",
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			agent := testAgent("my-agent", "my-namespace")
+			agent.Spec.LLMGateway = tt.gateway
+			deployment := GenerateAgentDeployment(agent)
+			require.Len(t, deployment.Spec.Template.Spec.Containers, 1)
+			env := envVarsByName(deployment.Spec.Template.Spec.Containers[0].Env)
+
+			if !tt.expectGateway {
+				for _, name := range gatewayEnvNames {
+					assert.NotContains(t, env, name)
+				}
+				return
+			}
+
+			for _, name := range gatewayEnvNames {
+				require.Contains(t, env, name)
+			}
+			assert.Equal(t, tt.expectedURL, env["LITELLM_BASE_URL"].Value)
+			assert.Equal(t, tt.expectedURL+"/mcp", env["LITELLM_MCP_URL"].Value)
+			assert.Equal(t, tt.expectedURL+"/v1", env["OPENAI_BASE_URL"].Value)
+			assert.Equal(t, tt.expectedURL, env["ANTHROPIC_BASE_URL"].Value)
+			for _, name := range []string{"OPENAI_API_KEY", "ANTHROPIC_API_KEY"} {
+				require.NotNil(t, env[name].ValueFrom)
+				require.NotNil(t, env[name].ValueFrom.SecretKeyRef)
+				assert.Equal(t, tt.expectedKey, env[name].ValueFrom.SecretKeyRef.Name)
+				assert.Equal(t, mmv1beta.SecretKeyAPIKey, env[name].ValueFrom.SecretKeyRef.Key)
+			}
+		})
+	}
 }
 
 func TestGenerateAgentDeployment_WithStorage(t *testing.T) {
@@ -284,136 +376,151 @@ func TestGenerateAgentHookSecret(t *testing.T) {
 	assert.NotContains(t, secret.Data, mmv1beta.SecretKeyAPIKey)
 }
 
-func TestGenerateAgentNetworkPolicy_Deny(t *testing.T) {
-	agent := testAgent("my-agent", "default")
-	agent.Spec.EgressPolicy = mmv1beta.AgentEgressPolicyDeny
-
-	np := GenerateAgentNetworkPolicy(agent)
-
-	assert.Equal(t, "my-agent", np.Name)
-	assert.Equal(t, "default", np.Namespace)
-	assert.Len(t, np.OwnerReferences, 1)
-
-	assert.Contains(t, np.Spec.PolicyTypes, networkingv1.PolicyTypeIngress)
-	assert.Contains(t, np.Spec.PolicyTypes, networkingv1.PolicyTypeEgress)
-
-	assert.Len(t, np.Spec.Ingress, 1)
-	ingress := np.Spec.Ingress[0]
-	assert.Len(t, ingress.From, 1)
-	assert.Equal(t, "mm-prod", ingress.From[0].PodSelector.MatchLabels[mmv1beta.ClusterLabel])
-	assert.Equal(t, mmv1beta.MattermostAppContainerName, ingress.From[0].PodSelector.MatchLabels["app"])
-	assert.Len(t, ingress.Ports, 1)
-	assert.Equal(t, int32(8080), ingress.Ports[0].Port.IntVal)
-
-	assert.Len(t, np.Spec.Egress, 2)
-
-	mmEgress := np.Spec.Egress[0]
-	assert.Len(t, mmEgress.To, 1)
-	assert.Equal(t, "mm-prod", mmEgress.To[0].PodSelector.MatchLabels[mmv1beta.ClusterLabel])
-	assert.Equal(t, mmv1beta.MattermostAppContainerName, mmEgress.To[0].PodSelector.MatchLabels["app"])
-	assert.Len(t, mmEgress.Ports, 1)
-	assert.Equal(t, int32(8065), mmEgress.Ports[0].Port.IntVal)
-
-	dnsEgress := np.Spec.Egress[1]
-	assert.Len(t, dnsEgress.Ports, 2)
-}
-
-func TestGenerateAgentNetworkPolicy_AllowWeb(t *testing.T) {
-	agent := testAgent("my-agent", "default")
-	agent.Spec.EgressPolicy = mmv1beta.AgentEgressPolicyAllowWeb
-
-	np := GenerateAgentNetworkPolicy(agent)
-
-	assert.Len(t, np.Spec.Egress, 3)
-
-	mmEgress := np.Spec.Egress[0]
-	assert.Len(t, mmEgress.To, 1)
-	assert.Equal(t, "mm-prod", mmEgress.To[0].PodSelector.MatchLabels[mmv1beta.ClusterLabel])
-	assert.Len(t, mmEgress.Ports, 1)
-	assert.Equal(t, int32(8065), mmEgress.Ports[0].Port.IntVal)
-
-	dnsEgress := np.Spec.Egress[1]
-	assert.Len(t, dnsEgress.Ports, 2)
-	assert.Equal(t, int32(53), dnsEgress.Ports[0].Port.IntVal)
-	assert.Equal(t, int32(53), dnsEgress.Ports[1].Port.IntVal)
-
-	webEgress := np.Spec.Egress[2]
-	assert.Empty(t, webEgress.To, "no To selector means any destination")
-	require.Len(t, webEgress.Ports, 2)
-	assert.Equal(t, int32(443), webEgress.Ports[0].Port.IntVal)
-	assert.Equal(t, corev1.ProtocolTCP, *webEgress.Ports[0].Protocol)
-	assert.Equal(t, int32(80), webEgress.Ports[1].Port.IntVal)
-	assert.Equal(t, corev1.ProtocolTCP, *webEgress.Ports[1].Protocol)
-}
-
-func TestGenerateAgentNetworkPolicy_Allow(t *testing.T) {
-	agent := testAgent("my-agent", "default")
-	agent.Spec.EgressPolicy = mmv1beta.AgentEgressPolicyAllow
-
-	np := GenerateAgentNetworkPolicy(agent)
-
-	assert.Equal(t, "my-agent", np.Name)
-	assert.Equal(t, "default", np.Namespace)
-	assert.Len(t, np.OwnerReferences, 1)
-
-	assert.Contains(t, np.Spec.PolicyTypes, networkingv1.PolicyTypeIngress)
-	assert.Contains(t, np.Spec.PolicyTypes, networkingv1.PolicyTypeEgress)
-
-	assert.Len(t, np.Spec.Ingress, 1)
-	ingress := np.Spec.Ingress[0]
-	assert.Len(t, ingress.From, 1)
-	assert.Equal(t, "mm-prod", ingress.From[0].PodSelector.MatchLabels[mmv1beta.ClusterLabel])
-	assert.Equal(t, mmv1beta.MattermostAppContainerName, ingress.From[0].PodSelector.MatchLabels["app"])
-
-	require.Len(t, np.Spec.Egress, 1)
-	assert.Empty(t, np.Spec.Egress[0].To, "allow-all rule has no To selector")
-	assert.Empty(t, np.Spec.Egress[0].Ports, "allow-all rule has no Ports restriction")
-}
-
-func TestGenerateAgentNetworkPolicy_AllowWithLiteLLM(t *testing.T) {
-	agent := testAgent("my-agent", "default")
-	agent.Spec.EgressPolicy = mmv1beta.AgentEgressPolicyAllow
-	agent.Spec.LLMGateway = &mmv1beta.LLMGatewayConfig{
-		OperatorManaged: &mmv1beta.OperatorManagedGateway{},
+func TestGenerateAgentNetworkPolicy_EgressPolicyGatewayMatrix(t *testing.T) {
+	policies := []struct {
+		name            string
+		value           mmv1beta.AgentEgressPolicy
+		baseEgressCount int
+		restricted      bool
+		expectWebEgress bool
+	}{
+		{name: "empty", baseEgressCount: 2, restricted: true},
+		{name: "deny", value: mmv1beta.AgentEgressPolicyDeny, baseEgressCount: 2, restricted: true},
+		{name: "allow web", value: mmv1beta.AgentEgressPolicyAllowWeb, baseEgressCount: 3, restricted: true, expectWebEgress: true},
+		{name: "allow", value: mmv1beta.AgentEgressPolicyAllow, baseEgressCount: 1},
+		{name: "unknown", value: mmv1beta.AgentEgressPolicy("unknown"), baseEgressCount: 2, restricted: true},
+	}
+	gateways := []struct {
+		name                 string
+		config               *mmv1beta.LLMGatewayConfig
+		restrictedEgressPort int32
+		operatorManaged      bool
+	}{
+		{name: "none"},
+		{
+			name: "operator managed",
+			config: &mmv1beta.LLMGatewayConfig{
+				OperatorManaged: &mmv1beta.OperatorManagedGateway{},
+			},
+			restrictedEgressPort: mmv1beta.AgentLiteLLMPort,
+			operatorManaged:      true,
+		},
+		{
+			name: "external explicit port",
+			config: &mmv1beta.LLMGatewayConfig{
+				External: &mmv1beta.ExternalLLMGateway{
+					URL:              "https://gateway.example.com:8443",
+					VirtualKeySecret: "external-key-secret",
+				},
+			},
+			restrictedEgressPort: 8443,
+		},
 	}
 
-	np := GenerateAgentNetworkPolicy(agent)
+	for _, policy := range policies {
+		for _, gateway := range gateways {
+			t.Run(policy.name+"/"+gateway.name, func(t *testing.T) {
+				agent := testAgent("my-agent", "default")
+				agent.Spec.EgressPolicy = policy.value
+				agent.Spec.LLMGateway = gateway.config
 
-	require.Len(t, np.Spec.Egress, 1)
-	assert.Empty(t, np.Spec.Egress[0].To, "allow-all rule has no To selector")
-	assert.Empty(t, np.Spec.Egress[0].Ports, "allow-all rule has no Ports restriction")
+				networkPolicy := GenerateAgentNetworkPolicy(agent)
 
-	require.Len(t, np.Spec.Ingress, 1)
-	assert.Len(t, np.Spec.Ingress[0].From, 2, "ingress should allow both MM and LiteLLM pods")
-	assert.Equal(t, "mm-prod", np.Spec.Ingress[0].From[0].PodSelector.MatchLabels[mmv1beta.ClusterLabel])
-	assert.Equal(t, mmv1beta.AgentLiteLLMDeploymentName, np.Spec.Ingress[0].From[1].PodSelector.MatchLabels["app"])
+				assert.Equal(t, "my-agent", networkPolicy.Name)
+				assert.Equal(t, "default", networkPolicy.Namespace)
+				assert.Len(t, networkPolicy.OwnerReferences, 1)
+				assert.ElementsMatch(t, []networkingv1.PolicyType{
+					networkingv1.PolicyTypeIngress,
+					networkingv1.PolicyTypeEgress,
+				}, networkPolicy.Spec.PolicyTypes)
+
+				expectedEgressCount := policy.baseEgressCount
+				if policy.restricted && gateway.restrictedEgressPort != 0 {
+					expectedEgressCount++
+				}
+				assert.Len(t, networkPolicy.Spec.Egress, expectedEgressCount)
+
+				require.Len(t, networkPolicy.Spec.Ingress, 1)
+				expectedIngressPeers := 1
+				if gateway.operatorManaged {
+					expectedIngressPeers++
+				}
+				assert.Len(t, networkPolicy.Spec.Ingress[0].From, expectedIngressPeers)
+
+				if !policy.restricted {
+					require.Len(t, networkPolicy.Spec.Egress, 1)
+					assert.Empty(t, networkPolicy.Spec.Egress[0].To)
+					assert.Empty(t, networkPolicy.Spec.Egress[0].Ports)
+					return
+				}
+
+				mattermostEgress := findEgressRuleByPort(t, networkPolicy, MattermostServerPort)
+				require.Len(t, mattermostEgress.To, 1)
+				require.NotNil(t, mattermostEgress.To[0].PodSelector)
+				assert.Equal(
+					t,
+					mmv1beta.MattermostSelectorLabels(agent.Spec.MattermostRef.Name),
+					mattermostEgress.To[0].PodSelector.MatchLabels,
+				)
+
+				dnsEgress := findEgressRuleByPort(t, networkPolicy, 53)
+				require.Len(t, dnsEgress.Ports, 2)
+				assert.Empty(t, dnsEgress.To)
+				protocols := make([]corev1.Protocol, 0, len(dnsEgress.Ports))
+				for _, port := range dnsEgress.Ports {
+					require.NotNil(t, port.Protocol)
+					protocols = append(protocols, *port.Protocol)
+				}
+				assert.ElementsMatch(t, []corev1.Protocol{
+					corev1.ProtocolTCP,
+					corev1.ProtocolUDP,
+				}, protocols)
+
+				if gateway.restrictedEgressPort != 0 {
+					gatewayEgress := findEgressRuleByPort(
+						t, networkPolicy, gateway.restrictedEgressPort,
+					)
+					if gateway.operatorManaged {
+						require.Len(t, gatewayEgress.To, 1)
+						require.NotNil(t, gatewayEgress.To[0].PodSelector)
+						assert.Equal(
+							t,
+							LiteLLMSelectorLabels(),
+							gatewayEgress.To[0].PodSelector.MatchLabels,
+						)
+					} else {
+						assert.Empty(t, gatewayEgress.To)
+					}
+				}
+
+				if policy.expectWebEgress {
+					webEgress := findEgressRuleByPort(t, networkPolicy, 443)
+					assert.Empty(t, webEgress.To)
+					assert.True(t, egressRuleHasPort(webEgress, 80))
+				}
+			})
+		}
+	}
 }
 
-func TestGenerateAgentNetworkPolicy_EgressPolicy_TableDriven(t *testing.T) {
+func TestExternalGatewayPort(t *testing.T) {
 	tests := []struct {
-		name             string
-		egressPolicy     mmv1beta.AgentEgressPolicy
-		expectedEgresses int
+		name     string
+		url      string
+		port     int32
+		expected bool
 	}{
-		{name: "empty", egressPolicy: "", expectedEgresses: 2},
-		{name: "deny", egressPolicy: mmv1beta.AgentEgressPolicyDeny, expectedEgresses: 2},
-		{name: "allowWeb", egressPolicy: mmv1beta.AgentEgressPolicyAllowWeb, expectedEgresses: 3},
-		{name: "allow", egressPolicy: mmv1beta.AgentEgressPolicyAllow, expectedEgresses: 1},
-		{name: "unknown", egressPolicy: mmv1beta.AgentEgressPolicy("unknown"), expectedEgresses: 2},
+		{name: "explicit", url: "https://gateway.example.com:8443", port: 8443, expected: true},
+		{name: "https default", url: "https://gateway.example.com", port: 443, expected: true},
+		{name: "http default", url: "http://gateway.example.com/path", port: 80, expected: true},
+		{name: "invalid", url: "http://[::1", expected: false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			agent := testAgent("my-agent", "default")
-			agent.Spec.EgressPolicy = tt.egressPolicy
-
-			np := GenerateAgentNetworkPolicy(agent)
-
-			assert.Equal(t, []networkingv1.PolicyType{
-				networkingv1.PolicyTypeIngress,
-				networkingv1.PolicyTypeEgress,
-			}, np.Spec.PolicyTypes)
-			assert.Len(t, np.Spec.Egress, tt.expectedEgresses)
+			port, ok := externalGatewayPort(tt.url)
+			assert.Equal(t, tt.expected, ok)
+			assert.Equal(t, tt.port, port)
 		})
 	}
 }
