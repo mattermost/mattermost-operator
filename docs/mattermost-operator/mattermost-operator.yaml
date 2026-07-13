@@ -214,9 +214,10 @@ spec:
                         minLength: 1
                         type: string
                         x-kubernetes-validations:
-                        - message: must be a valid absolute URL with an http:// or
-                            https:// scheme
-                          rule: isURL(self) && (self.startsWith('http://') || self.startsWith('https://'))
+                        - message: must be a valid absolute URL with a host and an
+                            http or https scheme
+                          rule: isURL(self) && url(self).getHostname() != '' && url(self).getScheme()
+                            in ['http', 'https']
                       virtualKeySecret:
                         description: |-
                           VirtualKeySecret is the name of the K8s Secret containing the virtual key

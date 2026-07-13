@@ -139,7 +139,7 @@ type ExternalLLMGateway struct {
 	// HTTPS and port 80 for HTTP.
 	// Example: "http://litellm.my-namespace.svc.cluster.local:4000"
 	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:XValidation:rule="isURL(self) && (self.startsWith('http://') || self.startsWith('https://'))",message="must be a valid absolute URL with an http:// or https:// scheme"
+	// +kubebuilder:validation:XValidation:rule="isURL(self) && url(self).getHostname() != '' && url(self).getScheme() in ['http', 'https']",message="must be a valid absolute URL with a host and an http or https scheme"
 	URL string `json:"url"`
 
 	// VirtualKeySecret is the name of the K8s Secret containing the virtual key

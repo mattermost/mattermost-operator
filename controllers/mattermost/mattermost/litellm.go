@@ -143,6 +143,10 @@ func (r *MattermostReconciler) checkLiteLLMDeployment(ctx context.Context, matte
 		return errors.Wrap(err, "failed to get litellm deployment")
 	}
 
+	if err := requireLiteLLMControl(current, mattermost); err != nil {
+		return err
+	}
+
 	return r.Resources.Update(current, desired, reqLogger)
 }
 
@@ -160,9 +164,24 @@ func (r *MattermostReconciler) checkLiteLLMService(ctx context.Context, mattermo
 		return errors.Wrap(err, "failed to get litellm service")
 	}
 
+	if err := requireLiteLLMControl(current, mattermost); err != nil {
+		return err
+	}
+
 	resources.CopyServiceEmptyAutoAssignedFields(desired, current)
 
 	return r.Resources.Update(current, desired, reqLogger)
+}
+
+// requireLiteLLMControl rejects updates to a gateway object controlled by
+// someone else. Gateway names are fixed per namespace, so without this check
+// two installations enabling the gateway would steal the objects from each
+// other on every reconcile.
+func requireLiteLLMControl(obj client.Object, mattermost *mmv1beta.Mattermost) error {
+	if metav1.IsControlledBy(obj, mattermost) {
+		return nil
+	}
+	return fmt.Errorf("%T %s exists but is not managed by this Mattermost installation; only one installation per namespace can enable the operator-managed LiteLLM gateway", obj, obj.GetName())
 }
 
 // deleteLiteLLMResources removes the LiteLLM Deployment and Service when the

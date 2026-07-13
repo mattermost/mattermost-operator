@@ -297,6 +297,36 @@ func TestCheckLiteLLM_DisableTransition(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestCheckLiteLLM_DoesNotStealOtherInstallationsGateway(t *testing.T) {
+	logger, fakeClient, reconciler := setupTestDeps(t)
+
+	// Installation A owns the gateway in the namespace.
+	mmA := newLiteLLMTestMattermost(t)
+	mmA.Name = "installation-a"
+	mmA.UID = types.UID("uid-a")
+	require.NoError(t, fakeClient.Create(context.TODO(), newLiteLLMDBCredentialsSecret(mmA.Namespace)))
+	require.NoError(t, reconciler.checkLiteLLM(context.TODO(), mmA, logger))
+
+	// Installation B also enables the gateway; it must not take over A's objects.
+	mmB := newLiteLLMTestMattermost(t)
+	mmB.Name = "installation-b"
+	mmB.UID = types.UID("uid-b")
+	mmB.Spec.Agents.LLMGateway.Image = "ghcr.io/berriai/litellm-database:v9.9.9"
+
+	err := reconciler.checkLiteLLM(context.TODO(), mmB, logger)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not managed by this Mattermost installation")
+
+	deployment := &appsv1.Deployment{}
+	require.NoError(t, fakeClient.Get(context.TODO(), types.NamespacedName{
+		Name:      mmv1beta.AgentLiteLLMDeploymentName,
+		Namespace: mmA.Namespace,
+	}, deployment))
+	require.Len(t, deployment.OwnerReferences, 1)
+	assert.Equal(t, mmA.Name, deployment.OwnerReferences[0].Name, "gateway must remain owned by installation A")
+	assert.NotEqual(t, "ghcr.io/berriai/litellm-database:v9.9.9", deployment.Spec.Template.Spec.Containers[0].Image)
+}
+
 func TestCleanupLiteLLMIfDisabled_DoesNotDeleteOtherInstallationsGateway(t *testing.T) {
 	logger, fakeClient, reconciler := setupTestDeps(t)
 
