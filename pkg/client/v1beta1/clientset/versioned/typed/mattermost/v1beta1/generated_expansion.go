@@ -5,4 +5,6 @@
 
 package v1beta1
 
+type AgentExpansion interface{}
+
 type MattermostExpansion interface{}
