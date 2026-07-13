@@ -39,6 +39,9 @@ const (
 	// ClusterLabel is the label applied across all components
 	ClusterLabel = "installation.mattermost.com/installation"
 
+	// AgentNameLabel is the label applied to resources belonging to a given Agent.
+	AgentNameLabel = "installation.mattermost.com/agent"
+
 	// ClusterResourceLabel is the label applied to a given Mattermost
 	// as well as all other resources created to support it.
 	ClusterResourceLabel = "installation.mattermost.com/resource"

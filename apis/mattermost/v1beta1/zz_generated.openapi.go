@@ -78,6 +78,13 @@ func schema_mattermost_operator_apis_mattermost_v1beta1_AgentSpec(ref common.Ref
 				Description: "AgentSpec defines the desired state of Agent",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
+					"mattermostRef": {
+						SchemaProps: spec.SchemaProps{
+							Description: "MattermostRef is a reference to the Mattermost CR in the same namespace that this agent is associated with.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.AgentMattermostRef"),
+						},
+					},
 					"image": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Image defines the agent container image.",
@@ -115,13 +122,6 @@ func schema_mattermost_operator_apis_mattermost_v1beta1_AgentSpec(ref common.Ref
 							Format:      "",
 						},
 					},
-					"mattermostRef": {
-						SchemaProps: spec.SchemaProps{
-							Description: "MattermostRef is a reference to the Mattermost CR in the same namespace that this agent is associated with.",
-							Default:     map[string]interface{}{},
-							Ref:         ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.AgentMattermostRef"),
-						},
-					},
 					"env": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Env defines optional environment variables to inject into the agent pod.",
@@ -149,7 +149,7 @@ func schema_mattermost_operator_apis_mattermost_v1beta1_AgentSpec(ref common.Ref
 						},
 					},
 				},
-				Required: []string{"image", "mattermostRef"},
+				Required: []string{"mattermostRef", "image"},
 			},
 		},
 		Dependencies: []string{

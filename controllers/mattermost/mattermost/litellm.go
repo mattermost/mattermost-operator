@@ -55,15 +55,15 @@ func (r *MattermostReconciler) checkLiteLLMDBCredentials(mattermost *mmv1beta.Ma
 	}, secret)
 	if k8sErrors.IsNotFound(err) {
 		return fmt.Errorf("required Secret %q (key %q) not found in namespace %s; the operator-managed LiteLLM gateway requires an externally-provisioned PostgreSQL connection string",
-			mmv1beta.AgentLiteLLMDBCredentialsSecret, "connectionString", mattermost.Namespace)
+			mmv1beta.AgentLiteLLMDBCredentialsSecret, mmv1beta.SecretKeyConnectionString, mattermost.Namespace)
 	}
 	if err != nil {
 		return errors.Wrap(err, "failed to check litellm db credentials secret")
 	}
 
-	if len(secret.Data["connectionString"]) == 0 {
+	if len(secret.Data[mmv1beta.SecretKeyConnectionString]) == 0 {
 		return fmt.Errorf("secret %q must contain a non-empty %q key with a PostgreSQL connection string",
-			mmv1beta.AgentLiteLLMDBCredentialsSecret, "connectionString")
+			mmv1beta.AgentLiteLLMDBCredentialsSecret, mmv1beta.SecretKeyConnectionString)
 	}
 
 	return nil
@@ -81,9 +81,9 @@ func (r *MattermostReconciler) checkLiteLLMMasterKey(mattermost *mmv1beta.Matter
 		Namespace: mattermost.Namespace,
 	}, existing)
 	if err == nil {
-		if len(existing.Data["masterKey"]) == 0 {
+		if len(existing.Data[mmv1beta.SecretKeyMasterKey]) == 0 {
 			return fmt.Errorf("secret %q must contain a non-empty %q key",
-				mmv1beta.AgentLiteLLMMasterKeySecretName, "masterKey")
+				mmv1beta.AgentLiteLLMMasterKeySecretName, mmv1beta.SecretKeyMasterKey)
 		}
 		return nil
 	}
@@ -96,7 +96,7 @@ func (r *MattermostReconciler) checkLiteLLMMasterKey(mattermost *mmv1beta.Matter
 		return errors.Wrap(err, "failed to generate litellm master key")
 	}
 
-	desired := mattermostApp.GenerateLiteLLMMasterKeySecret(mattermost.Namespace, "sk-"+hexKey)
+	desired := mattermostApp.GenerateLiteLLMMasterKeySecret(mattermost, "sk-"+hexKey)
 	return r.Resources.CreateIfNotExists(nil, desired, reqLogger)
 }
 

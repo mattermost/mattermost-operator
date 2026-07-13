@@ -42,7 +42,7 @@ func newLiteLLMDBCredentialsSecret(namespace string) *corev1.Secret {
 			Name:      mmv1beta.AgentLiteLLMDBCredentialsSecret,
 			Namespace: namespace,
 		},
-		Data: map[string][]byte{"connectionString": []byte("postgres://user:pass@host/db")},
+		Data: map[string][]byte{mmv1beta.SecretKeyConnectionString: []byte("postgres://user:pass@host/db")},
 	}
 }
 
@@ -110,7 +110,7 @@ func TestCheckLiteLLM(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Empty(t, secret.OwnerReferences, "master-key Secret must not be owned")
-		originalKey := string(secret.Data["masterKey"])
+		originalKey := string(secret.Data[mmv1beta.SecretKeyMasterKey])
 		assert.NotEmpty(t, originalKey)
 
 		err = reconciler.checkLiteLLM(mm, logger)
@@ -121,7 +121,7 @@ func TestCheckLiteLLM(t *testing.T) {
 			Namespace: mm.Namespace,
 		}, secret)
 		require.NoError(t, err)
-		assert.Equal(t, originalKey, string(secret.Data["masterKey"]), "master key must be preserved")
+		assert.Equal(t, originalKey, string(secret.Data[mmv1beta.SecretKeyMasterKey]), "master key must be preserved")
 	})
 }
 
@@ -158,7 +158,7 @@ func TestCheckLiteLLM_MissingConnectionStringKey(t *testing.T) {
 
 	err := reconciler.checkLiteLLM(mm, logger)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "connectionString")
+	assert.Contains(t, err.Error(), mmv1beta.SecretKeyConnectionString)
 }
 
 func TestCheckLiteLLM_DisableTransition(t *testing.T) {
@@ -196,7 +196,7 @@ func TestCheckLiteLLM_DisableTransition(t *testing.T) {
 		Namespace: mm.Namespace,
 	}, masterKey)
 	require.NoError(t, err, "master-key Secret must be retained when gateway is disabled")
-	assert.NotEmpty(t, masterKey.Data["masterKey"])
+	assert.NotEmpty(t, masterKey.Data[mmv1beta.SecretKeyMasterKey])
 
 	// Disabled with nothing deployed is a no-op.
 	err = reconciler.checkLiteLLM(mm, logger)

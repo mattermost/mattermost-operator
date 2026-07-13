@@ -84,13 +84,8 @@ func (r *AgentReconciler) checkAgentService(ctx context.Context, agent *mmv1beta
 func (r *AgentReconciler) checkExternallyProvisionedSecrets(ctx context.Context, agent *mmv1beta.Agent) error {
 	required := []string{agent.BotTokenSecretName()}
 
-	if agent.HasLLMGateway() {
-		switch {
-		case agent.HasOperatorManagedGateway():
-			required = append(required, agent.LiteLLMKeySecretName())
-		case agent.Spec.LLMGateway.External != nil:
-			required = append(required, agent.Spec.LLMGateway.External.VirtualKeySecret)
-		}
+	if _, keySecretName, ok := agent.GatewayEndpoint(); ok {
+		required = append(required, keySecretName)
 	}
 
 	for _, name := range required {
@@ -160,10 +155,13 @@ func (r *AgentReconciler) checkAgentHealth(ctx context.Context, agent *mmv1beta.
 	status := prior
 	status.State = mmv1beta.Reconciling
 	status.ObservedGeneration = agent.Generation
-	status.Endpoint = fmt.Sprintf("http://%s.%s.svc.cluster.local:%d", agent.Name, agent.Namespace, mmv1beta.AgentHTTPPort)
+	status.Endpoint = mattermostApp.AgentServiceURL(agent)
 
 	deployment := &appsv1.Deployment{}
-	err := r.Client.Get(ctx, types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, deployment)
+	err := r.Client.Get(ctx, types.NamespacedName{
+		Name:      mattermostApp.AgentDeploymentName(agent),
+		Namespace: agent.Namespace,
+	}, deployment)
 	if err != nil {
 		return status, errors.Wrap(err, "failed to get agent deployment for health check")
 	}

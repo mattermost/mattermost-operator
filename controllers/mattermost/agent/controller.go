@@ -85,11 +85,7 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, request ctrl.Request) (
 	}
 
 	// Apply defaults.
-	err = agent.SetDefaults()
-	if err != nil {
-		r.updateStatusReconcilingAndLogError(ctx, agent, status, reqLogger, err)
-		return reconcile.Result{}, err
-	}
+	agent.SetDefaults()
 
 	// Check Mattermost CR readiness.
 	mm := &mmv1beta.Mattermost{}

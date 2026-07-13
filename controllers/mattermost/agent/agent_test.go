@@ -79,7 +79,7 @@ func setupReconciler(t *testing.T, objs ...runtime.Object) (*AgentReconciler, *r
 
 func TestCheckAgentService(t *testing.T) {
 	agent := newTestAgent()
-	_ = agent.SetDefaults()
+	agent.SetDefaults()
 
 	reconciler, _ := setupReconciler(t, agent)
 
@@ -102,7 +102,7 @@ func TestCheckAgentService(t *testing.T) {
 
 func TestCheckAgentDeployment(t *testing.T) {
 	agent := newTestAgent()
-	_ = agent.SetDefaults()
+	agent.SetDefaults()
 
 	// The deployment requires the bot token secret to exist for the volume.
 	botSecret := &corev1.Secret{
@@ -110,7 +110,7 @@ func TestCheckAgentDeployment(t *testing.T) {
 			Name:      agent.BotTokenSecretName(),
 			Namespace: agent.Namespace,
 		},
-		Data: map[string][]byte{"token": []byte("test-token")},
+		Data: map[string][]byte{mmv1beta.SecretKeyBotToken: []byte("test-token")},
 	}
 
 	reconciler, _ := setupReconciler(t, agent, botSecret)
@@ -158,7 +158,7 @@ func TestCheckAgentDeployment(t *testing.T) {
 func TestCheckAgentNetworkPolicy_Deny(t *testing.T) {
 	agent := newTestAgent()
 	agent.Spec.EgressPolicy = mmv1beta.AgentEgressPolicyDeny
-	_ = agent.SetDefaults()
+	agent.SetDefaults()
 
 	reconciler, _ := setupReconciler(t, agent)
 
@@ -179,7 +179,7 @@ func TestCheckAgentNetworkPolicy_Deny(t *testing.T) {
 func TestCheckAgentNetworkPolicy_AllowWeb(t *testing.T) {
 	agent := newTestAgent()
 	agent.Spec.EgressPolicy = mmv1beta.AgentEgressPolicyAllowWeb
-	_ = agent.SetDefaults()
+	agent.SetDefaults()
 
 	reconciler, _ := setupReconciler(t, agent)
 
@@ -193,8 +193,8 @@ func TestCheckAgentNetworkPolicy_AllowWeb(t *testing.T) {
 	err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, np)
 	require.NoError(t, err)
 
-	// AllowWeb policy: MM egress (8065) + DNS (53) + HTTPS (443) + HTTP (80) = 4 egress rules.
-	assert.Len(t, np.Spec.Egress, 4)
+	// AllowWeb policy: MM, DNS, and one web rule containing HTTPS and HTTP.
+	assert.Len(t, np.Spec.Egress, 3)
 }
 
 func TestCheckAgentDeployment_WithLLMGateway(t *testing.T) {
@@ -202,14 +202,14 @@ func TestCheckAgentDeployment_WithLLMGateway(t *testing.T) {
 	agent.Spec.LLMGateway = &mmv1beta.LLMGatewayConfig{
 		OperatorManaged: &mmv1beta.OperatorManagedGateway{},
 	}
-	_ = agent.SetDefaults()
+	agent.SetDefaults()
 
 	botSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      agent.BotTokenSecretName(),
 			Namespace: agent.Namespace,
 		},
-		Data: map[string][]byte{"token": []byte("test-token")},
+		Data: map[string][]byte{mmv1beta.SecretKeyBotToken: []byte("test-token")},
 	}
 
 	reconciler, _ := setupReconciler(t, agent, botSecret)
@@ -247,14 +247,14 @@ func TestCheckAgentDeployment_WithLLMGateway(t *testing.T) {
 	require.NotNil(t, openAIKey.ValueFrom, "OPENAI_API_KEY must use ValueFrom")
 	require.NotNil(t, openAIKey.ValueFrom.SecretKeyRef, "OPENAI_API_KEY must use SecretKeyRef")
 	assert.Equal(t, expectedKeySecretName, openAIKey.ValueFrom.SecretKeyRef.Name)
-	assert.Equal(t, "apiKey", openAIKey.ValueFrom.SecretKeyRef.Key)
+	assert.Equal(t, mmv1beta.SecretKeyAPIKey, openAIKey.ValueFrom.SecretKeyRef.Key)
 
 	anthropicKey, ok := envMap["ANTHROPIC_API_KEY"]
 	require.True(t, ok, "ANTHROPIC_API_KEY must be present")
 	require.NotNil(t, anthropicKey.ValueFrom, "ANTHROPIC_API_KEY must use ValueFrom")
 	require.NotNil(t, anthropicKey.ValueFrom.SecretKeyRef, "ANTHROPIC_API_KEY must use SecretKeyRef")
 	assert.Equal(t, expectedKeySecretName, anthropicKey.ValueFrom.SecretKeyRef.Name)
-	assert.Equal(t, "apiKey", anthropicKey.ValueFrom.SecretKeyRef.Key)
+	assert.Equal(t, mmv1beta.SecretKeyAPIKey, anthropicKey.ValueFrom.SecretKeyRef.Key)
 
 	// Standard env vars must still be present (backwards compat check).
 	assert.Contains(t, envMap, "MM_SERVER_URL")
@@ -264,7 +264,7 @@ func TestCheckAgentDeployment_WithLLMGateway(t *testing.T) {
 
 func TestCheckHookSecret_CreatesSecret(t *testing.T) {
 	agent := newTestAgent()
-	_ = agent.SetDefaults()
+	agent.SetDefaults()
 
 	reconciler, _ := setupReconciler(t, agent)
 	logger := testLogger()
@@ -279,16 +279,16 @@ func TestCheckHookSecret_CreatesSecret(t *testing.T) {
 		Namespace: agent.Namespace,
 	}, secret)
 	require.NoError(t, err)
-	assert.Contains(t, secret.Data, "hookSecret")
+	assert.Contains(t, secret.Data, mmv1beta.SecretKeyHookSecret)
 
 	// Verify the hook secret is a 64-character hex string (32 bytes encoded).
-	hookSecret := string(secret.Data["hookSecret"])
+	hookSecret := string(secret.Data[mmv1beta.SecretKeyHookSecret])
 	assert.Len(t, hookSecret, 64)
 }
 
 func TestCheckHookSecret_Idempotent(t *testing.T) {
 	agent := newTestAgent()
-	_ = agent.SetDefaults()
+	agent.SetDefaults()
 
 	// Pre-create the hook secret.
 	existingSecret := &corev1.Secret{
@@ -296,7 +296,7 @@ func TestCheckHookSecret_Idempotent(t *testing.T) {
 			Name:      agent.HookSecretName(),
 			Namespace: agent.Namespace,
 		},
-		Data: map[string][]byte{"hookSecret": []byte("pre-existing-value")},
+		Data: map[string][]byte{mmv1beta.SecretKeyHookSecret: []byte("pre-existing-value")},
 	}
 
 	reconciler, _ := setupReconciler(t, agent, existingSecret)
@@ -312,7 +312,7 @@ func TestCheckHookSecret_Idempotent(t *testing.T) {
 		Namespace: agent.Namespace,
 	}, secret)
 	require.NoError(t, err)
-	assert.Equal(t, []byte("pre-existing-value"), secret.Data["hookSecret"])
+	assert.Equal(t, []byte("pre-existing-value"), secret.Data[mmv1beta.SecretKeyHookSecret])
 }
 
 func TestCheckAgentNetworkPolicy_DenyWithLiteLLM(t *testing.T) {
@@ -321,7 +321,7 @@ func TestCheckAgentNetworkPolicy_DenyWithLiteLLM(t *testing.T) {
 	agent.Spec.LLMGateway = &mmv1beta.LLMGatewayConfig{
 		OperatorManaged: &mmv1beta.OperatorManagedGateway{},
 	}
-	_ = agent.SetDefaults()
+	agent.SetDefaults()
 
 	reconciler, _ := setupReconciler(t, agent)
 
@@ -339,7 +339,7 @@ func TestCheckAgentNetworkPolicy_DenyWithLiteLLM(t *testing.T) {
 	require.Len(t, np.Spec.Ingress, 1)
 	require.Len(t, np.Spec.Ingress[0].From, 2, "ingress should allow both MM and LiteLLM pods")
 	assert.Equal(t, agent.Spec.MattermostRef.Name, np.Spec.Ingress[0].From[0].PodSelector.MatchLabels[mmv1beta.ClusterLabel])
-	assert.Equal(t, "mm-agent-litellm", np.Spec.Ingress[0].From[1].PodSelector.MatchLabels["app"])
+	assert.Equal(t, mmv1beta.AgentLiteLLMDeploymentName, np.Spec.Ingress[0].From[1].PodSelector.MatchLabels["app"])
 
 	// Deny + LiteLLM: 3 egress rules (MM + LiteLLM + DNS).
 	assert.Len(t, np.Spec.Egress, 3, "deny+litellm should have 3 egress rules: MM, LiteLLM, DNS")
@@ -354,7 +354,7 @@ func TestCheckAgentNetworkPolicy_DenyWithLiteLLM(t *testing.T) {
 	assert.Equal(t, int32(4000), np.Spec.Egress[1].Ports[0].Port.IntVal, "rule 1 should be LiteLLM port 4000")
 	require.NotEmpty(t, np.Spec.Egress[1].To)
 	require.NotNil(t, np.Spec.Egress[1].To[0].PodSelector)
-	assert.Equal(t, "mm-agent-litellm", np.Spec.Egress[1].To[0].PodSelector.MatchLabels["app"])
+	assert.Equal(t, mmv1beta.AgentLiteLLMDeploymentName, np.Spec.Egress[1].To[0].PodSelector.MatchLabels["app"])
 
 	// Rule 2: DNS (port 53, no To selector — allows all destinations).
 	require.Len(t, np.Spec.Egress[2].Ports, 2, "DNS rule should have TCP+UDP")
@@ -363,7 +363,7 @@ func TestCheckAgentNetworkPolicy_DenyWithLiteLLM(t *testing.T) {
 
 func TestCheckAgentHealth_CarriesForwardPriorStatus(t *testing.T) {
 	agent := newTestAgent()
-	_ = agent.SetDefaults()
+	agent.SetDefaults()
 
 	// Pre-create a ready Deployment so the health check succeeds.
 	deployment := &appsv1.Deployment{
@@ -397,7 +397,7 @@ func TestCheckAgentPVC_Creates(t *testing.T) {
 		Size:      resource.MustParse("1Gi"),
 		MountPath: "/data",
 	}
-	_ = agent.SetDefaults()
+	agent.SetDefaults()
 
 	reconciler, _ := setupReconciler(t, agent)
 	logger := testLogger()
@@ -424,7 +424,7 @@ func TestCheckAgentPVC_Creates(t *testing.T) {
 func TestCheckAgentPVC_Skips(t *testing.T) {
 	agent := newTestAgent()
 	// Storage is nil — PVC should not be created.
-	_ = agent.SetDefaults()
+	agent.SetDefaults()
 
 	reconciler, _ := setupReconciler(t, agent)
 	logger := testLogger()
@@ -447,7 +447,7 @@ func TestCheckAgentPVC_OwnerReference(t *testing.T) {
 		Size:      resource.MustParse("2Gi"),
 		MountPath: "/data",
 	}
-	_ = agent.SetDefaults()
+	agent.SetDefaults()
 
 	reconciler, _ := setupReconciler(t, agent)
 	logger := testLogger()
@@ -476,7 +476,7 @@ func TestCheckAgentPVC_WithStorageClass(t *testing.T) {
 		StorageClassName: &storageClass,
 		MountPath:        "/workspace",
 	}
-	_ = agent.SetDefaults()
+	agent.SetDefaults()
 
 	reconciler, _ := setupReconciler(t, agent)
 	logger := testLogger()
@@ -501,7 +501,7 @@ func TestCheckAgentPVC_Idempotent(t *testing.T) {
 		Size:      resource.MustParse("1Gi"),
 		MountPath: "/data",
 	}
-	_ = agent.SetDefaults()
+	agent.SetDefaults()
 
 	reconciler, _ := setupReconciler(t, agent)
 	logger := testLogger()
@@ -518,7 +518,7 @@ func TestCheckAgentPVC_Idempotent(t *testing.T) {
 func TestCheckAgentNetworkPolicy_Allow(t *testing.T) {
 	agent := newTestAgent()
 	agent.Spec.EgressPolicy = mmv1beta.AgentEgressPolicyAllow
-	_ = agent.SetDefaults()
+	agent.SetDefaults()
 
 	reconciler, _ := setupReconciler(t, agent)
 
@@ -548,7 +548,7 @@ func TestCheckAgentNetworkPolicy_AllowWithLiteLLM(t *testing.T) {
 	agent.Spec.LLMGateway = &mmv1beta.LLMGatewayConfig{
 		OperatorManaged: &mmv1beta.OperatorManagedGateway{},
 	}
-	_ = agent.SetDefaults()
+	agent.SetDefaults()
 
 	reconciler, _ := setupReconciler(t, agent)
 

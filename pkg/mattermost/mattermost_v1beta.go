@@ -571,7 +571,8 @@ func mattermostRolePermissions() []rbacv1.PolicyRule {
 // inside it) the access needed to manage Agent CRs and their externally
 // provisioned Secrets (bot token, LiteLLM virtual key). Granted only when
 // spec.agents.enabled is true. v1beta1 only; Agents do not integrate with
-// legacy ClusterInstallations.
+// legacy ClusterInstallations. The Secret grant is namespace-wide because
+// agent secret names are dynamic and RBAC cannot scope create by resourceName.
 func agentRolePermissions() []rbacv1.PolicyRule {
 	return []rbacv1.PolicyRule{
 		{

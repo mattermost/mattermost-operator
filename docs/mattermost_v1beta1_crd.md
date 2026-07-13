@@ -56,6 +56,24 @@ _Appears in:_
 | `spec` _[AgentSpec](#agentspec)_ |  |  |  |
 
 
+#### AgentEgressPolicy
+
+_Underlying type:_ _string_
+
+AgentEgressPolicy controls outbound network access from an agent pod.
+
+
+
+_Appears in:_
+- [AgentSpec](#agentspec)
+
+| Field | Description |
+| --- | --- |
+| `deny` |  |
+| `allowWeb` |  |
+| `allow` |  |
+
+
 #### AgentList
 
 
@@ -103,11 +121,11 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
+| `mattermostRef` _[AgentMattermostRef](#agentmattermostref)_ | MattermostRef is a reference to the Mattermost CR in the same namespace<br />that this agent is associated with. |  |  |
 | `image` _string_ | Image defines the agent container image. |  | MinLength: 1 <br /> |
 | `hooks` _string array_ | Hooks lists the Mattermost plugin hook names this agent subscribes to.<br />Example: ["MessageHasBeenPosted", "UserHasJoinedChannel"] |  | Optional: \{\} <br /> |
 | `resources` _[ResourceRequirements](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#resourcerequirements-v1-core)_ | Resources defines the CPU/memory requests and limits for the agent pod. |  | Optional: \{\} <br /> |
-| `egressPolicy` _string_ | EgressPolicy controls outbound network access from the agent pod.<br />  - "deny" (default): only Mattermost server, DNS, and LiteLLM gateway<br />  - "allowWeb": additionally permits outbound TCP 80/443 to any destination (port-based; domain-level filtering is future work)<br />  - "allow": permits all outbound traffic |  | Enum: [deny allowWeb allow] <br />Optional: \{\} <br /> |
-| `mattermostRef` _[AgentMattermostRef](#agentmattermostref)_ | MattermostRef is a reference to the Mattermost CR in the same namespace<br />that this agent is associated with. |  |  |
+| `egressPolicy` _[AgentEgressPolicy](#agentegresspolicy)_ | EgressPolicy controls outbound network access from the agent pod.<br />  - "deny" (default): only Mattermost server, DNS, and LiteLLM gateway<br />  - "allowWeb": additionally permits outbound TCP 80/443 to any destination (port-based; domain-level filtering is future work)<br />  - "allow": permits all outbound traffic | deny | Enum: [deny allowWeb allow] <br />Optional: \{\} <br /> |
 | `env` _[EnvVar](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#envvar-v1-core) array_ | Env defines optional environment variables to inject into the agent pod. |  | Optional: \{\} <br /> |
 | `llmGateway` _[LLMGatewayConfig](#llmgatewayconfig)_ | LLMGateway configures the LLM gateway for this agent.<br />When OperatorManaged is set, the agent uses the LiteLLM gateway managed<br />by the referenced Mattermost installation. When External is set, the<br />agent uses an existing LiteLLM instance. |  | Optional: \{\} <br /> |
 | `storage` _[AgentStorageConfig](#agentstorageconfig)_ | Storage configures optional persistent storage for the agent pod.<br />When set, the operator creates a PVC and mounts it into the agent container. |  | Optional: \{\} <br /> |
@@ -270,7 +288,7 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `url` _string_ | URL is the base URL of the external LiteLLM instance.<br />Example: "http://litellm.my-namespace.svc.cluster.local:4000" |  | MinLength: 1 <br /> |
+| `url` _string_ | URL is the base URL of the external LiteLLM instance.<br />The agent NetworkPolicy permits TCP egress to this URL's explicit port,<br />or to port 443 for HTTPS and port 80 for HTTP.<br />Example: "http://litellm.my-namespace.svc.cluster.local:4000" |  | MinLength: 1 <br /> |
 | `virtualKeySecret` _string_ | VirtualKeySecret is the name of the K8s Secret containing the virtual key<br />for this agent. The Secret must have a key "apiKey". |  | MinLength: 1 <br /> |
 
 

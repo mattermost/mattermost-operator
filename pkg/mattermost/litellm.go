@@ -4,8 +4,6 @@
 package mattermost
 
 import (
-	"fmt"
-
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -14,36 +12,27 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-// LiteLLMLabels returns the label set for all LiteLLM resources.
-func LiteLLMLabels() map[string]string {
-	return map[string]string{"app": "mm-agent-litellm"}
+// LiteLLMSelectorLabels returns the stable labels used to select LiteLLM pods.
+func LiteLLMSelectorLabels() map[string]string {
+	return map[string]string{"app": mmv1beta.AgentLiteLLMDeploymentName}
 }
 
-// LiteLLMServiceURL returns the in-cluster base URL for the LiteLLM service.
-func LiteLLMServiceURL(namespace string) string {
-	return fmt.Sprintf("http://%s.%s.svc.cluster.local:%d",
-		mmv1beta.AgentLiteLLMServiceName, namespace, mmv1beta.AgentLiteLLMPort)
-}
-
-// secretEnvSource returns an EnvVarSource that reads from a Secret key.
-func secretEnvSource(secretName, key string) *corev1.EnvVarSource {
-	return &corev1.EnvVarSource{
-		SecretKeyRef: &corev1.SecretKeySelector{
-			LocalObjectReference: corev1.LocalObjectReference{Name: secretName},
-			Key:                  key,
-		},
-	}
+// LiteLLMLabels returns all labels for LiteLLM resources owned by a Mattermost.
+func LiteLLMLabels(mattermost *mmv1beta.Mattermost) map[string]string {
+	labels := LiteLLMSelectorLabels()
+	labels[mmv1beta.ClusterLabel] = mattermost.Name
+	return labels
 }
 
 // GenerateLiteLLMMasterKeySecret returns the Secret storing the LiteLLM master key.
-func GenerateLiteLLMMasterKeySecret(namespace, masterKey string) *corev1.Secret {
+func GenerateLiteLLMMasterKeySecret(mattermost *mmv1beta.Mattermost, masterKey string) *corev1.Secret {
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      mmv1beta.AgentLiteLLMMasterKeySecretName,
-			Namespace: namespace,
-			Labels:    LiteLLMLabels(),
+			Namespace: mattermost.Namespace,
+			Labels:    LiteLLMLabels(mattermost),
 		},
-		Data: map[string][]byte{"masterKey": []byte(masterKey)},
+		Data: map[string][]byte{mmv1beta.SecretKeyMasterKey: []byte(masterKey)},
 	}
 }
 
@@ -57,11 +46,11 @@ func GenerateLiteLLMDeployment(mattermost *mmv1beta.Mattermost) *appsv1.Deployme
 	baseEnv := []corev1.EnvVar{
 		{
 			Name:      "DATABASE_URL",
-			ValueFrom: secretEnvSource(mmv1beta.AgentLiteLLMDBCredentialsSecret, "connectionString"),
+			ValueFrom: EnvSourceFromSecret(mmv1beta.AgentLiteLLMDBCredentialsSecret, mmv1beta.SecretKeyConnectionString),
 		},
 		{
 			Name:      "LITELLM_MASTER_KEY",
-			ValueFrom: secretEnvSource(mmv1beta.AgentLiteLLMMasterKeySecretName, "masterKey"),
+			ValueFrom: EnvSourceFromSecret(mmv1beta.AgentLiteLLMMasterKeySecretName, mmv1beta.SecretKeyMasterKey),
 		},
 		{
 			Name:  "STORE_MODEL_IN_DB",
@@ -101,16 +90,16 @@ func GenerateLiteLLMDeployment(mattermost *mmv1beta.Mattermost) *appsv1.Deployme
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      mmv1beta.AgentLiteLLMDeploymentName,
 			Namespace: mattermost.Namespace,
-			Labels:    LiteLLMLabels(),
+			Labels:    LiteLLMLabels(mattermost),
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: LiteLLMLabels(),
+				MatchLabels: LiteLLMSelectorLabels(),
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: LiteLLMLabels(),
+					Labels: LiteLLMLabels(mattermost),
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -142,11 +131,11 @@ func GenerateLiteLLMService(mattermost *mmv1beta.Mattermost) *corev1.Service {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      mmv1beta.AgentLiteLLMServiceName,
 			Namespace: mattermost.Namespace,
-			Labels:    LiteLLMLabels(),
+			Labels:    LiteLLMLabels(mattermost),
 		},
 		Spec: corev1.ServiceSpec{
 			Type:     corev1.ServiceTypeClusterIP,
-			Selector: LiteLLMLabels(),
+			Selector: LiteLLMSelectorLabels(),
 			Ports: []corev1.ServicePort{
 				{
 					Name:       "http",

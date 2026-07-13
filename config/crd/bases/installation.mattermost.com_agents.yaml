@@ -11,8 +11,6 @@ spec:
     kind: Agent
     listKind: AgentList
     plural: agents
-    shortNames:
-    - agent
     singular: agent
   scope: Namespaced
   versions:
@@ -55,6 +53,7 @@ spec:
             description: AgentSpec defines the desired state of Agent
             properties:
               egressPolicy:
+                default: deny
                 description: |-
                   EgressPolicy controls outbound network access from the agent pod.
                     - "deny" (default): only Mattermost server, DNS, and LiteLLM gateway
@@ -209,9 +208,14 @@ spec:
                       url:
                         description: |-
                           URL is the base URL of the external LiteLLM instance.
+                          The agent NetworkPolicy permits TCP egress to this URL's explicit port,
+                          or to port 443 for HTTPS and port 80 for HTTP.
                           Example: "http://litellm.my-namespace.svc.cluster.local:4000"
                         minLength: 1
                         type: string
+                        x-kubernetes-validations:
+                        - message: must be a valid URL
+                          rule: isURL(self)
                       virtualKeySecret:
                         description: |-
                           VirtualKeySecret is the name of the K8s Secret containing the virtual key

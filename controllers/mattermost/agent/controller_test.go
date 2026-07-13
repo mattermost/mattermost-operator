@@ -119,7 +119,7 @@ func TestReconcileAgent_FullReconcile(t *testing.T) {
 			Name:      agent.BotTokenSecretName(),
 			Namespace: agent.Namespace,
 		},
-		Data: map[string][]byte{"token": []byte("bot-secret-token")},
+		Data: map[string][]byte{mmv1beta.SecretKeyBotToken: []byte("bot-secret-token")},
 	}
 	err := c.Create(context.TODO(), botTokenSecret)
 	require.NoError(t, err)
@@ -135,7 +135,7 @@ func TestReconcileAgent_FullReconcile(t *testing.T) {
 	sa := &corev1.ServiceAccount{}
 	err = c.Get(context.TODO(), types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, sa)
 	require.NoError(t, err)
-	assert.Equal(t, mmv1beta.AgentLabels(agent.Name), sa.Labels)
+	assert.Equal(t, mmv1beta.AgentLabels(agent), sa.Labels)
 	require.Len(t, sa.OwnerReferences, 1)
 	assert.Equal(t, agent.Name, sa.OwnerReferences[0].Name)
 	assert.Equal(t, "Agent", sa.OwnerReferences[0].Kind)
@@ -179,8 +179,8 @@ func TestReconcileAgent_FullReconcile(t *testing.T) {
 		Namespace: agent.Namespace,
 	}, hookSecret)
 	require.NoError(t, err, "hook secret should be created during reconcile")
-	assert.Contains(t, hookSecret.Data, "hookSecret")
-	assert.Len(t, string(hookSecret.Data["hookSecret"]), 64, "hook secret should be 64-char hex")
+	assert.Contains(t, hookSecret.Data, mmv1beta.SecretKeyHookSecret)
+	assert.Len(t, string(hookSecret.Data[mmv1beta.SecretKeyHookSecret]), 64, "hook secret should be 64-char hex")
 }
 
 func TestReconcileAgent_ImageUpdate(t *testing.T) {
@@ -190,7 +190,7 @@ func TestReconcileAgent_ImageUpdate(t *testing.T) {
 	logf.SetLogger(logger)
 
 	agent := newTestAgent()
-	_ = agent.SetDefaults()
+	agent.SetDefaults()
 
 	mm := &mmv1beta.Mattermost{
 		ObjectMeta: metav1.ObjectMeta{
@@ -208,7 +208,7 @@ func TestReconcileAgent_ImageUpdate(t *testing.T) {
 			Name:      agent.BotTokenSecretName(),
 			Namespace: agent.Namespace,
 		},
-		Data: map[string][]byte{"token": []byte("bot-token")},
+		Data: map[string][]byte{mmv1beta.SecretKeyBotToken: []byte("bot-token")},
 	}
 
 	s := setupScheme(t)
@@ -265,7 +265,7 @@ func TestReconcileAgent_WithLLMGateway(t *testing.T) {
 	agent.Spec.LLMGateway = &mmv1beta.LLMGatewayConfig{
 		OperatorManaged: &mmv1beta.OperatorManagedGateway{},
 	}
-	_ = agent.SetDefaults()
+	agent.SetDefaults()
 
 	mm := newReadyMattermostWithGateway()
 
@@ -274,7 +274,7 @@ func TestReconcileAgent_WithLLMGateway(t *testing.T) {
 			Name:      agent.BotTokenSecretName(),
 			Namespace: agent.Namespace,
 		},
-		Data: map[string][]byte{"token": []byte("bot-secret-token")},
+		Data: map[string][]byte{mmv1beta.SecretKeyBotToken: []byte("bot-secret-token")},
 	}
 
 	litellmKeySecret := &corev1.Secret{
@@ -282,7 +282,7 @@ func TestReconcileAgent_WithLLMGateway(t *testing.T) {
 			Name:      agent.LiteLLMKeySecretName(),
 			Namespace: agent.Namespace,
 		},
-		Data: map[string][]byte{"key": []byte("sk-test-virtual-key")},
+		Data: map[string][]byte{mmv1beta.SecretKeyAPIKey: []byte("sk-test-virtual-key")},
 	}
 
 	s := setupScheme(t)
@@ -308,10 +308,10 @@ func TestReconcileAgent_WithLLMGateway(t *testing.T) {
 		},
 		Spec: appsv1.DeploymentSpec{
 			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{"app": "mm-agent-litellm"},
+				MatchLabels: map[string]string{"app": mmv1beta.AgentLiteLLMDeploymentName},
 			},
 			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "mm-agent-litellm"}},
+				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": mmv1beta.AgentLiteLLMDeploymentName}},
 				Spec:       corev1.PodSpec{Containers: []corev1.Container{{Name: "litellm", Image: mmv1beta.AgentLiteLLMDefaultImage}}},
 			},
 		},
@@ -367,7 +367,7 @@ func TestReconcileAgent_WithLLMGateway(t *testing.T) {
 		Namespace: agent.Namespace,
 	}, hookSecret)
 	require.NoError(t, err, "hook secret should be created during reconcile")
-	assert.Contains(t, hookSecret.Data, "hookSecret")
+	assert.Contains(t, hookSecret.Data, mmv1beta.SecretKeyHookSecret)
 }
 
 func newReadyMattermost() *mmv1beta.Mattermost {
@@ -400,7 +400,7 @@ func TestReconcileAgent_OperatorManagedGatesOnLiteLLMReadiness(t *testing.T) {
 	agent.Spec.LLMGateway = &mmv1beta.LLMGatewayConfig{
 		OperatorManaged: &mmv1beta.OperatorManagedGateway{},
 	}
-	_ = agent.SetDefaults()
+	agent.SetDefaults()
 
 	// LiteLLM Deployment exists but has no ready replicas.
 	litellmDeploy := &appsv1.Deployment{
@@ -439,7 +439,7 @@ func TestReconcileAgent_OperatorManagedWithoutInstallationGateway(t *testing.T) 
 	agent.Spec.LLMGateway = &mmv1beta.LLMGatewayConfig{
 		OperatorManaged: &mmv1beta.OperatorManagedGateway{},
 	}
-	_ = agent.SetDefaults()
+	agent.SetDefaults()
 
 	// Mattermost is stable but does not configure spec.agents.llmGateway.
 	mm := newReadyMattermost()
@@ -509,14 +509,14 @@ func TestReconcileAgent_MissingLiteLLMKeySecret_OperatorManaged(t *testing.T) {
 	agent.Spec.LLMGateway = &mmv1beta.LLMGatewayConfig{
 		OperatorManaged: &mmv1beta.OperatorManagedGateway{},
 	}
-	_ = agent.SetDefaults()
+	agent.SetDefaults()
 
 	botTokenSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      agent.BotTokenSecretName(),
 			Namespace: agent.Namespace,
 		},
-		Data: map[string][]byte{"token": []byte("bot-secret-token")},
+		Data: map[string][]byte{mmv1beta.SecretKeyBotToken: []byte("bot-secret-token")},
 	}
 
 	// Pre-create a ready LiteLLM Deployment (managed by the Mattermost controller).
@@ -577,7 +577,7 @@ func TestReconcileAgent_MissingVirtualKeySecret_External(t *testing.T) {
 			Name:      agent.BotTokenSecretName(),
 			Namespace: agent.Namespace,
 		},
-		Data: map[string][]byte{"token": []byte("bot-token")},
+		Data: map[string][]byte{mmv1beta.SecretKeyBotToken: []byte("bot-token")},
 	}
 
 	s := setupScheme(t)
@@ -622,7 +622,7 @@ func TestReconcileAgent_AllowEgressPolicy(t *testing.T) {
 			Name:      agent.BotTokenSecretName(),
 			Namespace: agent.Namespace,
 		},
-		Data: map[string][]byte{"token": []byte("bot-secret-token")},
+		Data: map[string][]byte{mmv1beta.SecretKeyBotToken: []byte("bot-secret-token")},
 	}
 
 	s := setupScheme(t)

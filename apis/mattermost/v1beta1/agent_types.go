@@ -18,6 +18,9 @@ import (
 // https://book.kubebuilder.io/reference/generating-crd.html                  //
 ////////////////////////////////////////////////////////////////////////////////
 
+// AgentEgressPolicy controls outbound network access from an agent pod.
+type AgentEgressPolicy string
+
 // AgentMattermostRef references a Mattermost CR by name.
 type AgentMattermostRef struct {
 	// Name of the Mattermost CR in the same namespace.
@@ -44,6 +47,10 @@ type AgentStorageConfig struct {
 // AgentSpec defines the desired state of Agent
 // +k8s:openapi-gen=true
 type AgentSpec struct {
+	// MattermostRef is a reference to the Mattermost CR in the same namespace
+	// that this agent is associated with.
+	MattermostRef AgentMattermostRef `json:"mattermostRef"`
+
 	// Image defines the agent container image.
 	// +kubebuilder:validation:MinLength=1
 	Image string `json:"image"`
@@ -62,12 +69,9 @@ type AgentSpec struct {
 	//   - "allowWeb": additionally permits outbound TCP 80/443 to any destination (port-based; domain-level filtering is future work)
 	//   - "allow": permits all outbound traffic
 	// +kubebuilder:validation:Enum=deny;allowWeb;allow
+	// +kubebuilder:default=deny
 	// +optional
-	EgressPolicy string `json:"egressPolicy,omitempty"`
-
-	// MattermostRef is a reference to the Mattermost CR in the same namespace
-	// that this agent is associated with.
-	MattermostRef AgentMattermostRef `json:"mattermostRef"`
+	EgressPolicy AgentEgressPolicy `json:"egressPolicy,omitempty"`
 
 	// Env defines optional environment variables to inject into the agent pod.
 	// +optional
@@ -111,12 +115,49 @@ type AgentStatus struct {
 	ReadyReplicas int32 `json:"readyReplicas,omitempty"`
 }
 
+// LLMGatewayConfig defines how the agent connects to an LLM gateway.
+// +kubebuilder:validation:XValidation:rule="has(self.external) != has(self.operatorManaged)",message="exactly one of external or operatorManaged must be set"
+type LLMGatewayConfig struct {
+	// External configures the agent to use an existing LiteLLM instance.
+	// +optional
+	External *ExternalLLMGateway `json:"external,omitempty"`
+
+	// OperatorManaged opts this agent into the LiteLLM gateway of the
+	// referenced Mattermost installation (spec.agents.llmGateway on the
+	// Mattermost CR). The Mattermost agents plugin must create the Secret
+	// named "agent-<name>-litellm-key" (key "apiKey") with this agent's
+	// virtual key before the agent pod can start.
+	// +optional
+	OperatorManaged *OperatorManagedGateway `json:"operatorManaged,omitempty"`
+}
+
+// ExternalLLMGateway configures the agent to use an externally managed LiteLLM instance.
+type ExternalLLMGateway struct {
+	// URL is the base URL of the external LiteLLM instance.
+	// The agent NetworkPolicy permits TCP egress to this URL's explicit port,
+	// or to port 443 for HTTPS and port 80 for HTTP.
+	// Example: "http://litellm.my-namespace.svc.cluster.local:4000"
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:XValidation:rule="isURL(self)",message="must be a valid URL"
+	URL string `json:"url"`
+
+	// VirtualKeySecret is the name of the K8s Secret containing the virtual key
+	// for this agent. The Secret must have a key "apiKey".
+	// +kubebuilder:validation:MinLength=1
+	VirtualKeySecret string `json:"virtualKeySecret"`
+}
+
+// OperatorManagedGateway is an empty marker (the `emptyDir: {}` idiom) that
+// opts an agent into the installation-level LiteLLM gateway. The gateway
+// itself is configured and deployed via spec.agents.llmGateway on the
+// referenced Mattermost CR.
+type OperatorManagedGateway struct{}
+
 // +genclient
 
 // Agent is the Schema for the agents API
 // +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
-// +kubebuilder:resource:shortName="agent"
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:priority=0,name="State",type=string,JSONPath=".status.state",description="State of Agent"
 // +kubebuilder:printcolumn:priority=0,name="Image",type=string,JSONPath=".spec.image",description="Image of Agent"
@@ -137,41 +178,6 @@ type AgentList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []Agent `json:"items"`
 }
-
-// LLMGatewayConfig defines how the agent connects to an LLM gateway.
-// +kubebuilder:validation:XValidation:rule="has(self.external) != has(self.operatorManaged)",message="exactly one of external or operatorManaged must be set"
-type LLMGatewayConfig struct {
-	// External configures the agent to use an existing LiteLLM instance.
-	// +optional
-	External *ExternalLLMGateway `json:"external,omitempty"`
-
-	// OperatorManaged opts this agent into the LiteLLM gateway of the
-	// referenced Mattermost installation (spec.agents.llmGateway on the
-	// Mattermost CR). The Mattermost agents plugin must create the Secret
-	// named "agent-<name>-litellm-key" (key "apiKey") with this agent's
-	// virtual key before the agent pod can start.
-	// +optional
-	OperatorManaged *OperatorManagedGateway `json:"operatorManaged,omitempty"`
-}
-
-// ExternalLLMGateway configures the agent to use an externally managed LiteLLM instance.
-type ExternalLLMGateway struct {
-	// URL is the base URL of the external LiteLLM instance.
-	// Example: "http://litellm.my-namespace.svc.cluster.local:4000"
-	// +kubebuilder:validation:MinLength=1
-	URL string `json:"url"`
-
-	// VirtualKeySecret is the name of the K8s Secret containing the virtual key
-	// for this agent. The Secret must have a key "apiKey".
-	// +kubebuilder:validation:MinLength=1
-	VirtualKeySecret string `json:"virtualKeySecret"`
-}
-
-// OperatorManagedGateway is an empty marker (the `emptyDir: {}` idiom) that
-// opts an agent into the installation-level LiteLLM gateway. The gateway
-// itself is configured and deployed via spec.agents.llmGateway on the
-// referenced Mattermost CR.
-type OperatorManagedGateway struct{}
 
 func init() {
 	SchemeBuilder.Register(&Agent{}, &AgentList{})

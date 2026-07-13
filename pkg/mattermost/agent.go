@@ -1,7 +1,8 @@
 package mattermost
 
 import (
-	"fmt"
+	"net/url"
+	"strconv"
 	"strings"
 
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
@@ -13,6 +14,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
+
+// MattermostServerPort is the HTTP port exposed by the Mattermost server pod.
+const MattermostServerPort = int32(8065)
 
 // AgentOwnerReference returns the owner reference for an Agent resource.
 func AgentOwnerReference(agent *mmv1beta.Agent) []metav1.OwnerReference {
@@ -31,24 +35,39 @@ func GenerateAgentServiceAccount(agent *mmv1beta.Agent) *corev1.ServiceAccount {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            agent.Name,
 			Namespace:       agent.Namespace,
-			Labels:          mmv1beta.AgentLabels(agent.Name),
+			Labels:          mmv1beta.AgentLabels(agent),
 			OwnerReferences: AgentOwnerReference(agent),
 		},
 	}
+}
+
+// AgentServiceName returns the generated Service name for an Agent.
+func AgentServiceName(agent *mmv1beta.Agent) string {
+	return agent.Name
+}
+
+// AgentDeploymentName returns the generated Deployment name for an Agent.
+func AgentDeploymentName(agent *mmv1beta.Agent) string {
+	return agent.Name
+}
+
+// AgentServiceURL returns the in-cluster HTTP endpoint for an Agent.
+func AgentServiceURL(agent *mmv1beta.Agent) string {
+	return mmv1beta.ClusterServiceURL(AgentServiceName(agent), agent.Namespace, mmv1beta.AgentHTTPPort)
 }
 
 // GenerateAgentService returns the HTTP Service for an Agent.
 func GenerateAgentService(agent *mmv1beta.Agent) *corev1.Service {
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            agent.Name,
+			Name:            AgentServiceName(agent),
 			Namespace:       agent.Namespace,
-			Labels:          mmv1beta.AgentLabels(agent.Name),
+			Labels:          mmv1beta.AgentLabels(agent),
 			OwnerReferences: AgentOwnerReference(agent),
 		},
 		Spec: corev1.ServiceSpec{
 			Type:     corev1.ServiceTypeClusterIP,
-			Selector: mmv1beta.AgentSelectorLabels(agent.Name),
+			Selector: mmv1beta.AgentSelectorLabels(agent),
 			Ports: []corev1.ServicePort{
 				{
 					Name:       "http",
@@ -60,13 +79,9 @@ func GenerateAgentService(agent *mmv1beta.Agent) *corev1.Service {
 	}
 }
 
-// MattermostServerPort is the HTTP port exposed by the Mattermost server pod.
-const MattermostServerPort = 8065
-
 // mmServerURL returns the in-cluster URL for the Mattermost server referenced by the agent.
 func mmServerURL(agent *mmv1beta.Agent) string {
-	return fmt.Sprintf("http://%s.%s.svc.cluster.local:%d",
-		agent.Spec.MattermostRef.Name, agent.Namespace, MattermostServerPort)
+	return mmv1beta.ClusterServiceURL(agent.Spec.MattermostRef.Name, agent.Namespace, MattermostServerPort)
 }
 
 // imageTagNeedsAlwaysPull returns true if the image tag is "dev", "latest",
@@ -81,11 +96,7 @@ func imageTagNeedsAlwaysPull(image string) bool {
 }
 
 func appendLiteLLMEnvVars(env []corev1.EnvVar, baseURL, keySecretName string) []corev1.EnvVar {
-	if baseURL == "" || keySecretName == "" {
-		return env
-	}
-
-	keyEnvSource := secretEnvSource(keySecretName, "apiKey")
+	keyEnvSource := EnvSourceFromSecret(keySecretName, mmv1beta.SecretKeyAPIKey)
 	return append(env,
 		corev1.EnvVar{Name: "LITELLM_BASE_URL", Value: baseURL},
 		corev1.EnvVar{Name: "LITELLM_MCP_URL", Value: baseURL + "/mcp"},
@@ -112,35 +123,22 @@ func GenerateAgentDeployment(agent *mmv1beta.Agent) *appsv1.Deployment {
 		},
 		{
 			Name: "MM_BOT_TOKEN",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: agent.BotTokenSecretName(),
-					},
-					Key: "token",
-				},
-			},
+			ValueFrom: EnvSourceFromSecret(
+				agent.BotTokenSecretName(),
+				mmv1beta.SecretKeyBotToken,
+			),
 		},
 		{
 			Name: "HOOK_SECRET",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: agent.HookSecretName(),
-					},
-					Key: "hookSecret",
-				},
-			},
+			ValueFrom: EnvSourceFromSecret(
+				agent.HookSecretName(),
+				mmv1beta.SecretKeyHookSecret,
+			),
 		},
 	}
 
-	if agent.HasLLMGateway() {
-		switch {
-		case agent.HasOperatorManagedGateway():
-			baseEnv = appendLiteLLMEnvVars(baseEnv, LiteLLMServiceURL(agent.Namespace), agent.LiteLLMKeySecretName())
-		case agent.Spec.LLMGateway.External != nil:
-			baseEnv = appendLiteLLMEnvVars(baseEnv, agent.Spec.LLMGateway.External.URL, agent.Spec.LLMGateway.External.VirtualKeySecret)
-		}
+	if baseURL, keySecretName, ok := agent.GatewayEndpoint(); ok {
+		baseEnv = appendLiteLLMEnvVars(baseEnv, baseURL, keySecretName)
 	}
 
 	envVars := mergeEnvVars(baseEnv, agent.Spec.Env)
@@ -185,19 +183,19 @@ func GenerateAgentDeployment(agent *mmv1beta.Agent) *appsv1.Deployment {
 
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            agent.Name,
+			Name:            AgentDeploymentName(agent),
 			Namespace:       agent.Namespace,
-			Labels:          mmv1beta.AgentLabels(agent.Name),
+			Labels:          mmv1beta.AgentLabels(agent),
 			OwnerReferences: AgentOwnerReference(agent),
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: mmv1beta.AgentSelectorLabels(agent.Name),
+				MatchLabels: mmv1beta.AgentSelectorLabels(agent),
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: mmv1beta.AgentLabels(agent.Name),
+					Labels: mmv1beta.AgentLabels(agent),
 				},
 				Spec: corev1.PodSpec{
 					ServiceAccountName: agent.Name,
@@ -213,6 +211,16 @@ func GenerateAgentDeployment(agent *mmv1beta.Agent) *appsv1.Deployment {
 									Name:          "http",
 								},
 							},
+							ReadinessProbe: &corev1.Probe{
+								ProbeHandler: corev1.ProbeHandler{
+									TCPSocket: &corev1.TCPSocketAction{
+										Port: intstr.FromInt32(mmv1beta.AgentHTTPPort),
+									},
+								},
+								InitialDelaySeconds: 15,
+								PeriodSeconds:       5,
+								FailureThreshold:    6,
+							},
 							Resources:    agent.Spec.Resources,
 							VolumeMounts: volumeMounts,
 						},
@@ -225,23 +233,22 @@ func GenerateAgentDeployment(agent *mmv1beta.Agent) *appsv1.Deployment {
 }
 
 // agentIngressRules returns the ingress rules for the Agent NetworkPolicy.
-// Always allows ingress from MM server pods. When LLMGateway is configured,
-// also allows ingress from LiteLLM pods (which proxy chat requests to agents).
-func agentIngressRules(agent *mmv1beta.Agent, protocol *corev1.Protocol, agentPort *intstr.IntOrString) []networkingv1.NetworkPolicyIngressRule {
+// It allows Mattermost server pods and an operator-managed LiteLLM gateway.
+func agentIngressRules(agent *mmv1beta.Agent) []networkingv1.NetworkPolicyIngressRule {
+	protocol := corev1.ProtocolTCP
+	agentPort := intstr.FromInt32(mmv1beta.AgentHTTPPort)
 	ingressFrom := []networkingv1.NetworkPolicyPeer{
 		{
 			PodSelector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{
-					mmv1beta.ClusterLabel: agent.Spec.MattermostRef.Name,
-				},
+				MatchLabels: mmv1beta.MattermostSelectorLabels(agent.Spec.MattermostRef.Name),
 			},
 		},
 	}
 
-	if agent.HasLLMGateway() {
+	if agent.HasOperatorManagedGateway() {
 		ingressFrom = append(ingressFrom, networkingv1.NetworkPolicyPeer{
 			PodSelector: &metav1.LabelSelector{
-				MatchLabels: LiteLLMLabels(),
+				MatchLabels: LiteLLMSelectorLabels(),
 			},
 		})
 	}
@@ -251,31 +258,27 @@ func agentIngressRules(agent *mmv1beta.Agent, protocol *corev1.Protocol, agentPo
 			From: ingressFrom,
 			Ports: []networkingv1.NetworkPolicyPort{
 				{
-					Protocol: protocol,
-					Port:     agentPort,
+					Protocol: &protocol,
+					Port:     &agentPort,
 				},
 			},
 		},
 	}
 }
 
-// GenerateAgentNetworkPolicy returns the NetworkPolicy for an Agent.
-func GenerateAgentNetworkPolicy(agent *mmv1beta.Agent) *networkingv1.NetworkPolicy {
+// agentBaseEgressRules returns the restricted egress rules for an Agent.
+func agentBaseEgressRules(agent *mmv1beta.Agent) []networkingv1.NetworkPolicyEgressRule {
 	protocol := corev1.ProtocolTCP
 	protocolUDP := corev1.ProtocolUDP
-	agentPort := intstr.FromInt32(mmv1beta.AgentHTTPPort)
-	mmPort := intstr.FromInt32(8065)
+	mmPort := intstr.FromInt32(MattermostServerPort)
 	dnsPort := intstr.FromInt32(53)
-	liteLLMPort := intstr.FromInt32(mmv1beta.AgentLiteLLMPort)
 
 	egressRules := []networkingv1.NetworkPolicyEgressRule{
 		{
 			To: []networkingv1.NetworkPolicyPeer{
 				{
 					PodSelector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{
-							mmv1beta.ClusterLabel: agent.Spec.MattermostRef.Name,
-						},
+						MatchLabels: mmv1beta.MattermostSelectorLabels(agent.Spec.MattermostRef.Name),
 					},
 				},
 			},
@@ -288,12 +291,13 @@ func GenerateAgentNetworkPolicy(agent *mmv1beta.Agent) *networkingv1.NetworkPoli
 		},
 	}
 
-	if agent.HasLLMGateway() {
+	if agent.HasOperatorManagedGateway() {
+		liteLLMPort := intstr.FromInt32(mmv1beta.AgentLiteLLMPort)
 		egressRules = append(egressRules, networkingv1.NetworkPolicyEgressRule{
 			To: []networkingv1.NetworkPolicyPeer{
 				{
 					PodSelector: &metav1.LabelSelector{
-						MatchLabels: LiteLLMLabels(),
+						MatchLabels: LiteLLMSelectorLabels(),
 					},
 				},
 			},
@@ -304,6 +308,20 @@ func GenerateAgentNetworkPolicy(agent *mmv1beta.Agent) *networkingv1.NetworkPoli
 				},
 			},
 		})
+	}
+
+	if agent.HasExternalGateway() {
+		if port, ok := externalGatewayPort(agent.Spec.LLMGateway.External.URL); ok {
+			externalPort := intstr.FromInt32(port)
+			egressRules = append(egressRules, networkingv1.NetworkPolicyEgressRule{
+				Ports: []networkingv1.NetworkPolicyPort{
+					{
+						Protocol: &protocol,
+						Port:     &externalPort,
+					},
+				},
+			})
+		}
 	}
 
 	egressRules = append(egressRules, networkingv1.NetworkPolicyEgressRule{
@@ -319,53 +337,76 @@ func GenerateAgentNetworkPolicy(agent *mmv1beta.Agent) *networkingv1.NetworkPoli
 		},
 	})
 
-	// If egressPolicy is allowWeb, add specific egress rules for HTTPS, HTTP,
-	// and other required outbound traffic. This avoids a catch-all that would
-	// let the agent reach internal services (e.g., PostgreSQL) it shouldn't access.
-	if agent.Spec.EgressPolicy == mmv1beta.AgentEgressPolicyAllowWeb {
-		httpsPort := intstr.FromInt32(443)
-		httpPort := intstr.FromInt32(80)
+	return egressRules
+}
 
-		egressRules = append(egressRules, networkingv1.NetworkPolicyEgressRule{
-			Ports: []networkingv1.NetworkPolicyPort{
-				{
-					Protocol: &protocol,
-					Port:     &httpsPort,
-				},
-			},
-		})
-
-		egressRules = append(egressRules, networkingv1.NetworkPolicyEgressRule{
-			Ports: []networkingv1.NetworkPolicyPort{
-				{
-					Protocol: &protocol,
-					Port:     &httpPort,
-				},
-			},
-		})
+func externalGatewayPort(rawURL string) (int32, bool) {
+	parsedURL, err := url.Parse(rawURL)
+	if err != nil {
+		return 0, false
 	}
 
-	// If egressPolicy is allow, permit all outbound traffic.
-	if agent.Spec.EgressPolicy == mmv1beta.AgentEgressPolicyAllow {
+	if parsedURL.Port() != "" {
+		port, err := strconv.ParseInt(parsedURL.Port(), 10, 32)
+		if err != nil || port < 1 || port > 65535 {
+			return 0, false
+		}
+		return int32(port), true
+	}
+
+	switch strings.ToLower(parsedURL.Scheme) {
+	case "https":
+		return 443, true
+	case "http":
+		return 80, true
+	default:
+		return 0, false
+	}
+}
+
+// webEgressRule allows HTTP and HTTPS to any destination.
+func webEgressRule() networkingv1.NetworkPolicyEgressRule {
+	protocol := corev1.ProtocolTCP
+	httpsPort := intstr.FromInt32(443)
+	httpPort := intstr.FromInt32(80)
+	return networkingv1.NetworkPolicyEgressRule{
+		Ports: []networkingv1.NetworkPolicyPort{
+			{Protocol: &protocol, Port: &httpsPort},
+			{Protocol: &protocol, Port: &httpPort},
+		},
+	}
+}
+
+// GenerateAgentNetworkPolicy returns the NetworkPolicy for an Agent.
+func GenerateAgentNetworkPolicy(agent *mmv1beta.Agent) *networkingv1.NetworkPolicy {
+	var egressRules []networkingv1.NetworkPolicyEgressRule
+	switch agent.Spec.EgressPolicy {
+	case mmv1beta.AgentEgressPolicyAllow:
 		egressRules = []networkingv1.NetworkPolicyEgressRule{{}}
+	case mmv1beta.AgentEgressPolicyAllowWeb:
+		egressRules = append(agentBaseEgressRules(agent), webEgressRule())
+	case mmv1beta.AgentEgressPolicyDeny:
+		egressRules = agentBaseEgressRules(agent)
+	default:
+		egressRules = agentBaseEgressRules(agent)
 	}
 
 	return &networkingv1.NetworkPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            agent.Name,
 			Namespace:       agent.Namespace,
-			Labels:          mmv1beta.AgentLabels(agent.Name),
+			Labels:          mmv1beta.AgentLabels(agent),
 			OwnerReferences: AgentOwnerReference(agent),
 		},
 		Spec: networkingv1.NetworkPolicySpec{
 			PodSelector: metav1.LabelSelector{
-				MatchLabels: mmv1beta.AgentSelectorLabels(agent.Name),
+				MatchLabels: mmv1beta.AgentSelectorLabels(agent),
 			},
 			PolicyTypes: []networkingv1.PolicyType{
 				networkingv1.PolicyTypeIngress,
 				networkingv1.PolicyTypeEgress,
 			},
-			Ingress: agentIngressRules(agent, &protocol, &agentPort),
+			Ingress: agentIngressRules(agent),
 			Egress:  egressRules,
 		},
 	}
@@ -377,10 +418,10 @@ func GenerateAgentHookSecret(agent *mmv1beta.Agent, secretValue string) *corev1.
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            agent.HookSecretName(),
 			Namespace:       agent.Namespace,
-			Labels:          mmv1beta.AgentLabels(agent.Name),
+			Labels:          mmv1beta.AgentLabels(agent),
 			OwnerReferences: AgentOwnerReference(agent),
 		},
-		Data: map[string][]byte{"hookSecret": []byte(secretValue)},
+		Data: map[string][]byte{mmv1beta.SecretKeyHookSecret: []byte(secretValue)},
 	}
 }
 
@@ -390,7 +431,7 @@ func GenerateAgentPVC(agent *mmv1beta.Agent) *corev1.PersistentVolumeClaim {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            agent.StoragePVCName(),
 			Namespace:       agent.Namespace,
-			Labels:          mmv1beta.AgentLabels(agent.Name),
+			Labels:          mmv1beta.AgentLabels(agent),
 			OwnerReferences: AgentOwnerReference(agent),
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{

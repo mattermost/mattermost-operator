@@ -65,7 +65,11 @@ func TestGenerateAgentServiceAccount(t *testing.T) {
 
 	assert.Equal(t, "my-agent", sa.Name)
 	assert.Equal(t, "default", sa.Namespace)
-	assert.Equal(t, mmv1beta.AgentLabels("my-agent"), sa.Labels)
+	assert.Equal(t, mmv1beta.AgentLabels(agent), sa.Labels)
+	assert.Equal(t, "my-agent", sa.Labels[mmv1beta.AgentNameLabel])
+	assert.Equal(t, "mm-prod", sa.Labels[mmv1beta.ClusterLabel])
+	assert.Equal(t, "my-agent", sa.Labels[mmv1beta.ClusterResourceLabel])
+	assert.Equal(t, mmv1beta.AgentAppName, sa.Labels["app"])
 	assert.Len(t, sa.OwnerReferences, 1)
 	assert.Equal(t, "Agent", sa.OwnerReferences[0].Kind)
 }
@@ -83,7 +87,8 @@ func TestGenerateAgentService(t *testing.T) {
 	assert.Equal(t, int32(8080), svc.Spec.Ports[0].Port)
 	assert.Equal(t, "http", svc.Spec.Ports[0].Name)
 
-	assert.Equal(t, mmv1beta.AgentSelectorLabels("my-agent"), svc.Spec.Selector)
+	assert.Equal(t, mmv1beta.AgentSelectorLabels(agent), svc.Spec.Selector)
+	assert.NotContains(t, svc.Spec.Selector, mmv1beta.ClusterLabel)
 }
 
 func TestGenerateAgentDeployment(t *testing.T) {
@@ -96,7 +101,7 @@ func TestGenerateAgentDeployment(t *testing.T) {
 
 	assert.Equal(t, int32(1), *dep.Spec.Replicas)
 
-	assert.Equal(t, mmv1beta.AgentSelectorLabels("my-agent"), dep.Spec.Selector.MatchLabels)
+	assert.Equal(t, mmv1beta.AgentSelectorLabels(agent), dep.Spec.Selector.MatchLabels)
 
 	assert.Equal(t, "my-agent", dep.Spec.Template.Spec.ServiceAccountName)
 
@@ -111,6 +116,9 @@ func TestGenerateAgentDeployment(t *testing.T) {
 
 	assert.Len(t, c.Ports, 1)
 	assert.Equal(t, int32(8080), c.Ports[0].ContainerPort)
+	require.NotNil(t, c.ReadinessProbe)
+	require.NotNil(t, c.ReadinessProbe.TCPSocket)
+	assert.Equal(t, mmv1beta.AgentHTTPPort, c.ReadinessProbe.TCPSocket.Port.IntVal)
 
 	envMap := envVarsByName(c.Env)
 	require.Contains(t, envMap, "MM_SERVER_URL")
@@ -123,7 +131,7 @@ func TestGenerateAgentDeployment(t *testing.T) {
 	require.NotNil(t, hookSecretEnv.ValueFrom)
 	require.NotNil(t, hookSecretEnv.ValueFrom.SecretKeyRef)
 	assert.Equal(t, agent.HookSecretName(), hookSecretEnv.ValueFrom.SecretKeyRef.Name)
-	assert.Equal(t, "hookSecret", hookSecretEnv.ValueFrom.SecretKeyRef.Key)
+	assert.Equal(t, mmv1beta.SecretKeyHookSecret, hookSecretEnv.ValueFrom.SecretKeyRef.Key)
 
 	assert.Len(t, c.VolumeMounts, 1)
 	assert.Equal(t, "bot-token", c.VolumeMounts[0].Name)
@@ -209,8 +217,7 @@ func TestSetDefaults_StorageMountPath(t *testing.T) {
 			},
 		},
 	}
-	err := agent.SetDefaults()
-	require.NoError(t, err)
+	agent.SetDefaults()
 	assert.Equal(t, mmv1beta.AgentStorageDefaultMountPath, agent.Spec.Storage.MountPath)
 }
 
@@ -225,9 +232,34 @@ func TestSetDefaults_StorageMountPathPreserved(t *testing.T) {
 			},
 		},
 	}
-	err := agent.SetDefaults()
-	require.NoError(t, err)
+	agent.SetDefaults()
 	assert.Equal(t, "/custom/path", agent.Spec.Storage.MountPath)
+}
+
+func TestSetDefaults_ResourcesAsPair(t *testing.T) {
+	t.Run("defaults both when both are unset", func(t *testing.T) {
+		agent := testAgent("my-agent", "default")
+		agent.Spec.Resources = corev1.ResourceRequirements{}
+
+		agent.SetDefaults()
+
+		assert.Equal(t, resource.MustParse("100m"), agent.Spec.Resources.Requests[corev1.ResourceCPU])
+		assert.Equal(t, resource.MustParse("500m"), agent.Spec.Resources.Limits[corev1.ResourceCPU])
+	})
+
+	t.Run("preserves limits-only configuration", func(t *testing.T) {
+		agent := testAgent("my-agent", "default")
+		agent.Spec.Resources = corev1.ResourceRequirements{
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU: resource.MustParse("50m"),
+			},
+		}
+
+		agent.SetDefaults()
+
+		assert.Nil(t, agent.Spec.Resources.Requests)
+		assert.Equal(t, resource.MustParse("50m"), agent.Spec.Resources.Limits[corev1.ResourceCPU])
+	})
 }
 
 func TestStoragePVCName(t *testing.T) {
@@ -243,13 +275,13 @@ func TestGenerateAgentHookSecret(t *testing.T) {
 
 	assert.Equal(t, agent.HookSecretName(), secret.Name)
 	assert.Equal(t, "default", secret.Namespace)
-	assert.Equal(t, mmv1beta.AgentLabels("my-agent"), secret.Labels)
+	assert.Equal(t, mmv1beta.AgentLabels(agent), secret.Labels)
 	assert.Len(t, secret.OwnerReferences, 1)
 	assert.Equal(t, "Agent", secret.OwnerReferences[0].Kind)
-	assert.Equal(t, []byte("abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"), secret.Data["hookSecret"])
+	assert.Equal(t, []byte("abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"), secret.Data[mmv1beta.SecretKeyHookSecret])
 
-	assert.NotContains(t, secret.Data, "token")
-	assert.NotContains(t, secret.Data, "apiKey")
+	assert.NotContains(t, secret.Data, mmv1beta.SecretKeyBotToken)
+	assert.NotContains(t, secret.Data, mmv1beta.SecretKeyAPIKey)
 }
 
 func TestGenerateAgentNetworkPolicy_Deny(t *testing.T) {
@@ -269,6 +301,7 @@ func TestGenerateAgentNetworkPolicy_Deny(t *testing.T) {
 	ingress := np.Spec.Ingress[0]
 	assert.Len(t, ingress.From, 1)
 	assert.Equal(t, "mm-prod", ingress.From[0].PodSelector.MatchLabels[mmv1beta.ClusterLabel])
+	assert.Equal(t, mmv1beta.MattermostAppContainerName, ingress.From[0].PodSelector.MatchLabels["app"])
 	assert.Len(t, ingress.Ports, 1)
 	assert.Equal(t, int32(8080), ingress.Ports[0].Port.IntVal)
 
@@ -277,6 +310,7 @@ func TestGenerateAgentNetworkPolicy_Deny(t *testing.T) {
 	mmEgress := np.Spec.Egress[0]
 	assert.Len(t, mmEgress.To, 1)
 	assert.Equal(t, "mm-prod", mmEgress.To[0].PodSelector.MatchLabels[mmv1beta.ClusterLabel])
+	assert.Equal(t, mmv1beta.MattermostAppContainerName, mmEgress.To[0].PodSelector.MatchLabels["app"])
 	assert.Len(t, mmEgress.Ports, 1)
 	assert.Equal(t, int32(8065), mmEgress.Ports[0].Port.IntVal)
 
@@ -290,7 +324,7 @@ func TestGenerateAgentNetworkPolicy_AllowWeb(t *testing.T) {
 
 	np := GenerateAgentNetworkPolicy(agent)
 
-	assert.Len(t, np.Spec.Egress, 4)
+	assert.Len(t, np.Spec.Egress, 3)
 
 	mmEgress := np.Spec.Egress[0]
 	assert.Len(t, mmEgress.To, 1)
@@ -303,17 +337,13 @@ func TestGenerateAgentNetworkPolicy_AllowWeb(t *testing.T) {
 	assert.Equal(t, int32(53), dnsEgress.Ports[0].Port.IntVal)
 	assert.Equal(t, int32(53), dnsEgress.Ports[1].Port.IntVal)
 
-	httpsEgress := np.Spec.Egress[2]
-	assert.Empty(t, httpsEgress.To, "no To selector means any destination")
-	assert.Len(t, httpsEgress.Ports, 1)
-	assert.Equal(t, int32(443), httpsEgress.Ports[0].Port.IntVal)
-	assert.Equal(t, corev1.ProtocolTCP, *httpsEgress.Ports[0].Protocol)
-
-	httpEgress := np.Spec.Egress[3]
-	assert.Empty(t, httpEgress.To, "no To selector means any destination")
-	assert.Len(t, httpEgress.Ports, 1)
-	assert.Equal(t, int32(80), httpEgress.Ports[0].Port.IntVal)
-	assert.Equal(t, corev1.ProtocolTCP, *httpEgress.Ports[0].Protocol)
+	webEgress := np.Spec.Egress[2]
+	assert.Empty(t, webEgress.To, "no To selector means any destination")
+	require.Len(t, webEgress.Ports, 2)
+	assert.Equal(t, int32(443), webEgress.Ports[0].Port.IntVal)
+	assert.Equal(t, corev1.ProtocolTCP, *webEgress.Ports[0].Protocol)
+	assert.Equal(t, int32(80), webEgress.Ports[1].Port.IntVal)
+	assert.Equal(t, corev1.ProtocolTCP, *webEgress.Ports[1].Protocol)
 }
 
 func TestGenerateAgentNetworkPolicy_Allow(t *testing.T) {
@@ -333,6 +363,7 @@ func TestGenerateAgentNetworkPolicy_Allow(t *testing.T) {
 	ingress := np.Spec.Ingress[0]
 	assert.Len(t, ingress.From, 1)
 	assert.Equal(t, "mm-prod", ingress.From[0].PodSelector.MatchLabels[mmv1beta.ClusterLabel])
+	assert.Equal(t, mmv1beta.MattermostAppContainerName, ingress.From[0].PodSelector.MatchLabels["app"])
 
 	require.Len(t, np.Spec.Egress, 1)
 	assert.Empty(t, np.Spec.Egress[0].To, "allow-all rule has no To selector")
@@ -355,19 +386,20 @@ func TestGenerateAgentNetworkPolicy_AllowWithLiteLLM(t *testing.T) {
 	require.Len(t, np.Spec.Ingress, 1)
 	assert.Len(t, np.Spec.Ingress[0].From, 2, "ingress should allow both MM and LiteLLM pods")
 	assert.Equal(t, "mm-prod", np.Spec.Ingress[0].From[0].PodSelector.MatchLabels[mmv1beta.ClusterLabel])
-	assert.Equal(t, "mm-agent-litellm", np.Spec.Ingress[0].From[1].PodSelector.MatchLabels["app"])
+	assert.Equal(t, mmv1beta.AgentLiteLLMDeploymentName, np.Spec.Ingress[0].From[1].PodSelector.MatchLabels["app"])
 }
 
 func TestGenerateAgentNetworkPolicy_EgressPolicy_TableDriven(t *testing.T) {
 	tests := []struct {
 		name             string
-		egressPolicy     string
+		egressPolicy     mmv1beta.AgentEgressPolicy
 		expectedEgresses int
 	}{
 		{name: "empty", egressPolicy: "", expectedEgresses: 2},
 		{name: "deny", egressPolicy: mmv1beta.AgentEgressPolicyDeny, expectedEgresses: 2},
-		{name: "allowWeb", egressPolicy: mmv1beta.AgentEgressPolicyAllowWeb, expectedEgresses: 4},
+		{name: "allowWeb", egressPolicy: mmv1beta.AgentEgressPolicyAllowWeb, expectedEgresses: 3},
 		{name: "allow", egressPolicy: mmv1beta.AgentEgressPolicyAllow, expectedEgresses: 1},
+		{name: "unknown", egressPolicy: mmv1beta.AgentEgressPolicy("unknown"), expectedEgresses: 2},
 	}
 
 	for _, tt := range tests {
@@ -449,7 +481,7 @@ func TestGenerateAgentPVC(t *testing.T) {
 
 	assert.Equal(t, agent.StoragePVCName(), pvc.Name)
 	assert.Equal(t, "default", pvc.Namespace)
-	assert.Equal(t, mmv1beta.AgentLabels("my-agent"), pvc.Labels)
+	assert.Equal(t, mmv1beta.AgentLabels(agent), pvc.Labels)
 	assert.Len(t, pvc.OwnerReferences, 1)
 	assert.Equal(t, "Agent", pvc.OwnerReferences[0].Kind)
 	assert.Equal(t, []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}, pvc.Spec.AccessModes)
