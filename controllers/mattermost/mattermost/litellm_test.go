@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
+	mattermostApp "github.com/mattermost/mattermost-operator/pkg/mattermost"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
@@ -64,7 +65,7 @@ func TestCheckLiteLLM(t *testing.T) {
 
 	require.NoError(t, fakeClient.Create(context.TODO(), newLiteLLMDBCredentialsSecret(mm.Namespace)))
 
-	err := reconciler.checkLiteLLM(mm, logger)
+	err := reconciler.checkLiteLLM(context.TODO(), mm, logger)
 	require.NoError(t, err)
 
 	t.Run("deployment owned by mm CR with image and resources from spec", func(t *testing.T) {
@@ -113,7 +114,7 @@ func TestCheckLiteLLM(t *testing.T) {
 		originalKey := string(secret.Data[mmv1beta.SecretKeyMasterKey])
 		assert.NotEmpty(t, originalKey)
 
-		err = reconciler.checkLiteLLM(mm, logger)
+		err = reconciler.checkLiteLLM(context.TODO(), mm, logger)
 		require.NoError(t, err)
 
 		err = fakeClient.Get(context.TODO(), types.NamespacedName{
@@ -125,12 +126,69 @@ func TestCheckLiteLLM(t *testing.T) {
 	})
 }
 
+func TestCheckLiteLLM_OwnerReferencesSurviveUpdate(t *testing.T) {
+	logger, fakeClient, reconciler := setupTestDeps(t)
+
+	mm := newLiteLLMTestMattermost(t)
+	require.NoError(t, fakeClient.Create(context.TODO(), newLiteLLMDBCredentialsSecret(mm.Namespace)))
+	require.NoError(t, reconciler.checkLiteLLM(context.TODO(), mm, logger))
+
+	// Change the spec so the second reconcile issues a real Update.
+	mm.Spec.Agents.LLMGateway.Image = "ghcr.io/berriai/litellm-database:v2.0.0"
+	require.NoError(t, reconciler.checkLiteLLM(context.TODO(), mm, logger))
+
+	deployment := &appsv1.Deployment{}
+	require.NoError(t, fakeClient.Get(context.TODO(), types.NamespacedName{
+		Name:      mmv1beta.AgentLiteLLMDeploymentName,
+		Namespace: mm.Namespace,
+	}, deployment))
+	assert.Equal(t, "ghcr.io/berriai/litellm-database:v2.0.0", deployment.Spec.Template.Spec.Containers[0].Image)
+	require.Len(t, deployment.OwnerReferences, 1, "owner references must survive updates")
+	assert.Equal(t, "Mattermost", deployment.OwnerReferences[0].Kind)
+	assert.Equal(t, mm.Name, deployment.OwnerReferences[0].Name)
+
+	service := &corev1.Service{}
+	require.NoError(t, fakeClient.Get(context.TODO(), types.NamespacedName{
+		Name:      mmv1beta.AgentLiteLLMServiceName,
+		Namespace: mm.Namespace,
+	}, service))
+	require.Len(t, service.OwnerReferences, 1, "owner references must survive updates")
+	assert.Equal(t, mm.Name, service.OwnerReferences[0].Name)
+}
+
+func TestCheckLiteLLM_DBCredentialsRotationRollsPods(t *testing.T) {
+	logger, fakeClient, reconciler := setupTestDeps(t)
+
+	mm := newLiteLLMTestMattermost(t)
+	secret := newLiteLLMDBCredentialsSecret(mm.Namespace)
+	require.NoError(t, fakeClient.Create(context.TODO(), secret))
+	require.NoError(t, reconciler.checkLiteLLM(context.TODO(), mm, logger))
+
+	deploymentKey := types.NamespacedName{
+		Name:      mmv1beta.AgentLiteLLMDeploymentName,
+		Namespace: mm.Namespace,
+	}
+	deployment := &appsv1.Deployment{}
+	require.NoError(t, fakeClient.Get(context.TODO(), deploymentKey, deployment))
+	originalHash := deployment.Spec.Template.Annotations[mattermostApp.LiteLLMDBCredentialsHashAnnotation]
+	require.NotEmpty(t, originalHash)
+
+	secret.Data[mmv1beta.SecretKeyConnectionString] = []byte("postgres://user:rotated@host/db")
+	require.NoError(t, fakeClient.Update(context.TODO(), secret))
+	require.NoError(t, reconciler.checkLiteLLM(context.TODO(), mm, logger))
+
+	require.NoError(t, fakeClient.Get(context.TODO(), deploymentKey, deployment))
+	rotatedHash := deployment.Spec.Template.Annotations[mattermostApp.LiteLLMDBCredentialsHashAnnotation]
+	assert.NotEmpty(t, rotatedHash)
+	assert.NotEqual(t, originalHash, rotatedHash, "rotating db credentials must change the pod template annotation")
+}
+
 func TestCheckLiteLLM_MissingDBCredentials(t *testing.T) {
 	logger, fakeClient, reconciler := setupTestDeps(t)
 
 	mm := newLiteLLMTestMattermost(t)
 
-	err := reconciler.checkLiteLLM(mm, logger)
+	err := reconciler.checkLiteLLM(context.TODO(), mm, logger)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), mmv1beta.AgentLiteLLMDBCredentialsSecret)
 
@@ -164,7 +222,7 @@ func TestCheckLiteLLM_InvalidConnectionString(t *testing.T) {
 			}
 			require.NoError(t, fakeClient.Create(context.TODO(), secret))
 
-			err := reconciler.checkLiteLLM(mm, logger)
+			err := reconciler.checkLiteLLM(context.TODO(), mm, logger)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), mmv1beta.SecretKeyConnectionString)
 		})
@@ -177,7 +235,7 @@ func TestCheckLiteLLM_RecreatesDeletedService(t *testing.T) {
 	require.NoError(t, fakeClient.Create(
 		context.TODO(), newLiteLLMDBCredentialsSecret(mm.Namespace),
 	))
-	require.NoError(t, reconciler.checkLiteLLM(mm, logger))
+	require.NoError(t, reconciler.checkLiteLLM(context.TODO(), mm, logger))
 
 	service := &corev1.Service{}
 	key := types.NamespacedName{
@@ -186,7 +244,7 @@ func TestCheckLiteLLM_RecreatesDeletedService(t *testing.T) {
 	require.NoError(t, fakeClient.Get(context.TODO(), key, service))
 	require.NoError(t, fakeClient.Delete(context.TODO(), service))
 
-	require.NoError(t, reconciler.checkLiteLLM(mm, logger))
+	require.NoError(t, reconciler.checkLiteLLM(context.TODO(), mm, logger))
 	require.NoError(t, fakeClient.Get(context.TODO(), key, &corev1.Service{}))
 }
 
@@ -196,14 +254,21 @@ func TestCheckLiteLLM_DisableTransition(t *testing.T) {
 	mm := newLiteLLMTestMattermost(t)
 	require.NoError(t, fakeClient.Create(context.TODO(), newLiteLLMDBCredentialsSecret(mm.Namespace)))
 
-	err := reconciler.checkLiteLLM(mm, logger)
+	err := reconciler.checkLiteLLM(context.TODO(), mm, logger)
 	require.NoError(t, err)
+
+	// With the gateway still enabled the cleanup is a no-op.
+	require.NoError(t, reconciler.cleanupLiteLLMIfDisabled(context.TODO(), mm, logger))
+	require.NoError(t, fakeClient.Get(context.TODO(), types.NamespacedName{
+		Name:      mmv1beta.AgentLiteLLMDeploymentName,
+		Namespace: mm.Namespace,
+	}, &appsv1.Deployment{}))
 
 	// Disable the gateway.
 	mm.Spec.Agents.LLMGateway = nil
 
-	err = reconciler.checkLiteLLM(mm, logger)
-	require.NoError(t, err)
+	require.NoError(t, reconciler.checkLiteLLM(context.TODO(), mm, logger), "create/update path must be a no-op when disabled")
+	require.NoError(t, reconciler.cleanupLiteLLMIfDisabled(context.TODO(), mm, logger))
 
 	deployment := &appsv1.Deployment{}
 	err = fakeClient.Get(context.TODO(), types.NamespacedName{
@@ -228,6 +293,47 @@ func TestCheckLiteLLM_DisableTransition(t *testing.T) {
 	assert.NotEmpty(t, masterKey.Data[mmv1beta.SecretKeyMasterKey])
 
 	// Disabled with nothing deployed is a no-op.
-	err = reconciler.checkLiteLLM(mm, logger)
+	err = reconciler.cleanupLiteLLMIfDisabled(context.TODO(), mm, logger)
 	require.NoError(t, err)
+}
+
+func TestCleanupLiteLLMIfDisabled_DoesNotDeleteOtherInstallationsGateway(t *testing.T) {
+	logger, fakeClient, reconciler := setupTestDeps(t)
+
+	// Installation A owns the gateway in the namespace.
+	mmA := newLiteLLMTestMattermost(t)
+	mmA.Name = "installation-a"
+	mmA.UID = types.UID("uid-a")
+	require.NoError(t, fakeClient.Create(context.TODO(), newLiteLLMDBCredentialsSecret(mmA.Namespace)))
+	require.NoError(t, reconciler.checkLiteLLM(context.TODO(), mmA, logger))
+
+	// Installation B in the same namespace has the gateway disabled.
+	mmB := newLiteLLMTestMattermost(t)
+	mmB.Name = "installation-b"
+	mmB.UID = types.UID("uid-b")
+	mmB.Spec.Agents = nil
+
+	require.NoError(t, reconciler.cleanupLiteLLMIfDisabled(context.TODO(), mmB, logger))
+
+	deployment := &appsv1.Deployment{}
+	require.NoError(t, fakeClient.Get(context.TODO(), types.NamespacedName{
+		Name:      mmv1beta.AgentLiteLLMDeploymentName,
+		Namespace: mmA.Namespace,
+	}, deployment), "installation B must not delete installation A's gateway deployment")
+
+	service := &corev1.Service{}
+	require.NoError(t, fakeClient.Get(context.TODO(), types.NamespacedName{
+		Name:      mmv1beta.AgentLiteLLMServiceName,
+		Namespace: mmA.Namespace,
+	}, service), "installation B must not delete installation A's gateway service")
+
+	// The owning installation can still clean its own gateway up.
+	mmA.Spec.Agents.LLMGateway = nil
+	require.NoError(t, reconciler.cleanupLiteLLMIfDisabled(context.TODO(), mmA, logger))
+
+	err := fakeClient.Get(context.TODO(), types.NamespacedName{
+		Name:      mmv1beta.AgentLiteLLMDeploymentName,
+		Namespace: mmA.Namespace,
+	}, &appsv1.Deployment{})
+	assert.True(t, k8sErrors.IsNotFound(err))
 }

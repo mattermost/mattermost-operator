@@ -70,6 +70,11 @@ func (r *AgentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&networkingv1.NetworkPolicy{}).
 		Watches(&mmv1beta.Mattermost{}, handler.EnqueueRequestsFromMapFunc(r.agentsForMattermost)).
 		Watches(&appsv1.Deployment{}, handler.EnqueueRequestsFromMapFunc(r.agentsForLiteLLMDeployment)).
+		// Prerequisite Secrets (bot token, virtual key) are provisioned by
+		// the agents plugin or the user, not owned by the Agent CR, so
+		// Owns(&corev1.Secret{}) never fires for them; watch them explicitly
+		// to converge promptly instead of waiting for the polling backstop.
+		Watches(&corev1.Secret{}, handler.EnqueueRequestsFromMapFunc(r.agentsForSecret)).
 		Complete(r)
 }
 
@@ -102,6 +107,45 @@ func (r *AgentReconciler) agentsForMattermost(ctx context.Context, obj client.Ob
 		})
 	}
 	return requests
+}
+
+// agentsForSecret maps a Secret event to the Agents in the same namespace
+// that reference it as an unowned prerequisite: the plugin-provisioned bot
+// token, the operator-managed-gateway virtual key, or an external gateway
+// virtual key.
+func (r *AgentReconciler) agentsForSecret(ctx context.Context, obj client.Object) []reconcile.Request {
+	agents := &mmv1beta.AgentList{}
+	err := r.Client.List(ctx, agents, client.InNamespace(obj.GetNamespace()))
+	if err != nil {
+		r.Log.Error(err, "Failed to list Agents for Secret event", "secret", obj.GetName())
+		return nil
+	}
+
+	var requests []reconcile.Request
+	for i := range agents.Items {
+		if !agentReferencesSecret(&agents.Items[i], obj.GetName()) {
+			continue
+		}
+		requests = append(requests, reconcile.Request{
+			NamespacedName: types.NamespacedName{Name: agents.Items[i].Name, Namespace: agents.Items[i].Namespace},
+		})
+	}
+	return requests
+}
+
+// agentReferencesSecret reports whether the named Secret is one of the
+// agent's unowned prerequisite Secrets.
+func agentReferencesSecret(agent *mmv1beta.Agent, secretName string) bool {
+	if agent.BotTokenSecretName() == secretName {
+		return true
+	}
+	if agent.HasOperatorManagedGateway() && agent.LiteLLMKeySecretName() == secretName {
+		return true
+	}
+	if agent.HasExternalGateway() && agent.Spec.LLMGateway.External.VirtualKeySecret == secretName {
+		return true
+	}
+	return false
 }
 
 // agentsForLiteLLMDeployment maps LiteLLM gateway Deployment events to the
@@ -189,7 +233,7 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, request ctrl.Request) (
 	}
 	if mm.Status.State != mmv1beta.Stable {
 		reqLogger.Info("Mattermost not stable, requeuing", "mmState", mm.Status.State)
-		return reconcile.Result{RequeueAfter: dependencyRequeueDelay}, nil
+		return r.requeueWaitingForDependency(ctx, agent, status, reqLogger)
 	}
 
 	// Gate on the LiteLLM gateway, which is managed by the Mattermost controller.
@@ -198,7 +242,7 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, request ctrl.Request) (
 		return r.handleCheckError(ctx, agent, status, reqLogger, err)
 	}
 	if !ready {
-		return reconcile.Result{RequeueAfter: dependencyRequeueDelay}, nil
+		return r.requeueWaitingForDependency(ctx, agent, status, reqLogger)
 	}
 
 	err = r.checkAgent(ctx, agent, reqLogger)
@@ -229,6 +273,19 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, request ctrl.Request) (
 func (r *AgentReconciler) updateSpec(ctx context.Context, reqLogger logr.Logger, updated *mmv1beta.Agent) error {
 	reqLogger.Info("Updating Agent spec")
 	return r.Client.Update(ctx, updated)
+}
+
+// requeueWaitingForDependency persists an up-to-date Reconciling status
+// (current ObservedGeneration, cleared Error, no stale Stable state) before
+// requeueing to wait on a dependency. The status helper skips unchanged
+// writes, so repeated waits are cheap.
+func (r *AgentReconciler) requeueWaitingForDependency(ctx context.Context, agent *mmv1beta.Agent, status mmv1beta.AgentStatus, reqLogger logr.Logger) (ctrl.Result, error) {
+	status.Error = ""
+	err := r.updateStatusReconciling(ctx, agent, status, reqLogger)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+	return reconcile.Result{RequeueAfter: dependencyRequeueDelay}, nil
 }
 
 // handleCheckError surfaces err on the Agent status and maps confirmed config

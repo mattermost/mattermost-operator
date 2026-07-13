@@ -288,7 +288,7 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `url` _string_ | URL is the base URL of the external LiteLLM instance.<br />The agent NetworkPolicy permits TCP egress to this URL's explicit port,<br />or to port 443 for HTTPS and port 80 for HTTP.<br />Example: "http://litellm.my-namespace.svc.cluster.local:4000" |  | MinLength: 1 <br /> |
+| `url` _string_ | URL is the base URL of the external LiteLLM instance.<br />It must be an absolute http:// or https:// URL: the agent NetworkPolicy<br />permits TCP egress to this URL's explicit port, or to port 443 for<br />HTTPS and port 80 for HTTP.<br />Example: "http://litellm.my-namespace.svc.cluster.local:4000" |  | MinLength: 1 <br /> |
 | `virtualKeySecret` _string_ | VirtualKeySecret is the name of the K8s Secret containing the virtual key<br />for this agent. The Secret must have a key "apiKey". |  | MinLength: 1 <br /> |
 
 

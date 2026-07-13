@@ -340,6 +340,11 @@ func agentBaseEgressRules(agent *mmv1beta.Agent) []networkingv1.NetworkPolicyEgr
 	return egressRules
 }
 
+// externalGatewayPort derives the egress port for an external gateway URL.
+// CRD validation guarantees an absolute http:// or https:// URL, so port
+// derivation cannot fail: the explicit port wins, otherwise the scheme
+// default (80/443) applies. The parse-failure fallback is kept harmless for
+// objects persisted before that validation existed.
 func externalGatewayPort(rawURL string) (int32, bool) {
 	parsedURL, err := url.Parse(rawURL)
 	if err != nil {
@@ -354,14 +359,10 @@ func externalGatewayPort(rawURL string) (int32, bool) {
 		return int32(port), true
 	}
 
-	switch strings.ToLower(parsedURL.Scheme) {
-	case "https":
-		return 443, true
-	case "http":
+	if strings.EqualFold(parsedURL.Scheme, "http") {
 		return 80, true
-	default:
-		return 0, false
 	}
+	return 443, true
 }
 
 // webEgressRule allows HTTP and HTTPS to any destination.

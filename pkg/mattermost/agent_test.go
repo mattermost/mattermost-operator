@@ -513,7 +513,11 @@ func TestExternalGatewayPort(t *testing.T) {
 		{name: "explicit", url: "https://gateway.example.com:8443", port: 8443, expected: true},
 		{name: "https default", url: "https://gateway.example.com", port: 443, expected: true},
 		{name: "http default", url: "http://gateway.example.com/path", port: 80, expected: true},
-		{name: "invalid", url: "http://[::1", expected: false},
+		{name: "unparseable", url: "http://[::1", expected: false},
+		// CRD validation now rejects scheme-less URLs; already-persisted
+		// objects fall back to the HTTPS default rather than silently
+		// dropping the egress rule.
+		{name: "legacy scheme-less", url: "litellm.example.com:4000", port: 443, expected: true},
 	}
 
 	for _, tt := range tests {

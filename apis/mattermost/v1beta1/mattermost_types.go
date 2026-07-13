@@ -332,6 +332,7 @@ type PodExtensions struct {
 }
 
 // MattermostAgents configures Agent CR integration for this installation.
+// +kubebuilder:validation:XValidation:rule="!has(self.llmGateway) || self.enabled",message="agents.llmGateway requires agents.enabled"
 type MattermostAgents struct {
 	// Enabled grants the Mattermost server ServiceAccount the RBAC required
 	// to manage Agent CRs and their externally provisioned Secrets (bot

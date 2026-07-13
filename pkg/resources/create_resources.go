@@ -209,20 +209,21 @@ func (r *ResourceHelper) CreateIfNotExists(owner v1.Object, desired Object, reqL
 		return errors.Wrapf(err, "failed to check if %T %s exists", desired, desired.GetName())
 	}
 
-	reqLogger.Info("Creating resource", "kind", fmt.Sprintf("%T", desired), "name", desired.GetName())
 	if owner == nil {
-		return r.createUnowned(desired)
+		return r.CreateUnowned(desired, reqLogger)
 	}
+	reqLogger.Info("Creating resource", "kind", fmt.Sprintf("%T", desired), "name", desired.GetName())
 	return r.Create(owner, desired, reqLogger)
 }
 
-// createUnowned creates the resource without setting a controller reference.
-func (r *ResourceHelper) createUnowned(desired Object) error {
+// CreateUnowned creates the resource without setting a controller reference.
+func (r *ResourceHelper) CreateUnowned(desired Object, reqLogger logr.Logger) error {
 	err := defaultAnnotator.SetLastAppliedAnnotation(desired)
 	if err != nil {
 		return errors.Wrap(err, "failed to apply annotation to the resource")
 	}
 
+	reqLogger.Info("Creating resource", "kind", fmt.Sprintf("%T", desired), "name", desired.GetName())
 	return r.client.Create(context.TODO(), desired)
 }
 

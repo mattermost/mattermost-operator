@@ -134,11 +134,12 @@ type LLMGatewayConfig struct {
 // ExternalLLMGateway configures the agent to use an externally managed LiteLLM instance.
 type ExternalLLMGateway struct {
 	// URL is the base URL of the external LiteLLM instance.
-	// The agent NetworkPolicy permits TCP egress to this URL's explicit port,
-	// or to port 443 for HTTPS and port 80 for HTTP.
+	// It must be an absolute http:// or https:// URL: the agent NetworkPolicy
+	// permits TCP egress to this URL's explicit port, or to port 443 for
+	// HTTPS and port 80 for HTTP.
 	// Example: "http://litellm.my-namespace.svc.cluster.local:4000"
 	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:XValidation:rule="isURL(self)",message="must be a valid URL"
+	// +kubebuilder:validation:XValidation:rule="isURL(self) && (self.startsWith('http://') || self.startsWith('https://'))",message="must be a valid absolute URL with an http:// or https:// scheme"
 	URL string `json:"url"`
 
 	// VirtualKeySecret is the name of the K8s Secret containing the virtual key
@@ -162,6 +163,7 @@ type OperatorManagedGateway struct{}
 // +kubebuilder:printcolumn:priority=0,name="State",type=string,JSONPath=".status.state",description="State of Agent"
 // +kubebuilder:printcolumn:priority=0,name="Image",type=string,JSONPath=".spec.image",description="Image of Agent"
 // +kubebuilder:printcolumn:priority=0,name="Endpoint",type=string,JSONPath=".status.endpoint",description="HTTP Endpoint"
+// +kubebuilder:validation:XValidation:rule="self.metadata.name != self.spec.mattermostRef.name",message="agent name must differ from the referenced Mattermost installation name"
 type Agent struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

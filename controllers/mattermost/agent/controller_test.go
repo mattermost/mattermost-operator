@@ -66,6 +66,12 @@ func (c *secretReadErrorClient) Get(
 
 func TestReconcileAgent_MattermostNotStable(t *testing.T) {
 	agent := newTestAgent()
+	agent.Generation = 3
+	agent.Status = mmv1beta.AgentStatus{
+		State:              mmv1beta.Stable,
+		Error:              "stale error from a previous reconcile",
+		ObservedGeneration: 1,
+	}
 	mm := newReadyMattermost()
 	mm.Status.State = mmv1beta.Reconciling
 	reconciler := setupReconciler(t, agent, mm)
@@ -77,6 +83,14 @@ func TestReconcileAgent_MattermostNotStable(t *testing.T) {
 	deployment := &appsv1.Deployment{}
 	err = reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(agent), deployment)
 	assert.True(t, k8sErrors.IsNotFound(err))
+
+	// The wait must not leave a stale status behind: state drops to
+	// Reconciling, the old error is cleared and the generation advances.
+	persisted := &mmv1beta.Agent{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(agent), persisted))
+	assert.Equal(t, mmv1beta.Reconciling, persisted.Status.State)
+	assert.Empty(t, persisted.Status.Error)
+	assert.Equal(t, agent.Generation, persisted.Status.ObservedGeneration)
 }
 
 func TestReconcileAgent_FullLifecycle(t *testing.T) {
@@ -247,6 +261,13 @@ func TestReconcileAgent_OperatorManagedGatewayUnreadyThenReady(t *testing.T) {
 	)
 	assert.True(t, k8sErrors.IsNotFound(err))
 
+	// Waiting on the gateway persists a fresh Reconciling status.
+	persisted := &mmv1beta.Agent{}
+	require.NoError(t, reconciler.Client.Get(context.Background(), client.ObjectKeyFromObject(agent), persisted))
+	assert.Equal(t, mmv1beta.Reconciling, persisted.Status.State)
+	assert.Empty(t, persisted.Status.Error)
+	assert.Equal(t, persisted.Generation, persisted.Status.ObservedGeneration)
+
 	gatewayDeployment = &appsv1.Deployment{}
 	require.NoError(t, reconciler.Client.Get(context.Background(), types.NamespacedName{
 		Name: mmv1beta.AgentLiteLLMDeploymentName, Namespace: agent.Namespace,
@@ -414,4 +435,61 @@ func TestAgentsForLiteLLMDeployment(t *testing.T) {
 		Name: "unrelated", Namespace: gatewayAgent.Namespace,
 	}}
 	assert.Empty(t, reconciler.agentsForLiteLLMDeployment(context.Background(), unrelated))
+}
+
+func TestAgentsForSecret(t *testing.T) {
+	plainAgent := newTestAgent()
+	plainAgent.Name = "agent-plain"
+
+	managedAgent := newTestAgent()
+	managedAgent.Name = "agent-managed"
+	managedAgent.Spec.LLMGateway = operatorManagedGatewayConfig()
+
+	externalAgent := newTestAgent()
+	externalAgent.Name = "agent-external"
+	externalAgent.Spec.LLMGateway = externalGatewayConfig()
+
+	otherNamespaceAgent := newTestAgent()
+	otherNamespaceAgent.Name = "agent-elsewhere"
+	otherNamespaceAgent.Namespace = "other"
+
+	reconciler := setupReconciler(t, plainAgent, managedAgent, externalAgent, otherNamespaceAgent)
+
+	secretInDefault := func(name string) *corev1.Secret {
+		return &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default"}}
+	}
+	requestNames := func(requests []reconcile.Request) []string {
+		names := make([]string, 0, len(requests))
+		for _, request := range requests {
+			names = append(names, request.Name)
+		}
+		return names
+	}
+
+	t.Run("bot token secret maps to its agent", func(t *testing.T) {
+		requests := reconciler.agentsForSecret(context.Background(), secretInDefault(plainAgent.BotTokenSecretName()))
+		assert.ElementsMatch(t, []string{plainAgent.Name}, requestNames(requests))
+	})
+
+	t.Run("operator-managed virtual key secret maps to its agent", func(t *testing.T) {
+		requests := reconciler.agentsForSecret(context.Background(), secretInDefault(managedAgent.LiteLLMKeySecretName()))
+		assert.ElementsMatch(t, []string{managedAgent.Name}, requestNames(requests))
+	})
+
+	t.Run("external virtual key secret maps to its agent", func(t *testing.T) {
+		requests := reconciler.agentsForSecret(context.Background(), secretInDefault(externalGatewayKeySecret))
+		assert.ElementsMatch(t, []string{externalAgent.Name}, requestNames(requests))
+	})
+
+	t.Run("unrelated secret maps to nothing", func(t *testing.T) {
+		assert.Empty(t, reconciler.agentsForSecret(context.Background(), secretInDefault("unrelated-secret")))
+	})
+
+	t.Run("secret in another namespace does not map across namespaces", func(t *testing.T) {
+		secret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{
+			Name: otherNamespaceAgent.BotTokenSecretName(), Namespace: "other",
+		}}
+		requests := reconciler.agentsForSecret(context.Background(), secret)
+		assert.ElementsMatch(t, []string{otherNamespaceAgent.Name}, requestNames(requests))
+	})
 }

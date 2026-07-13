@@ -72,14 +72,25 @@ func (r *AgentReconciler) checkAgentServiceAccount(ctx context.Context, agent *m
 	return r.Resources.Update(current, desired, reqLogger)
 }
 
+// checkHookSecret ensures the operator-generated hook Secret exists.
+// Randomness is only generated after a Get confirms the Secret is missing.
 func (r *AgentReconciler) checkHookSecret(ctx context.Context, agent *mmv1beta.Agent, reqLogger logr.Logger) error {
+	existing := &corev1.Secret{}
+	err := r.Client.Get(ctx, types.NamespacedName{Name: agent.HookSecretName(), Namespace: agent.Namespace}, existing)
+	if err == nil {
+		return nil
+	}
+	if !k8sErrors.IsNotFound(err) {
+		return errors.Wrap(err, "failed to check hook secret")
+	}
+
 	secretValue, err := utils.RandomHex(32)
 	if err != nil {
 		return errors.Wrap(err, "failed to generate random hook secret")
 	}
 
 	desired := mattermostApp.GenerateAgentHookSecret(agent, secretValue)
-	return errors.Wrap(r.Resources.CreateIfNotExists(agent, desired, reqLogger), "failed to create hook secret")
+	return errors.Wrap(r.Resources.Create(agent, desired, reqLogger), "failed to create hook secret")
 }
 
 func (r *AgentReconciler) checkAgentNetworkPolicy(ctx context.Context, agent *mmv1beta.Agent, reqLogger logr.Logger) error {

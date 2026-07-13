@@ -208,14 +208,16 @@ spec:
                       url:
                         description: |-
                           URL is the base URL of the external LiteLLM instance.
-                          The agent NetworkPolicy permits TCP egress to this URL's explicit port,
-                          or to port 443 for HTTPS and port 80 for HTTP.
+                          It must be an absolute http:// or https:// URL: the agent NetworkPolicy
+                          permits TCP egress to this URL's explicit port, or to port 443 for
+                          HTTPS and port 80 for HTTP.
                           Example: "http://litellm.my-namespace.svc.cluster.local:4000"
                         minLength: 1
                         type: string
                         x-kubernetes-validations:
-                        - message: must be a valid URL
-                          rule: isURL(self)
+                        - message: must be a valid absolute URL with an http:// or
+                            https:// scheme
+                          rule: isURL(self) && (self.startsWith('http://') || self.startsWith('https://'))
                       virtualKeySecret:
                         description: |-
                           VirtualKeySecret is the name of the K8s Secret containing the virtual key
@@ -368,6 +370,10 @@ spec:
                 type: string
             type: object
         type: object
+        x-kubernetes-validations:
+        - message: agent name must differ from the referenced Mattermost installation
+            name
+          rule: self.metadata.name != self.spec.mattermostRef.name
     served: true
     storage: true
     subresources:

@@ -12,6 +12,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
+// LiteLLMDBCredentialsHashAnnotation is stamped on the LiteLLM pod template
+// with a hash of the database connection string, so credential rotation rolls
+// the pods (the connection string is consumed via env-from-secret, which is
+// fixed at pod start).
+const LiteLLMDBCredentialsHashAnnotation = "mattermost.com/db-credentials-hash"
+
 // LiteLLMSelectorLabels returns the stable labels used to select LiteLLM pods.
 func LiteLLMSelectorLabels() map[string]string {
 	return map[string]string{"app": mmv1beta.AgentLiteLLMDeploymentName}
@@ -38,8 +44,10 @@ func GenerateLiteLLMMasterKeySecret(mattermost *mmv1beta.Mattermost, masterKey s
 
 // GenerateLiteLLMDeployment returns the Deployment for the LiteLLM gateway,
 // configured from mattermost.Spec.Agents.LLMGateway (defaults applied by
-// Mattermost.SetDefaults).
-func GenerateLiteLLMDeployment(mattermost *mmv1beta.Mattermost) *appsv1.Deployment {
+// Mattermost.SetDefaults). dbCredentialsHash is a hash of the database
+// connection string, stamped on the pod template so credential rotation
+// triggers a rollout.
+func GenerateLiteLLMDeployment(mattermost *mmv1beta.Mattermost, dbCredentialsHash string) *appsv1.Deployment {
 	replicas := int32(1)
 	gateway := mattermost.Spec.Agents.LLMGateway
 
@@ -88,9 +96,10 @@ func GenerateLiteLLMDeployment(mattermost *mmv1beta.Mattermost) *appsv1.Deployme
 
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      mmv1beta.AgentLiteLLMDeploymentName,
-			Namespace: mattermost.Namespace,
-			Labels:    LiteLLMLabels(mattermost),
+			Name:            mmv1beta.AgentLiteLLMDeploymentName,
+			Namespace:       mattermost.Namespace,
+			Labels:          LiteLLMLabels(mattermost),
+			OwnerReferences: MattermostOwnerReference(mattermost),
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
@@ -100,6 +109,9 @@ func GenerateLiteLLMDeployment(mattermost *mmv1beta.Mattermost) *appsv1.Deployme
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: LiteLLMLabels(mattermost),
+					Annotations: map[string]string{
+						LiteLLMDBCredentialsHashAnnotation: dbCredentialsHash,
+					},
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -129,9 +141,10 @@ func GenerateLiteLLMDeployment(mattermost *mmv1beta.Mattermost) *appsv1.Deployme
 func GenerateLiteLLMService(mattermost *mmv1beta.Mattermost) *corev1.Service {
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      mmv1beta.AgentLiteLLMServiceName,
-			Namespace: mattermost.Namespace,
-			Labels:    LiteLLMLabels(mattermost),
+			Name:            mmv1beta.AgentLiteLLMServiceName,
+			Namespace:       mattermost.Namespace,
+			Labels:          LiteLLMLabels(mattermost),
+			OwnerReferences: MattermostOwnerReference(mattermost),
 		},
 		Spec: corev1.ServiceSpec{
 			Type:     corev1.ServiceTypeClusterIP,

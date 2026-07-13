@@ -45,12 +45,16 @@ func TestGenerateLiteLLMMasterKeySecret(t *testing.T) {
 
 func TestGenerateLiteLLMDeployment(t *testing.T) {
 	mm := testMattermostWithGateway(t, "mm-test", "my-namespace")
-	dep := GenerateLiteLLMDeployment(mm)
+	dep := GenerateLiteLLMDeployment(mm, "abcd1234")
 
 	assert.Equal(t, mmv1beta.AgentLiteLLMDeploymentName, dep.Name)
 	assert.Equal(t, "my-namespace", dep.Namespace)
 	assert.Equal(t, LiteLLMLabels(mm), dep.Labels)
 	assert.Equal(t, "mm-test", dep.Labels[mmv1beta.ClusterLabel])
+	assert.Equal(t, MattermostOwnerReference(mm), dep.OwnerReferences,
+		"deployment must embed the Mattermost owner reference so updates cannot strip it")
+	assert.Equal(t, "abcd1234", dep.Spec.Template.Annotations[LiteLLMDBCredentialsHashAnnotation],
+		"pod template must be stamped with the db-credentials hash so rotation rolls pods")
 
 	require.NotNil(t, dep.Spec.Replicas)
 	assert.Equal(t, int32(1), *dep.Spec.Replicas)
@@ -117,7 +121,7 @@ func TestGenerateLiteLLMDeployment_CustomImageAndResources(t *testing.T) {
 		},
 	}
 
-	dep := GenerateLiteLLMDeployment(mm)
+	dep := GenerateLiteLLMDeployment(mm, "abcd1234")
 
 	require.Len(t, dep.Spec.Template.Spec.Containers, 1)
 	c := dep.Spec.Template.Spec.Containers[0]
@@ -134,10 +138,22 @@ func TestGenerateLiteLLMDeployment_MutableTagAlwaysPulls(t *testing.T) {
 	mm := testMattermostWithGateway(t, "mm-test", "my-namespace")
 	mm.Spec.Agents.LLMGateway.Image = "ghcr.io/berriai/litellm-database:latest"
 
-	dep := GenerateLiteLLMDeployment(mm)
+	dep := GenerateLiteLLMDeployment(mm, "abcd1234")
 
 	require.Len(t, dep.Spec.Template.Spec.Containers, 1)
 	assert.Equal(t, corev1.PullAlways, dep.Spec.Template.Spec.Containers[0].ImagePullPolicy)
+}
+
+func TestGenerateLiteLLMDeployment_DBCredentialsHashChangesPodTemplate(t *testing.T) {
+	mm := testMattermostWithGateway(t, "mm-test", "my-namespace")
+
+	before := GenerateLiteLLMDeployment(mm, "hash-before")
+	after := GenerateLiteLLMDeployment(mm, "hash-after")
+
+	assert.Equal(t, "hash-before", before.Spec.Template.Annotations[LiteLLMDBCredentialsHashAnnotation])
+	assert.Equal(t, "hash-after", after.Spec.Template.Annotations[LiteLLMDBCredentialsHashAnnotation])
+	assert.NotEqual(t, before.Spec.Template.Annotations, after.Spec.Template.Annotations,
+		"changed db credentials must change the pod template to trigger a rollout")
 }
 
 func TestGenerateLiteLLMService(t *testing.T) {
@@ -147,6 +163,8 @@ func TestGenerateLiteLLMService(t *testing.T) {
 	assert.Equal(t, mmv1beta.AgentLiteLLMServiceName, svc.Name)
 	assert.Equal(t, "my-namespace", svc.Namespace)
 	assert.Equal(t, LiteLLMLabels(mm), svc.Labels)
+	assert.Equal(t, MattermostOwnerReference(mm), svc.OwnerReferences,
+		"service must embed the Mattermost owner reference so updates cannot strip it")
 
 	assert.Equal(t, corev1.ServiceTypeClusterIP, svc.Spec.Type)
 	assert.Equal(t, LiteLLMSelectorLabels(), svc.Spec.Selector)

@@ -147,6 +147,9 @@ spec:
                         type: object
                     type: object
                 type: object
+                x-kubernetes-validations:
+                - message: agents.llmGateway requires agents.enabled
+                  rule: '!has(self.llmGateway) || self.enabled'
               awsLoadBalancerController:
                 properties:
                   annotations:

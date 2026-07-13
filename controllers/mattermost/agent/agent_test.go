@@ -268,6 +268,12 @@ func TestCheckAgentHealth_MidRolloutNotStable(t *testing.T) {
 				ObservedGeneration: 2, Replicas: 1, UpdatedReplicas: 1,
 			},
 		},
+		{
+			name: "old replicas still terminating",
+			status: appsv1.DeploymentStatus{
+				ObservedGeneration: 2, ReadyReplicas: 1, Replicas: 2, UpdatedReplicas: 1,
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -280,10 +286,12 @@ func TestCheckAgentHealth_MidRolloutNotStable(t *testing.T) {
 			reconciler := setupReconciler(t, agent, deployment)
 
 			status, err := reconciler.checkAgentHealth(
-				context.Background(), agent, mmv1beta.AgentStatus{}, reconciler.Log,
+				context.Background(), agent, mmv1beta.AgentStatus{ReadyReplicas: 9}, reconciler.Log,
 			)
 			require.Error(t, err)
 			assert.Equal(t, mmv1beta.Reconciling, status.State)
+			assert.Equal(t, tt.status.ReadyReplicas, status.ReadyReplicas,
+				"replica counts must be refreshed even on unhealthy paths")
 		})
 	}
 }

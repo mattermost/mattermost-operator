@@ -32,9 +32,9 @@ spec:
   # "connectionString") with a PostgreSQL DSN in the same namespace.
   llmGateway:
     operatorManaged: {}
+  # With operatorManaged set, the operator injects the gateway credentials
+  # (OPENAI_API_KEY etc.) from the agent's virtual-key Secret; do not override
+  # them here. Use env only for agent-specific settings.
   env:
-    - name: OPENAI_API_KEY
-      valueFrom:
-        secretKeyRef:
-          name: agent-secrets
-          key: openai-key
+    - name: AGENT_LOG_LEVEL
+      value: "info"

@@ -29,13 +29,16 @@ func (r *AgentReconciler) checkAgentHealth(ctx context.Context, agent *mmv1beta.
 		return status, errors.Wrap(err, "failed to get agent deployment for health check")
 	}
 
+	// Refresh replica counts even when the rollout is incomplete, so the
+	// persisted status never carries stale numbers.
+	status.ReadyReplicas = deployment.Status.ReadyReplicas
+
 	err = checkDeploymentRolloutComplete(deployment)
 	if err != nil {
 		return status, err
 	}
 
 	status.State = mmv1beta.Stable
-	status.ReadyReplicas = deployment.Status.ReadyReplicas
 	status.Error = ""
 	return status, nil
 }
@@ -56,6 +59,12 @@ func checkDeploymentRolloutComplete(deployment *appsv1.Deployment) error {
 	}
 	if deployment.Status.UpdatedReplicas != replicas {
 		return fmt.Errorf("deployment has %d updated replicas, want %d", deployment.Status.UpdatedReplicas, replicas)
+	}
+
+	// Matches kubectl rollout-status semantics: old replicas still
+	// terminating mean the rollout has not completed.
+	if deployment.Status.Replicas != replicas {
+		return fmt.Errorf("deployment has %d total replicas, want %d (old replicas may still be terminating)", deployment.Status.Replicas, replicas)
 	}
 
 	if deployment.Status.ReadyReplicas < 1 {
