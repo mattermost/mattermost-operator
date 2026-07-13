@@ -2,7 +2,6 @@ package agent
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/go-logr/logr"
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
@@ -16,6 +15,45 @@ import (
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 )
+
+// checkAgent ensures all resources that make up an Agent. The NetworkPolicy is
+// created before the Deployment so agent pods never start without their egress
+// policy.
+func (r *AgentReconciler) checkAgent(ctx context.Context, agent *mmv1beta.Agent, reqLogger logr.Logger) error {
+	reqLogger = reqLogger.WithValues("Reconcile", "agent")
+
+	err := r.checkAgentServiceAccount(ctx, agent, reqLogger)
+	if err != nil {
+		return err
+	}
+
+	err = r.checkHookSecret(ctx, agent, reqLogger)
+	if err != nil {
+		return err
+	}
+
+	err = r.checkAgentNetworkPolicy(ctx, agent, reqLogger)
+	if err != nil {
+		return err
+	}
+
+	err = r.checkAgentService(ctx, agent, reqLogger)
+	if err != nil {
+		return err
+	}
+
+	err = r.checkAgentPVC(ctx, agent, reqLogger)
+	if err != nil {
+		return err
+	}
+
+	err = r.checkExternallyProvisionedSecrets(ctx, agent)
+	if err != nil {
+		return err
+	}
+
+	return r.checkAgentDeployment(ctx, agent, reqLogger)
+}
 
 func (r *AgentReconciler) checkAgentServiceAccount(ctx context.Context, agent *mmv1beta.Agent, reqLogger logr.Logger) error {
 	desired := mattermostApp.GenerateAgentServiceAccount(agent)
@@ -35,28 +73,30 @@ func (r *AgentReconciler) checkAgentServiceAccount(ctx context.Context, agent *m
 }
 
 func (r *AgentReconciler) checkHookSecret(ctx context.Context, agent *mmv1beta.Agent, reqLogger logr.Logger) error {
-	secretName := agent.HookSecretName()
-	existingSecret := &corev1.Secret{}
-	err := r.Client.Get(ctx, types.NamespacedName{Name: secretName, Namespace: agent.Namespace}, existingSecret)
-	if err == nil {
-		return nil
-	}
-	if !k8sErrors.IsNotFound(err) {
-		return errors.Wrap(err, "failed to check for existing hook secret")
-	}
-
 	secretValue, err := utils.RandomHex(32)
 	if err != nil {
 		return errors.Wrap(err, "failed to generate random hook secret")
 	}
 
 	desired := mattermostApp.GenerateAgentHookSecret(agent, secretValue)
-	if err := r.Resources.CreateIfNotExists(agent, desired, reqLogger); err != nil {
-		return errors.Wrap(err, "failed to create hook secret")
+	return errors.Wrap(r.Resources.CreateIfNotExists(agent, desired, reqLogger), "failed to create hook secret")
+}
+
+func (r *AgentReconciler) checkAgentNetworkPolicy(ctx context.Context, agent *mmv1beta.Agent, reqLogger logr.Logger) error {
+	desired := mattermostApp.GenerateAgentNetworkPolicy(agent)
+
+	err := r.Resources.CreateIfNotExists(agent, desired, reqLogger)
+	if err != nil {
+		return errors.Wrap(err, "failed to create agent network policy")
 	}
 
-	reqLogger.Info("Created hook secret", "secret", secretName)
-	return nil
+	current := &networkingv1.NetworkPolicy{}
+	err = r.Client.Get(ctx, types.NamespacedName{Name: desired.Name, Namespace: desired.Namespace}, current)
+	if err != nil {
+		return errors.Wrap(err, "failed to get agent network policy")
+	}
+
+	return r.Resources.Update(current, desired, reqLogger)
 }
 
 func (r *AgentReconciler) checkAgentService(ctx context.Context, agent *mmv1beta.Agent, reqLogger logr.Logger) error {
@@ -78,26 +118,44 @@ func (r *AgentReconciler) checkAgentService(ctx context.Context, agent *mmv1beta
 	return r.Resources.Update(current, desired, reqLogger)
 }
 
-// checkExternallyProvisionedSecrets verifies Secrets that the agents plugin (not the
-// operator) must create before the agent Deployment can start. Missing secrets are a
-// config/dependency issue — the operator never creates them.
-func (r *AgentReconciler) checkExternallyProvisionedSecrets(ctx context.Context, agent *mmv1beta.Agent) error {
-	required := []string{agent.BotTokenSecretName()}
-
-	if _, keySecretName, ok := agent.GatewayEndpoint(); ok {
-		required = append(required, keySecretName)
+// checkAgentPVC creates the agent storage PVC if configured. PVCs are create-only;
+// size/class changes require manual intervention (PVC specs are mostly immutable).
+func (r *AgentReconciler) checkAgentPVC(ctx context.Context, agent *mmv1beta.Agent, reqLogger logr.Logger) error {
+	if agent.Spec.Storage == nil {
+		return nil
 	}
 
-	for _, name := range required {
+	desired := mattermostApp.GenerateAgentPVC(agent)
+	if err := r.Resources.CreatePvcIfNotExists(agent, desired, reqLogger); err != nil {
+		return errors.Wrap(err, "failed to create agent storage PVC")
+	}
+	return nil
+}
+
+// checkExternallyProvisionedSecrets verifies Secrets that the agents plugin
+// (not the operator) must create before the agent Deployment can start. A
+// missing Secret or missing/empty key is a config issue (errConfigIssue);
+// transient API failures are real errors.
+func (r *AgentReconciler) checkExternallyProvisionedSecrets(ctx context.Context, agent *mmv1beta.Agent) error {
+	type requiredSecret struct{ name, key string }
+
+	required := []requiredSecret{{agent.BotTokenSecretName(), mmv1beta.SecretKeyBotToken}}
+	if _, keySecretName, ok := agent.GatewayEndpoint(); ok {
+		required = append(required, requiredSecret{keySecretName, mmv1beta.SecretKeyAPIKey})
+	}
+
+	for _, req := range required {
 		existing := &corev1.Secret{}
-		err := r.Client.Get(ctx, types.NamespacedName{Name: name, Namespace: agent.Namespace}, existing)
-		if err == nil {
-			continue
-		}
+		err := r.Client.Get(ctx, types.NamespacedName{Name: req.name, Namespace: agent.Namespace}, existing)
 		if k8sErrors.IsNotFound(err) {
-			return fmt.Errorf("required Secret %q not found: it must be provisioned externally (the Mattermost agents plugin creates it); the operator does not manage this secret", name)
+			return errors.Wrapf(errConfigIssue, "required Secret %q not found: it must be provisioned externally (the Mattermost agents plugin creates it); the operator does not manage this secret", req.name)
 		}
-		return errors.Wrapf(err, "failed to check for required secret %q", name)
+		if err != nil {
+			return errors.Wrapf(err, "failed to check for required secret %q", req.name)
+		}
+		if len(existing.Data[req.key]) == 0 {
+			return errors.Wrapf(errConfigIssue, "required Secret %q must contain a non-empty %q key; it is provisioned externally (the Mattermost agents plugin creates it)", req.name, req.key)
+		}
 	}
 
 	return nil
@@ -118,60 +176,4 @@ func (r *AgentReconciler) checkAgentDeployment(ctx context.Context, agent *mmv1b
 	}
 
 	return r.Resources.Update(current, desired, reqLogger)
-}
-
-func (r *AgentReconciler) checkAgentNetworkPolicy(ctx context.Context, agent *mmv1beta.Agent, reqLogger logr.Logger) error {
-	desired := mattermostApp.GenerateAgentNetworkPolicy(agent)
-
-	err := r.Resources.CreateIfNotExists(agent, desired, reqLogger)
-	if err != nil {
-		return errors.Wrap(err, "failed to create agent network policy")
-	}
-
-	current := &networkingv1.NetworkPolicy{}
-	err = r.Client.Get(ctx, types.NamespacedName{Name: desired.Name, Namespace: desired.Namespace}, current)
-	if err != nil {
-		return errors.Wrap(err, "failed to get agent network policy")
-	}
-
-	return r.Resources.Update(current, desired, reqLogger)
-}
-
-// checkAgentPVC creates the agent storage PVC if configured. PVCs are create-only;
-// size/class changes require manual intervention (PVC specs are mostly immutable).
-func (r *AgentReconciler) checkAgentPVC(ctx context.Context, agent *mmv1beta.Agent, reqLogger logr.Logger) error {
-	if agent.Spec.Storage == nil {
-		return nil
-	}
-
-	desired := mattermostApp.GenerateAgentPVC(agent)
-	if err := r.Resources.CreatePvcIfNotExists(agent, desired, reqLogger); err != nil {
-		return errors.Wrap(err, "failed to create agent storage PVC")
-	}
-	return nil
-}
-
-func (r *AgentReconciler) checkAgentHealth(ctx context.Context, agent *mmv1beta.Agent, prior mmv1beta.AgentStatus, reqLogger logr.Logger) (mmv1beta.AgentStatus, error) {
-	status := prior
-	status.State = mmv1beta.Reconciling
-	status.ObservedGeneration = agent.Generation
-	status.Endpoint = mattermostApp.AgentServiceURL(agent)
-
-	deployment := &appsv1.Deployment{}
-	err := r.Client.Get(ctx, types.NamespacedName{
-		Name:      mattermostApp.AgentDeploymentName(agent),
-		Namespace: agent.Namespace,
-	}, deployment)
-	if err != nil {
-		return status, errors.Wrap(err, "failed to get agent deployment for health check")
-	}
-
-	if deployment.Status.ReadyReplicas < 1 {
-		return status, fmt.Errorf("agent deployment has %d ready replicas, need at least 1", deployment.Status.ReadyReplicas)
-	}
-
-	status.State = mmv1beta.Stable
-	status.ReadyReplicas = deployment.Status.ReadyReplicas
-	status.Error = ""
-	return status, nil
 }

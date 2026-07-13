@@ -7,6 +7,7 @@ import (
 	"github.com/go-logr/logr"
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	"github.com/mattermost/mattermost-operator/pkg/resources"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
 	blubr "github.com/mattermost/blubr"
@@ -60,6 +61,7 @@ func setupReconciler(t *testing.T, objs ...runtime.Object) (*AgentReconciler, *r
 	c := fake.NewClientBuilder().
 		WithScheme(s).
 		WithStatusSubresource(&mmv1beta.Agent{}, &appsv1.Deployment{}, &mmv1beta.Mattermost{}).
+		WithIndex(&mmv1beta.Agent{}, mattermostRefNameIndex, indexAgentByMattermostRef).
 		WithRuntimeObjects(clientObjs...).
 		Build()
 
@@ -365,13 +367,13 @@ func TestCheckAgentHealth_CarriesForwardPriorStatus(t *testing.T) {
 	agent := newTestAgent()
 	agent.SetDefaults()
 
-	// Pre-create a ready Deployment so the health check succeeds.
+	// Pre-create a fully rolled-out Deployment so the health check succeeds.
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      agent.Name,
 			Namespace: agent.Namespace,
 		},
-		Status: appsv1.DeploymentStatus{ReadyReplicas: 1, Replicas: 1},
+		Status: appsv1.DeploymentStatus{ReadyReplicas: 1, Replicas: 1, UpdatedReplicas: 1},
 	}
 
 	reconciler, _ := setupReconciler(t, agent, deployment)
@@ -384,11 +386,108 @@ func TestCheckAgentHealth_CarriesForwardPriorStatus(t *testing.T) {
 	status, err := reconciler.checkAgentHealth(context.TODO(), agent, prior, logger)
 	require.NoError(t, err)
 
-	// New fields are set correctly; ObservedGeneration is overwritten from the CR.
+	// New fields are set correctly; ObservedGeneration is untouched (it is
+	// owned by Reconcile, not the health check).
 	assert.Equal(t, mmv1beta.Stable, status.State)
-	assert.Equal(t, agent.Generation, status.ObservedGeneration)
+	assert.Equal(t, int64(7), status.ObservedGeneration)
 	assert.Empty(t, status.Error)
 	assert.Contains(t, status.Endpoint, "http://")
+}
+
+func TestCheckAgentHealth_MidRolloutNotStable(t *testing.T) {
+	for name, deploymentStatus := range map[string]appsv1.DeploymentStatus{
+		// The Deployment controller has not observed the latest spec yet;
+		// ready replicas may belong to the old ReplicaSet.
+		"generation not observed": {ObservedGeneration: 1, ReadyReplicas: 1, Replicas: 1, UpdatedReplicas: 1},
+		// The old ReplicaSet still serves while the new one rolls out.
+		"no updated replicas": {ObservedGeneration: 2, ReadyReplicas: 1, Replicas: 1, UpdatedReplicas: 0},
+		"no ready replicas":   {ObservedGeneration: 2, ReadyReplicas: 0, Replicas: 1, UpdatedReplicas: 1},
+	} {
+		t.Run(name, func(t *testing.T) {
+			agent := newTestAgent()
+			agent.SetDefaults()
+
+			deployment := &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       agent.Name,
+					Namespace:  agent.Namespace,
+					Generation: 2,
+				},
+				Status: deploymentStatus,
+			}
+
+			reconciler, _ := setupReconciler(t, agent, deployment)
+
+			status, err := reconciler.checkAgentHealth(context.TODO(), agent, mmv1beta.AgentStatus{}, testLogger())
+			require.Error(t, err)
+			assert.Equal(t, mmv1beta.Reconciling, status.State)
+		})
+	}
+}
+
+func TestCheckExternallyProvisionedSecrets(t *testing.T) {
+	newExternalAgent := func() *mmv1beta.Agent {
+		agent := newTestAgent()
+		agent.Spec.LLMGateway = &mmv1beta.LLMGatewayConfig{
+			External: &mmv1beta.ExternalLLMGateway{
+				URL:              "http://litellm.external.svc.cluster.local:4000",
+				VirtualKeySecret: "external-key-secret",
+			},
+		}
+		return agent
+	}
+
+	botSecret := func(agent *mmv1beta.Agent, data map[string][]byte) *corev1.Secret {
+		return &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: agent.BotTokenSecretName(), Namespace: agent.Namespace},
+			Data:       data,
+		}
+	}
+
+	t.Run("missing bot token secret is a config issue", func(t *testing.T) {
+		agent := newTestAgent()
+		reconciler, _ := setupReconciler(t, agent)
+
+		err := reconciler.checkExternallyProvisionedSecrets(context.TODO(), agent)
+		require.Error(t, err)
+		assert.True(t, errors.Is(err, errConfigIssue))
+		assert.Contains(t, err.Error(), agent.BotTokenSecretName())
+	})
+
+	t.Run("bot token secret without token key is a config issue", func(t *testing.T) {
+		agent := newTestAgent()
+		reconciler, _ := setupReconciler(t, agent, botSecret(agent, map[string][]byte{"wrong-key": []byte("x")}))
+
+		err := reconciler.checkExternallyProvisionedSecrets(context.TODO(), agent)
+		require.Error(t, err)
+		assert.True(t, errors.Is(err, errConfigIssue))
+		assert.Contains(t, err.Error(), mmv1beta.SecretKeyBotToken)
+	})
+
+	t.Run("virtual key secret without apiKey key is a config issue", func(t *testing.T) {
+		agent := newExternalAgent()
+		keySecret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: "external-key-secret", Namespace: agent.Namespace},
+			Data:       map[string][]byte{mmv1beta.SecretKeyAPIKey: nil},
+		}
+		reconciler, _ := setupReconciler(t, agent, botSecret(agent, map[string][]byte{mmv1beta.SecretKeyBotToken: []byte("tok")}), keySecret)
+
+		err := reconciler.checkExternallyProvisionedSecrets(context.TODO(), agent)
+		require.Error(t, err)
+		assert.True(t, errors.Is(err, errConfigIssue))
+		assert.Contains(t, err.Error(), mmv1beta.SecretKeyAPIKey)
+	})
+
+	t.Run("valid secrets pass", func(t *testing.T) {
+		agent := newExternalAgent()
+		keySecret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: "external-key-secret", Namespace: agent.Namespace},
+			Data:       map[string][]byte{mmv1beta.SecretKeyAPIKey: []byte("sk-key")},
+		}
+		reconciler, _ := setupReconciler(t, agent, botSecret(agent, map[string][]byte{mmv1beta.SecretKeyBotToken: []byte("tok")}), keySecret)
+
+		require.NoError(t, reconciler.checkExternallyProvisionedSecrets(context.TODO(), agent))
+	})
 }
 
 func TestCheckAgentPVC_Creates(t *testing.T) {
