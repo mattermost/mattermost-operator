@@ -2,12 +2,12 @@ package agent
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/go-logr/logr"
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	"github.com/mattermost/mattermost-operator/pkg/resources"
-	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -16,7 +16,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -24,8 +23,6 @@ const (
 	healthCheckRequeueDelay = 6 * time.Second
 	dependencyRequeueDelay  = 15 * time.Second
 	configIssueRequeueDelay = 60 * time.Second
-
-	agentFinalizer = "agent.installation.mattermost.com/finalizer"
 )
 
 // AgentReconciler reconciles an Agent object.
@@ -52,7 +49,6 @@ func (r *AgentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.Service{}).
 		Owns(&corev1.ServiceAccount{}).
 		Owns(&corev1.Secret{}).
-		Owns(&corev1.ConfigMap{}).
 		Owns(&corev1.PersistentVolumeClaim{}).
 		Owns(&networkingv1.NetworkPolicy{}).
 		Complete(r)
@@ -60,10 +56,9 @@ func (r *AgentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 // +kubebuilder:rbac:groups=installation.mattermost.com,resources=agents,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=installation.mattermost.com,resources=agents/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=installation.mattermost.com,resources=agents/finalizers,verbs=update
 // +kubebuilder:rbac:groups=installation.mattermost.com,resources=mattermosts,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups="",resources=services;secrets;serviceaccounts;configmaps;persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="",resources=services;secrets;serviceaccounts;persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=get;list;watch;create;update;patch;delete
 
 func (r *AgentReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
@@ -77,32 +72,6 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, request ctrl.Request) (
 		return reconcile.Result{}, nil
 	} else if err != nil {
 		return reconcile.Result{}, err
-	}
-
-	// Handle finalizer / deletion.
-	if agent.DeletionTimestamp.IsZero() {
-		if agent.HasOperatorManagedGateway() {
-			if !controllerutil.ContainsFinalizer(agent, agentFinalizer) {
-				controllerutil.AddFinalizer(agent, agentFinalizer)
-				if err := r.Update(ctx, agent); err != nil {
-					return reconcile.Result{}, errors.Wrap(err, "failed to add finalizer")
-				}
-				// The Update triggers a watch event that re-fires Reconcile with
-				// the fresh object; no explicit requeue needed.
-				return reconcile.Result{}, nil
-			}
-		}
-	} else {
-		if controllerutil.ContainsFinalizer(agent, agentFinalizer) {
-			if err := r.cleanupLiteLLMIfLast(ctx, agent, reqLogger); err != nil {
-				return reconcile.Result{}, err
-			}
-			controllerutil.RemoveFinalizer(agent, agentFinalizer)
-			if err := r.Update(ctx, agent); err != nil {
-				return reconcile.Result{}, errors.Wrap(err, "failed to remove finalizer")
-			}
-		}
-		return reconcile.Result{}, nil
 	}
 
 	status := agent.Status
@@ -137,29 +106,19 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, request ctrl.Request) (
 		return reconcile.Result{RequeueAfter: dependencyRequeueDelay}, nil
 	}
 
-	// LiteLLM gateway (operator-managed).
+	// LiteLLM gateway readiness (the gateway itself is managed by the
+	// Mattermost controller).
 	if agent.HasOperatorManagedGateway() {
-		if err = r.checkLiteLLMDBCredentials(ctx, agent); err != nil {
-			r.updateStatusReconcilingAndLogError(ctx, agent, status, reqLogger, err)
+		if !mm.OperatorManagedLLMGatewayEnabled() {
+			confErr := fmt.Errorf("agent uses llmGateway.operatorManaged but Mattermost installation %q does not configure spec.agents.llmGateway", mm.Name)
+			r.updateStatusReconcilingAndLogError(ctx, agent, status, reqLogger, confErr)
 			return reconcile.Result{RequeueAfter: configIssueRequeueDelay}, nil
 		}
-		if err = r.checkLiteLLMMasterKey(ctx, agent, reqLogger); err != nil {
-			r.updateStatusReconcilingAndLogError(ctx, agent, status, reqLogger, err)
-			return reconcile.Result{}, err
-		}
-		if err = r.checkLiteLLMDeployment(ctx, agent, reqLogger); err != nil {
-			r.updateStatusReconcilingAndLogError(ctx, agent, status, reqLogger, err)
-			return reconcile.Result{}, err
-		}
-		if err = r.checkLiteLLMService(ctx, agent, reqLogger); err != nil {
-			r.updateStatusReconcilingAndLogError(ctx, agent, status, reqLogger, err)
-			return reconcile.Result{}, err
-		}
 
-		ready, err := r.checkLiteLLMReady(ctx, agent, reqLogger)
-		if err != nil {
-			r.updateStatusReconcilingAndLogError(ctx, agent, status, reqLogger, err)
-			return reconcile.Result{}, err
+		ready, readyErr := r.checkLiteLLMReady(ctx, agent, reqLogger)
+		if readyErr != nil {
+			r.updateStatusReconcilingAndLogError(ctx, agent, status, reqLogger, readyErr)
+			return reconcile.Result{}, readyErr
 		}
 		if !ready {
 			return reconcile.Result{RequeueAfter: dependencyRequeueDelay}, nil

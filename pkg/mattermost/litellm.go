@@ -10,7 +10,6 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -36,25 +35,24 @@ func secretEnvSource(secretName, key string) *corev1.EnvVarSource {
 	}
 }
 
-// GenerateLiteLLMConfigMap returns the ConfigMap for LiteLLM general settings.
-// Models are registered via API.
-func GenerateLiteLLMConfigMap(namespace string) *corev1.ConfigMap {
-	return &corev1.ConfigMap{
+// GenerateLiteLLMMasterKeySecret returns the Secret storing the LiteLLM master key.
+func GenerateLiteLLMMasterKeySecret(namespace, masterKey string) *corev1.Secret {
+	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      mmv1beta.AgentLiteLLMConfigMapName,
+			Name:      mmv1beta.AgentLiteLLMMasterKeySecretName,
 			Namespace: namespace,
 			Labels:    LiteLLMLabels(),
 		},
-		Data: map[string]string{
-			"config.yaml": "general_settings:\n  store_model_in_db: true\n",
-		},
+		Data: map[string][]byte{"masterKey": []byte(masterKey)},
 	}
 }
 
-// GenerateLiteLLMDeployment returns the Deployment for the LiteLLM gateway.
-func GenerateLiteLLMDeployment(namespace, image string) *appsv1.Deployment {
+// GenerateLiteLLMDeployment returns the Deployment for the LiteLLM gateway,
+// configured from mattermost.Spec.Agents.LLMGateway (defaults applied by
+// Mattermost.SetDefaults).
+func GenerateLiteLLMDeployment(mattermost *mmv1beta.Mattermost) *appsv1.Deployment {
 	replicas := int32(1)
-	configVolumeName := "litellm-config"
+	gateway := mattermost.Spec.Agents.LLMGateway
 
 	baseEnv := []corev1.EnvVar{
 		{
@@ -95,14 +93,14 @@ func GenerateLiteLLMDeployment(namespace, image string) *appsv1.Deployment {
 	}
 
 	liteLLMPullPolicy := corev1.PullIfNotPresent
-	if imageTagNeedsAlwaysPull(image) {
+	if imageTagNeedsAlwaysPull(gateway.Image) {
 		liteLLMPullPolicy = corev1.PullAlways
 	}
 
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      mmv1beta.AgentLiteLLMDeploymentName,
-			Namespace: namespace,
+			Namespace: mattermost.Namespace,
 			Labels:    LiteLLMLabels(),
 		},
 		Spec: appsv1.DeploymentSpec{
@@ -118,9 +116,8 @@ func GenerateLiteLLMDeployment(namespace, image string) *appsv1.Deployment {
 					Containers: []corev1.Container{
 						{
 							Name:            "litellm",
-							Image:           image,
+							Image:           gateway.Image,
 							ImagePullPolicy: liteLLMPullPolicy,
-							Args:            []string{"--config", "/app/config/config.yaml"},
 							Env:             baseEnv,
 							Ports: []corev1.ContainerPort{
 								{
@@ -128,37 +125,9 @@ func GenerateLiteLLMDeployment(namespace, image string) *appsv1.Deployment {
 									Name:          "http",
 								},
 							},
-							Resources: corev1.ResourceRequirements{
-								Requests: corev1.ResourceList{
-									corev1.ResourceCPU:    resource.MustParse("500m"),
-									corev1.ResourceMemory: resource.MustParse("512Mi"),
-								},
-								Limits: corev1.ResourceList{
-									corev1.ResourceCPU:    resource.MustParse("2"),
-									corev1.ResourceMemory: resource.MustParse("2Gi"),
-								},
-							},
+							Resources:      gateway.Resources,
 							LivenessProbe:  livenessProbe,
 							ReadinessProbe: readinessProbe,
-							VolumeMounts: []corev1.VolumeMount{
-								{
-									Name:      configVolumeName,
-									MountPath: "/app/config",
-									ReadOnly:  true,
-								},
-							},
-						},
-					},
-					Volumes: []corev1.Volume{
-						{
-							Name: configVolumeName,
-							VolumeSource: corev1.VolumeSource{
-								ConfigMap: &corev1.ConfigMapVolumeSource{
-									LocalObjectReference: corev1.LocalObjectReference{
-										Name: mmv1beta.AgentLiteLLMConfigMapName,
-									},
-								},
-							},
 						},
 					},
 				},
@@ -168,11 +137,11 @@ func GenerateLiteLLMDeployment(namespace, image string) *appsv1.Deployment {
 }
 
 // GenerateLiteLLMService returns the ClusterIP Service for the LiteLLM gateway.
-func GenerateLiteLLMService(namespace string) *corev1.Service {
+func GenerateLiteLLMService(mattermost *mmv1beta.Mattermost) *corev1.Service {
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      mmv1beta.AgentLiteLLMServiceName,
-			Namespace: namespace,
+			Namespace: mattermost.Namespace,
 			Labels:    LiteLLMLabels(),
 		},
 		Spec: corev1.ServiceSpec{

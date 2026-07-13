@@ -109,7 +109,7 @@ _Appears in:_
 | `egressPolicy` _string_ | EgressPolicy controls outbound network access from the agent pod.<br />  - "deny" (default): only Mattermost server, DNS, and LiteLLM gateway<br />  - "allowWeb": additionally permits outbound TCP 80/443 to any destination (port-based; domain-level filtering is future work)<br />  - "allow": permits all outbound traffic |  | Enum: [deny allowWeb allow] <br />Optional: \{\} <br /> |
 | `mattermostRef` _[AgentMattermostRef](#agentmattermostref)_ | MattermostRef is a reference to the Mattermost CR in the same namespace<br />that this agent is associated with. |  |  |
 | `env` _[EnvVar](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#envvar-v1-core) array_ | Env defines optional environment variables to inject into the agent pod. |  | Optional: \{\} <br /> |
-| `llmGateway` _[LLMGatewayConfig](#llmgatewayconfig)_ | LLMGateway configures the LLM gateway for this agent.<br />When OperatorManaged is set, the operator deploys the shared LiteLLM<br />infrastructure only. When External is set, the agent uses an existing<br />LiteLLM instance. |  | Optional: \{\} <br /> |
+| `llmGateway` _[LLMGatewayConfig](#llmgatewayconfig)_ | LLMGateway configures the LLM gateway for this agent.<br />When OperatorManaged is set, the agent uses the LiteLLM gateway managed<br />by the referenced Mattermost installation. When External is set, the<br />agent uses an existing LiteLLM instance. |  | Optional: \{\} <br /> |
 | `storage` _[AgentStorageConfig](#agentstorageconfig)_ | Storage configures optional persistent storage for the agent pod.<br />When set, the operator creates a PVC and mounts it into the agent container. |  | Optional: \{\} <br /> |
 
 
@@ -131,6 +131,23 @@ _Appears in:_
 | `size` _[Quantity](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#quantity-resource-api)_ | Size is the requested PVC storage size (e.g., "1Gi", "500Mi"). |  |  |
 | `storageClassName` _string_ | StorageClassName is the name of the StorageClass to use for the PVC.<br />If omitted, the cluster default StorageClass is used. |  | Optional: \{\} <br /> |
 | `mountPath` _string_ | MountPath is the path inside the container where the volume is mounted.<br />Defaults to "/data". |  | Optional: \{\} <br /> |
+
+
+#### AgentsLLMGateway
+
+
+
+AgentsLLMGateway configures the operator-managed LiteLLM gateway deployment.
+
+
+
+_Appears in:_
+- [MattermostAgents](#mattermostagents)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `image` _string_ | Image is the LiteLLM container image to use.<br />Defaults to "ghcr.io/berriai/litellm-database:main-v1.82.0-stable". |  | Optional: \{\} <br /> |
+| `resources` _[ResourceRequirements](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#resourcerequirements-v1-core)_ | Resources defines the CPU/memory requests and limits for the LiteLLM pod.<br />Defaults to requests of 500m/512Mi and limits of 2/2Gi. |  | Optional: \{\} <br /> |
 
 
 #### Database
@@ -361,7 +378,7 @@ _Appears in:_
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
 | `external` _[ExternalLLMGateway](#externalllmgateway)_ | External configures the agent to use an existing LiteLLM instance. |  | Optional: \{\} <br /> |
-| `operatorManaged` _[OperatorManagedLLMGateway](#operatormanagedllmgateway)_ | OperatorManaged configures the operator to deploy and manage a shared<br />LiteLLM instance in the agent's namespace. |  | Optional: \{\} <br /> |
+| `operatorManaged` _[OperatorManagedGateway](#operatormanagedgateway)_ | OperatorManaged opts this agent into the LiteLLM gateway of the<br />referenced Mattermost installation (spec.agents.llmGateway on the<br />Mattermost CR). The Mattermost agents plugin must create the Secret<br />named "agent-<name>-litellm-key" (key "apiKey") with this agent's<br />virtual key before the agent pod can start. |  | Optional: \{\} <br /> |
 
 
 #### LocalFileStore
@@ -415,6 +432,7 @@ _Appears in:_
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
 | `enabled` _boolean_ | Enabled grants the Mattermost server ServiceAccount the RBAC required<br />to manage Agent CRs and their externally provisioned Secrets (bot<br />tokens, LiteLLM virtual keys). Required for the agents plugin to<br />provision remote agents. Defaults to false. |  | Optional: \{\} <br /> |
+| `llmGateway` _[AgentsLLMGateway](#agentsllmgateway)_ | LLMGateway causes the operator to deploy a LiteLLM gateway<br />(Deployment/Service) in the installation namespace, owned by this<br />Mattermost CR and shared by its agents. Requires a Secret named<br />"mm-agent-litellm-db-credentials" with key "connectionString"<br />containing a PostgreSQL DSN; the operator does not provision this<br />database. Only honored when Enabled is true. |  | Optional: \{\} <br /> |
 
 
 #### MattermostList
@@ -510,30 +528,20 @@ _Appears in:_
 | `version` _string_ | Defines the cluster version for the database to use |  | Optional: \{\} <br /> |
 
 
-#### OperatorManagedLLMGateway
+#### OperatorManagedGateway
 
 
 
-OperatorManagedLLMGateway configures the operator to deploy and manage LiteLLM
-infrastructure only (Deployment/Service/ConfigMap/master-key Secret). Model
-registration and per-agent virtual-key creation are the responsibility of the
-Mattermost agents plugin, which must create the Secret named by
-Agent.LiteLLMKeySecretName() (key "apiKey") before the agent pod can start.
-
-Prerequisite: the namespace MUST contain a Secret named
-"mm-agent-litellm-db-credentials" with key "connectionString" containing a
-PostgreSQL DSN. The operator does not provision this database. The master-key
-Secret ("mm-agent-litellm-master-key") is auto-created if missing.
+OperatorManagedGateway is an empty marker (the `emptyDir: {}` idiom) that
+opts an agent into the installation-level LiteLLM gateway. The gateway
+itself is configured and deployed via spec.agents.llmGateway on the
+referenced Mattermost CR.
 
 
 
 _Appears in:_
 - [LLMGatewayConfig](#llmgatewayconfig)
 
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `image` _string_ | Image is the LiteLLM container image to use.<br />Defaults to "ghcr.io/berriai/litellm-database:main-v1.82.0-stable". |  | Optional: \{\} <br /> |
-| `resources` _[ResourceRequirements](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#resourcerequirements-v1-core)_ | Resources defines the CPU/memory requests and limits for the LiteLLM pod. |  | Optional: \{\} <br /> |
 
 
 #### OperatorManagedMinio

@@ -74,9 +74,9 @@ type AgentSpec struct {
 	Env []corev1.EnvVar `json:"env,omitempty"`
 
 	// LLMGateway configures the LLM gateway for this agent.
-	// When OperatorManaged is set, the operator deploys the shared LiteLLM
-	// infrastructure only. When External is set, the agent uses an existing
-	// LiteLLM instance.
+	// When OperatorManaged is set, the agent uses the LiteLLM gateway managed
+	// by the referenced Mattermost installation. When External is set, the
+	// agent uses an existing LiteLLM instance.
 	// +optional
 	LLMGateway *LLMGatewayConfig `json:"llmGateway,omitempty"`
 
@@ -139,15 +139,19 @@ type AgentList struct {
 }
 
 // LLMGatewayConfig defines how the agent connects to an LLM gateway.
+// +kubebuilder:validation:XValidation:rule="has(self.external) != has(self.operatorManaged)",message="exactly one of external or operatorManaged must be set"
 type LLMGatewayConfig struct {
 	// External configures the agent to use an existing LiteLLM instance.
 	// +optional
 	External *ExternalLLMGateway `json:"external,omitempty"`
 
-	// OperatorManaged configures the operator to deploy and manage a shared
-	// LiteLLM instance in the agent's namespace.
+	// OperatorManaged opts this agent into the LiteLLM gateway of the
+	// referenced Mattermost installation (spec.agents.llmGateway on the
+	// Mattermost CR). The Mattermost agents plugin must create the Secret
+	// named "agent-<name>-litellm-key" (key "apiKey") with this agent's
+	// virtual key before the agent pod can start.
 	// +optional
-	OperatorManaged *OperatorManagedLLMGateway `json:"operatorManaged,omitempty"`
+	OperatorManaged *OperatorManagedGateway `json:"operatorManaged,omitempty"`
 }
 
 // ExternalLLMGateway configures the agent to use an externally managed LiteLLM instance.
@@ -163,26 +167,11 @@ type ExternalLLMGateway struct {
 	VirtualKeySecret string `json:"virtualKeySecret"`
 }
 
-// OperatorManagedLLMGateway configures the operator to deploy and manage LiteLLM
-// infrastructure only (Deployment/Service/ConfigMap/master-key Secret). Model
-// registration and per-agent virtual-key creation are the responsibility of the
-// Mattermost agents plugin, which must create the Secret named by
-// Agent.LiteLLMKeySecretName() (key "apiKey") before the agent pod can start.
-//
-// Prerequisite: the namespace MUST contain a Secret named
-// "mm-agent-litellm-db-credentials" with key "connectionString" containing a
-// PostgreSQL DSN. The operator does not provision this database. The master-key
-// Secret ("mm-agent-litellm-master-key") is auto-created if missing.
-type OperatorManagedLLMGateway struct {
-	// Image is the LiteLLM container image to use.
-	// Defaults to "ghcr.io/berriai/litellm-database:main-v1.82.0-stable".
-	// +optional
-	Image string `json:"image,omitempty"`
-
-	// Resources defines the CPU/memory requests and limits for the LiteLLM pod.
-	// +optional
-	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
-}
+// OperatorManagedGateway is an empty marker (the `emptyDir: {}` idiom) that
+// opts an agent into the installation-level LiteLLM gateway. The gateway
+// itself is configured and deployed via spec.agents.llmGateway on the
+// referenced Mattermost CR.
+type OperatorManagedGateway struct{}
 
 func init() {
 	SchemeBuilder.Register(&Agent{}, &AgentList{})

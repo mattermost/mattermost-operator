@@ -8,30 +8,47 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestGenerateLiteLLMConfigMap(t *testing.T) {
-	cm := GenerateLiteLLMConfigMap("my-namespace")
+// testMattermostWithGateway returns a Mattermost CR with the LiteLLM gateway
+// enabled and defaults applied.
+func testMattermostWithGateway(t *testing.T, name, ns string) *mmv1beta.Mattermost {
+	mm := &mmv1beta.Mattermost{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: ns,
+		},
+		Spec: mmv1beta.MattermostSpec{
+			IngressName: "test.example.com",
+			Agents: &mmv1beta.MattermostAgents{
+				Enabled:    true,
+				LLMGateway: &mmv1beta.AgentsLLMGateway{},
+			},
+		},
+	}
+	require.NoError(t, mm.SetDefaults())
+	return mm
+}
 
-	assert.Equal(t, mmv1beta.AgentLiteLLMConfigMapName, cm.Name)
-	assert.Equal(t, "my-namespace", cm.Namespace)
-	assert.Equal(t, LiteLLMLabels(), cm.Labels)
+func TestGenerateLiteLLMMasterKeySecret(t *testing.T) {
+	secret := GenerateLiteLLMMasterKeySecret("my-namespace", "sk-test-key")
 
-	require.Contains(t, cm.Data, "config.yaml")
-	assert.Contains(t, cm.Data["config.yaml"], "store_model_in_db: true")
-	assert.Contains(t, cm.Data["config.yaml"], "general_settings")
-
-	assert.Empty(t, cm.OwnerReferences)
+	assert.Equal(t, mmv1beta.AgentLiteLLMMasterKeySecretName, secret.Name)
+	assert.Equal(t, "my-namespace", secret.Namespace)
+	assert.Equal(t, LiteLLMLabels(), secret.Labels)
+	assert.Equal(t, []byte("sk-test-key"), secret.Data["masterKey"])
+	assert.Empty(t, secret.OwnerReferences)
 }
 
 func TestGenerateLiteLLMDeployment(t *testing.T) {
-	dep := GenerateLiteLLMDeployment("my-namespace", mmv1beta.AgentLiteLLMDefaultImage)
+	mm := testMattermostWithGateway(t, "mm-test", "my-namespace")
+	dep := GenerateLiteLLMDeployment(mm)
 
 	assert.Equal(t, mmv1beta.AgentLiteLLMDeploymentName, dep.Name)
 	assert.Equal(t, "my-namespace", dep.Namespace)
 	assert.Equal(t, LiteLLMLabels(), dep.Labels)
-
-	assert.Empty(t, dep.OwnerReferences)
 
 	require.NotNil(t, dep.Spec.Replicas)
 	assert.Equal(t, int32(1), *dep.Spec.Replicas)
@@ -43,7 +60,7 @@ func TestGenerateLiteLLMDeployment(t *testing.T) {
 
 	assert.Equal(t, "litellm", c.Name)
 	assert.Equal(t, mmv1beta.AgentLiteLLMDefaultImage, c.Image)
-	assert.Equal(t, []string{"--config", "/app/config/config.yaml"}, c.Args)
+	assert.Empty(t, c.Args)
 
 	envMap := envVarsByName(c.Env)
 
@@ -66,8 +83,11 @@ func TestGenerateLiteLLMDeployment(t *testing.T) {
 	assert.Equal(t, mmv1beta.AgentLiteLLMPort, c.Ports[0].ContainerPort)
 	assert.Equal(t, "http", c.Ports[0].Name)
 
-	assert.NotEmpty(t, c.Resources.Requests)
-	assert.NotEmpty(t, c.Resources.Limits)
+	// Default resources applied by SetDefaults.
+	assert.Equal(t, resource.MustParse("500m"), c.Resources.Requests[corev1.ResourceCPU])
+	assert.Equal(t, resource.MustParse("512Mi"), c.Resources.Requests[corev1.ResourceMemory])
+	assert.Equal(t, resource.MustParse("2"), c.Resources.Limits[corev1.ResourceCPU])
+	assert.Equal(t, resource.MustParse("2Gi"), c.Resources.Limits[corev1.ResourceMemory])
 
 	require.NotNil(t, c.LivenessProbe)
 	require.NotNil(t, c.LivenessProbe.HTTPGet)
@@ -79,26 +99,55 @@ func TestGenerateLiteLLMDeployment(t *testing.T) {
 	assert.Equal(t, "/health/readiness", c.ReadinessProbe.HTTPGet.Path)
 	assert.Equal(t, mmv1beta.AgentLiteLLMPort, c.ReadinessProbe.HTTPGet.Port.IntVal)
 
-	require.Len(t, c.VolumeMounts, 1)
-	assert.Equal(t, "litellm-config", c.VolumeMounts[0].Name)
-	assert.Equal(t, "/app/config", c.VolumeMounts[0].MountPath)
-	assert.True(t, c.VolumeMounts[0].ReadOnly)
+	// The config file/ConfigMap was removed; STORE_MODEL_IN_DB covers it.
+	assert.Empty(t, c.VolumeMounts)
+	assert.Empty(t, dep.Spec.Template.Spec.Volumes)
+}
 
-	require.Len(t, dep.Spec.Template.Spec.Volumes, 1)
-	vol := dep.Spec.Template.Spec.Volumes[0]
-	assert.Equal(t, "litellm-config", vol.Name)
-	require.NotNil(t, vol.ConfigMap)
-	assert.Equal(t, mmv1beta.AgentLiteLLMConfigMapName, vol.ConfigMap.Name)
+func TestGenerateLiteLLMDeployment_CustomImageAndResources(t *testing.T) {
+	mm := testMattermostWithGateway(t, "mm-test", "my-namespace")
+	mm.Spec.Agents.LLMGateway.Image = "ghcr.io/berriai/litellm-database:v1.99.9"
+	mm.Spec.Agents.LLMGateway.Resources = corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("250m"),
+			corev1.ResourceMemory: resource.MustParse("256Mi"),
+		},
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("1"),
+			corev1.ResourceMemory: resource.MustParse("1Gi"),
+		},
+	}
+
+	dep := GenerateLiteLLMDeployment(mm)
+
+	require.Len(t, dep.Spec.Template.Spec.Containers, 1)
+	c := dep.Spec.Template.Spec.Containers[0]
+
+	assert.Equal(t, "ghcr.io/berriai/litellm-database:v1.99.9", c.Image)
+	assert.Equal(t, corev1.PullIfNotPresent, c.ImagePullPolicy)
+	assert.Equal(t, resource.MustParse("250m"), c.Resources.Requests[corev1.ResourceCPU])
+	assert.Equal(t, resource.MustParse("256Mi"), c.Resources.Requests[corev1.ResourceMemory])
+	assert.Equal(t, resource.MustParse("1"), c.Resources.Limits[corev1.ResourceCPU])
+	assert.Equal(t, resource.MustParse("1Gi"), c.Resources.Limits[corev1.ResourceMemory])
+}
+
+func TestGenerateLiteLLMDeployment_MutableTagAlwaysPulls(t *testing.T) {
+	mm := testMattermostWithGateway(t, "mm-test", "my-namespace")
+	mm.Spec.Agents.LLMGateway.Image = "ghcr.io/berriai/litellm-database:latest"
+
+	dep := GenerateLiteLLMDeployment(mm)
+
+	require.Len(t, dep.Spec.Template.Spec.Containers, 1)
+	assert.Equal(t, corev1.PullAlways, dep.Spec.Template.Spec.Containers[0].ImagePullPolicy)
 }
 
 func TestGenerateLiteLLMService(t *testing.T) {
-	svc := GenerateLiteLLMService("my-namespace")
+	mm := testMattermostWithGateway(t, "mm-test", "my-namespace")
+	svc := GenerateLiteLLMService(mm)
 
 	assert.Equal(t, mmv1beta.AgentLiteLLMServiceName, svc.Name)
 	assert.Equal(t, "my-namespace", svc.Namespace)
 	assert.Equal(t, LiteLLMLabels(), svc.Labels)
-
-	assert.Empty(t, svc.OwnerReferences)
 
 	assert.Equal(t, corev1.ServiceTypeClusterIP, svc.Spec.Type)
 	assert.Equal(t, LiteLLMLabels(), svc.Spec.Selector)
@@ -119,9 +168,7 @@ func TestLiteLLMServiceURL(t *testing.T) {
 func TestGenerateAgentDeployment_WithLLMGateway(t *testing.T) {
 	agent := testAgent("my-agent", "my-namespace")
 	agent.Spec.LLMGateway = &mmv1beta.LLMGatewayConfig{
-		OperatorManaged: &mmv1beta.OperatorManagedLLMGateway{
-			Image: mmv1beta.AgentLiteLLMDefaultImage,
-		},
+		OperatorManaged: &mmv1beta.OperatorManagedGateway{},
 	}
 
 	dep := GenerateAgentDeployment(agent)
@@ -207,9 +254,7 @@ func TestGenerateAgentNetworkPolicy_DenyWithLiteLLM(t *testing.T) {
 	agent := testAgent("my-agent", "my-namespace")
 	agent.Spec.EgressPolicy = mmv1beta.AgentEgressPolicyDeny
 	agent.Spec.LLMGateway = &mmv1beta.LLMGatewayConfig{
-		OperatorManaged: &mmv1beta.OperatorManagedLLMGateway{
-			Image: mmv1beta.AgentLiteLLMDefaultImage,
-		},
+		OperatorManaged: &mmv1beta.OperatorManagedGateway{},
 	}
 
 	np := GenerateAgentNetworkPolicy(agent)
@@ -262,9 +307,7 @@ func TestGenerateAgentNetworkPolicy_AllowWebWithLiteLLM(t *testing.T) {
 	agent := testAgent("my-agent", "my-namespace")
 	agent.Spec.EgressPolicy = mmv1beta.AgentEgressPolicyAllowWeb
 	agent.Spec.LLMGateway = &mmv1beta.LLMGatewayConfig{
-		OperatorManaged: &mmv1beta.OperatorManagedLLMGateway{
-			Image: mmv1beta.AgentLiteLLMDefaultImage,
-		},
+		OperatorManaged: &mmv1beta.OperatorManagedGateway{},
 	}
 
 	np := GenerateAgentNetworkPolicy(agent)

@@ -339,6 +339,28 @@ type MattermostAgents struct {
 	// provision remote agents. Defaults to false.
 	// +optional
 	Enabled bool `json:"enabled,omitempty"`
+
+	// LLMGateway causes the operator to deploy a LiteLLM gateway
+	// (Deployment/Service) in the installation namespace, owned by this
+	// Mattermost CR and shared by its agents. Requires a Secret named
+	// "mm-agent-litellm-db-credentials" with key "connectionString"
+	// containing a PostgreSQL DSN; the operator does not provision this
+	// database. Only honored when Enabled is true.
+	// +optional
+	LLMGateway *AgentsLLMGateway `json:"llmGateway,omitempty"`
+}
+
+// AgentsLLMGateway configures the operator-managed LiteLLM gateway deployment.
+type AgentsLLMGateway struct {
+	// Image is the LiteLLM container image to use.
+	// Defaults to "ghcr.io/berriai/litellm-database:main-v1.82.0-stable".
+	// +optional
+	Image string `json:"image,omitempty"`
+
+	// Resources defines the CPU/memory requests and limits for the LiteLLM pod.
+	// Defaults to requests of 500m/512Mi and limits of 2/2Gi.
+	// +optional
+	Resources v1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 // Database defines the database configuration for Mattermost.

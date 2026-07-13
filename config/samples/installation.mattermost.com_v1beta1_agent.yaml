@@ -18,6 +18,20 @@ spec:
   egressPolicy: allowWeb
   mattermostRef:
     name: my-mattermost
+  # Opts into the LiteLLM gateway managed by the referenced Mattermost
+  # installation. The gateway itself is configured on the Mattermost CR:
+  #
+  #   spec:
+  #     agents:
+  #       enabled: true
+  #       llmGateway:
+  #         image: ghcr.io/berriai/litellm-database:main-v1.82.0-stable  # optional
+  #         resources: {}                                                # optional
+  #
+  # and requires a Secret "mm-agent-litellm-db-credentials" (key
+  # "connectionString") with a PostgreSQL DSN in the same namespace.
+  llmGateway:
+    operatorManaged: {}
   env:
     - name: OPENAI_API_KEY
       valueFrom:

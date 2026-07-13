@@ -19,7 +19,6 @@ const (
 	AgentLiteLLMPort                = int32(4000)
 	AgentLiteLLMDeploymentName      = "mm-agent-litellm"
 	AgentLiteLLMServiceName         = "mm-agent-litellm"
-	AgentLiteLLMConfigMapName       = "mm-agent-litellm-config"
 	AgentLiteLLMMasterKeySecretName = "mm-agent-litellm-master-key"
 	AgentLiteLLMDBCredentialsSecret = "mm-agent-litellm-db-credentials"
 	AgentStorageDefaultMountPath    = "/data"
@@ -45,12 +44,6 @@ func (a *Agent) SetDefaults() error {
 		}
 	}
 
-	if a.HasOperatorManagedGateway() {
-		if a.Spec.LLMGateway.OperatorManaged.Image == "" {
-			a.Spec.LLMGateway.OperatorManaged.Image = AgentLiteLLMDefaultImage
-		}
-	}
-
 	if a.Spec.Storage != nil && a.Spec.Storage.MountPath == "" {
 		a.Spec.Storage.MountPath = AgentStorageDefaultMountPath
 	}
@@ -63,7 +56,8 @@ func (a *Agent) HasLLMGateway() bool {
 	return a.Spec.LLMGateway != nil
 }
 
-// HasOperatorManagedGateway reports whether the operator should manage LiteLLM.
+// HasOperatorManagedGateway reports whether the agent opts into the
+// operator-managed LiteLLM gateway of its Mattermost installation.
 func (a *Agent) HasOperatorManagedGateway() bool {
 	return a.Spec.LLMGateway != nil && a.Spec.LLMGateway.OperatorManaged != nil
 }

@@ -8,6 +8,7 @@ import (
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	mattermostApp "github.com/mattermost/mattermost-operator/pkg/mattermost"
 	"github.com/mattermost/mattermost-operator/pkg/resources"
+	"github.com/mattermost/mattermost-operator/pkg/utils"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -44,13 +45,13 @@ func (r *AgentReconciler) checkHookSecret(ctx context.Context, agent *mmv1beta.A
 		return errors.Wrap(err, "failed to check for existing hook secret")
 	}
 
-	secretValue, err := randomHex(32)
+	secretValue, err := utils.RandomHex(32)
 	if err != nil {
 		return errors.Wrap(err, "failed to generate random hook secret")
 	}
 
 	desired := mattermostApp.GenerateAgentHookSecret(agent, secretValue)
-	if err := r.Resources.CreateSecretIfNotExists(agent, desired, reqLogger); err != nil {
+	if err := r.Resources.CreateIfNotExists(agent, desired, reqLogger); err != nil {
 		return errors.Wrap(err, "failed to create hook secret")
 	}
 
@@ -127,7 +128,7 @@ func (r *AgentReconciler) checkAgentDeployment(ctx context.Context, agent *mmv1b
 func (r *AgentReconciler) checkAgentNetworkPolicy(ctx context.Context, agent *mmv1beta.Agent, reqLogger logr.Logger) error {
 	desired := mattermostApp.GenerateAgentNetworkPolicy(agent)
 
-	err := r.Resources.CreateNetworkPolicyIfNotExists(agent, desired, reqLogger)
+	err := r.Resources.CreateIfNotExists(agent, desired, reqLogger)
 	if err != nil {
 		return errors.Wrap(err, "failed to create agent network policy")
 	}

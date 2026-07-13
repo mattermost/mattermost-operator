@@ -11,6 +11,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 const (
@@ -73,11 +74,36 @@ func (mm *Mattermost) SetDefaults() error {
 	mm.Spec.FileStore.SetDefaults()
 	mm.Spec.Database.SetDefaults()
 
+	if mm.Spec.Agents != nil && mm.Spec.Agents.LLMGateway != nil {
+		mm.Spec.Agents.LLMGateway.SetDefaults()
+	}
+
 	if err := validateVolumes(mm.Spec.Volumes); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+// SetDefaults sets missing LiteLLM gateway values to their defaults.
+func (gw *AgentsLLMGateway) SetDefaults() {
+	if gw.Image == "" {
+		gw.Image = AgentLiteLLMDefaultImage
+	}
+
+	if gw.Resources.Requests == nil {
+		gw.Resources.Requests = corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("500m"),
+			corev1.ResourceMemory: resource.MustParse("512Mi"),
+		}
+	}
+
+	if gw.Resources.Limits == nil {
+		gw.Resources.Limits = corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("2"),
+			corev1.ResourceMemory: resource.MustParse("2Gi"),
+		}
+	}
 }
 
 // validateVolumes enforces an allowlist of volume sources. Only the following
@@ -106,6 +132,12 @@ func validateVolumes(volumes []corev1.Volume) error {
 // Mattermost server ServiceAccount.
 func (mm *Mattermost) AgentsEnabled() bool {
 	return mm.Spec.Agents != nil && mm.Spec.Agents.Enabled
+}
+
+// OperatorManagedLLMGatewayEnabled reports whether the operator should deploy
+// the LiteLLM gateway for this installation.
+func (mm *Mattermost) OperatorManagedLLMGatewayEnabled() bool {
+	return mm.AgentsEnabled() && mm.Spec.Agents.LLMGateway != nil
 }
 
 // IngressEnabled determines whether Mattermost Ingress should be created.

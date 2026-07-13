@@ -188,6 +188,14 @@ func (r *MattermostReconciler) Reconcile(ctx context.Context, request ctrl.Reque
 		return reconcile.Result{}, err
 	}
 
+	// Checked after the core server resources so gateway problems never block
+	// the server from coming up.
+	err = r.checkLiteLLM(mattermost, reqLogger)
+	if err != nil {
+		r.updateStatusReconcilingAndLogError(mattermost, status, reqLogger, err)
+		return reconcile.Result{}, err
+	}
+
 	status, err = r.checkMattermostHealth(mattermost, status, reqLogger)
 	if err != nil {
 		statusErr := r.updateStatus(mattermost, status, reqLogger)

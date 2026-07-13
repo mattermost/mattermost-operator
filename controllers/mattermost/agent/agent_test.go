@@ -200,9 +200,7 @@ func TestCheckAgentNetworkPolicy_AllowWeb(t *testing.T) {
 func TestCheckAgentDeployment_WithLLMGateway(t *testing.T) {
 	agent := newTestAgent()
 	agent.Spec.LLMGateway = &mmv1beta.LLMGatewayConfig{
-		OperatorManaged: &mmv1beta.OperatorManagedLLMGateway{
-			Image: mmv1beta.AgentLiteLLMDefaultImage,
-		},
+		OperatorManaged: &mmv1beta.OperatorManagedGateway{},
 	}
 	_ = agent.SetDefaults()
 
@@ -321,9 +319,7 @@ func TestCheckAgentNetworkPolicy_DenyWithLiteLLM(t *testing.T) {
 	agent := newTestAgent()
 	agent.Spec.EgressPolicy = mmv1beta.AgentEgressPolicyDeny
 	agent.Spec.LLMGateway = &mmv1beta.LLMGatewayConfig{
-		OperatorManaged: &mmv1beta.OperatorManagedLLMGateway{
-			Image: mmv1beta.AgentLiteLLMDefaultImage,
-		},
+		OperatorManaged: &mmv1beta.OperatorManagedGateway{},
 	}
 	_ = agent.SetDefaults()
 
@@ -550,9 +546,7 @@ func TestCheckAgentNetworkPolicy_AllowWithLiteLLM(t *testing.T) {
 	agent := newTestAgent()
 	agent.Spec.EgressPolicy = mmv1beta.AgentEgressPolicyAllow
 	agent.Spec.LLMGateway = &mmv1beta.LLMGatewayConfig{
-		OperatorManaged: &mmv1beta.OperatorManagedLLMGateway{
-			Image: mmv1beta.AgentLiteLLMDefaultImage,
-		},
+		OperatorManaged: &mmv1beta.OperatorManagedGateway{},
 	}
 	_ = agent.SetDefaults()
 

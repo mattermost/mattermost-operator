@@ -343,9 +343,7 @@ func TestGenerateAgentNetworkPolicy_AllowWithLiteLLM(t *testing.T) {
 	agent := testAgent("my-agent", "default")
 	agent.Spec.EgressPolicy = mmv1beta.AgentEgressPolicyAllow
 	agent.Spec.LLMGateway = &mmv1beta.LLMGatewayConfig{
-		OperatorManaged: &mmv1beta.OperatorManagedLLMGateway{
-			Image: mmv1beta.AgentLiteLLMDefaultImage,
-		},
+		OperatorManaged: &mmv1beta.OperatorManagedGateway{},
 	}
 
 	np := GenerateAgentNetworkPolicy(agent)

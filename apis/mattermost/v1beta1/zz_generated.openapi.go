@@ -138,7 +138,7 @@ func schema_mattermost_operator_apis_mattermost_v1beta1_AgentSpec(ref common.Ref
 					},
 					"llmGateway": {
 						SchemaProps: spec.SchemaProps{
-							Description: "LLMGateway configures the LLM gateway for this agent. When OperatorManaged is set, the operator deploys the shared LiteLLM infrastructure only. When External is set, the agent uses an existing LiteLLM instance.",
+							Description: "LLMGateway configures the LLM gateway for this agent. When OperatorManaged is set, the agent uses the LiteLLM gateway managed by the referenced Mattermost installation. When External is set, the agent uses an existing LiteLLM instance.",
 							Ref:         ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.LLMGatewayConfig"),
 						},
 					},

@@ -2,6 +2,7 @@ package resources
 
 import (
 	"context"
+	"fmt"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -21,10 +22,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-// LastAppliedConfig is the objectmatcher annotation key used for resource diffs.
-const LastAppliedConfig = "mattermost.com/last-applied"
+const lastAppliedConfig = "mattermost.com/last-applied"
 
-var defaultAnnotator = objectMatcher.NewAnnotator(LastAppliedConfig)
+var defaultAnnotator = objectMatcher.NewAnnotator(lastAppliedConfig)
 
 // Object combines the interfaces that all Kubernetes objects must implement.
 type Object interface {
@@ -193,30 +193,37 @@ func (r *ResourceHelper) CreatePvcIfNotExists(owner v1.Object, pvc *corev1.Persi
 	return nil
 }
 
-func (r *ResourceHelper) CreateNetworkPolicyIfNotExists(owner v1.Object, networkPolicy *networkingv1.NetworkPolicy, reqLogger logr.Logger) error {
-	foundNetworkPolicy := &networkingv1.NetworkPolicy{}
-	err := r.client.Get(context.TODO(), types.NamespacedName{Name: networkPolicy.Name, Namespace: networkPolicy.Namespace}, foundNetworkPolicy)
-	if err != nil && k8sErrors.IsNotFound(err) {
-		reqLogger.Info("Creating network policy", "name", networkPolicy.Name)
-		return r.Create(owner, networkPolicy, reqLogger)
-	} else if err != nil {
-		return errors.Wrap(err, "failed to check if network policy exists")
+// CreateIfNotExists creates desired if no object with the same name/namespace exists.
+// A nil owner creates the resource without a controller reference.
+func (r *ResourceHelper) CreateIfNotExists(owner v1.Object, desired Object, reqLogger logr.Logger) error {
+	found, ok := desired.DeepCopyObject().(Object)
+	if !ok {
+		return errors.Errorf("failed to deep copy %T as a client object", desired)
 	}
 
-	return nil
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: desired.GetName(), Namespace: desired.GetNamespace()}, found)
+	if err == nil {
+		return nil
+	}
+	if !k8sErrors.IsNotFound(err) {
+		return errors.Wrapf(err, "failed to check if %T %s exists", desired, desired.GetName())
+	}
+
+	reqLogger.Info("Creating resource", "kind", fmt.Sprintf("%T", desired), "name", desired.GetName())
+	if owner == nil {
+		return r.createUnowned(desired)
+	}
+	return r.Create(owner, desired, reqLogger)
 }
 
-func (r *ResourceHelper) CreateSecretIfNotExists(owner v1.Object, secret *corev1.Secret, reqLogger logr.Logger) error {
-	foundSecret := &corev1.Secret{}
-	err := r.client.Get(context.TODO(), types.NamespacedName{Name: secret.Name, Namespace: secret.Namespace}, foundSecret)
-	if err != nil && k8sErrors.IsNotFound(err) {
-		reqLogger.Info("Creating secret", "name", secret.Name)
-		return r.Create(owner, secret, reqLogger)
-	} else if err != nil {
-		return errors.Wrap(err, "failed to check if secret exists")
+// createUnowned creates the resource without setting a controller reference.
+func (r *ResourceHelper) createUnowned(desired Object) error {
+	err := defaultAnnotator.SetLastAppliedAnnotation(desired)
+	if err != nil {
+		return errors.Wrap(err, "failed to apply annotation to the resource")
 	}
 
-	return nil
+	return r.client.Create(context.TODO(), desired)
 }
 
 func (r *ResourceHelper) DeleteDeployment(key types.NamespacedName, reqLogger logr.Logger) error {

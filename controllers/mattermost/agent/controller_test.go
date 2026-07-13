@@ -20,7 +20,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -263,41 +262,12 @@ func TestReconcileAgent_WithLLMGateway(t *testing.T) {
 	logf.SetLogger(logger)
 
 	agent := newTestAgent()
-	// No LLMProviders — avoids HTTP calls to in-cluster LiteLLM URL during model registration.
-	// API-level behaviour (model registration, virtual key creation) is covered in litellm_test.go.
 	agent.Spec.LLMGateway = &mmv1beta.LLMGatewayConfig{
-		OperatorManaged: &mmv1beta.OperatorManagedLLMGateway{
-			Image: mmv1beta.AgentLiteLLMDefaultImage,
-		},
+		OperatorManaged: &mmv1beta.OperatorManagedGateway{},
 	}
 	_ = agent.SetDefaults()
 
-	mm := &mmv1beta.Mattermost{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "mm-test",
-			Namespace: "default",
-			UID:       types.UID("mm-uid"),
-		},
-		Status: mmv1beta.MattermostStatus{
-			State: mmv1beta.Stable,
-		},
-	}
-
-	masterKeySecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      mmv1beta.AgentLiteLLMMasterKeySecretName,
-			Namespace: "default",
-		},
-		Data: map[string][]byte{"masterKey": []byte("sk-test-master-key")},
-	}
-
-	dbCredentialsSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      mmv1beta.AgentLiteLLMDBCredentialsSecret,
-			Namespace: "default",
-		},
-		Data: map[string][]byte{"connectionString": []byte("postgres://user:pass@host/db")},
-	}
+	mm := newReadyMattermostWithGateway()
 
 	botTokenSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -319,7 +289,7 @@ func TestReconcileAgent_WithLLMGateway(t *testing.T) {
 	c := fake.NewClientBuilder().
 		WithScheme(s).
 		WithStatusSubresource(&mmv1beta.Agent{}, &appsv1.Deployment{}, &mmv1beta.Mattermost{}).
-		WithRuntimeObjects(agent, mm, masterKeySecret, dbCredentialsSecret, botTokenSecret, litellmKeySecret).
+		WithRuntimeObjects(agent, mm, botTokenSecret, litellmKeySecret).
 		Build()
 
 	r := &AgentReconciler{
@@ -329,7 +299,8 @@ func TestReconcileAgent_WithLLMGateway(t *testing.T) {
 		Resources: resources.NewResourceHelper(c, s),
 	}
 
-	// Pre-create the LiteLLM Deployment with ReadyReplicas=1 so checkLiteLLMReady passes.
+	// Pre-create a ready LiteLLM Deployment (managed by the Mattermost
+	// controller) so checkLiteLLMReady passes.
 	litellmDeploy := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      mmv1beta.AgentLiteLLMDeploymentName,
@@ -354,15 +325,7 @@ func TestReconcileAgent_WithLLMGateway(t *testing.T) {
 
 	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}}
 
-	// First reconcile: adds finalizer and returns; the Update triggers the next reconcile via the watch.
-	_, err = r.Reconcile(context.Background(), req)
-	require.NoError(t, err)
-
-	afterAdd := &mmv1beta.Agent{}
-	require.NoError(t, c.Get(context.TODO(), types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, afterAdd))
-	assert.True(t, controllerutil.ContainsFinalizer(afterAdd, agentFinalizer), "finalizer should be added on first reconcile")
-
-	// Second reconcile: agent Deployment not ready yet → requeue with healthCheckRequeueDelay.
+	// First reconcile: agent Deployment not ready yet → requeue with healthCheckRequeueDelay.
 	res, err := r.Reconcile(context.Background(), req)
 	require.NoError(t, err)
 	assert.Equal(t, 6*time.Second, res.RequeueAfter)
@@ -372,23 +335,6 @@ func TestReconcileAgent_WithLLMGateway(t *testing.T) {
 	err = c.Get(context.TODO(), types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, agentAfterFirstReconcile)
 	require.NoError(t, err)
 	assert.Equal(t, mmv1beta.Reconciling, agentAfterFirstReconcile.Status.State)
-
-	// Verify LiteLLM ConfigMap was created (shared resource, no OwnerReference).
-	litellmCM := &corev1.ConfigMap{}
-	err = c.Get(context.TODO(), types.NamespacedName{
-		Name:      mmv1beta.AgentLiteLLMConfigMapName,
-		Namespace: agent.Namespace,
-	}, litellmCM)
-	require.NoError(t, err, "LiteLLM ConfigMap should be created by reconcile")
-
-	// Verify LiteLLM Service was created.
-	litellmSvc := &corev1.Service{}
-	err = c.Get(context.TODO(), types.NamespacedName{
-		Name:      mmv1beta.AgentLiteLLMServiceName,
-		Namespace: agent.Namespace,
-	}, litellmSvc)
-	require.NoError(t, err, "LiteLLM Service should be created by reconcile")
-	assert.Equal(t, "mm-agent-litellm", litellmSvc.Labels["app"])
 
 	// Verify agent Deployment was created with LiteLLM env vars.
 	agentDeploy := &appsv1.Deployment{}
@@ -424,16 +370,6 @@ func TestReconcileAgent_WithLLMGateway(t *testing.T) {
 	assert.Contains(t, hookSecret.Data, "hookSecret")
 }
 
-// newFinalizerTestAgent builds an Agent CR with the supplied name and an optional
-// LLMGateway override for use in finalizer-focused tests.
-func newFinalizerTestAgent(name string, gateway *mmv1beta.LLMGatewayConfig) *mmv1beta.Agent {
-	a := newTestAgent()
-	a.Name = name
-	a.UID = types.UID(name + "-uid")
-	a.Spec.LLMGateway = gateway
-	return a
-}
-
 func newReadyMattermost() *mmv1beta.Mattermost {
 	return &mmv1beta.Mattermost{
 		ObjectMeta: metav1.ObjectMeta{
@@ -445,247 +381,87 @@ func newReadyMattermost() *mmv1beta.Mattermost {
 	}
 }
 
-func TestFinalizer_AddedForOperatorManaged(t *testing.T) {
+// newReadyMattermostWithGateway returns a stable Mattermost with the
+// operator-managed LiteLLM gateway configured.
+func newReadyMattermostWithGateway() *mmv1beta.Mattermost {
+	mm := newReadyMattermost()
+	mm.Spec.Agents = &mmv1beta.MattermostAgents{
+		Enabled:    true,
+		LLMGateway: &mmv1beta.AgentsLLMGateway{},
+	}
+	return mm
+}
+
+func TestReconcileAgent_OperatorManagedGatesOnLiteLLMReadiness(t *testing.T) {
 	logger := testLogger()
 	logf.SetLogger(logger)
 
-	agent := newFinalizerTestAgent("finalizer-agent", &mmv1beta.LLMGatewayConfig{
-		OperatorManaged: &mmv1beta.OperatorManagedLLMGateway{
-			Image: mmv1beta.AgentLiteLLMDefaultImage,
+	agent := newTestAgent()
+	agent.Spec.LLMGateway = &mmv1beta.LLMGatewayConfig{
+		OperatorManaged: &mmv1beta.OperatorManagedGateway{},
+	}
+	_ = agent.SetDefaults()
+
+	// LiteLLM Deployment exists but has no ready replicas.
+	litellmDeploy := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      mmv1beta.AgentLiteLLMDeploymentName,
+			Namespace: agent.Namespace,
 		},
-	})
+		Status: appsv1.DeploymentStatus{ReadyReplicas: 0},
+	}
 
 	s := setupScheme(t)
 	c := fake.NewClientBuilder().
 		WithScheme(s).
-		WithStatusSubresource(&mmv1beta.Agent{}).
-		WithRuntimeObjects(agent, newReadyMattermost()).
+		WithStatusSubresource(&mmv1beta.Agent{}, &appsv1.Deployment{}, &mmv1beta.Mattermost{}).
+		WithRuntimeObjects(agent, newReadyMattermostWithGateway(), litellmDeploy).
 		Build()
 
 	r := &AgentReconciler{Client: c, Log: logger, Scheme: s, Resources: resources.NewResourceHelper(c, s)}
 
 	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}}
-	_, err := r.Reconcile(context.Background(), req)
+	res, err := r.Reconcile(context.Background(), req)
 	require.NoError(t, err)
+	assert.Equal(t, 15*time.Second, res.RequeueAfter)
 
-	updated := &mmv1beta.Agent{}
-	require.NoError(t, c.Get(context.TODO(), req.NamespacedName, updated))
-	assert.Contains(t, updated.Finalizers, agentFinalizer)
+	// No agent resources until the gateway is ready.
+	deploy := &appsv1.Deployment{}
+	err = c.Get(context.TODO(), types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}, deploy)
+	require.True(t, k8sErrors.IsNotFound(err), "agent Deployment must not be created before LiteLLM is ready")
 }
 
-func TestFinalizer_NotAddedForExternal(t *testing.T) {
+func TestReconcileAgent_OperatorManagedWithoutInstallationGateway(t *testing.T) {
 	logger := testLogger()
 	logf.SetLogger(logger)
 
-	agent := newFinalizerTestAgent("external-agent", &mmv1beta.LLMGatewayConfig{
-		External: &mmv1beta.ExternalLLMGateway{
-			URL:              "http://litellm.external.svc.cluster.local:4000",
-			VirtualKeySecret: "my-external-key-secret",
-		},
-	})
+	agent := newTestAgent()
+	agent.Spec.LLMGateway = &mmv1beta.LLMGatewayConfig{
+		OperatorManaged: &mmv1beta.OperatorManagedGateway{},
+	}
+	_ = agent.SetDefaults()
 
-	botSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      agent.BotTokenSecretName(),
-			Namespace: agent.Namespace,
-		},
-		Data: map[string][]byte{"token": []byte("bot-token")},
-	}
-	virtualKeySecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "my-external-key-secret",
-			Namespace: agent.Namespace,
-		},
-		Data: map[string][]byte{"key": []byte("sk-external-key")},
-	}
+	// Mattermost is stable but does not configure spec.agents.llmGateway.
+	mm := newReadyMattermost()
 
 	s := setupScheme(t)
 	c := fake.NewClientBuilder().
 		WithScheme(s).
-		WithStatusSubresource(&mmv1beta.Agent{}, &appsv1.Deployment{}).
-		WithRuntimeObjects(agent, newReadyMattermost(), botSecret, virtualKeySecret).
+		WithStatusSubresource(&mmv1beta.Agent{}, &appsv1.Deployment{}, &mmv1beta.Mattermost{}).
+		WithRuntimeObjects(agent, mm).
 		Build()
 
 	r := &AgentReconciler{Client: c, Log: logger, Scheme: s, Resources: resources.NewResourceHelper(c, s)}
 
 	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}}
-	_, err := r.Reconcile(context.Background(), req)
-	require.NoError(t, err)
+	res, err := r.Reconcile(context.Background(), req)
+	require.NoError(t, err, "config issue must not error-loop")
+	assert.Equal(t, 60*time.Second, res.RequeueAfter)
 
 	updated := &mmv1beta.Agent{}
 	require.NoError(t, c.Get(context.TODO(), req.NamespacedName, updated))
-	assert.NotContains(t, updated.Finalizers, agentFinalizer)
-}
-
-func TestFinalizer_CleanupTearsDownLiteLLMWhenLast(t *testing.T) {
-	logger := testLogger()
-	logf.SetLogger(logger)
-
-	agent := newFinalizerTestAgent("last-agent", &mmv1beta.LLMGatewayConfig{
-		OperatorManaged: &mmv1beta.OperatorManagedLLMGateway{
-			Image: mmv1beta.AgentLiteLLMDefaultImage,
-		},
-	})
-
-	botSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      agent.BotTokenSecretName(),
-			Namespace: agent.Namespace,
-		},
-		Data: map[string][]byte{"token": []byte("bot-token")},
-	}
-
-	masterKey := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      mmv1beta.AgentLiteLLMMasterKeySecretName,
-			Namespace: agent.Namespace,
-		},
-		Data: map[string][]byte{"masterKey": []byte("sk-test-master-key")},
-	}
-	dbCreds := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      mmv1beta.AgentLiteLLMDBCredentialsSecret,
-			Namespace: agent.Namespace,
-		},
-		Data: map[string][]byte{"connectionString": []byte("postgres://user:pass@host/db")},
-	}
-
-	s := setupScheme(t)
-	c := fake.NewClientBuilder().
-		WithScheme(s).
-		WithStatusSubresource(&mmv1beta.Agent{}, &appsv1.Deployment{}).
-		WithRuntimeObjects(agent, newReadyMattermost(), botSecret, masterKey, dbCreds).
-		Build()
-
-	r := &AgentReconciler{Client: c, Log: logger, Scheme: s, Resources: resources.NewResourceHelper(c, s)}
-
-	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}}
-
-	// Reconcile twice: add finalizer, then create LiteLLM resources.
-	_, err := r.Reconcile(context.Background(), req)
-	require.NoError(t, err)
-	_, err = r.Reconcile(context.Background(), req)
-	require.NoError(t, err)
-
-	// Verify LiteLLM Deployment exists before deletion.
-	litellmDeploy := &appsv1.Deployment{}
-	err = c.Get(context.TODO(), types.NamespacedName{
-		Name:      mmv1beta.AgentLiteLLMDeploymentName,
-		Namespace: agent.Namespace,
-	}, litellmDeploy)
-	require.NoError(t, err, "LiteLLM Deployment should exist before deletion")
-
-	// Mark agent for deletion. Because the finalizer is set, Delete is non-blocking and
-	// the fake client populates DeletionTimestamp instead of removing the object.
-	updated := &mmv1beta.Agent{}
-	require.NoError(t, c.Get(context.TODO(), req.NamespacedName, updated))
-	require.NoError(t, c.Delete(context.TODO(), updated))
-
-	// Reconcile to run cleanup.
-	_, err = r.Reconcile(context.Background(), req)
-	require.NoError(t, err)
-
-	// LiteLLM Deployment should be gone.
-	err = c.Get(context.TODO(), types.NamespacedName{
-		Name:      mmv1beta.AgentLiteLLMDeploymentName,
-		Namespace: agent.Namespace,
-	}, litellmDeploy)
-	assert.True(t, k8sErrors.IsNotFound(err), "LiteLLM Deployment should be removed; got err=%v", err)
-
-	// Master-key Secret should be retained (DB outlives teardown).
-	retainedMasterKey := &corev1.Secret{}
-	err = c.Get(context.TODO(), types.NamespacedName{
-		Name:      mmv1beta.AgentLiteLLMMasterKeySecretName,
-		Namespace: agent.Namespace,
-	}, retainedMasterKey)
-	require.NoError(t, err, "LiteLLM master-key Secret should be retained")
-	assert.Equal(t, []byte("sk-test-master-key"), retainedMasterKey.Data["masterKey"])
-
-	// Agent should have its finalizer removed (and may already be gone).
-	finalAgent := &mmv1beta.Agent{}
-	err = c.Get(context.TODO(), req.NamespacedName, finalAgent)
-	if err == nil {
-		assert.NotContains(t, finalAgent.Finalizers, agentFinalizer)
-	} else {
-		assert.True(t, k8sErrors.IsNotFound(err))
-	}
-}
-
-func TestFinalizer_CleanupLeavesLiteLLMWhenSiblingsExist(t *testing.T) {
-	logger := testLogger()
-	logf.SetLogger(logger)
-
-	agentA := newFinalizerTestAgent("agent-a", &mmv1beta.LLMGatewayConfig{
-		OperatorManaged: &mmv1beta.OperatorManagedLLMGateway{
-			Image: mmv1beta.AgentLiteLLMDefaultImage,
-		},
-	})
-	agentB := newFinalizerTestAgent("agent-b", &mmv1beta.LLMGatewayConfig{
-		OperatorManaged: &mmv1beta.OperatorManagedLLMGateway{
-			Image: mmv1beta.AgentLiteLLMDefaultImage,
-		},
-	})
-
-	botSecretA := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Name: agentA.BotTokenSecretName(), Namespace: agentA.Namespace},
-		Data:       map[string][]byte{"token": []byte("bot-token-a")},
-	}
-	botSecretB := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Name: agentB.BotTokenSecretName(), Namespace: agentB.Namespace},
-		Data:       map[string][]byte{"token": []byte("bot-token-b")},
-	}
-	masterKey := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Name: mmv1beta.AgentLiteLLMMasterKeySecretName, Namespace: agentA.Namespace},
-		Data:       map[string][]byte{"masterKey": []byte("sk-test-master-key")},
-	}
-	dbCreds := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Name: mmv1beta.AgentLiteLLMDBCredentialsSecret, Namespace: agentA.Namespace},
-		Data:       map[string][]byte{"connectionString": []byte("postgres://user:pass@host/db")},
-	}
-
-	s := setupScheme(t)
-	c := fake.NewClientBuilder().
-		WithScheme(s).
-		WithStatusSubresource(&mmv1beta.Agent{}, &appsv1.Deployment{}).
-		WithRuntimeObjects(agentA, agentB, newReadyMattermost(), botSecretA, botSecretB, masterKey, dbCreds).
-		Build()
-
-	r := &AgentReconciler{Client: c, Log: logger, Scheme: s, Resources: resources.NewResourceHelper(c, s)}
-
-	reqA := reconcile.Request{NamespacedName: types.NamespacedName{Name: agentA.Name, Namespace: agentA.Namespace}}
-	reqB := reconcile.Request{NamespacedName: types.NamespacedName{Name: agentB.Name, Namespace: agentB.Namespace}}
-
-	// Reconcile both to add finalizers and provision LiteLLM.
-	_, err := r.Reconcile(context.Background(), reqA)
-	require.NoError(t, err)
-	_, err = r.Reconcile(context.Background(), reqA)
-	require.NoError(t, err)
-	_, err = r.Reconcile(context.Background(), reqB)
-	require.NoError(t, err)
-	_, err = r.Reconcile(context.Background(), reqB)
-	require.NoError(t, err)
-
-	// Mark agentA for deletion. Finalizer keeps the object alive while DeletionTimestamp is set.
-	updatedA := &mmv1beta.Agent{}
-	require.NoError(t, c.Get(context.TODO(), reqA.NamespacedName, updatedA))
-	require.NoError(t, c.Delete(context.TODO(), updatedA))
-
-	// Reconcile agentA — cleanup should NOT delete LiteLLM because agentB still exists.
-	_, err = r.Reconcile(context.Background(), reqA)
-	require.NoError(t, err)
-
-	// LiteLLM Deployment should still exist.
-	litellmDeploy := &appsv1.Deployment{}
-	err = c.Get(context.TODO(), types.NamespacedName{
-		Name:      mmv1beta.AgentLiteLLMDeploymentName,
-		Namespace: agentA.Namespace,
-	}, litellmDeploy)
-	require.NoError(t, err, "LiteLLM Deployment should remain because agent-b is a sibling")
-
-	// agent-b should still have its finalizer.
-	finalB := &mmv1beta.Agent{}
-	require.NoError(t, c.Get(context.TODO(), reqB.NamespacedName, finalB))
-	assert.Contains(t, finalB.Finalizers, agentFinalizer)
+	assert.Equal(t, mmv1beta.Reconciling, updated.Status.State)
+	assert.Contains(t, updated.Status.Error, "spec.agents.llmGateway")
 }
 
 func TestReconcileAgent_MissingBotTokenSecret(t *testing.T) {
@@ -731,9 +507,7 @@ func TestReconcileAgent_MissingLiteLLMKeySecret_OperatorManaged(t *testing.T) {
 
 	agent := newTestAgent()
 	agent.Spec.LLMGateway = &mmv1beta.LLMGatewayConfig{
-		OperatorManaged: &mmv1beta.OperatorManagedLLMGateway{
-			Image: mmv1beta.AgentLiteLLMDefaultImage,
-		},
+		OperatorManaged: &mmv1beta.OperatorManagedGateway{},
 	}
 	_ = agent.SetDefaults()
 
@@ -744,26 +518,21 @@ func TestReconcileAgent_MissingLiteLLMKeySecret_OperatorManaged(t *testing.T) {
 		},
 		Data: map[string][]byte{"token": []byte("bot-secret-token")},
 	}
-	dbCredentialsSecret := &corev1.Secret{
+
+	// Pre-create a ready LiteLLM Deployment (managed by the Mattermost controller).
+	litellmDeploy := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      mmv1beta.AgentLiteLLMDBCredentialsSecret,
+			Name:      mmv1beta.AgentLiteLLMDeploymentName,
 			Namespace: agent.Namespace,
 		},
-		Data: map[string][]byte{"connectionString": []byte("postgres://user:pass@host/db")},
-	}
-	masterKeySecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      mmv1beta.AgentLiteLLMMasterKeySecretName,
-			Namespace: agent.Namespace,
-		},
-		Data: map[string][]byte{"masterKey": []byte("sk-test-master-key")},
+		Status: appsv1.DeploymentStatus{ReadyReplicas: 1, Replicas: 1},
 	}
 
 	s := setupScheme(t)
 	c := fake.NewClientBuilder().
 		WithScheme(s).
 		WithStatusSubresource(&mmv1beta.Agent{}, &appsv1.Deployment{}, &mmv1beta.Mattermost{}).
-		WithRuntimeObjects(agent, newReadyMattermost(), botTokenSecret, dbCredentialsSecret, masterKeySecret).
+		WithRuntimeObjects(agent, newReadyMattermostWithGateway(), botTokenSecret, litellmDeploy).
 		Build()
 
 	r := &AgentReconciler{
@@ -773,33 +542,9 @@ func TestReconcileAgent_MissingLiteLLMKeySecret_OperatorManaged(t *testing.T) {
 		Resources: resources.NewResourceHelper(c, s),
 	}
 
-	litellmDeploy := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      mmv1beta.AgentLiteLLMDeploymentName,
-			Namespace: agent.Namespace,
-		},
-		Spec: appsv1.DeploymentSpec{
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{"app": "mm-agent-litellm"},
-			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "mm-agent-litellm"}},
-				Spec:       corev1.PodSpec{Containers: []corev1.Container{{Name: "litellm", Image: mmv1beta.AgentLiteLLMDefaultImage}}},
-			},
-		},
-		Status: appsv1.DeploymentStatus{ReadyReplicas: 1, Replicas: 1},
-	}
-	require.NoError(t, c.Create(context.TODO(), litellmDeploy))
-	litellmDeploy.Status.ReadyReplicas = 1
-	require.NoError(t, c.Status().Update(context.TODO(), litellmDeploy))
-
 	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: agent.Name, Namespace: agent.Namespace}}
 
-	// First reconcile adds the finalizer.
-	_, err := r.Reconcile(context.Background(), req)
-	require.NoError(t, err)
-
-	// Second reconcile: LiteLLM ready, but virtual-key secret missing.
+	// LiteLLM ready, but virtual-key secret missing.
 	res, err := r.Reconcile(context.Background(), req)
 	require.NoError(t, err)
 	assert.Equal(t, 60*time.Second, res.RequeueAfter)
