@@ -164,6 +164,7 @@ type OperatorManagedGateway struct{}
 // +kubebuilder:printcolumn:priority=0,name="Image",type=string,JSONPath=".spec.image",description="Image of Agent"
 // +kubebuilder:printcolumn:priority=0,name="Endpoint",type=string,JSONPath=".status.endpoint",description="HTTP Endpoint"
 // +kubebuilder:validation:XValidation:rule="self.metadata.name != self.spec.mattermostRef.name",message="agent name must differ from the referenced Mattermost installation name"
+// +kubebuilder:validation:XValidation:rule="self.metadata.name.matches('^[a-z]([-a-z0-9]{0,61}[a-z0-9])?$')",message="agent name must be a valid RFC 1035 DNS label: at most 63 lowercase alphanumeric or '-' characters, starting with a letter and ending alphanumeric"
 type Agent struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
