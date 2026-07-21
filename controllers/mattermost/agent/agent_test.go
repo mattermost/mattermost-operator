@@ -245,6 +245,20 @@ func TestCheckAgentHealth_PreservesObservedGeneration(t *testing.T) {
 	assert.Contains(t, status.Endpoint, agent.Name)
 }
 
+func TestCheckAgentHealth_MissingDeploymentResetsReadyReplicas(t *testing.T) {
+	agent := newTestAgent()
+	agent.SetDefaults()
+	reconciler := setupReconciler(t, agent)
+
+	status, err := reconciler.checkAgentHealth(
+		context.Background(), agent, mmv1beta.AgentStatus{ReadyReplicas: 3}, reconciler.Log,
+	)
+	require.Error(t, err)
+	assert.Equal(t, mmv1beta.Reconciling, status.State)
+	assert.Equal(t, int32(0), status.ReadyReplicas,
+		"a stale count must not survive a failed deployment lookup")
+}
+
 func TestCheckAgentHealth_MidRolloutNotStable(t *testing.T) {
 	tests := []struct {
 		name   string

@@ -9,6 +9,7 @@ import (
 	mattermostApp "github.com/mattermost/mattermost-operator/pkg/mattermost"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -26,6 +27,11 @@ func (r *AgentReconciler) checkAgentHealth(ctx context.Context, agent *mmv1beta.
 		Namespace: agent.Namespace,
 	}, deployment)
 	if err != nil {
+		// The deployment is gone, so don't carry over a stale count. Other
+		// errors (e.g. API blips) keep the prior count rather than misreport 0.
+		if k8sErrors.IsNotFound(err) {
+			status.ReadyReplicas = 0
+		}
 		return status, errors.Wrap(err, "failed to get agent deployment for health check")
 	}
 
