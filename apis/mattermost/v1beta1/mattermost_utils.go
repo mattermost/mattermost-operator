@@ -94,14 +94,13 @@ func (gw *AgentsLLMGateway) SetDefaults() {
 		gw.Image = AgentLiteLLMDefaultImage
 	}
 
-	if gw.Resources.Requests == nil {
+	// Only default when the user set neither, so a partial spec (e.g. only
+	// Limits) never gets defaults injected that violate Requests <= Limits.
+	if gw.Resources.Requests == nil && gw.Resources.Limits == nil {
 		gw.Resources.Requests = corev1.ResourceList{
 			corev1.ResourceCPU:    resource.MustParse("500m"),
 			corev1.ResourceMemory: resource.MustParse("512Mi"),
 		}
-	}
-
-	if gw.Resources.Limits == nil {
 		gw.Resources.Limits = corev1.ResourceList{
 			corev1.ResourceCPU:    resource.MustParse("2"),
 			corev1.ResourceMemory: resource.MustParse("2Gi"),
