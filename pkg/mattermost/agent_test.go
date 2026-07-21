@@ -167,6 +167,20 @@ func TestGenerateAgentDeployment(t *testing.T) {
 	assert.Len(t, volumes, 1)
 	assert.Equal(t, "bot-token", volumes[0].Name)
 	assert.Equal(t, agent.BotTokenSecretName(), volumes[0].Secret.SecretName)
+
+	podSC := dep.Spec.Template.Spec.SecurityContext
+	require.NotNil(t, podSC)
+	require.NotNil(t, podSC.RunAsNonRoot)
+	assert.True(t, *podSC.RunAsNonRoot)
+	require.NotNil(t, podSC.SeccompProfile)
+	assert.Equal(t, corev1.SeccompProfileTypeRuntimeDefault, podSC.SeccompProfile.Type)
+
+	containerSC := c.SecurityContext
+	require.NotNil(t, containerSC)
+	require.NotNil(t, containerSC.AllowPrivilegeEscalation)
+	assert.False(t, *containerSC.AllowPrivilegeEscalation)
+	require.NotNil(t, containerSC.Capabilities)
+	assert.Equal(t, []corev1.Capability{"ALL"}, containerSC.Capabilities.Drop)
 }
 
 func TestGenerateAgentDeployment_CustomEnvVars(t *testing.T) {

@@ -181,6 +181,9 @@ func GenerateAgentDeployment(agent *mmv1beta.Agent) *appsv1.Deployment {
 		pullPolicy = corev1.PullAlways
 	}
 
+	runAsNonRoot := true
+	allowPrivilegeEscalation := false
+
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            AgentDeploymentName(agent),
@@ -199,6 +202,12 @@ func GenerateAgentDeployment(agent *mmv1beta.Agent) *appsv1.Deployment {
 				},
 				Spec: corev1.PodSpec{
 					ServiceAccountName: agent.Name,
+					SecurityContext: &corev1.PodSecurityContext{
+						RunAsNonRoot: &runAsNonRoot,
+						SeccompProfile: &corev1.SeccompProfile{
+							Type: corev1.SeccompProfileTypeRuntimeDefault,
+						},
+					},
 					Containers: []corev1.Container{
 						{
 							Name:            mmv1beta.AgentContainerName,
@@ -223,6 +232,12 @@ func GenerateAgentDeployment(agent *mmv1beta.Agent) *appsv1.Deployment {
 							},
 							Resources:    agent.Spec.Resources,
 							VolumeMounts: volumeMounts,
+							SecurityContext: &corev1.SecurityContext{
+								AllowPrivilegeEscalation: &allowPrivilegeEscalation,
+								Capabilities: &corev1.Capabilities{
+									Drop: []corev1.Capability{"ALL"},
+								},
+							},
 						},
 					},
 					Volumes: volumes,
