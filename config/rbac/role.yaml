@@ -119,3 +119,19 @@ rules:
       - update
       - patch
       - delete
+  # Optional: manage ServiceMonitors when spec.monitoring.serviceMonitor is enabled.
+  # The Prometheus Operator CRDs are an optional cluster dependency; the operator
+  # skips gracefully when they are absent.
+  - apiGroups:
+      - monitoring.coreos.com
+    resources:
+      - servicemonitors
+      - prometheusrules
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete

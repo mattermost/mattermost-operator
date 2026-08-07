@@ -63,9 +63,13 @@ func (r *MattermostReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrency
 		For(&mmv1beta.Mattermost{}).
 		Owns(&corev1.Service{}).
 		Owns(&corev1.Secret{}).
+		Owns(&corev1.ConfigMap{}).
 		Owns(&networkingv1.Ingress{}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&batchv1.Job{}).
+		// NOTE: ServiceMonitor is intentionally NOT added to Owns(). A watch on a
+		// type whose CRD is absent would fail the manager at startup; the Prometheus
+		// Operator CRDs are an optional dependency. GC still works via owner references.
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: maxConcurrency,
 		}).

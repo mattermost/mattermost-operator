@@ -61,6 +61,21 @@ func (r *MattermostReconciler) checkMattermost(
 		}
 	}
 
+	err = r.checkMattermostServiceMonitor(mattermost, reqLogger)
+	if err != nil {
+		return reconcileStatus{}, err
+	}
+
+	err = r.checkMattermostGrafanaDashboard(mattermost, reqLogger)
+	if err != nil {
+		return reconcileStatus{}, err
+	}
+
+	err = r.checkMattermostPrometheusRule(mattermost, reqLogger)
+	if err != nil {
+		return reconcileStatus{}, err
+	}
+
 	return r.checkMattermostDeployment(mattermost, dbInfo, fsConfig, status, reqLogger)
 }
 

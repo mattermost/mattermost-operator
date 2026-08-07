@@ -676,6 +676,81 @@ spec:
                   - name
                   type: object
                 type: array
+              monitoring:
+                description: |-
+                  Monitoring defines optional Prometheus/Grafana integration resources for
+                  this installation. Each capability is gated by its own flag.
+                properties:
+                  grafanaDashboard:
+                    description: |-
+                      GrafanaDashboard configures a ConfigMap holding Mattermost's Grafana
+                      dashboards, labelled for discovery by the Grafana dashboard sidecar.
+                    properties:
+                      discoveryLabel:
+                        description: |-
+                          DiscoveryLabel is the label key the Grafana dashboard sidecar selects on.
+                          Defaults to "grafana_dashboard" when empty.
+                        type: string
+                      discoveryLabelValue:
+                        description: |-
+                          DiscoveryLabelValue is the label value the sidecar matches.
+                          Defaults to "1" when empty.
+                        type: string
+                      enabled:
+                        description: Enabled determines whether the Operator should
+                          create the dashboard ConfigMap.
+                        type: boolean
+                    required:
+                    - enabled
+                    type: object
+                  prometheusRule:
+                    description: |-
+                      PrometheusRule configures a Prometheus Operator PrometheusRule holding
+                      Mattermost's alerting/recording rules. Same optional-CRD behaviour as
+                      ServiceMonitor: skipped with a logged warning when the Prometheus Operator
+                      CRDs are absent.
+                    properties:
+                      enabled:
+                        description: Enabled determines whether the Operator should
+                          create the PrometheusRule.
+                        type: boolean
+                      labels:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          Labels are added to the PrometheusRule so the cluster's Prometheus
+                          ruleSelector can be made to match it.
+                        type: object
+                    required:
+                    - enabled
+                    type: object
+                  serviceMonitor:
+                    description: |-
+                      ServiceMonitor configures a Prometheus Operator ServiceMonitor pointed at
+                      the Mattermost metrics endpoint. Requires the Prometheus Operator CRDs to
+                      be installed in the cluster; if they are absent the Operator logs a warning
+                      and skips creation rather than failing.
+                    properties:
+                      enabled:
+                        description: Enabled determines whether the Operator should
+                          create the ServiceMonitor.
+                        type: boolean
+                      interval:
+                        description: |-
+                          Interval at which Prometheus scrapes the metrics endpoint (e.g. "30s").
+                          Defaults to "30s" when empty.
+                        type: string
+                      labels:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          Labels are added to the ServiceMonitor so the cluster's Prometheus
+                          serviceMonitorSelector can be made to match it.
+                        type: object
+                    required:
+                    - enabled
+                    type: object
+                type: object
               podExtensions:
                 description: |-
                   PodExtensions specify custom extensions for Mattermost pods.

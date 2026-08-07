@@ -1,0 +1,18 @@
+# STARTER rules — intentionally minimal and conservative. Alert thresholds encode
+# opinions and usually need per-environment tuning, so treat this as a starting
+# point, not a complete alerting package. Drop additional *.yaml files in this
+# directory (each a `groups:` document) and they are embedded and merged.
+groups:
+  - name: mattermost.rules
+    rules:
+      - alert: MattermostServerDown
+        # Fires when the Mattermost metrics target has been unscrapable for 5m.
+        # Requires MetricsSettings.Enable=true + an Enterprise license so the
+        # /metrics endpoint (port 8067) is actually served.
+        expr: up{job="mattermost"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Mattermost server is down"
+          description: "The Mattermost metrics endpoint has been unreachable for more than 5 minutes."

@@ -1,0 +1,21 @@
+{
+  "__comment": "PLACEHOLDER dashboard — replace with the real Mattermost dashboard JSON. Drop additional *.json files in this directory and they are embedded and shipped automatically (one ConfigMap data key per file).",
+  "title": "Mattermost Overview (placeholder)",
+  "schemaVersion": 39,
+  "editable": true,
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Placeholder — replace with real panels",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "up{job=\"mattermost\"}",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" }
+}
