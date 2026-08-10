@@ -164,13 +164,12 @@ type Patch struct {
 	Patch   string `json:"patch,omitempty"`
 }
 
-// Monitoring defines optional Prometheus/Grafana integration resources.
+// Monitoring defines optional Prometheus integration resources.
 //
 // All resources are created in the Mattermost namespace and are consumed by an
-// external observability stack (the access direction is Grafana -> Mattermost):
-// Prometheus scrapes the ServiceMonitor target and Grafana's dashboard sidecar
-// reads the dashboard ConfigMap. The Operator never writes into the Grafana /
-// monitoring namespace.
+// external observability stack (the access direction is Prometheus -> Mattermost):
+// Prometheus scrapes the ServiceMonitor target and loads the PrometheusRule via
+// its ruleSelector. The Operator never writes into the monitoring namespace.
 type Monitoring struct {
 	// ServiceMonitor configures a Prometheus Operator ServiceMonitor pointed at
 	// the Mattermost metrics endpoint. Requires the Prometheus Operator CRDs to
@@ -179,17 +178,26 @@ type Monitoring struct {
 	// +optional
 	ServiceMonitor *ServiceMonitor `json:"serviceMonitor,omitempty"`
 
-	// GrafanaDashboard configures a ConfigMap holding Mattermost's Grafana
-	// dashboards, labelled for discovery by the Grafana dashboard sidecar.
-	// +optional
-	GrafanaDashboard *GrafanaDashboard `json:"grafanaDashboard,omitempty"`
-
 	// PrometheusRule configures a Prometheus Operator PrometheusRule holding
 	// Mattermost's alerting/recording rules. Same optional-CRD behaviour as
 	// ServiceMonitor: skipped with a logged warning when the Prometheus Operator
 	// CRDs are absent.
 	// +optional
 	PrometheusRule *PrometheusRule `json:"prometheusRule,omitempty"`
+
+	// ClientMetrics controls whether client/RUM and notification performance
+	// metrics are exported on the same /metrics endpoint. These already default
+	// to on in the Mattermost server; this flag makes the choice explicit and
+	// lets an operator turn them off. Requires an Enterprise license to be served.
+	// +optional
+	ClientMetrics *ClientMetrics `json:"clientMetrics,omitempty"`
+
+	// CallsMetrics configures an additional ServiceMonitor targeting an rtcd
+	// (Calls real-time daemon) Service that the user runs alongside Mattermost.
+	// rtcd is not deployed by this Operator, so the rtcd Service selector must be
+	// supplied here.
+	// +optional
+	CallsMetrics *CallsMetrics `json:"callsMetrics,omitempty"`
 }
 
 // ServiceMonitor gates and configures the Prometheus Operator ServiceMonitor.
@@ -208,20 +216,35 @@ type ServiceMonitor struct {
 	Labels map[string]string `json:"labels,omitempty"`
 }
 
-// GrafanaDashboard gates and configures the Grafana dashboard ConfigMap.
-type GrafanaDashboard struct {
-	// Enabled determines whether the Operator should create the dashboard ConfigMap.
+// ClientMetrics gates client/RUM and notification performance metrics.
+//
+// These ride the same /metrics endpoint (port 8067) as the server metrics and
+// default to on in the Mattermost server. The flag exists so an operator can
+// opt out; it does not add a scrape target.
+type ClientMetrics struct {
+	// Enabled toggles MM_METRICSSETTINGS_ENABLECLIENTMETRICS and
+	// MM_METRICSSETTINGS_ENABLENOTIFICATIONMETRICS. Defaults to true to match the
+	// Mattermost server default.
+	Enabled bool `json:"enabled"`
+}
+
+// CallsMetrics gates a second ServiceMonitor targeting an rtcd Service.
+//
+// rtcd (the Calls real-time daemon) exposes Prometheus metrics on its own
+// endpoint (default :8045/metrics) and is deployed separately from Mattermost,
+// so the user must point the Operator at the rtcd Service via RtcdServiceSelector.
+type CallsMetrics struct {
+	// Enabled determines whether the Operator should create the rtcd ServiceMonitor.
 	Enabled bool `json:"enabled"`
 
-	// DiscoveryLabel is the label key the Grafana dashboard sidecar selects on.
-	// Defaults to "grafana_dashboard" when empty.
+	// RtcdServiceSelector are the labels identifying the rtcd Service to scrape.
+	// Required when Enabled is true.
 	// +optional
-	DiscoveryLabel string `json:"discoveryLabel,omitempty"`
+	RtcdServiceSelector map[string]string `json:"rtcdServiceSelector,omitempty"`
 
-	// DiscoveryLabelValue is the label value the sidecar matches.
-	// Defaults to "1" when empty.
+	// Port is the rtcd metrics port name or number. Defaults to "8045" when empty.
 	// +optional
-	DiscoveryLabelValue string `json:"discoveryLabelValue,omitempty"`
+	Port string `json:"port,omitempty"`
 }
 
 // PrometheusRule gates and configures the Prometheus Operator PrometheusRule.

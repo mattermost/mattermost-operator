@@ -65,46 +65,45 @@ func TestGenerateServiceMonitorV1Beta(t *testing.T) {
 	})
 }
 
-func TestGenerateGrafanaDashboardConfigMapV1Beta(t *testing.T) {
-	t.Run("defaults discovery label and ships embedded dashboards", func(t *testing.T) {
+func TestGenerateRtcdServiceMonitorV1Beta(t *testing.T) {
+	t.Run("nil when no rtcd selector provided", func(t *testing.T) {
 		mm := newMattermostWithMonitoring(&mmv1beta.Monitoring{
-			GrafanaDashboard: &mmv1beta.GrafanaDashboard{Enabled: true},
+			CallsMetrics: &mmv1beta.CallsMetrics{Enabled: true},
 		})
-
-		cm, err := GenerateGrafanaDashboardConfigMapV1Beta(mm)
-		require.NoError(t, err)
-		require.NotNil(t, cm)
-
-		assert.Equal(t, "test-mm-grafana-dashboards", cm.Name)
-		assert.Equal(t, "mattermost", cm.Namespace)
-		require.Len(t, cm.OwnerReferences, 1)
-		assert.Equal(t, "Mattermost", cm.OwnerReferences[0].Kind)
-
-		// The sidecar discovery label must be present with the default value.
-		assert.Equal(t, defaultDashboardDiscoveryLabelValue, cm.Labels[defaultDashboardDiscoveryLabel])
-
-		// At least the placeholder dashboard is embedded and shipped.
-		require.NotEmpty(t, cm.Data)
-		assert.Contains(t, cm.Data, "mattermost-overview.json")
+		assert.Nil(t, GenerateRtcdServiceMonitorV1Beta(mm))
 	})
 
-	t.Run("honors custom discovery label", func(t *testing.T) {
+	t.Run("numeric port becomes targetPort and defaults to 8045", func(t *testing.T) {
 		mm := newMattermostWithMonitoring(&mmv1beta.Monitoring{
-			GrafanaDashboard: &mmv1beta.GrafanaDashboard{
+			CallsMetrics: &mmv1beta.CallsMetrics{
 				Enabled:             true,
-				DiscoveryLabel:      "grafana_dashboard_custom",
-				DiscoveryLabelValue: "yes",
+				RtcdServiceSelector: map[string]string{"app": "rtcd"},
 			},
 		})
 
-		cm, err := GenerateGrafanaDashboardConfigMapV1Beta(mm)
-		require.NoError(t, err)
-		require.NotNil(t, cm)
+		sm := GenerateRtcdServiceMonitorV1Beta(mm)
+		require.NotNil(t, sm)
+		assert.Equal(t, "test-mm-rtcd", sm.Name)
+		assert.Equal(t, map[string]string{"app": "rtcd"}, sm.Spec.Selector.MatchLabels)
+		require.Len(t, sm.Spec.Endpoints, 1)
+		require.NotNil(t, sm.Spec.Endpoints[0].TargetPort)
+		assert.Equal(t, int32(8045), sm.Spec.Endpoints[0].TargetPort.IntVal)
+		assert.Equal(t, metricsPath, sm.Spec.Endpoints[0].Path)
+	})
 
-		assert.Equal(t, "yes", cm.Labels["grafana_dashboard_custom"])
-		// Default discovery label should not be set when overridden.
-		_, hasDefault := cm.Labels[defaultDashboardDiscoveryLabel]
-		assert.False(t, hasDefault)
+	t.Run("named port becomes Port", func(t *testing.T) {
+		mm := newMattermostWithMonitoring(&mmv1beta.Monitoring{
+			CallsMetrics: &mmv1beta.CallsMetrics{
+				Enabled:             true,
+				RtcdServiceSelector: map[string]string{"app": "rtcd"},
+				Port:                "metrics",
+			},
+		})
+
+		sm := GenerateRtcdServiceMonitorV1Beta(mm)
+		require.NotNil(t, sm)
+		assert.Equal(t, "metrics", sm.Spec.Endpoints[0].Port)
+		assert.Nil(t, sm.Spec.Endpoints[0].TargetPort)
 	})
 }
 
@@ -126,6 +125,22 @@ func TestGeneratePrometheusRuleV1Beta(t *testing.T) {
 		// The embedded starter rules must parse into at least one group/rule.
 		require.NotEmpty(t, pr.Spec.Groups)
 		assert.NotEmpty(t, pr.Spec.Groups[0].Rules)
+
+		// Per-instance placeholders must be substituted so alerts scope to this
+		// installation's pods (never left as raw tokens or static IPs/CIDR).
+		var sawServerDown bool
+		for _, g := range pr.Spec.Groups {
+			for _, rule := range g.Rules {
+				expr := rule.Expr.String()
+				assert.NotContains(t, expr, "__", "placeholder token left unsubstituted: %s", expr)
+				if rule.Alert == "MattermostServerDown" {
+					sawServerDown = true
+					assert.Contains(t, expr, `namespace="mattermost"`)
+					assert.Contains(t, expr, `service="test-mm"`)
+				}
+			}
+		}
+		assert.True(t, sawServerDown, "expected MattermostServerDown alert")
 	})
 
 	t.Run("honors extra labels for ruleSelector matching", func(t *testing.T) {

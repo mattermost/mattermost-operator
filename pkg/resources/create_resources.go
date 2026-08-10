@@ -128,19 +128,6 @@ func (r *ResourceHelper) CreateServiceIfNotExists(owner v1.Object, service *core
 	return nil
 }
 
-func (r *ResourceHelper) CreateConfigMapIfNotExists(owner v1.Object, configMap *corev1.ConfigMap, reqLogger logr.Logger) error {
-	foundConfigMap := &corev1.ConfigMap{}
-	err := r.client.Get(context.TODO(), types.NamespacedName{Name: configMap.Name, Namespace: configMap.Namespace}, foundConfigMap)
-	if err != nil && k8sErrors.IsNotFound(err) {
-		reqLogger.Info("Creating config map", "name", configMap.Name)
-		return r.Create(owner, configMap, reqLogger)
-	} else if err != nil {
-		return errors.Wrap(err, "failed to check if config map exists")
-	}
-
-	return nil
-}
-
 // CreateServiceMonitorIfNotExists creates a Prometheus Operator ServiceMonitor.
 // The Prometheus Operator CRDs are an optional cluster dependency: if they are
 // not installed the API has no matching kind, which we treat as a logged no-op
