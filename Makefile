@@ -108,6 +108,9 @@ KUSTOMIZE_VER := v4.5.7
 KUSTOMIZE_BIN := kustomize
 KUSTOMIZE := $(TOOLS_BIN_DIR)/$(KUSTOMIZE_BIN)
 
+SETUP_ENVTEST_BIN := setup-envtest
+SETUP_ENVTEST := $(TOOLS_BIN_DIR)/$(SETUP_ENVTEST_BIN)
+
 ## --------------------------------------
 ## Rules
 ## --------------------------------------
@@ -121,6 +124,17 @@ unittest: ## Runs unit tests
 
 e2e-local:
 	./test/e2e_local.sh
+
+# Fast local validation with envtest (a real apiserver+etcd from binaries — no
+# Docker). Covers CRD CEL validation and the monitoring reconcile create/delete
+# lifecycle. Downloads the apiserver binaries on first run.
+ENVTEST_K8S_VERSION ?= 1.31.0
+test-envtest: $(SETUP_ENVTEST)
+	KUBEBUILDER_ASSETS="$$($(SETUP_ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(TOOLS_BIN_DIR)/envtest -p path)" \
+		$(GO) test -tags envtest ./test/envtest/... ./controllers/mattermost/mattermost/... -run 'CEL|Monitoring' -v
+
+$(SETUP_ENVTEST): ## Install setup-envtest
+	GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) sigs.k8s.io/controller-runtime/tools/setup-envtest setup-envtest latest
 
 goverall: $(GOVERALLS_GEN) ## Runs goveralls
 	$(GOVERALLS_GEN) -coverprofile=coverage.out -service=circle-ci -repotoken ${COVERALLS_REPO_TOKEN} || true
