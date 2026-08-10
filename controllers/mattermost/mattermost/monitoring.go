@@ -10,6 +10,7 @@ import (
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	mattermostApp "github.com/mattermost/mattermost-operator/pkg/mattermost"
@@ -38,7 +39,72 @@ func (r *MattermostReconciler) checkMattermostMonitoring(mattermost *mmv1beta.Ma
 	if err := r.checkMattermostRtcdServiceMonitor(mattermost, reqLogger); err != nil {
 		return err
 	}
-	return r.checkMattermostPrometheusRule(mattermost, reqLogger)
+	if err := r.checkMattermostPrometheusRule(mattermost, reqLogger); err != nil {
+		return err
+	}
+	return r.checkMattermostGrafanaDashboard(mattermost, reqLogger)
+}
+
+// checkMattermostGrafanaDashboard reconciles one ConfigMap per embedded Grafana
+// dashboard, labelled for discovery by the Grafana dashboard sidecar. When the
+// flag is off every owned dashboard ConfigMap is deleted; when on, ConfigMaps no
+// longer in the embedded set are pruned (e.g. a dashboard was removed/renamed).
+func (r *MattermostReconciler) checkMattermostGrafanaDashboard(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) error {
+	existing := &corev1.ConfigMapList{}
+	if err := r.Client.List(context.TODO(), existing,
+		client.InNamespace(mattermost.Namespace),
+		client.MatchingLabels(mattermostApp.DashboardConfigMapSelector(mattermost)),
+	); err != nil {
+		return errors.Wrap(err, "failed to list grafana dashboard config maps")
+	}
+
+	if !grafanaDashboardEnabled(mattermost) {
+		return r.deleteConfigMaps(existing.Items, reqLogger)
+	}
+
+	desired, err := mattermostApp.GenerateGrafanaDashboardConfigMapsV1Beta(mattermost)
+	if err != nil {
+		return errors.Wrap(err, "failed to generate grafana dashboard config maps")
+	}
+
+	desiredNames := make(map[string]bool, len(desired))
+	for _, cm := range desired {
+		desiredNames[cm.Name] = true
+
+		if err = r.Resources.CreateConfigMapIfNotExists(mattermost, cm, reqLogger); err != nil {
+			return err
+		}
+
+		current := &corev1.ConfigMap{}
+		if err = r.Client.Get(context.TODO(), types.NamespacedName{Name: cm.Name, Namespace: cm.Namespace}, current); err != nil {
+			return errors.Wrap(err, "failed to fetch current grafana dashboard config map")
+		}
+
+		if err = r.Resources.Update(current, cm, reqLogger); err != nil {
+			return err
+		}
+	}
+
+	// Prune dashboard ConfigMaps we own that are no longer in the embedded set.
+	stale := existing.Items[:0]
+	for i := range existing.Items {
+		if !desiredNames[existing.Items[i].Name] {
+			stale = append(stale, existing.Items[i])
+		}
+	}
+	return r.deleteConfigMaps(stale, reqLogger)
+}
+
+// deleteConfigMaps deletes the given ConfigMaps, ignoring already-gone ones.
+func (r *MattermostReconciler) deleteConfigMaps(items []corev1.ConfigMap, reqLogger logr.Logger) error {
+	for i := range items {
+		cm := &items[i]
+		reqLogger.Info("Deleting grafana dashboard config map", "name", cm.Name)
+		if err := r.Client.Delete(context.TODO(), cm); err != nil && !k8sErrors.IsNotFound(err) {
+			return errors.Wrap(err, "failed to delete grafana dashboard config map")
+		}
+	}
+	return nil
 }
 
 // checkMattermostServiceMonitor reconciles the dedicated metrics Service and the
@@ -176,6 +242,12 @@ func prometheusRuleEnabled(mattermost *mmv1beta.Mattermost) bool {
 	return mattermost.Spec.Monitoring != nil &&
 		mattermost.Spec.Monitoring.PrometheusRule != nil &&
 		mattermost.Spec.Monitoring.PrometheusRule.Enabled
+}
+
+func grafanaDashboardEnabled(mattermost *mmv1beta.Mattermost) bool {
+	return mattermost.Spec.Monitoring != nil &&
+		mattermost.Spec.Monitoring.GrafanaDashboard != nil &&
+		mattermost.Spec.Monitoring.GrafanaDashboard.Enabled
 }
 
 func callsMetricsEnabled(mattermost *mmv1beta.Mattermost) bool {

@@ -733,6 +733,29 @@ spec:
                           Mattermost server defaults (both on); set explicitly to override.
                         type: boolean
                     type: object
+                  grafanaDashboard:
+                    description: |-
+                      GrafanaDashboard configures ConfigMaps holding Mattermost's Grafana
+                      dashboards (one ConfigMap per dashboard), labelled for discovery by the
+                      Grafana dashboard sidecar.
+                    properties:
+                      discoveryLabel:
+                        description: |-
+                          DiscoveryLabel is the label key the Grafana dashboard sidecar selects on.
+                          Defaults to "grafana_dashboard" when empty.
+                        type: string
+                      discoveryLabelValue:
+                        description: |-
+                          DiscoveryLabelValue is the label value the sidecar matches.
+                          Defaults to "1" when empty.
+                        type: string
+                      enabled:
+                        description: Enabled determines whether the Operator should
+                          create the dashboard ConfigMaps.
+                        type: boolean
+                    required:
+                    - enabled
+                    type: object
                   prometheusRule:
                     description: |-
                       PrometheusRule configures a Prometheus Operator PrometheusRule holding

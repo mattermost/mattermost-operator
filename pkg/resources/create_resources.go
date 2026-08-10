@@ -173,6 +173,19 @@ func (r *ResourceHelper) CreatePrometheusRuleIfNotExists(owner v1.Object, promet
 	return errors.Wrap(err, "failed to check if prometheus rule exists")
 }
 
+func (r *ResourceHelper) CreateConfigMapIfNotExists(owner v1.Object, configMap *corev1.ConfigMap, reqLogger logr.Logger) error {
+	foundConfigMap := &corev1.ConfigMap{}
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: configMap.Name, Namespace: configMap.Namespace}, foundConfigMap)
+	if err != nil && k8sErrors.IsNotFound(err) {
+		reqLogger.Info("Creating config map", "name", configMap.Name)
+		return r.Create(owner, configMap, reqLogger)
+	} else if err != nil {
+		return errors.Wrap(err, "failed to check if config map exists")
+	}
+
+	return nil
+}
+
 // DeleteServiceMonitor deletes a ServiceMonitor if present. An absent Prometheus
 // Operator CRD (NoMatch) or an already-gone object are treated as no-ops, so
 // disabling monitoring is safe whether or not the CRDs are installed.

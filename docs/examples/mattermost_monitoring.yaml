@@ -39,8 +39,18 @@ spec:
       labels:
         release: kube-prometheus-stack
 
+    # Ships the Mattermost Grafana dashboards as ConfigMaps (one per dashboard),
+    # labelled for pickup by the Grafana dashboard sidecar. Dashboards are
+    # pod-scoped: pick a namespace + pod (server), not a raw instance IP.
+    grafanaDashboard:
+      enabled: true
+      # discoveryLabel: grafana_dashboard   # override the sidecar label if needed
+      # discoveryLabelValue: "1"
+
     # Client/RUM + notification performance metrics ride the same /metrics
-    # endpoint and default to on in the server. Set enabled: false to opt out.
+    # endpoint and default to on in the server. Omit this block to keep the
+    # server defaults; set enabled: false to explicitly opt out.
+    # Required for the web/mobile/desktop dashboards to have data.
     clientMetrics:
       enabled: true
 

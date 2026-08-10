@@ -185,6 +185,12 @@ type Monitoring struct {
 	// +optional
 	PrometheusRule *PrometheusRule `json:"prometheusRule,omitempty"`
 
+	// GrafanaDashboard configures ConfigMaps holding Mattermost's Grafana
+	// dashboards (one ConfigMap per dashboard), labelled for discovery by the
+	// Grafana dashboard sidecar.
+	// +optional
+	GrafanaDashboard *GrafanaDashboard `json:"grafanaDashboard,omitempty"`
+
 	// ClientMetrics controls whether client/RUM and notification performance
 	// metrics are exported on the same /metrics endpoint. These already default
 	// to on in the Mattermost server; this flag makes the choice explicit and
@@ -214,6 +220,27 @@ type ServiceMonitor struct {
 	// serviceMonitorSelector can be made to match it.
 	// +optional
 	Labels map[string]string `json:"labels,omitempty"`
+}
+
+// GrafanaDashboard gates and configures the Grafana dashboard ConfigMaps.
+//
+// The Operator ships one ConfigMap per embedded dashboard (keeping each object
+// well under the 1MB ConfigMap limit and matching the Grafana sidecar's
+// one-file-per-ConfigMap convention). Each carries the discovery label the
+// sidecar watches for.
+type GrafanaDashboard struct {
+	// Enabled determines whether the Operator should create the dashboard ConfigMaps.
+	Enabled bool `json:"enabled"`
+
+	// DiscoveryLabel is the label key the Grafana dashboard sidecar selects on.
+	// Defaults to "grafana_dashboard" when empty.
+	// +optional
+	DiscoveryLabel string `json:"discoveryLabel,omitempty"`
+
+	// DiscoveryLabelValue is the label value the sidecar matches.
+	// Defaults to "1" when empty.
+	// +optional
+	DiscoveryLabelValue string `json:"discoveryLabelValue,omitempty"`
 }
 
 // ClientMetrics gates client/RUM and notification performance metrics.

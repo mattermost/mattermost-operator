@@ -66,6 +66,49 @@ func TestGenerateServiceMonitorV1Beta(t *testing.T) {
 	})
 }
 
+func TestGenerateGrafanaDashboardConfigMapsV1Beta(t *testing.T) {
+	t.Run("one ConfigMap per embedded dashboard, discovery + prune labels, under 1MB", func(t *testing.T) {
+		mm := newMattermostWithMonitoring(&mmv1beta.Monitoring{
+			GrafanaDashboard: &mmv1beta.GrafanaDashboard{Enabled: true},
+		})
+
+		cms, err := GenerateGrafanaDashboardConfigMapsV1Beta(mm)
+		require.NoError(t, err)
+		require.NotEmpty(t, cms)
+
+		for _, cm := range cms {
+			assert.Equal(t, "mattermost", cm.Namespace)
+			require.Len(t, cm.OwnerReferences, 1)
+			assert.Equal(t, defaultDashboardDiscoveryLabelValue, cm.Labels[defaultDashboardDiscoveryLabel])
+			assert.Equal(t, "test-mm", cm.Labels[dashboardConfigMapLabel])
+			require.Len(t, cm.Data, 1)
+			assert.Contains(t, cm.Name, "test-mm-grafana-")
+			var size int
+			for _, v := range cm.Data {
+				size += len(v)
+			}
+			assert.Less(t, size, 1024*1024)
+		}
+	})
+
+	t.Run("honors custom discovery label", func(t *testing.T) {
+		mm := newMattermostWithMonitoring(&mmv1beta.Monitoring{
+			GrafanaDashboard: &mmv1beta.GrafanaDashboard{
+				Enabled:             true,
+				DiscoveryLabel:      "grafana_dashboard_custom",
+				DiscoveryLabelValue: "yes",
+			},
+		})
+
+		cms, err := GenerateGrafanaDashboardConfigMapsV1Beta(mm)
+		require.NoError(t, err)
+		require.NotEmpty(t, cms)
+		assert.Equal(t, "yes", cms[0].Labels["grafana_dashboard_custom"])
+		_, hasDefault := cms[0].Labels[defaultDashboardDiscoveryLabel]
+		assert.False(t, hasDefault)
+	})
+}
+
 func TestGenerateMetricsServiceV1Beta(t *testing.T) {
 	mm := newMattermostWithMonitoring(&mmv1beta.Monitoring{
 		ServiceMonitor: &mmv1beta.ServiceMonitor{Enabled: true},
