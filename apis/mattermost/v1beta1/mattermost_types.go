@@ -223,9 +223,10 @@ type ServiceMonitor struct {
 // opt out; it does not add a scrape target.
 type ClientMetrics struct {
 	// Enabled toggles MM_METRICSSETTINGS_ENABLECLIENTMETRICS and
-	// MM_METRICSSETTINGS_ENABLENOTIFICATIONMETRICS. Defaults to true to match the
-	// Mattermost server default.
-	Enabled bool `json:"enabled"`
+	// MM_METRICSSETTINGS_ENABLENOTIFICATIONMETRICS. Leave unset to keep the
+	// Mattermost server defaults (both on); set explicitly to override.
+	// +optional
+	Enabled *bool `json:"enabled,omitempty"`
 }
 
 // CallsMetrics gates a second ServiceMonitor targeting an rtcd Service.
@@ -233,6 +234,7 @@ type ClientMetrics struct {
 // rtcd (the Calls real-time daemon) exposes Prometheus metrics on its own
 // endpoint (default :8045/metrics) and is deployed separately from Mattermost,
 // so the user must point the Operator at the rtcd Service via RtcdServiceSelector.
+// +kubebuilder:validation:XValidation:rule="!self.enabled || (has(self.rtcdServiceSelector) && size(self.rtcdServiceSelector) > 0)",message="rtcdServiceSelector is required when callsMetrics.enabled is true"
 type CallsMetrics struct {
 	// Enabled determines whether the Operator should create the rtcd ServiceMonitor.
 	Enabled bool `json:"enabled"`
@@ -245,6 +247,12 @@ type CallsMetrics struct {
 	// Port is the rtcd metrics port name or number. Defaults to "8045" when empty.
 	// +optional
 	Port string `json:"port,omitempty"`
+
+	// Labels are added to the rtcd ServiceMonitor so the cluster's Prometheus
+	// serviceMonitorSelector can match it. Falls back to the serviceMonitor
+	// labels when empty; set at least one of them or Prometheus will ignore it.
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
 }
 
 // PrometheusRule gates and configures the Prometheus Operator PrometheusRule.

@@ -692,6 +692,14 @@ spec:
                         description: Enabled determines whether the Operator should
                           create the rtcd ServiceMonitor.
                         type: boolean
+                      labels:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          Labels are added to the rtcd ServiceMonitor so the cluster's Prometheus
+                          serviceMonitorSelector can match it. Falls back to the serviceMonitor
+                          labels when empty; set at least one of them or Prometheus will ignore it.
+                        type: object
                       port:
                         description: Port is the rtcd metrics port name or number.
                           Defaults to "8045" when empty.
@@ -706,6 +714,11 @@ spec:
                     required:
                     - enabled
                     type: object
+                    x-kubernetes-validations:
+                    - message: rtcdServiceSelector is required when callsMetrics.enabled
+                        is true
+                      rule: '!self.enabled || (has(self.rtcdServiceSelector) && size(self.rtcdServiceSelector)
+                        > 0)'
                   clientMetrics:
                     description: |-
                       ClientMetrics controls whether client/RUM and notification performance
@@ -716,11 +729,9 @@ spec:
                       enabled:
                         description: |-
                           Enabled toggles MM_METRICSSETTINGS_ENABLECLIENTMETRICS and
-                          MM_METRICSSETTINGS_ENABLENOTIFICATIONMETRICS. Defaults to true to match the
-                          Mattermost server default.
+                          MM_METRICSSETTINGS_ENABLENOTIFICATIONMETRICS. Leave unset to keep the
+                          Mattermost server defaults (both on); set explicitly to override.
                         type: boolean
-                    required:
-                    - enabled
                     type: object
                   prometheusRule:
                     description: |-

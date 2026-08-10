@@ -173,6 +173,45 @@ func (r *ResourceHelper) CreatePrometheusRuleIfNotExists(owner v1.Object, promet
 	return errors.Wrap(err, "failed to check if prometheus rule exists")
 }
 
+// DeleteServiceMonitor deletes a ServiceMonitor if present. An absent Prometheus
+// Operator CRD (NoMatch) or an already-gone object are treated as no-ops, so
+// disabling monitoring is safe whether or not the CRDs are installed.
+func (r *ResourceHelper) DeleteServiceMonitor(key types.NamespacedName, reqLogger logr.Logger) error {
+	found := &monitoringv1.ServiceMonitor{}
+	err := r.client.Get(context.TODO(), key, found)
+	if err != nil {
+		if apimeta.IsNoMatchError(err) || k8sErrors.IsNotFound(err) {
+			return nil
+		}
+		return errors.Wrap(err, "failed to check if service monitor exists")
+	}
+
+	reqLogger.Info("Deleting service monitor", "name", key.Name)
+	if err := r.client.Delete(context.TODO(), found); err != nil && !k8sErrors.IsNotFound(err) {
+		return errors.Wrap(err, "failed to delete service monitor")
+	}
+	return nil
+}
+
+// DeletePrometheusRule deletes a PrometheusRule if present, with the same
+// graceful handling of absent CRDs as DeleteServiceMonitor.
+func (r *ResourceHelper) DeletePrometheusRule(key types.NamespacedName, reqLogger logr.Logger) error {
+	found := &monitoringv1.PrometheusRule{}
+	err := r.client.Get(context.TODO(), key, found)
+	if err != nil {
+		if apimeta.IsNoMatchError(err) || k8sErrors.IsNotFound(err) {
+			return nil
+		}
+		return errors.Wrap(err, "failed to check if prometheus rule exists")
+	}
+
+	reqLogger.Info("Deleting prometheus rule", "name", key.Name)
+	if err := r.client.Delete(context.TODO(), found); err != nil && !k8sErrors.IsNotFound(err) {
+		return errors.Wrap(err, "failed to delete prometheus rule")
+	}
+	return nil
+}
+
 func (r *ResourceHelper) CreateIngressIfNotExists(owner v1.Object, ingress *networkingv1.Ingress, reqLogger logr.Logger) error {
 	foundIngress := &networkingv1.Ingress{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: ingress.Name, Namespace: ingress.Namespace}, foundIngress)

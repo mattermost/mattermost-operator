@@ -51,3 +51,13 @@ spec:
     #   rtcdServiceSelector:
     #     app: rtcd
     #   port: "8045"
+    #   labels:                      # falls back to serviceMonitor.labels if omitted
+    #     release: kube-prometheus-stack
+
+# NOTE: the operator creates a dedicated internal metrics Service (<name>-metrics)
+# that the ServiceMonitor scrapes, so monitoring works in every service mode —
+# including useServiceLoadBalancer, where the app Service exposes only 80/443.
+# Metrics stay internal to the cluster; they are never published via the LB.
+#
+# Disabling a capability (enabled: false) deletes the resources the operator
+# created for it, as long as the `monitoring` block itself remains present.

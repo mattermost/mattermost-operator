@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
@@ -36,9 +37,9 @@ func TestGenerateServiceMonitorV1Beta(t *testing.T) {
 		require.Len(t, sm.OwnerReferences, 1)
 		assert.Equal(t, "Mattermost", sm.OwnerReferences[0].Kind)
 
-		// Selector must match the Mattermost Service identity labels so Prometheus
-		// scrapes the right Service.
-		assert.Equal(t, mmv1beta.MattermostSelectorLabels("test-mm"), sm.Spec.Selector.MatchLabels)
+		// Selector must match the dedicated metrics Service (unique label) so it
+		// scrapes only that Service, not the main app Service.
+		assert.Equal(t, map[string]string{metricsServiceLabel: "test-mm"}, sm.Spec.Selector.MatchLabels)
 
 		require.Len(t, sm.Spec.Endpoints, 1)
 		ep := sm.Spec.Endpoints[0]
@@ -63,6 +64,34 @@ func TestGenerateServiceMonitorV1Beta(t *testing.T) {
 		// Extra label present so the customer's Prometheus serviceMonitorSelector can match.
 		assert.Equal(t, "kube-prometheus-stack", sm.Labels["release"])
 	})
+}
+
+func TestGenerateMetricsServiceV1Beta(t *testing.T) {
+	mm := newMattermostWithMonitoring(&mmv1beta.Monitoring{
+		ServiceMonitor: &mmv1beta.ServiceMonitor{Enabled: true},
+	})
+
+	svc := GenerateMetricsServiceV1Beta(mm)
+	require.NotNil(t, svc)
+
+	assert.Equal(t, "test-mm-metrics", svc.Name)
+	assert.Equal(t, "mattermost", svc.Namespace)
+	// Distinct label the ServiceMonitor selects on.
+	assert.Equal(t, "test-mm", svc.Labels[metricsServiceLabel])
+	// Routes to the Mattermost pods; internal (headless) only.
+	assert.Equal(t, mmv1beta.MattermostSelectorLabels("test-mm"), svc.Spec.Selector)
+	assert.Equal(t, corev1.ClusterIPNone, svc.Spec.ClusterIP)
+	require.Len(t, svc.Spec.Ports, 1)
+	assert.Equal(t, metricsPortName, svc.Spec.Ports[0].Name)
+	assert.EqualValues(t, metricsPort, svc.Spec.Ports[0].Port)
+}
+
+func TestClientMetricsPointer(t *testing.T) {
+	// nil Enabled must leave server defaults untouched (no env emitted).
+	mm := newMattermostWithMonitoring(&mmv1beta.Monitoring{
+		ClientMetrics: &mmv1beta.ClientMetrics{},
+	})
+	assert.Nil(t, mm.Spec.Monitoring.ClientMetrics.Enabled)
 }
 
 func TestGenerateRtcdServiceMonitorV1Beta(t *testing.T) {
@@ -104,6 +133,43 @@ func TestGenerateRtcdServiceMonitorV1Beta(t *testing.T) {
 		require.NotNil(t, sm)
 		assert.Equal(t, "metrics", sm.Spec.Endpoints[0].Port)
 		assert.Nil(t, sm.Spec.Endpoints[0].TargetPort)
+	})
+
+	t.Run("discovery labels fall back to serviceMonitor labels", func(t *testing.T) {
+		// callsMetrics has no own labels, but serviceMonitor does — the rtcd SM
+		// must inherit them so Prometheus selects it.
+		mm := newMattermostWithMonitoring(&mmv1beta.Monitoring{
+			ServiceMonitor: &mmv1beta.ServiceMonitor{
+				Enabled: true,
+				Labels:  map[string]string{"release": "kube-prometheus-stack"},
+			},
+			CallsMetrics: &mmv1beta.CallsMetrics{
+				Enabled:             true,
+				RtcdServiceSelector: map[string]string{"app": "rtcd"},
+			},
+		})
+
+		sm := GenerateRtcdServiceMonitorV1Beta(mm)
+		require.NotNil(t, sm)
+		assert.Equal(t, "kube-prometheus-stack", sm.Labels["release"])
+	})
+
+	t.Run("own labels win over serviceMonitor labels", func(t *testing.T) {
+		mm := newMattermostWithMonitoring(&mmv1beta.Monitoring{
+			ServiceMonitor: &mmv1beta.ServiceMonitor{
+				Enabled: true,
+				Labels:  map[string]string{"release": "sm-stack"},
+			},
+			CallsMetrics: &mmv1beta.CallsMetrics{
+				Enabled:             true,
+				RtcdServiceSelector: map[string]string{"app": "rtcd"},
+				Labels:              map[string]string{"release": "calls-stack"},
+			},
+		})
+
+		sm := GenerateRtcdServiceMonitorV1Beta(mm)
+		require.NotNil(t, sm)
+		assert.Equal(t, "calls-stack", sm.Labels["release"])
 	})
 }
 

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	sigsyaml "sigs.k8s.io/yaml"
@@ -29,6 +30,15 @@ const (
 
 	defaultScrapeInterval = "30s"
 
+	// metricsPort is the Mattermost metrics container port (8067).
+	metricsPort = 8067
+
+	// metricsServiceLabel marks the dedicated metrics Service so the
+	// ServiceMonitor can target it uniquely (the main app Service does not carry
+	// this label). This is what makes scraping work in every service mode —
+	// including useServiceLoadBalancer, where the app Service drops port 8067.
+	metricsServiceLabel = "mattermost.com/scrape-metrics"
+
 	// defaultRtcdMetricsPort is the rtcd metrics port (Calls real-time daemon).
 	defaultRtcdMetricsPort = "8045"
 )
@@ -46,8 +56,61 @@ const (
 	rulePlaceholderPodSelector = "__POD_SELECTOR__"
 )
 
+// GenerateMetricsServiceV1Beta builds a dedicated, internal (headless ClusterIP)
+// Service exposing only the Mattermost metrics port. The ServiceMonitor targets
+// THIS Service rather than the main app Service, so scraping works in every
+// service mode — including useServiceLoadBalancer, where the app Service exposes
+// only 80/443 and drops the metrics port. Metrics stay internal to the cluster;
+// they are never published through the LoadBalancer.
+func GenerateMetricsServiceV1Beta(mattermost *mmv1beta.Mattermost) *corev1.Service {
+	labels := mattermost.MattermostLabels(mattermost.Name)
+	// Distinct label so the ServiceMonitor selects only this Service.
+	labels[metricsServiceLabel] = mattermost.Name
+
+	return &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            metricsServiceName(mattermost.Name),
+			Namespace:       mattermost.Namespace,
+			Labels:          labels,
+			OwnerReferences: MattermostOwnerReference(mattermost),
+		},
+		Spec: corev1.ServiceSpec{
+			// Headless: we only need per-pod endpoints for Prometheus to scrape.
+			ClusterIP: corev1.ClusterIPNone,
+			Type:      corev1.ServiceTypeClusterIP,
+			// Route to the Mattermost pods (same selector the app Service uses).
+			Selector:                 mmv1beta.MattermostSelectorLabels(mattermost.Name),
+			PublishNotReadyAddresses: true,
+			Ports: []corev1.ServicePort{
+				{
+					Name:       metricsPortName,
+					Port:       metricsPort,
+					TargetPort: intstr.FromString(metricsPortName),
+				},
+			},
+		},
+	}
+}
+
+func metricsServiceName(mattermostName string) string {
+	return mattermostName + "-metrics"
+}
+
+// rtcdDiscoveryLabels resolves the Prometheus discovery labels for the rtcd
+// ServiceMonitor: callsMetrics.labels win, otherwise fall back to the main
+// serviceMonitor.labels.
+func rtcdDiscoveryLabels(mattermost *mmv1beta.Mattermost) map[string]string {
+	if cm := mattermost.Spec.Monitoring.CallsMetrics; cm != nil && len(cm.Labels) > 0 {
+		return cm.Labels
+	}
+	if sm := mattermost.Spec.Monitoring.ServiceMonitor; sm != nil {
+		return sm.Labels
+	}
+	return nil
+}
+
 // GenerateServiceMonitorV1Beta builds a Prometheus Operator ServiceMonitor that
-// scrapes the Mattermost metrics endpoint. It is created in the Mattermost
+// scrapes the dedicated metrics Service. It is created in the Mattermost
 // namespace; the cluster's Prometheus reaches in to scrape it (Prometheus ->
 // Mattermost), so the Operator never touches the monitoring namespace.
 func GenerateServiceMonitorV1Beta(mattermost *mmv1beta.Mattermost) *monitoringv1.ServiceMonitor {
@@ -73,9 +136,9 @@ func GenerateServiceMonitorV1Beta(mattermost *mmv1beta.Mattermost) *monitoringv1
 			OwnerReferences: MattermostOwnerReference(mattermost),
 		},
 		Spec: monitoringv1.ServiceMonitorSpec{
-			// Select the Mattermost Service by its stable identity labels.
+			// Select the dedicated metrics Service (unique label).
 			Selector: metav1.LabelSelector{
-				MatchLabels: mmv1beta.MattermostSelectorLabels(mattermost.Name),
+				MatchLabels: map[string]string{metricsServiceLabel: mattermost.Name},
 			},
 			Endpoints: []monitoringv1.Endpoint{
 				{
@@ -101,15 +164,15 @@ func GenerateRtcdServiceMonitorV1Beta(mattermost *mmv1beta.Mattermost) *monitori
 
 	interval := defaultScrapeInterval
 	labels := mattermost.MattermostLabels(mattermost.Name)
-	if sm := mattermost.Spec.Monitoring.ServiceMonitor; sm != nil {
-		if sm.Interval != "" {
-			interval = sm.Interval
-		}
-		// Reuse the same discovery labels so the rtcd ServiceMonitor matches the
-		// same Prometheus serviceMonitorSelector as the Mattermost one.
-		for k, v := range sm.Labels {
-			labels[k] = v
-		}
+	if sm := mattermost.Spec.Monitoring.ServiceMonitor; sm != nil && sm.Interval != "" {
+		interval = sm.Interval
+	}
+	// Discovery labels so the cluster Prometheus serviceMonitorSelector matches
+	// this ServiceMonitor: prefer callsMetrics.labels, fall back to the
+	// serviceMonitor labels (so enabling calls alone still gets selected when the
+	// main ServiceMonitor is configured).
+	for k, v := range rtcdDiscoveryLabels(mattermost) {
+		labels[k] = v
 	}
 
 	endpoint := monitoringv1.Endpoint{
@@ -182,9 +245,13 @@ func GeneratePrometheusRuleV1Beta(mattermost *mmv1beta.Mattermost) (*monitoringv
 // the cluster. The pod selector is the Deployment's pod-name prefix ("<name>-.*").
 func rulePlaceholders(mattermost *mmv1beta.Mattermost) map[string]string {
 	return map[string]string{
-		rulePlaceholderNamespace:   mattermost.Namespace,
-		rulePlaceholderService:     mattermost.Name,
-		rulePlaceholderPodSelector: mattermost.Name + "-.*",
+		rulePlaceholderNamespace: mattermost.Namespace,
+		rulePlaceholderService:   mattermost.Name,
+		// Deployment pods are "<name>-<replicaset-hash>-<pod-suffix>". Prometheus
+		// label matches are fully anchored, so "<name>-[^-]+-[^-]+" matches only
+		// this instance's pods — not a differently-named install that happens to
+		// share this name as a prefix (e.g. "mm" must not match "mm-test").
+		rulePlaceholderPodSelector: mattermost.Name + "-[^-]+-[^-]+",
 	}
 }
 

@@ -352,9 +352,12 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 
 	// Optional client/RUM + notification performance metrics. These default on in
 	// the Mattermost server and ride the same /metrics endpoint (no extra port);
-	// spec.monitoring.clientMetrics only exists so an operator can opt out.
-	if mattermost.Spec.Monitoring != nil && mattermost.Spec.Monitoring.ClientMetrics != nil {
-		clientMetrics := strconv.FormatBool(mattermost.Spec.Monitoring.ClientMetrics.Enabled)
+	// spec.monitoring.clientMetrics only exists so an operator can opt out. Only
+	// emit the env vars when set explicitly — a nil Enabled leaves server defaults.
+	if mattermost.Spec.Monitoring != nil &&
+		mattermost.Spec.Monitoring.ClientMetrics != nil &&
+		mattermost.Spec.Monitoring.ClientMetrics.Enabled != nil {
+		clientMetrics := strconv.FormatBool(*mattermost.Spec.Monitoring.ClientMetrics.Enabled)
 		envVarGeneral = append(envVarGeneral,
 			corev1.EnvVar{
 				Name:  "MM_METRICSSETTINGS_ENABLECLIENTMETRICS",
