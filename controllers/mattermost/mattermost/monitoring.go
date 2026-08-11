@@ -9,6 +9,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -78,6 +79,12 @@ func (r *MattermostReconciler) checkMattermostGrafanaDashboard(mattermost *mmv1b
 		current := &corev1.ConfigMap{}
 		if err = r.Client.Get(context.TODO(), types.NamespacedName{Name: cm.Name, Namespace: cm.Namespace}, current); err != nil {
 			return errors.Wrap(err, "failed to fetch current grafana dashboard config map")
+		}
+
+		// Don't adopt or overwrite a pre-existing ConfigMap that this Mattermost
+		// does not own — a name collision with an unrelated object.
+		if !metav1.IsControlledBy(current, mattermost) {
+			return errors.Errorf("config map %s/%s already exists and is not owned by this Mattermost; refusing to overwrite", current.Namespace, current.Name)
 		}
 
 		if err = r.Resources.Update(current, cm, reqLogger); err != nil {

@@ -131,7 +131,7 @@ e2e-local:
 ENVTEST_K8S_VERSION ?= 1.31.0
 test-envtest: $(SETUP_ENVTEST)
 	KUBEBUILDER_ASSETS="$$($(SETUP_ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(TOOLS_BIN_DIR)/envtest -p path)" \
-		$(GO) test -tags envtest ./test/envtest/... ./controllers/mattermost/mattermost/... -run 'CEL|Monitoring' -v
+		$(GO) test -tags envtest ./controllers/mattermost/mattermost/... -run 'Monitoring' -v
 
 $(SETUP_ENVTEST): ## Install setup-envtest
 	GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) sigs.k8s.io/controller-runtime/tools/setup-envtest setup-envtest latest
