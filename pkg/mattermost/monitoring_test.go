@@ -202,7 +202,9 @@ func TestGeneratePrometheusRuleV1Beta(t *testing.T) {
 				if rule.Alert == "MattermostServerDown" {
 					sawServerDown = true
 					assert.Contains(t, expr, `namespace="mattermost"`)
-					assert.Contains(t, expr, `service="test-mm"`)
+					// Matches the dedicated metrics Service name (what the
+					// Prometheus Operator sets as the `service` target label).
+					assert.Contains(t, expr, `service="test-mm-metrics"`)
 				}
 			}
 		}

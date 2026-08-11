@@ -185,9 +185,10 @@ func callsMetricsEnabled(mattermost *mmv1beta.Mattermost) bool {
 }
 
 // anyMonitoringEnabled reports whether any monitoring capability that depends on
-// the (Enterprise-gated) /metrics endpoint is turned on.
+// the (Enterprise-gated) Mattermost /metrics endpoint is turned on. callsMetrics
+// is intentionally excluded: it targets a separately-deployed rtcd whose metrics
+// are not gated by the Mattermost license.
 func anyMonitoringEnabled(mattermost *mmv1beta.Mattermost) bool {
 	return serviceMonitorEnabled(mattermost) ||
-		prometheusRuleEnabled(mattermost) ||
-		callsMetricsEnabled(mattermost)
+		prometheusRuleEnabled(mattermost)
 }

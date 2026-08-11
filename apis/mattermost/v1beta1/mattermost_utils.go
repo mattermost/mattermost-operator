@@ -298,9 +298,11 @@ func MattermostSelectorLabels(name string) map[string]string {
 // belonging to the given mattermost.
 func (mm *Mattermost) MattermostLabels(name string) map[string]string {
 	l := map[string]string{}
-	// Set resourceLabels ("global") as the initial labels
-	if mm.Spec.ResourceLabels != nil {
-		l = mm.Spec.ResourceLabels
+	// Copy resourceLabels ("global") as the initial labels — copy, not alias, so
+	// callers that add labels to the result never mutate the user's ResourceLabels
+	// map (ranging over a nil map is a no-op).
+	for k, v := range mm.Spec.ResourceLabels {
+		l[k] = v
 	}
 	// Overwrite with default labels
 	for k, v := range MattermostResourceLabels(name) {
