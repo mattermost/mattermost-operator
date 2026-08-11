@@ -206,7 +206,10 @@ type ServiceMonitor struct {
 	Enabled bool `json:"enabled"`
 
 	// Interval at which Prometheus scrapes the metrics endpoint (e.g. "30s").
-	// Defaults to "30s" when empty.
+	// Defaults to "30s" when empty. Must be a Prometheus duration so an invalid
+	// value is rejected at the Mattermost API rather than later by the
+	// ServiceMonitor CRD.
+	// +kubebuilder:validation:Pattern=`^(0|(([0-9]+)y)?(([0-9]+)w)?(([0-9]+)d)?(([0-9]+)h)?(([0-9]+)m)?(([0-9]+)s)?(([0-9]+)ms)?)$`
 	// +optional
 	Interval string `json:"interval,omitempty"`
 
