@@ -1,3 +1,8 @@
+//go:build envtest
+
+// This suite needs a real apiserver+etcd (envtest). It is excluded from the
+// default `go test` run and only executes via `make test-envtest`, which sets
+// KUBEBUILDER_ASSETS and passes -tags envtest.
 package envtest_test
 
 import (
