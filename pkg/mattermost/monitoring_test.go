@@ -80,6 +80,25 @@ func TestGeneratorsNilMonitoring(t *testing.T) {
 	pr, err := GeneratePrometheusRuleV1Beta(mm)
 	require.NoError(t, err)
 	assert.Nil(t, pr)
+
+	cm, err := GenerateMimirRulesConfigMapV1Beta(mm)
+	require.NoError(t, err)
+	assert.Nil(t, cm)
+}
+
+func TestMimirRulesRejectsReservedDiscoveryLabel(t *testing.T) {
+	// A discovery label equal to the reserved marker key would be overwritten
+	// during label assembly, so the generator must reject it up front.
+	mm := newMattermostWithMonitoring(&mmv1beta.Monitoring{
+		MimirRules: &mmv1beta.MimirRules{
+			Enabled:        true,
+			DiscoveryLabel: mimirRulesConfigMapLabel,
+		},
+	})
+
+	cm, err := GenerateMimirRulesConfigMapV1Beta(mm)
+	require.Error(t, err)
+	assert.Nil(t, cm)
 }
 
 func TestPrometheusRulePodSelectorEscapesDottedName(t *testing.T) {

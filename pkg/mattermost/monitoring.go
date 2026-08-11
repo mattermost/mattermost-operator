@@ -2,6 +2,7 @@ package mattermost
 
 import (
 	"embed"
+	"fmt"
 	"path"
 	"regexp"
 	"sort"
@@ -293,12 +294,23 @@ func rulePlaceholders(mattermost *mmv1beta.Mattermost) map[string]string {
 // PrometheusRule CRD. The ServiceMonitor + metrics Service are unchanged — Grafana
 // Alloy scrapes them and remote-writes to Mimir.
 func GenerateMimirRulesConfigMapV1Beta(mattermost *mmv1beta.Mattermost) (*corev1.ConfigMap, error) {
+	// Monitoring is an opt-in add-on; nothing to generate when it is unset.
+	if mattermost.Spec.Monitoring == nil {
+		return nil, nil
+	}
+
 	discoveryLabel := defaultMimirRulesDiscoveryLabel
 	discoveryValue := defaultMimirRulesDiscoveryLabelValue
 	var tenant string
 
 	if mr := mattermost.Spec.Monitoring.MimirRules; mr != nil {
 		if mr.DiscoveryLabel != "" {
+			// The marker label is reserved for cleanup; a discovery label that
+			// collides with it would be silently overwritten below, breaking
+			// ruler-sync. Reject it instead of producing a broken ConfigMap.
+			if mr.DiscoveryLabel == mimirRulesConfigMapLabel {
+				return nil, fmt.Errorf("mimirRules.discoveryLabel must not be the reserved key %q", mimirRulesConfigMapLabel)
+			}
 			discoveryLabel = mr.DiscoveryLabel
 		}
 		if mr.DiscoveryLabelValue != "" {
