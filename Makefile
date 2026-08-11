@@ -241,7 +241,7 @@ run: generate fmt vet manifests ## Run against the configured Kubernetes cluster
 	go run ./main.go
 
 install: manifests kustomize ## Install CRDs into a cluster
-	$(KUSTOMIZE) build config/crd | kubectl apply -f -
+	$(KUSTOMIZE) build config/crd | kubectl apply --server-side --force-conflicts -f -
 
 uninstall: manifests kustomize ## Uninstall CRDs from a cluster
 	$(KUSTOMIZE) build config/crd | kubectl delete -f -
@@ -249,7 +249,7 @@ uninstall: manifests kustomize ## Uninstall CRDs from a cluster
 deploy: manifests kustomize ## Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 	kubectl create ns mattermost-operator --dry-run -oyaml | kubectl apply -f -
 	cd config/manager && $(KUSTOMIZE) edit set image mattermost-operator="mattermost/mattermost-operator:test"
-	$(KUSTOMIZE) build config/default | kubectl apply -n mattermost-operator -f -
+	$(KUSTOMIZE) build config/default | kubectl apply --server-side --force-conflicts -n mattermost-operator -f -
 
 mysql-minio-operators: ## Deploys MinIO and MySQL Operators to the active cluster
 	./scripts/install-mysql-minio.sh
