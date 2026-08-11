@@ -728,6 +728,36 @@ spec:
                           Mattermost server defaults (both on); set explicitly to override.
                         type: boolean
                     type: object
+                  mimirRules:
+                    description: |-
+                      MimirRules is the Prometheus-free alternative to PrometheusRule: it ships
+                      the same alerting rules as a plain ConfigMap in Prometheus rules format
+                      (`groups:`), for loading into a Grafana Mimir ruler (e.g. by mimirtool or a
+                      ruler-sync sidecar) instead of the Prometheus Operator. Use this when the
+                      cluster runs Grafana Alloy + Mimir rather than Prometheus.
+                    properties:
+                      discoveryLabel:
+                        description: |-
+                          DiscoveryLabel is the label key a Mimir ruler-sync sidecar selects on.
+                          Defaults to "mimir_rules" when empty.
+                        type: string
+                      discoveryLabelValue:
+                        description: |-
+                          DiscoveryLabelValue is the label value the ruler-sync matches.
+                          Defaults to "1" when empty.
+                        type: string
+                      enabled:
+                        description: Enabled determines whether the Operator should
+                          create the rules ConfigMap.
+                        type: boolean
+                      tenant:
+                        description: |-
+                          Tenant, when set, is written as an annotation so a multi-tenant Mimir
+                          ruler-sync can load the rules under the right tenant/org id.
+                        type: string
+                    required:
+                    - enabled
+                    type: object
                   prometheusRule:
                     description: |-
                       PrometheusRule configures a Prometheus Operator PrometheusRule holding
