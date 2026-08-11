@@ -318,9 +318,11 @@ func (mm *Mattermost) MattermostLabels(name string) map[string]string {
 // belonging to the given mattermost.
 func (mm *Mattermost) MattermostPodLabels(name string) map[string]string {
 	l := map[string]string{}
-	// Set resourceLabels ("global") as the initial labels
-	if mm.Spec.ResourceLabels != nil {
-		l = mm.Spec.ResourceLabels
+	// Copy resourceLabels ("global") as the initial labels — copy, not alias, so
+	// this call never mutates the user's ResourceLabels map (a nil map ranges as
+	// a no-op).
+	for k, v := range mm.Spec.ResourceLabels {
+		l[k] = v
 	}
 	if mm.Spec.PodTemplate != nil {
 		// Overwrite with pod specific labels
@@ -342,9 +344,11 @@ func (mm *Mattermost) MattermostPodLabels(name string) map[string]string {
 // the pods belonging to the given mattermost dedicated job server.
 func (mm *Mattermost) MattermostJobServerPodLabels(name string) map[string]string {
 	l := map[string]string{}
-	// Set resourceLabels ("global") as the initial labels
-	if mm.Spec.ResourceLabels != nil {
-		l = mm.Spec.ResourceLabels
+	// Copy resourceLabels ("global") as the initial labels — copy, not alias, so
+	// this call never mutates the user's ResourceLabels map (a nil map ranges as
+	// a no-op).
+	for k, v := range mm.Spec.ResourceLabels {
+		l[k] = v
 	}
 	if mm.Spec.PodTemplate != nil {
 		// Overwrite with pod specific labels

@@ -132,6 +132,10 @@ func rtcdDiscoveryLabels(mattermost *mmv1beta.Mattermost) map[string]string {
 // namespace; the cluster's Prometheus reaches in to scrape it (Prometheus ->
 // Mattermost), so the Operator never touches the monitoring namespace.
 func GenerateServiceMonitorV1Beta(mattermost *mmv1beta.Mattermost) *monitoringv1.ServiceMonitor {
+	if mattermost.Spec.Monitoring == nil {
+		return nil
+	}
+
 	interval := defaultScrapeInterval
 	labels := mattermost.MattermostLabels(mattermost.Name)
 
@@ -175,6 +179,10 @@ func GenerateServiceMonitorV1Beta(mattermost *mmv1beta.Mattermost) *monitoringv1
 // selector and (optionally) the metrics port. Returns nil if no selector is set,
 // since a ServiceMonitor with an empty selector would scrape unrelated Services.
 func GenerateRtcdServiceMonitorV1Beta(mattermost *mmv1beta.Mattermost) *monitoringv1.ServiceMonitor {
+	if mattermost.Spec.Monitoring == nil {
+		return nil
+	}
+
 	cm := mattermost.Spec.Monitoring.CallsMetrics
 	if cm == nil || len(cm.RtcdServiceSelector) == 0 {
 		return nil
@@ -322,6 +330,10 @@ func loadEmbeddedDashboards() ([]embeddedDashboard, error) {
 // (Prometheus -> Mattermost). Rule expressions are scoped to this instance's
 // pods via placeholder substitution — see rulePlaceholders.
 func GeneratePrometheusRuleV1Beta(mattermost *mmv1beta.Mattermost) (*monitoringv1.PrometheusRule, error) {
+	if mattermost.Spec.Monitoring == nil {
+		return nil, nil
+	}
+
 	groups, err := loadEmbeddedPrometheusRuleGroups(rulePlaceholders(mattermost))
 	if err != nil {
 		return nil, err

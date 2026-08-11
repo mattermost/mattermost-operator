@@ -240,8 +240,16 @@ manager: generate fmt vet ## Build manager binary
 run: generate fmt vet manifests ## Run against the configured Kubernetes cluster in ~/.kube/config
 	go run ./main.go
 
+# Server-side apply is required because the Mattermost CRD exceeds the 256KB
+# client-side last-applied-configuration annotation limit. We use a stable
+# field manager and do NOT force conflicts, so a genuine conflict with another
+# manager (GitOps/Helm) surfaces as an error instead of being silently clobbered.
+# One-time migration from a prior client-side install: run the same command once
+# with `--force-conflicts` to take over fields owned by kubectl-client-side-apply.
+FIELD_MANAGER ?= mattermost-operator
+
 install: manifests kustomize ## Install CRDs into a cluster
-	$(KUSTOMIZE) build config/crd | kubectl apply --server-side --force-conflicts -f -
+	$(KUSTOMIZE) build config/crd | kubectl apply --server-side --field-manager=$(FIELD_MANAGER) -f -
 
 uninstall: manifests kustomize ## Uninstall CRDs from a cluster
 	$(KUSTOMIZE) build config/crd | kubectl delete -f -
@@ -249,7 +257,7 @@ uninstall: manifests kustomize ## Uninstall CRDs from a cluster
 deploy: manifests kustomize ## Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 	kubectl create ns mattermost-operator --dry-run -oyaml | kubectl apply -f -
 	cd config/manager && $(KUSTOMIZE) edit set image mattermost-operator="mattermost/mattermost-operator:test"
-	$(KUSTOMIZE) build config/default | kubectl apply --server-side --force-conflicts -n mattermost-operator -f -
+	$(KUSTOMIZE) build config/default | kubectl apply --server-side --field-manager=$(FIELD_MANAGER) -n mattermost-operator -f -
 
 mysql-minio-operators: ## Deploys MinIO and MySQL Operators to the active cluster
 	./scripts/install-mysql-minio.sh
