@@ -234,7 +234,6 @@ type ClientMetrics struct {
 // rtcd (the Calls real-time daemon) exposes Prometheus metrics on its own
 // endpoint (default :8045/metrics) and is deployed separately from Mattermost,
 // so the user must point the Operator at the rtcd Service via RtcdServiceSelector.
-// +kubebuilder:validation:XValidation:rule="!self.enabled || (has(self.rtcdServiceSelector) && size(self.rtcdServiceSelector) > 0)",message="rtcdServiceSelector is required when callsMetrics.enabled is true"
 type CallsMetrics struct {
 	// Enabled determines whether the Operator should create the rtcd ServiceMonitor.
 	Enabled bool `json:"enabled"`
