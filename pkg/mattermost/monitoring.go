@@ -355,7 +355,9 @@ func GeneratePrometheusRuleV1Beta(mattermost *mmv1beta.Mattermost) (*monitoringv
 func rulePlaceholders(mattermost *mmv1beta.Mattermost) map[string]string {
 	return map[string]string{
 		rulePlaceholderNamespace: mattermost.Namespace,
-		rulePlaceholderService:   mattermost.Name,
+		// The ServiceMonitor scrapes the dedicated <name>-metrics Service, so the
+		// Prometheus Operator sets the `service` target label to that Service name.
+		rulePlaceholderService: metricsServiceName(mattermost.Name),
 		// Deployment pods are "<name>-<replicaset-hash>-<pod-suffix>". Prometheus
 		// label matches are fully anchored, so "<name>-[^-]+-[^-]+" matches only
 		// this instance's pods — not a differently-named install that happens to
