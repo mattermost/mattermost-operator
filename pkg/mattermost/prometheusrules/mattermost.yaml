@@ -18,6 +18,12 @@ groups:
       - alert: MattermostServerDown
         # Metrics target unscrapable for 5m (server down, or metrics disabled /
         # unlicensed so /metrics on 8067 is not served).
+        # NOTE: `up == 0` only fires while the target still exists. If every pod
+        # is gone there is no `up` series, so this cannot detect a full outage on
+        # its own — pair it with MattermostPodCrashLooping / a kube_deployment
+        # replica alert for that case. We intentionally avoid `absent(up{...})`
+        # here because it would fire permanently in rule-only configurations that
+        # do not enable the ServiceMonitor.
         expr: up{namespace="__NAMESPACE__", service="__SERVICE__"} == 0
         for: 5m
         labels:
