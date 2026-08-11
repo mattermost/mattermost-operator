@@ -66,6 +66,22 @@ func TestGenerateServiceMonitorV1Beta(t *testing.T) {
 	})
 }
 
+func TestGeneratorsNilMonitoring(t *testing.T) {
+	// Exported generators must not panic when Spec.Monitoring is nil (defensive
+	// for direct/test callers; the reconcile path already guards this).
+	mm := &mmv1beta.Mattermost{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-mm", Namespace: "mattermost"},
+	}
+	require.Nil(t, mm.Spec.Monitoring)
+
+	assert.Nil(t, GenerateServiceMonitorV1Beta(mm))
+	assert.Nil(t, GenerateRtcdServiceMonitorV1Beta(mm))
+
+	pr, err := GeneratePrometheusRuleV1Beta(mm)
+	require.NoError(t, err)
+	assert.Nil(t, pr)
+}
+
 func TestGenerateMetricsServiceV1Beta(t *testing.T) {
 	mm := newMattermostWithMonitoring(&mmv1beta.Monitoring{
 		ServiceMonitor: &mmv1beta.ServiceMonitor{Enabled: true},

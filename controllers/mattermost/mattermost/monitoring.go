@@ -79,8 +79,10 @@ func (r *MattermostReconciler) checkMattermostRtcdServiceMonitor(mattermost *mmv
 
 	desired := mattermostApp.GenerateRtcdServiceMonitorV1Beta(mattermost)
 	if desired == nil {
-		reqLogger.Info("callsMetrics is enabled but rtcdServiceSelector is empty; skipping rtcd ServiceMonitor")
-		return nil
+		// callsMetrics is enabled but the selector was cleared: tear down any rtcd
+		// ServiceMonitor we previously created rather than leaving it orphaned.
+		reqLogger.Info("callsMetrics is enabled but rtcdServiceSelector is empty; removing any owned rtcd ServiceMonitor")
+		return r.deleteOwnedResource(mattermost, rtcdKey, &monitoringv1.ServiceMonitor{}, reqLogger)
 	}
 
 	return r.reconcileServiceMonitor(mattermost, desired, reqLogger)
