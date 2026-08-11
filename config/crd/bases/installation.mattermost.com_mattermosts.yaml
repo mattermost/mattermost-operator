@@ -714,11 +714,6 @@ spec:
                     required:
                     - enabled
                     type: object
-                    x-kubernetes-validations:
-                    - message: rtcdServiceSelector is required when callsMetrics.enabled
-                        is true
-                      rule: '!self.enabled || (has(self.rtcdServiceSelector) && size(self.rtcdServiceSelector)
-                        > 0)'
                   clientMetrics:
                     description: |-
                       ClientMetrics controls whether client/RUM and notification performance
