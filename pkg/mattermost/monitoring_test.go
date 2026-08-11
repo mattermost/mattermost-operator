@@ -82,6 +82,28 @@ func TestGeneratorsNilMonitoring(t *testing.T) {
 	assert.Nil(t, pr)
 }
 
+func TestPrometheusRulePodSelectorEscapesDottedName(t *testing.T) {
+	mm := newMattermostWithMonitoring(&mmv1beta.Monitoring{
+		PrometheusRule: &mmv1beta.PrometheusRule{Enabled: true},
+	})
+	// Mattermost names may contain dots, which are regex metacharacters.
+	mm.Name = "test.mm"
+
+	pr, err := GeneratePrometheusRuleV1Beta(mm)
+	require.NoError(t, err)
+	require.NotNil(t, pr)
+
+	var exprs string
+	for _, g := range pr.Spec.Groups {
+		for _, rule := range g.Rules {
+			exprs += rule.Expr.String() + "\n"
+		}
+	}
+	// The dot must be escaped so "test.mm" cannot match "testXmm-...".
+	assert.Contains(t, exprs, `pod=~"test\.mm-`)
+	assert.NotContains(t, exprs, `pod=~"test.mm-`)
+}
+
 func TestGenerateMetricsServiceV1Beta(t *testing.T) {
 	mm := newMattermostWithMonitoring(&mmv1beta.Monitoring{
 		ServiceMonitor: &mmv1beta.ServiceMonitor{Enabled: true},
