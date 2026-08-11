@@ -4249,38 +4249,38 @@
       {
         "hide": 2,
         "name": "rtcd_metrics_port",
-        "query": "${VAR_RTCD_METRICS_PORT}",
+        "query": "8045",
         "skipUrlSync": true,
         "type": "constant",
         "current": {
-          "value": "${VAR_RTCD_METRICS_PORT}",
-          "text": "${VAR_RTCD_METRICS_PORT}",
-          "selected": false
+          "value": "8045",
+          "text": "8045",
+          "selected": true
         },
         "options": [
           {
-            "value": "${VAR_RTCD_METRICS_PORT}",
-            "text": "${VAR_RTCD_METRICS_PORT}",
-            "selected": false
+            "value": "8045",
+            "text": "8045",
+            "selected": true
           }
         ]
       },
       {
         "hide": 2,
         "name": "calls_metrics_port",
-        "query": "${VAR_CALLS_METRICS_PORT}",
+        "query": "8067",
         "skipUrlSync": true,
         "type": "constant",
         "current": {
-          "value": "${VAR_CALLS_METRICS_PORT}",
-          "text": "${VAR_CALLS_METRICS_PORT}",
-          "selected": false
+          "value": "8067",
+          "text": "8067",
+          "selected": true
         },
         "options": [
           {
-            "value": "${VAR_CALLS_METRICS_PORT}",
-            "text": "${VAR_CALLS_METRICS_PORT}",
-            "selected": false
+            "value": "8067",
+            "text": "8067",
+            "selected": true
           }
         ]
       },

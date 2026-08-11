@@ -123,6 +123,24 @@ func TestGeneratorsNilMonitoring(t *testing.T) {
 	pr, err := GeneratePrometheusRuleV1Beta(mm)
 	require.NoError(t, err)
 	assert.Nil(t, pr)
+
+	cms, err := GenerateGrafanaDashboardConfigMapsV1Beta(mm)
+	require.NoError(t, err)
+	assert.Nil(t, cms)
+}
+
+func TestGrafanaDashboardRejectsReservedDiscoveryLabel(t *testing.T) {
+	// Using the operator's ownership-marker key as the sidecar discovery label
+	// must be rejected, not silently mishandled.
+	mm := newMattermostWithMonitoring(&mmv1beta.Monitoring{
+		GrafanaDashboard: &mmv1beta.GrafanaDashboard{
+			Enabled:        true,
+			DiscoveryLabel: dashboardConfigMapLabel,
+		},
+	})
+
+	_, err := GenerateGrafanaDashboardConfigMapsV1Beta(mm)
+	require.Error(t, err)
 }
 
 func TestPrometheusRulePodSelectorEscapesDottedName(t *testing.T) {

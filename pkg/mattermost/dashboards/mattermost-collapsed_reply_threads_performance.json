@@ -72,13 +72,21 @@
           "expr": "histogram_quantile (\n  0.99,\n  sum by (le,instance)(\n    rate(mattermost_db_store_time_bucket{pod=~\"$server\",method=\"ThreadStore.GetThreadsForUser\"}[5m])\n  )\n)",
           "interval": "",
           "legendFormat": "p99-{{instance}}",
-          "refId": "A"
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         },
         {
           "expr": "histogram_quantile (\n  0.50,\n  sum by (le,instance)(\n    rate(mattermost_db_store_time_bucket{pod=~\"$server\",method=\"ThreadStore.GetThreadsForUser\"}[5m])\n  )\n)",
           "interval": "",
           "legendFormat": "p50-{{instance}}",
-          "refId": "B"
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "thresholds": [],
@@ -111,6 +119,10 @@
       ],
       "yaxis": {
         "align": false
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
       }
     },
     {
@@ -157,13 +169,21 @@
           "expr": "sum(rate(mattermost_db_store_time_count{pod=~\"$server\",method=\"ThreadStore.GetThreadsForUser\"}[1m])) by (instance)",
           "interval": "",
           "legendFormat": "count-{{instance}}",
-          "refId": "A"
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         },
         {
           "expr": "sum(rate(mattermost_db_store_time_count{pod=~\"$server\",method=\"ThreadStore.GetThreadsForUser\"}[1m]))",
           "interval": "",
           "legendFormat": "Total",
-          "refId": "B"
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "thresholds": [],
@@ -196,6 +216,10 @@
       ],
       "yaxis": {
         "align": false
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
       }
     },
     {
@@ -291,6 +315,10 @@
       ],
       "yaxis": {
         "align": false
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
       }
     },
     {
@@ -386,6 +414,10 @@
       ],
       "yaxis": {
         "align": false
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
       }
     }
   ],

@@ -65,7 +65,11 @@
           "legendFormat": "{{instance}}",
           "metric": "mattermost_login_logins_total",
           "refId": "A",
-          "step": 5
+          "step": 5,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         },
         {
           "expr": "sum(mattermost_login_logins_total{pod=~\"$server\"})/(sum(mattermost_login_logins_total{pod=~\"$server\"})+sum(mattermost_login_logins_fail_total{pod=~\"$server\"}))",
@@ -75,7 +79,11 @@
           "legendFormat": "All",
           "metric": "mattermost_login_logins_total",
           "refId": "B",
-          "step": 5
+          "step": 5,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "thresholds": [],
@@ -165,7 +173,11 @@
           "legendFormat": "{{instance}}",
           "metric": "mattermost_login_logins_total",
           "refId": "A",
-          "step": 2
+          "step": 2,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         },
         {
           "expr": "sum(irate(mattermost_login_logins_total{pod=~\"$server\"}[1m]))",
@@ -174,7 +186,11 @@
           "intervalFactor": 1,
           "legendFormat": "Total",
           "refId": "B",
-          "step": 2
+          "step": 2,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "thresholds": [],
@@ -264,7 +280,11 @@
           "legendFormat": "{{instance}}",
           "metric": "mattermost_post_broadcasts_total",
           "refId": "A",
-          "step": 5
+          "step": 5,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         },
         {
           "expr": "sum(irate(mattermost_post_emails_sent_total{pod=~\"$server\"}[1m]))",
@@ -274,7 +294,11 @@
           "legendFormat": "Total",
           "metric": "mattermost_post_broadcasts_total",
           "refId": "B",
-          "step": 5
+          "step": 5,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "thresholds": [],
@@ -363,7 +387,11 @@
           "intervalFactor": 1,
           "legendFormat": "{{instance}}",
           "refId": "A",
-          "step": 5
+          "step": 5,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         },
         {
           "expr": "sum(irate(mattermost_post_pushes_sent_total{pod=~\"$server\"}[1m]))",
@@ -372,7 +400,11 @@
           "intervalFactor": 1,
           "legendFormat": "Total",
           "refId": "B",
-          "step": 5
+          "step": 5,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "thresholds": [],
@@ -462,7 +494,11 @@
           "legendFormat": "{{instance}}",
           "metric": "mattermost_post_file_attachments_total",
           "refId": "A",
-          "step": 5
+          "step": 5,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         },
         {
           "expr": "sum(irate(mattermost_post_file_attachments_total{pod=~\"$server\"}[1m]))",
@@ -472,7 +508,11 @@
           "legendFormat": "Total",
           "metric": "mattermost_post_file_attachments_total",
           "refId": "B",
-          "step": 5
+          "step": 5,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "thresholds": [],
@@ -558,7 +598,11 @@
           "interval": "5s",
           "intervalFactor": 1,
           "legendFormat": "{{instance}}",
-          "refId": "A"
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         },
         {
           "expr": "sum(irate(mattermost_search_posts_searches_total{pod=~\"$server\"}[1m]))",
@@ -566,7 +610,11 @@
           "interval": "5s",
           "intervalFactor": 1,
           "legendFormat": "{{instance}}",
-          "refId": "B"
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "thresholds": [],
@@ -652,7 +700,11 @@
           "interval": "5s",
           "intervalFactor": 1,
           "legendFormat": "{{instance}}",
-          "refId": "A"
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "thresholds": [],
@@ -744,7 +796,11 @@
           "legendFormat": "{{type}}",
           "metric": "mattermost_websocket_event_total",
           "refId": "A",
-          "step": 5
+          "step": 5,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "thresholds": [],
@@ -837,7 +893,11 @@
           "legendFormat": "{{name}}",
           "metric": "mattermost_websocket_broadcasts_total",
           "refId": "A",
-          "step": 5
+          "step": 5,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "thresholds": [],
@@ -927,7 +987,11 @@
           "legendFormat": "{{instance}}",
           "metric": "mattermost_http_requests_total",
           "refId": "A",
-          "step": 5
+          "step": 5,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         },
         {
           "expr": "sum(irate(mattermost_http_requests_total{pod=~\"$server\"}[1m]))",
@@ -937,7 +1001,11 @@
           "legendFormat": "Total",
           "metric": "mattermost_http_requests_total",
           "refId": "B",
-          "step": 5
+          "step": 5,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "thresholds": [],
@@ -1027,7 +1095,11 @@
           "legendFormat": "{{instance}}",
           "metric": "mattermost_cluster_cluster_requests_total",
           "refId": "A",
-          "step": 5
+          "step": 5,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         },
         {
           "expr": "sum(irate(mattermost_cluster_cluster_requests_total{pod=~\"$server\"}[1m]))",
@@ -1037,7 +1109,11 @@
           "legendFormat": "Total",
           "metric": "mattermost_cluster_cluster_requests_total",
           "refId": "B",
-          "step": 5
+          "step": 5,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "thresholds": [],
@@ -1130,7 +1206,11 @@
           "legendFormat": "{{name}}",
           "metric": "mattermost_websocket_broadcasts_total",
           "refId": "A",
-          "step": 5
+          "step": 5,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "thresholds": [],
@@ -1220,7 +1300,11 @@
           "legendFormat": "{{instance}} {{quantile}}",
           "metric": "go_gc_duration_seconds",
           "refId": "A",
-          "step": 5
+          "step": 5,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "thresholds": [],
@@ -1310,7 +1394,11 @@
           "legendFormat": "{{instance}}",
           "metric": "go_memstats_heap_objects",
           "refId": "A",
-          "step": 5
+          "step": 5,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         },
         {
           "expr": "sum(go_memstats_heap_objects{pod=~\"$server\"})",
@@ -1320,7 +1408,11 @@
           "legendFormat": "Total",
           "metric": "go_memstats_heap_objects",
           "refId": "B",
-          "step": 5
+          "step": 5,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "thresholds": [],
@@ -1413,7 +1505,11 @@
           "legendFormat": "{{route}}",
           "metric": "mattermost_cache_etag_hit_total",
           "refId": "A",
-          "step": 30
+          "step": 30,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "thresholds": [],
@@ -1506,7 +1602,11 @@
           "legendFormat": "{{name}}",
           "metric": "mattermost_cache_mem_hit_total",
           "refId": "A",
-          "step": 30
+          "step": 30,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "thresholds": [],
@@ -1599,7 +1699,11 @@
           "legendFormat": "{{route}}",
           "metric": "mattermost_cache_etag_hit_total",
           "refId": "A",
-          "step": 30
+          "step": 30,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "thresholds": [],
@@ -1694,7 +1798,11 @@
           "legendFormat": "{{name}}",
           "metric": "mattermost_cache_etag_hit_total",
           "refId": "A",
-          "step": 30
+          "step": 30,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "thresholds": [],
@@ -1786,7 +1894,11 @@
           "legendFormat": "{{instance}}",
           "metric": "mattermost_process_resident_memory_bytes",
           "refId": "A",
-          "step": 5
+          "step": 5,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         },
         {
           "expr": "sum(mattermost_process_resident_memory_bytes{pod=~\"$server\"}/1024/1024)",
@@ -1796,7 +1908,11 @@
           "legendFormat": "Total",
           "metric": "mattermost_process_resident_memory_bytes",
           "refId": "B",
-          "step": 5
+          "step": 5,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "thresholds": [],
@@ -1886,7 +2002,11 @@
           "legendFormat": "{{instance}}",
           "metric": "mattermost_process_virtual_memory_bytes",
           "refId": "A",
-          "step": 5
+          "step": 5,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         },
         {
           "expr": "sum(mattermost_process_virtual_memory_bytes{pod=~\"$server\"}/1024/1024)",
@@ -1896,7 +2016,11 @@
           "legendFormat": "Total",
           "metric": "mattermost_process_virtual_memory_bytes",
           "refId": "B",
-          "step": 5
+          "step": 5,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "thresholds": [],
@@ -1986,7 +2110,11 @@
           "legendFormat": "{{instance}}",
           "metric": "mattermost_process_open_fds",
           "refId": "A",
-          "step": 5
+          "step": 5,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         },
         {
           "expr": "sum(mattermost_process_open_fds{pod=~\"$server\"})",
@@ -1996,7 +2124,11 @@
           "legendFormat": "Total",
           "metric": "mattermost_process_open_fds",
           "refId": "B",
-          "step": 5
+          "step": 5,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "thresholds": [],

@@ -89,7 +89,11 @@
           "legendFormat": "",
           "metric": "mattermost_process_cpu_seconds_total",
           "refId": "A",
-          "step": 5
+          "step": 5,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "thresholds": "50,80",
@@ -174,7 +178,11 @@
           "intervalFactor": 1,
           "legendFormat": "",
           "refId": "A",
-          "step": 60
+          "step": 60,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "thresholds": "",
@@ -258,7 +266,11 @@
           "interval": "1m",
           "intervalFactor": 1,
           "refId": "A",
-          "step": 60
+          "step": 60,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "thresholds": "",
@@ -342,7 +354,11 @@
           "interval": "5s",
           "intervalFactor": 1,
           "refId": "A",
-          "step": 5
+          "step": 5,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "thresholds": "500, 800",
@@ -426,7 +442,11 @@
           "interval": "5s",
           "intervalFactor": 1,
           "refId": "A",
-          "step": 5
+          "step": 5,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "thresholds": "50, 80",
@@ -510,7 +530,11 @@
           "interval": "5s",
           "intervalFactor": 1,
           "refId": "A",
-          "step": 5
+          "step": 5,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "thresholds": "500, 800",
@@ -572,7 +596,11 @@
           "legendFormat": "{{instance}}",
           "metric": "mattermost_post_total",
           "refId": "A",
-          "step": 5
+          "step": 5,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         },
         {
           "expr": "sum(irate(mattermost_post_total{pod=~\"$server\"}[1m]))",
@@ -582,7 +610,11 @@
           "legendFormat": "Total",
           "metric": "mattermost_post_total",
           "refId": "B",
-          "step": 5
+          "step": 5,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "thresholds": [],
@@ -705,7 +737,11 @@
           "legendFormat": "{{instance}}",
           "metric": "mattermost_http_errors_total",
           "refId": "A",
-          "step": 5
+          "step": 5,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         },
         {
           "expr": "sum(irate(mattermost_http_errors_total{pod=~\"$server\"}[1m]))",
@@ -715,14 +751,22 @@
           "legendFormat": "Total",
           "metric": "mattermost_http_errors_total",
           "refId": "B",
-          "step": 5
+          "step": 5,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         },
         {
           "expr": "irate(mattermost_http_errors_total[1m])",
           "format": "time_series",
           "hide": true,
           "intervalFactor": 1,
-          "refId": "C"
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "thresholds": [
@@ -853,14 +897,22 @@
           "legendFormat": "{{instance}}",
           "metric": "mattermost_api_time_sum",
           "refId": "A",
-          "step": 5
+          "step": 5,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         },
         {
           "expr": "1000.0 * rate(mattermost_api_time_sum[1m]) /   rate(mattermost_api_time_count[1m])",
           "format": "time_series",
           "hide": true,
           "intervalFactor": 1,
-          "refId": "B"
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "thresholds": [
@@ -958,7 +1010,11 @@
           "legendFormat": "{{instance}}",
           "metric": "mattermost_db_master_connections_total",
           "refId": "A",
-          "step": 5
+          "step": 5,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         },
         {
           "expr": "sum(mattermost_db_master_connections_total{pod=~\"$server\"})",
@@ -968,7 +1024,11 @@
           "legendFormat": "Total",
           "metric": "mattermost_db_master_connections_total",
           "refId": "B",
-          "step": 5
+          "step": 5,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "thresholds": [],
@@ -1058,7 +1118,11 @@
           "legendFormat": "{{instance}}",
           "metric": "mattermost_cluster_cluster_request_duration_seconds_sum",
           "refId": "A",
-          "step": 5
+          "step": 5,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "thresholds": [],
@@ -1148,7 +1212,11 @@
           "legendFormat": "{{job}}",
           "metric": "mattermost_db_read_replica_connections_total",
           "refId": "A",
-          "step": 5
+          "step": 5,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         },
         {
           "expr": "sum(mattermost_db_read_replica_connections_total{pod=~\"$server\"})",
@@ -1158,7 +1226,11 @@
           "legendFormat": "Total",
           "metric": "mattermost_db_read_replica_connections_total",
           "refId": "B",
-          "step": 5
+          "step": 5,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "thresholds": [],
@@ -1248,7 +1320,11 @@
           "legendFormat": "{{instance}}",
           "metric": "mattermost_process_cpu_seconds_total",
           "refId": "A",
-          "step": 5
+          "step": 5,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "thresholds": [],
@@ -1338,7 +1414,11 @@
           "legendFormat": "{{instance}}",
           "metric": "go_goroutines",
           "refId": "A",
-          "step": 5
+          "step": 5,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         },
         {
           "expr": "sum(go_goroutines{pod=~\"$server\"})",
@@ -1348,7 +1428,11 @@
           "legendFormat": "Total",
           "metric": "go_goroutines",
           "refId": "B",
-          "step": 5
+          "step": 5,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
         }
       ],
       "thresholds": [],

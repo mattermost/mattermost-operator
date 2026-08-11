@@ -160,7 +160,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "histogram_quantile($percentile, sum by(le) (rate(mattermost_mobileapp_mobile_load_bucket{}[$rate])))",
+          "expr": "histogram_quantile($percentile, sum by(le) (rate(mattermost_mobileapp_mobile_load_bucket{}[$__rate_interval])))",
           "fullMetaSearch": false,
           "hide": false,
           "includeNullMetadata": false,
@@ -177,7 +177,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "histogram_quantile($percentile, sum by(le) (rate(mattermost_mobileapp_mobile_load_bucket{platform=\"android\"}[$rate])))",
+          "expr": "histogram_quantile($percentile, sum by(le) (rate(mattermost_mobileapp_mobile_load_bucket{platform=\"android\"}[$__rate_interval])))",
           "fullMetaSearch": false,
           "includeNullMetadata": false,
           "instant": false,
@@ -193,7 +193,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "histogram_quantile($percentile, sum by(le) (rate(mattermost_mobileapp_mobile_load_bucket{platform=\"ios\"}[$rate])))",
+          "expr": "histogram_quantile($percentile, sum by(le) (rate(mattermost_mobileapp_mobile_load_bucket{platform=\"ios\"}[$__rate_interval])))",
           "fullMetaSearch": false,
           "hide": false,
           "includeNullMetadata": false,
@@ -808,7 +808,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "histogram_quantile($percentile, sum by(le) (rate(mattermost_mobileapp_mobile_channel_switch_bucket{}[$rate])))",
+          "expr": "histogram_quantile($percentile, sum by(le) (rate(mattermost_mobileapp_mobile_channel_switch_bucket{}[$__rate_interval])))",
           "fullMetaSearch": false,
           "includeNullMetadata": false,
           "instant": false,
@@ -824,7 +824,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "histogram_quantile($percentile, sum by(le) (rate(mattermost_mobileapp_mobile_channel_switch_bucket{platform=\"android\"}[$rate])))",
+          "expr": "histogram_quantile($percentile, sum by(le) (rate(mattermost_mobileapp_mobile_channel_switch_bucket{platform=\"android\"}[$__rate_interval])))",
           "fullMetaSearch": false,
           "hide": false,
           "includeNullMetadata": false,
@@ -841,7 +841,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "histogram_quantile($percentile, sum by(le) (rate(mattermost_mobileapp_mobile_channel_switch_bucket{platform=\"ios\"}[$rate])))",
+          "expr": "histogram_quantile($percentile, sum by(le) (rate(mattermost_mobileapp_mobile_channel_switch_bucket{platform=\"ios\"}[$__rate_interval])))",
           "fullMetaSearch": false,
           "hide": false,
           "includeNullMetadata": false,
@@ -1453,7 +1453,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "histogram_quantile($percentile, sum by(le) (rate(mattermost_mobileapp_mobile_team_switch_bucket{}[$rate])))",
+          "expr": "histogram_quantile($percentile, sum by(le) (rate(mattermost_mobileapp_mobile_team_switch_bucket{}[$__rate_interval])))",
           "fullMetaSearch": false,
           "hide": false,
           "includeNullMetadata": false,
@@ -1470,7 +1470,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "histogram_quantile($percentile, sum by(le) (rate(mattermost_mobileapp_mobile_team_switch_bucket{platform=\"android\"}[$rate])))",
+          "expr": "histogram_quantile($percentile, sum by(le) (rate(mattermost_mobileapp_mobile_team_switch_bucket{platform=\"android\"}[$__rate_interval])))",
           "fullMetaSearch": false,
           "includeNullMetadata": false,
           "instant": false,
@@ -1486,7 +1486,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "histogram_quantile($percentile, sum by(le) (rate(mattermost_mobileapp_mobile_team_switch_bucket{platform=\"ios\"}[$rate])))",
+          "expr": "histogram_quantile($percentile, sum by(le) (rate(mattermost_mobileapp_mobile_team_switch_bucket{platform=\"ios\"}[$__rate_interval])))",
           "fullMetaSearch": false,
           "hide": false,
           "includeNullMetadata": false,
@@ -1977,26 +1977,6 @@
         "options": [],
         "includeAll": false,
         "multi": false
-      },
-      {
-        "description": "rate for measurements",
-        "hide": 2,
-        "name": "rate",
-        "query": "${VAR_RATE}",
-        "skipUrlSync": false,
-        "type": "constant",
-        "current": {
-          "value": "${VAR_RATE}",
-          "text": "${VAR_RATE}",
-          "selected": false
-        },
-        "options": [
-          {
-            "value": "${VAR_RATE}",
-            "text": "${VAR_RATE}",
-            "selected": false
-          }
-        ]
       },
       {
         "current": {

@@ -241,6 +241,10 @@ func GenerateRtcdServiceMonitorV1Beta(mattermost *mmv1beta.Mattermost) *monitori
 // one-file-per-ConfigMap convention. Created in the Mattermost namespace; a
 // Grafana running elsewhere reads them (Grafana -> Mattermost).
 func GenerateGrafanaDashboardConfigMapsV1Beta(mattermost *mmv1beta.Mattermost) ([]*corev1.ConfigMap, error) {
+	if mattermost.Spec.Monitoring == nil {
+		return nil, nil
+	}
+
 	discoveryLabel := defaultDashboardDiscoveryLabel
 	discoveryValue := defaultDashboardDiscoveryLabelValue
 
@@ -251,6 +255,13 @@ func GenerateGrafanaDashboardConfigMapsV1Beta(mattermost *mmv1beta.Mattermost) (
 		if gd.DiscoveryLabelValue != "" {
 			discoveryValue = gd.DiscoveryLabelValue
 		}
+	}
+
+	// The discovery label must not collide with the operator's ownership marker,
+	// or the marker would overwrite the sidecar's expected value (and break
+	// discovery). Reject the reserved key rather than silently mishandle it.
+	if discoveryLabel == dashboardConfigMapLabel {
+		return nil, fmt.Errorf("grafanaDashboard.discoveryLabel must not be the reserved key %q", dashboardConfigMapLabel)
 	}
 
 	dashboards, err := loadEmbeddedDashboards()
