@@ -60,7 +60,7 @@ func (r *MattermostReconciler) checkMattermostGrafanaDashboard(mattermost *mmv1b
 	}
 
 	if !grafanaDashboardEnabled(mattermost) {
-		return r.deleteConfigMaps(existing.Items, reqLogger)
+		return r.deleteConfigMaps(mattermost, existing.Items, reqLogger)
 	}
 
 	desired, err := mattermostApp.GenerateGrafanaDashboardConfigMapsV1Beta(mattermost)
@@ -99,13 +99,19 @@ func (r *MattermostReconciler) checkMattermostGrafanaDashboard(mattermost *mmv1b
 			stale = append(stale, existing.Items[i])
 		}
 	}
-	return r.deleteConfigMaps(stale, reqLogger)
+	return r.deleteConfigMaps(mattermost, stale, reqLogger)
 }
 
-// deleteConfigMaps deletes the given ConfigMaps, ignoring already-gone ones.
-func (r *MattermostReconciler) deleteConfigMaps(items []corev1.ConfigMap, reqLogger logr.Logger) error {
+// deleteConfigMaps deletes the given ConfigMaps, but only those this Mattermost
+// controls — so an unrelated ConfigMap that merely carries the discovery/marker
+// label is never removed. Already-gone objects are ignored.
+func (r *MattermostReconciler) deleteConfigMaps(mattermost *mmv1beta.Mattermost, items []corev1.ConfigMap, reqLogger logr.Logger) error {
 	for i := range items {
 		cm := &items[i]
+		if !metav1.IsControlledBy(cm, mattermost) {
+			reqLogger.Info("Skipping cleanup of config map not owned by this Mattermost", "name", cm.Name)
+			continue
+		}
 		reqLogger.Info("Deleting grafana dashboard config map", "name", cm.Name)
 		if err := r.Client.Delete(context.TODO(), cm); err != nil && !k8sErrors.IsNotFound(err) {
 			return errors.Wrap(err, "failed to delete grafana dashboard config map")
@@ -122,10 +128,10 @@ func (r *MattermostReconciler) checkMattermostServiceMonitor(mattermost *mmv1bet
 	smKey := types.NamespacedName{Name: mattermost.Name, Namespace: mattermost.Namespace}
 
 	if !serviceMonitorEnabled(mattermost) {
-		if err := r.Resources.DeleteServiceMonitor(smKey, reqLogger); err != nil {
+		if err := r.deleteOwnedResource(mattermost, smKey, &monitoringv1.ServiceMonitor{}, reqLogger); err != nil {
 			return err
 		}
-		return r.Resources.DeleteService(metricsSvcKey, reqLogger)
+		return r.deleteOwnedResource(mattermost, metricsSvcKey, &corev1.Service{}, reqLogger)
 	}
 
 	// The dedicated metrics Service must exist before the ServiceMonitor targets it.
@@ -144,7 +150,7 @@ func (r *MattermostReconciler) checkMattermostRtcdServiceMonitor(mattermost *mmv
 	rtcdKey := types.NamespacedName{Name: mattermost.Name + "-rtcd", Namespace: mattermost.Namespace}
 
 	if !callsMetricsEnabled(mattermost) {
-		return r.Resources.DeleteServiceMonitor(rtcdKey, reqLogger)
+		return r.deleteOwnedResource(mattermost, rtcdKey, &monitoringv1.ServiceMonitor{}, reqLogger)
 	}
 
 	desired := mattermostApp.GenerateRtcdServiceMonitorV1Beta(mattermost)
@@ -163,7 +169,7 @@ func (r *MattermostReconciler) checkMattermostPrometheusRule(mattermost *mmv1bet
 	ruleKey := types.NamespacedName{Name: mattermost.Name + "-rules", Namespace: mattermost.Namespace}
 
 	if !prometheusRuleEnabled(mattermost) {
-		return r.Resources.DeletePrometheusRule(ruleKey, reqLogger)
+		return r.deleteOwnedResource(mattermost, ruleKey, &monitoringv1.PrometheusRule{}, reqLogger)
 	}
 
 	desired, err := mattermostApp.GeneratePrometheusRuleV1Beta(mattermost)
@@ -185,6 +191,9 @@ func (r *MattermostReconciler) checkMattermostPrometheusRule(mattermost *mmv1bet
 		return errors.Wrap(err, "failed to fetch current prometheus rule")
 	}
 
+	if err := ensureOwnedForUpdate(mattermost, current); err != nil {
+		return err
+	}
 	return r.Resources.Update(current, desired, reqLogger)
 }
 
@@ -199,6 +208,9 @@ func (r *MattermostReconciler) reconcileService(mattermost *mmv1beta.Mattermost,
 		return errors.Wrap(err, "failed to fetch current metrics service")
 	}
 
+	if err := ensureOwnedForUpdate(mattermost, current); err != nil {
+		return err
+	}
 	return r.Resources.Update(current, desired, reqLogger)
 }
 
@@ -219,6 +231,9 @@ func (r *MattermostReconciler) reconcileServiceMonitor(mattermost *mmv1beta.Matt
 		return errors.Wrap(err, "failed to fetch current service monitor")
 	}
 
+	if err := ensureOwnedForUpdate(mattermost, current); err != nil {
+		return err
+	}
 	return r.Resources.Update(current, desired, reqLogger)
 }
 
@@ -237,6 +252,36 @@ func (r *MattermostReconciler) warnMonitoringWithoutLicense(mattermost *mmv1beta
 	if r.Recorder != nil {
 		r.Recorder.Event(mattermost, corev1.EventTypeWarning, "MonitoringRequiresEnterpriseLicense", msg)
 	}
+}
+
+// deleteOwnedResource deletes the object at key only if this Mattermost is its
+// controller owner, so cleanup-on-disable never removes an identically-named
+// resource the operator did not create. An absent Prometheus Operator CRD or an
+// already-gone object is a no-op.
+func (r *MattermostReconciler) deleteOwnedResource(mattermost *mmv1beta.Mattermost, key types.NamespacedName, obj client.Object, reqLogger logr.Logger) error {
+	if err := r.Client.Get(context.TODO(), key, obj); err != nil {
+		if apimeta.IsNoMatchError(err) || k8sErrors.IsNotFound(err) {
+			return nil
+		}
+		return errors.Wrap(err, "failed to fetch resource for cleanup")
+	}
+	if !metav1.IsControlledBy(obj, mattermost) {
+		reqLogger.Info("Skipping cleanup of resource not owned by this Mattermost", "name", key.Name)
+		return nil
+	}
+	if err := r.Client.Delete(context.TODO(), obj); err != nil && !k8sErrors.IsNotFound(err) {
+		return errors.Wrap(err, "failed to delete resource")
+	}
+	return nil
+}
+
+// ensureOwnedForUpdate refuses to overwrite a pre-existing object with the
+// generated name that this Mattermost does not control (a name collision).
+func ensureOwnedForUpdate(mattermost *mmv1beta.Mattermost, obj metav1.Object) error {
+	if !metav1.IsControlledBy(obj, mattermost) {
+		return errors.Errorf("%s/%s already exists and is not owned by this Mattermost; refusing to overwrite", obj.GetNamespace(), obj.GetName())
+	}
+	return nil
 }
 
 func serviceMonitorEnabled(mattermost *mmv1beta.Mattermost) bool {
