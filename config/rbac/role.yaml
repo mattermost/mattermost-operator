@@ -135,3 +135,11 @@ rules:
       - update
       - patch
       - delete
+  # Emit Warning events (e.g. MonitoringRequiresEnterpriseLicense) via the recorder.
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
