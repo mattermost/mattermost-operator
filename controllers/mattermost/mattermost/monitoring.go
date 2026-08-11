@@ -15,6 +15,7 @@ import (
 
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	mattermostApp "github.com/mattermost/mattermost-operator/pkg/mattermost"
+	"github.com/mattermost/mattermost-operator/pkg/resources"
 )
 
 // checkMattermostMonitoring reconciles the opt-in monitoring resources and warns
@@ -134,6 +135,11 @@ func (r *MattermostReconciler) reconcileService(mattermost *mmv1beta.Mattermost,
 	if err := ensureOwnedForUpdate(mattermost, current); err != nil {
 		return err
 	}
+
+	// Preserve the API-assigned, immutable clusterIP/clusterIPs (the metrics
+	// Service is headless, so clusterIPs is ["None"]); otherwise the update tries
+	// to clear them and fails on the next reconcile.
+	resources.CopyServiceEmptyAutoAssignedFields(desired, current)
 	return r.Resources.Update(current, desired, reqLogger)
 }
 
