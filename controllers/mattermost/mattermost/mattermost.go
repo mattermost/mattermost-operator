@@ -61,12 +61,20 @@ func (r *MattermostReconciler) checkMattermost(
 		}
 	}
 
-	err = r.checkMattermostMonitoring(mattermost, reqLogger)
+	recStatus, err := r.checkMattermostDeployment(mattermost, dbInfo, fsConfig, status, reqLogger)
 	if err != nil {
-		return reconcileStatus{}, err
+		return recStatus, err
 	}
 
-	return r.checkMattermostDeployment(mattermost, dbInfo, fsConfig, status, reqLogger)
+	// Monitoring is an opt-in add-on, so reconcile it after the core workload: a
+	// recoverable monitoring error (e.g. a name collision) must not block the
+	// Mattermost Deployment from converging/upgrading. The error still surfaces on
+	// the result so the reconcile is requeued.
+	if err := r.checkMattermostMonitoring(mattermost, reqLogger); err != nil {
+		return recStatus, err
+	}
+
+	return recStatus, nil
 }
 
 func (r *MattermostReconciler) checkLicence(mattermost *mmv1beta.Mattermost) error {

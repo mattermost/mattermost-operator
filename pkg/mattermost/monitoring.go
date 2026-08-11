@@ -4,6 +4,7 @@ import (
 	"embed"
 	"fmt"
 	"path"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -374,7 +375,9 @@ func rulePlaceholders(mattermost *mmv1beta.Mattermost) map[string]string {
 		// label matches are fully anchored, so "<name>-[^-]+-[^-]+" matches only
 		// this instance's pods — not a differently-named install that happens to
 		// share this name as a prefix (e.g. "mm" must not match "mm-test").
-		rulePlaceholderPodSelector: mattermost.Name + "-[^-]+-[^-]+",
+		// QuoteMeta the name: Mattermost names may contain dots, which are regex
+		// metacharacters ("test.mm" must not match "testXmm-...").
+		rulePlaceholderPodSelector: regexp.QuoteMeta(mattermost.Name) + "-[^-]+-[^-]+",
 	}
 }
 
