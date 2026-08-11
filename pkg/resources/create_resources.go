@@ -173,6 +173,19 @@ func (r *ResourceHelper) CreatePrometheusRuleIfNotExists(owner v1.Object, promet
 	return errors.Wrap(err, "failed to check if prometheus rule exists")
 }
 
+func (r *ResourceHelper) CreateConfigMapIfNotExists(owner v1.Object, configMap *corev1.ConfigMap, reqLogger logr.Logger) error {
+	foundConfigMap := &corev1.ConfigMap{}
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: configMap.Name, Namespace: configMap.Namespace}, foundConfigMap)
+	if err != nil && k8sErrors.IsNotFound(err) {
+		reqLogger.Info("Creating config map", "name", configMap.Name)
+		return r.Create(owner, configMap, reqLogger)
+	} else if err != nil {
+		return errors.Wrap(err, "failed to check if config map exists")
+	}
+
+	return nil
+}
+
 func (r *ResourceHelper) CreateIngressIfNotExists(owner v1.Object, ingress *networkingv1.Ingress, reqLogger logr.Logger) error {
 	foundIngress := &networkingv1.Ingress{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: ingress.Name, Namespace: ingress.Namespace}, foundIngress)
