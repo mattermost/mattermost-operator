@@ -58,6 +58,8 @@ func (r *MattermostReconciler) checkMattermostHealth(mattermost *mmv1beta.Matter
 	status.Endpoint = "not available"
 	var endpoint string
 
+	// The branch order matches GetSiteURLHost so that the reported endpoint always
+	// agrees with the SITEURL the Mattermost pods were configured with.
 	if mattermost.Spec.UseServiceLoadBalancer {
 		endpoint, err = healthChecker.CheckServiceLoadBalancer()
 		if err != nil {
@@ -67,6 +69,11 @@ func (r *MattermostReconciler) checkMattermostHealth(mattermost *mmv1beta.Matter
 		endpoint, err = healthChecker.CheckIngressLoadBalancer()
 		if err != nil {
 			return status, errors.Wrap(err, "failed to check ingress load balancer")
+		}
+	} else if mattermost.HTTPRouteEnabled() {
+		endpoint, err = healthChecker.CheckHTTPRoute()
+		if err != nil {
+			return status, errors.Wrap(err, "failed to check HTTPRoute")
 		}
 	}
 

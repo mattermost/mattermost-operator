@@ -12,6 +12,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -180,6 +182,42 @@ func (hc *HealthChecker) CheckIngressLoadBalancer() (string, error) {
 	}
 
 	return ingress.Items[0].Spec.Rules[0].Host, nil
+}
+
+// httpRouteListGVK identifies the Gateway API HTTPRoute list. The HTTPRoute is
+// read as unstructured for the same reason it is written that way; see
+// GenerateHTTPRouteV1Beta in the mattermost package.
+var httpRouteListGVK = schema.GroupVersionKind{
+	Group:   "gateway.networking.k8s.io",
+	Version: "v1",
+	Kind:    "HTTPRouteList",
+}
+
+// CheckHTTPRoute reports the primary hostname served by the Mattermost
+// HTTPRoute. It mirrors CheckIngressLoadBalancer: the hostname is taken from the
+// desired spec once the resource is confirmed to exist, rather than from any
+// Gateway address, so no permissions on Gateway resources are required.
+func (hc *HealthChecker) CheckHTTPRoute() (string, error) {
+	routes := &unstructured.UnstructuredList{}
+	routes.SetGroupVersionKind(httpRouteListGVK)
+
+	err := hc.apiReader.List(context.TODO(), routes, hc.listOptions...)
+	if err != nil {
+		return "", errors.Wrap(err, "unable to get HTTPRoute list")
+	}
+	if len(routes.Items) != 1 {
+		return "", fmt.Errorf("expected one HTTPRoute, but found %d", len(routes.Items))
+	}
+
+	hostnames, found, err := unstructured.NestedStringSlice(routes.Items[0].Object, "spec", "hostnames")
+	if err != nil {
+		return "", errors.Wrap(err, "unable to read HTTPRoute hostnames")
+	}
+	if !found || len(hostnames) == 0 {
+		return "", errors.New("HTTPRoute has no hostnames")
+	}
+
+	return hostnames[0], nil
 }
 
 func isPodReady(pod corev1.Pod) bool {

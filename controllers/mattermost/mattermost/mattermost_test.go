@@ -29,6 +29,7 @@ import (
 	v1beta1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -100,6 +101,10 @@ func TestCheckMattermost(t *testing.T) {
 		original := found.DeepCopy()
 
 		mm.Spec.UseServiceLoadBalancer = true
+		// Subtests below share this Mattermost, and UseServiceLoadBalancer suppresses
+		// Ingress and HTTPRoute reconciliation, so keep the flag scoped to this case.
+		defer func() { mm.Spec.UseServiceLoadBalancer = false }()
+
 		err = reconciler.checkMattermostService(mm, currentMMStatus, logger)
 		require.NoError(t, err)
 		err = reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mmName, Namespace: mmNamespace}, found)
@@ -1570,4 +1575,180 @@ func fixedDBAndFileStoreInfo(t *testing.T, mm *mmv1beta.Mattermost) (mattermostA
 	require.NoError(t, err)
 
 	return dbInfo, fsConfig
+}
+
+func TestCheckMattermostHTTPRoute(t *testing.T) {
+	logger, _, reconciler := setupTestDeps(t)
+
+	mmName := "foo"
+	mmNamespace := "default"
+	mm := &mmv1beta.Mattermost{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      mmName,
+			Namespace: mmNamespace,
+			UID:       types.UID("test"),
+		},
+		Spec: mmv1beta.MattermostSpec{
+			HTTPRoute: &mmv1beta.HTTPRouteSpec{
+				Enabled:    true,
+				Host:       "mm.example.com",
+				GatewayRef: mmv1beta.GatewayReference{Name: "shared-gateway"},
+			},
+		},
+	}
+
+	routeKey := types.NamespacedName{Name: mmName, Namespace: mmNamespace}
+
+	fetchRoute := func(t *testing.T) (*unstructured.Unstructured, error) {
+		t.Helper()
+		found := &unstructured.Unstructured{}
+		found.SetGroupVersionKind(httpRouteGVK)
+		return found, reconciler.Client.Get(context.TODO(), routeKey, found)
+	}
+
+	requireRoute := func(t *testing.T) *unstructured.Unstructured {
+		t.Helper()
+		found, err := fetchRoute(t)
+		require.NoError(t, err)
+		return found
+	}
+
+	hostnamesOf := func(t *testing.T, route *unstructured.Unstructured) []string {
+		t.Helper()
+		hostnames, found, err := unstructured.NestedStringSlice(route.Object, "spec", "hostnames")
+		require.NoError(t, err)
+		require.True(t, found)
+		return hostnames
+	}
+
+	t.Run("created when enabled", func(t *testing.T) {
+		require.NoError(t, reconciler.checkMattermostHTTPRoute(mm, logger))
+
+		found := requireRoute(t)
+		assert.Equal(t, "gateway.networking.k8s.io/v1", found.GetAPIVersion())
+		assert.Equal(t, "HTTPRoute", found.GetKind())
+		assert.Equal(t, []string{"mm.example.com"}, hostnamesOf(t, found))
+		require.Len(t, found.GetOwnerReferences(), 1)
+		assert.Equal(t, mmName, found.GetOwnerReferences()[0].Name)
+	})
+
+	t.Run("reconcile is idempotent", func(t *testing.T) {
+		// Guards against an update loop: JSON merge patch replaces lists wholesale,
+		// so a generated field that does not round trip would make every reconcile
+		// issue a write. A stable resourceVersion proves the patch was empty.
+		before := requireRoute(t)
+		require.NoError(t, reconciler.checkMattermostHTTPRoute(mm, logger))
+		after := requireRoute(t)
+		assert.Equal(t, before.GetResourceVersion(), after.GetResourceVersion())
+	})
+
+	t.Run("manual drift is reverted", func(t *testing.T) {
+		original := requireRoute(t)
+
+		modified := original.DeepCopy()
+		require.NoError(t, unstructured.SetNestedStringSlice(
+			modified.Object, []string{"tampered.example.com"}, "spec", "hostnames"))
+		modified.SetLabels(nil)
+		require.NoError(t, reconciler.Client.Update(context.TODO(), modified))
+
+		require.NoError(t, reconciler.checkMattermostHTTPRoute(mm, logger))
+
+		found := requireRoute(t)
+		assert.Equal(t, []string{"mm.example.com"}, hostnamesOf(t, found))
+		assert.Equal(t, original.GetLabels(), found.GetLabels())
+	})
+
+	t.Run("spec changes are applied", func(t *testing.T) {
+		mm.Spec.HTTPRoute.Hosts = []mmv1beta.IngressHost{{HostName: "extra.example.com"}}
+
+		require.NoError(t, reconciler.checkMattermostHTTPRoute(mm, logger))
+
+		assert.Equal(t, []string{"mm.example.com", "extra.example.com"}, hostnamesOf(t, requireRoute(t)))
+	})
+
+	t.Run("deleted when disabled", func(t *testing.T) {
+		mm.Spec.HTTPRoute.Enabled = false
+
+		require.NoError(t, reconciler.checkMattermostHTTPRoute(mm, logger))
+
+		_, err := fetchRoute(t)
+		require.Error(t, err)
+		assert.True(t, k8sErrors.IsNotFound(err), "expected HTTPRoute to be deleted, got %v", err)
+	})
+
+	t.Run("disabled and already absent is a no-op", func(t *testing.T) {
+		require.NoError(t, reconciler.checkMattermostHTTPRoute(mm, logger))
+	})
+
+	t.Run("no HTTPRoute section is a no-op", func(t *testing.T) {
+		mm.Spec.HTTPRoute = nil
+		require.NoError(t, reconciler.checkMattermostHTTPRoute(mm, logger))
+	})
+}
+
+// TestUseServiceLoadBalancerSuppressesHTTPRoute covers switching an installation
+// to Service load balancer mode after an HTTPRoute already exists. That mode does
+// not expose the Service port the route targets, so the route has to be removed
+// rather than left behind.
+//
+// Only the HTTPRoute is asserted here. Whether Service load balancer mode should
+// also clean up a leftover Ingress or IngressClass is a pre-existing question in
+// the Ingress path and is deliberately out of scope for HTTPRoute support.
+func TestUseServiceLoadBalancerSuppressesHTTPRoute(t *testing.T) {
+	logger, _, reconciler := setupTestDeps(t)
+
+	mmName := "foo"
+	mmNamespace := "default"
+	mm := &mmv1beta.Mattermost{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      mmName,
+			Namespace: mmNamespace,
+			UID:       types.UID("test"),
+		},
+		Spec: mmv1beta.MattermostSpec{
+			HTTPRoute: &mmv1beta.HTTPRouteSpec{
+				Enabled:    true,
+				Host:       "mm.example.com",
+				GatewayRef: mmv1beta.GatewayReference{Name: "shared-gateway"},
+			},
+		},
+	}
+
+	key := types.NamespacedName{Name: mmName, Namespace: mmNamespace}
+
+	httpRouteExists := func(t *testing.T) bool {
+		t.Helper()
+		found := &unstructured.Unstructured{}
+		found.SetGroupVersionKind(httpRouteGVK)
+		err := reconciler.Client.Get(context.TODO(), key, found)
+		if err != nil && k8sErrors.IsNotFound(err) {
+			return false
+		}
+		require.NoError(t, err)
+		return true
+	}
+
+	t.Run("exists while routing through the cluster", func(t *testing.T) {
+		require.NoError(t, reconciler.checkMattermostHTTPRoute(mm, logger))
+		assert.True(t, httpRouteExists(t))
+	})
+
+	t.Run("removed once useServiceLoadBalancer is enabled", func(t *testing.T) {
+		mm.Spec.UseServiceLoadBalancer = true
+
+		require.NoError(t, reconciler.checkMattermostHTTPRoute(mm, logger))
+		assert.False(t, httpRouteExists(t), "HTTPRoute should be removed in Service load balancer mode")
+	})
+
+	t.Run("not recreated while in Service load balancer mode", func(t *testing.T) {
+		require.NoError(t, reconciler.checkMattermostHTTPRoute(mm, logger))
+		assert.False(t, httpRouteExists(t))
+	})
+
+	t.Run("returns when useServiceLoadBalancer is turned back off", func(t *testing.T) {
+		mm.Spec.UseServiceLoadBalancer = false
+
+		require.NoError(t, reconciler.checkMattermostHTTPRoute(mm, logger))
+		assert.True(t, httpRouteExists(t))
+	})
 }
