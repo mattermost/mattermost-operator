@@ -11,6 +11,9 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1266,11 +1269,11 @@ func TestSanitizeIngressAnnotations(t *testing.T) {
 		{
 			name: "mixed safe and dangerous annotations",
 			input: map[string]string{
-				"nginx.ingress.kubernetes.io/proxy-body-size":         "1000M",
-				"nginx.ingress.kubernetes.io/configuration-snippet":   "dangerous",
-				"nginx.ingress.kubernetes.io/ssl-redirect":            "true",
-				"nginx.ingress.kubernetes.io/server-snippet":          "also-dangerous",
-				"safe-key-with-newline":                               "value\ninjected",
+				"nginx.ingress.kubernetes.io/proxy-body-size":       "1000M",
+				"nginx.ingress.kubernetes.io/configuration-snippet": "dangerous",
+				"nginx.ingress.kubernetes.io/ssl-redirect":          "true",
+				"nginx.ingress.kubernetes.io/server-snippet":        "also-dangerous",
+				"safe-key-with-newline":                             "value\ninjected",
 			},
 			expected: map[string]string{
 				"nginx.ingress.kubernetes.io/proxy-body-size": "1000M",
@@ -1309,6 +1312,241 @@ func TestGenerateIngress_V1Beta_SnippetAnnotationsFiltered(t *testing.T) {
 	assert.Equal(t, "500M", ingress.Annotations["nginx.ingress.kubernetes.io/proxy-body-size"])
 	assert.NotContains(t, ingress.Annotations, "nginx.ingress.kubernetes.io/configuration-snippet")
 	assert.NotContains(t, ingress.Annotations, "nginx.ingress.kubernetes.io/server-snippet")
+}
+
+func TestGenerateHTTPRoute_V1Beta(t *testing.T) {
+	mmName := "my-mm"
+	mmNamespace := "mm-ns"
+
+	newMattermost := func(httpRoute *mmv1beta.HTTPRouteSpec) *mmv1beta.Mattermost {
+		return &mmv1beta.Mattermost{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      mmName,
+				Namespace: mmNamespace,
+				UID:       types.UID("mm-uid"),
+			},
+			Spec: mmv1beta.MattermostSpec{HTTPRoute: httpRoute},
+		}
+	}
+
+	t.Run("defaults", func(t *testing.T) {
+		mattermost := newMattermost(&mmv1beta.HTTPRouteSpec{
+			Enabled:    true,
+			Host:       "mm.example.com",
+			GatewayRef: mmv1beta.GatewayReference{Name: "shared-gateway"},
+		})
+
+		route := GenerateHTTPRouteV1Beta(mattermost, logr.Discard())
+		require.NotNil(t, route)
+
+		assert.Equal(t, httpRouteGVK, route.GroupVersionKind())
+		assert.Equal(t, "gateway.networking.k8s.io/v1", route.GetAPIVersion())
+		assert.Equal(t, "HTTPRoute", route.GetKind())
+		assert.Equal(t, mmName, route.GetName())
+		assert.Equal(t, mmNamespace, route.GetNamespace())
+
+		assert.Equal(t, map[string]string{
+			"app": "mattermost",
+			"installation.mattermost.com/installation": mmName,
+			"installation.mattermost.com/resource":     mmName,
+		}, route.GetLabels())
+
+		require.Len(t, route.GetOwnerReferences(), 1)
+		owner := route.GetOwnerReferences()[0]
+		assert.Equal(t, "installation.mattermost.com/v1beta1", owner.APIVersion)
+		assert.Equal(t, "Mattermost", owner.Kind)
+		assert.Equal(t, mmName, owner.Name)
+		assert.Equal(t, types.UID("mm-uid"), owner.UID)
+		require.NotNil(t, owner.Controller)
+		assert.True(t, *owner.Controller)
+		require.NotNil(t, owner.BlockOwnerDeletion)
+		assert.True(t, *owner.BlockOwnerDeletion)
+
+		// Assert the whole spec so that an unexpected or missing field fails here
+		// rather than surfacing as drift against a live Gateway controller.
+		assert.Equal(t, map[string]interface{}{
+			"hostnames": []interface{}{"mm.example.com"},
+			"parentRefs": []interface{}{
+				map[string]interface{}{
+					"group":     "gateway.networking.k8s.io",
+					"kind":      "Gateway",
+					"name":      "shared-gateway",
+					"namespace": mmNamespace,
+				},
+			},
+			"rules": []interface{}{
+				map[string]interface{}{
+					"matches": []interface{}{
+						map[string]interface{}{
+							"path": map[string]interface{}{
+								"type":  "PathPrefix",
+								"value": "/",
+							},
+						},
+					},
+					"backendRefs": []interface{}{
+						map[string]interface{}{
+							"group":  "",
+							"kind":   "Service",
+							"name":   mmName,
+							"port":   int64(8065),
+							"weight": int64(100),
+						},
+					},
+					"timeouts": map[string]interface{}{
+						"request":        "3600s",
+						"backendRequest": "3600s",
+					},
+				},
+			},
+		}, route.Object["spec"])
+	})
+
+	t.Run("no sectionName key when unset", func(t *testing.T) {
+		mattermost := newMattermost(&mmv1beta.HTTPRouteSpec{
+			Enabled:    true,
+			Host:       "mm.example.com",
+			GatewayRef: mmv1beta.GatewayReference{Name: "shared-gateway"},
+		})
+
+		route := GenerateHTTPRouteV1Beta(mattermost, logr.Discard())
+
+		parentRefs, found, err := unstructured.NestedSlice(route.Object, "spec", "parentRefs")
+		require.NoError(t, err)
+		require.True(t, found)
+		require.Len(t, parentRefs, 1)
+		assert.NotContains(t, parentRefs[0].(map[string]interface{}), "sectionName")
+	})
+
+	t.Run("gatewayRef overrides", func(t *testing.T) {
+		mattermost := newMattermost(&mmv1beta.HTTPRouteSpec{
+			Enabled: true,
+			Host:    "mm.example.com",
+			GatewayRef: mmv1beta.GatewayReference{
+				Name:        "cilium-gateway",
+				Namespace:   "gateway-system",
+				Group:       "custom.networking.io",
+				SectionName: "https",
+			},
+		})
+
+		route := GenerateHTTPRouteV1Beta(mattermost, logr.Discard())
+
+		parentRefs, _, err := unstructured.NestedSlice(route.Object, "spec", "parentRefs")
+		require.NoError(t, err)
+		assert.Equal(t, []interface{}{
+			map[string]interface{}{
+				"group":       "custom.networking.io",
+				"kind":        "Gateway",
+				"name":        "cilium-gateway",
+				"namespace":   "gateway-system",
+				"sectionName": "https",
+			},
+		}, parentRefs)
+	})
+
+	t.Run("custom timeouts", func(t *testing.T) {
+		mattermost := newMattermost(&mmv1beta.HTTPRouteSpec{
+			Enabled:               true,
+			Host:                  "mm.example.com",
+			GatewayRef:            mmv1beta.GatewayReference{Name: "shared-gateway"},
+			RequestTimeout:        "120s",
+			BackendRequestTimeout: "60s",
+		})
+
+		route := GenerateHTTPRouteV1Beta(mattermost, logr.Discard())
+
+		rules, _, err := unstructured.NestedSlice(route.Object, "spec", "rules")
+		require.NoError(t, err)
+		require.Len(t, rules, 1)
+		assert.Equal(t, map[string]interface{}{
+			"request":        "120s",
+			"backendRequest": "60s",
+		}, rules[0].(map[string]interface{})["timeouts"])
+	})
+
+	t.Run("multiple hostnames retain order and skip duplicates", func(t *testing.T) {
+		mattermost := newMattermost(&mmv1beta.HTTPRouteSpec{
+			Enabled:    true,
+			Host:       "primary.example.com",
+			GatewayRef: mmv1beta.GatewayReference{Name: "shared-gateway"},
+			Hosts: []mmv1beta.IngressHost{
+				{HostName: "b.example.com"},
+				{HostName: "primary.example.com"},
+				{HostName: "a.example.com"},
+				{HostName: "b.example.com"},
+			},
+		})
+
+		route := GenerateHTTPRouteV1Beta(mattermost, logr.Discard())
+
+		hostnames, _, err := unstructured.NestedSlice(route.Object, "spec", "hostnames")
+		require.NoError(t, err)
+		assert.Equal(t, []interface{}{
+			"primary.example.com", "b.example.com", "a.example.com",
+		}, hostnames)
+	})
+
+	t.Run("annotations are passed through", func(t *testing.T) {
+		mattermost := newMattermost(&mmv1beta.HTTPRouteSpec{
+			Enabled:     true,
+			Host:        "mm.example.com",
+			GatewayRef:  mmv1beta.GatewayReference{Name: "shared-gateway"},
+			Annotations: map[string]string{"owner": "sre"},
+		})
+
+		route := GenerateHTTPRouteV1Beta(mattermost, logr.Discard())
+		assert.Equal(t, map[string]string{"owner": "sre"}, route.GetAnnotations())
+	})
+
+	t.Run("survives a JSON round trip", func(t *testing.T) {
+		// The object is sent to the API server and stored in the last-applied
+		// annotation as JSON, so every value has to be a legal unstructured type
+		// that survives encode/decode unchanged. A plain int (rather than int64)
+		// or a typed struct nested in the map would fail one of these.
+		mattermost := newMattermost(&mmv1beta.HTTPRouteSpec{
+			Enabled:    true,
+			Host:       "mm.example.com",
+			GatewayRef: mmv1beta.GatewayReference{Name: "shared-gateway"},
+		})
+
+		route := GenerateHTTPRouteV1Beta(mattermost, logr.Discard())
+
+		// DeepCopyJSON panics on any value that is not valid unstructured content.
+		require.NotPanics(t, func() { runtime.DeepCopyJSON(route.Object) })
+
+		raw, err := route.MarshalJSON()
+		require.NoError(t, err)
+
+		decoded := &unstructured.Unstructured{}
+		require.NoError(t, decoded.UnmarshalJSON(raw))
+		assert.Equal(t, route.Object, decoded.Object)
+	})
+}
+
+func TestGenerateHTTPRoute_V1Beta_SnippetAnnotationsFiltered(t *testing.T) {
+	mattermost := &mmv1beta.Mattermost{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-mm", Namespace: "default"},
+		Spec: mmv1beta.MattermostSpec{
+			HTTPRoute: &mmv1beta.HTTPRouteSpec{
+				Enabled:    true,
+				Host:       "test",
+				GatewayRef: mmv1beta.GatewayReference{Name: "gw"},
+				Annotations: map[string]string{
+					"owner": "sre",
+					"nginx.ingress.kubernetes.io/configuration-snippet": "more_set_headers 'X-Injected: true';",
+					"multiline": "value\nwith-newline",
+				},
+			},
+		},
+	}
+
+	route := GenerateHTTPRouteV1Beta(mattermost, logr.Discard())
+	require.NotNil(t, route)
+
+	assert.Equal(t, "sre", route.GetAnnotations()["owner"])
+	assert.NotContains(t, route.GetAnnotations(), "nginx.ingress.kubernetes.io/configuration-snippet")
+	assert.NotContains(t, route.GetAnnotations(), "multiline")
 }
 
 func TestGenerateALBIngress_V1Beta_SnippetAnnotationsFiltered(t *testing.T) {

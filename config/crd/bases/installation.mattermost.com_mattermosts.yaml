@@ -463,6 +463,70 @@ spec:
                         type: string
                     type: object
                 type: object
+              httpRoute:
+                description: |-
+                  HTTPRoute defines configuration for HTTPRoute resource (Gateway API) created by the Operator.
+                  When enabled, an HTTPRoute is created instead of or alongside the Ingress resource.
+                properties:
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    description: Annotations defines annotations to add to the HTTPRoute
+                      resource.
+                    type: object
+                  backendRequestTimeout:
+                    description: |-
+                      BackendRequestTimeout defines the timeout for backend requests (e.g. "3600s").
+                      Defaults to "3600s" when not set.
+                    type: string
+                  enabled:
+                    description: |-
+                      Enabled determines whether the Operator should create HTTPRoute resource or not.
+                      Disabling on an existing installation causes the Operator to remove the HTTPRoute.
+                    type: boolean
+                  gatewayRef:
+                    description: |-
+                      GatewayRef references the Gateway to attach this HTTPRoute to.
+                      Required when HTTPRoute is enabled. This is validated during defaulting
+                      rather than by the CRD schema, so that `httpRoute.enabled: false` stays a
+                      valid way to have the Operator remove the HTTPRoute without having to keep
+                      a Gateway reference around.
+                    properties:
+                      group:
+                        description: Group of the Gateway resource. Defaults to "gateway.networking.k8s.io".
+                        type: string
+                      name:
+                        description: Name of the Gateway.
+                        type: string
+                      namespace:
+                        description: Namespace of the Gateway. Defaults to the Mattermost
+                          instance namespace when not set.
+                        type: string
+                      sectionName:
+                        description: SectionName is the name of the section within
+                          the Gateway to attach to.
+                        type: string
+                    required:
+                    - name
+                    type: object
+                  host:
+                    description: Host defines the primary hostname for the HTTPRoute.
+                    type: string
+                  hosts:
+                    description: Hosts allows specifying additional hostnames.
+                    items:
+                      description: IngressHost specifies additional hosts configuration.
+                      properties:
+                        hostName:
+                          type: string
+                      type: object
+                    type: array
+                  requestTimeout:
+                    description: |-
+                      RequestTimeout defines the timeout for requests (e.g. "3600s").
+                      Defaults to "3600s" when not set.
+                    type: string
+                type: object
               image:
                 description: Image defines the Mattermost Docker image.
                 type: string

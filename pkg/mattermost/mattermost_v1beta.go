@@ -17,6 +17,7 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -247,6 +248,138 @@ func GenerateALBIngressV1Beta(mattermost *mmv1beta.Mattermost, logger logr.Logge
 	}
 
 	return ingress
+}
+
+var httpRouteGVK = schema.GroupVersionKind{
+	Group:   "gateway.networking.k8s.io",
+	Version: "v1",
+	Kind:    "HTTPRoute",
+}
+
+// GenerateHTTPRouteV1Beta returns the HTTPRoute (Gateway API) for the Mattermost app.
+//
+// NOTE: Why unstructured instead of the typed sigs.k8s.io/gateway-api SDK:
+//
+// Adding sigs.k8s.io/gateway-api as a direct dependency causes a transitive
+// dependency conflict that breaks the build. Any gateway-api release new enough
+// to support HTTPRoute v1 (stable) pulls in a newer kube-openapi snapshot that
+// requires sigs.k8s.io/structured-merge-diff/v6, while k8s.io/apimachinery at
+// the version pinned by this module (v0.33.x) was compiled against v4.  The two
+// major versions of structured-merge-diff expose incompatible types, so the
+// compiler rejects the combined module graph.
+//
+// Upgrading controller-runtime or the entire k8s.io/* dependency set to resolve
+// the conflict is a larger, separate effort. Using *unstructured.Unstructured is
+// the standard pattern for operators that manage CRDs owned by another operator:
+// it keeps the dependency graph clean, is version-agnostic, and is fully
+// supported by controller-runtime's client and the banzaicloud object-matcher.
+func GenerateHTTPRouteV1Beta(mattermost *mmv1beta.Mattermost, logger logr.Logger) *unstructured.Unstructured {
+	requestTimeout := "3600s"
+	if mattermost.Spec.HTTPRoute.RequestTimeout != "" {
+		requestTimeout = mattermost.Spec.HTTPRoute.RequestTimeout
+	}
+	backendTimeout := "3600s"
+	if mattermost.Spec.HTTPRoute.BackendRequestTimeout != "" {
+		backendTimeout = mattermost.Spec.HTTPRoute.BackendRequestTimeout
+	}
+
+	gwGroup := "gateway.networking.k8s.io"
+	if mattermost.Spec.HTTPRoute.GatewayRef.Group != "" {
+		gwGroup = mattermost.Spec.HTTPRoute.GatewayRef.Group
+	}
+
+	gwNamespace := mattermost.Namespace
+	if mattermost.Spec.HTTPRoute.GatewayRef.Namespace != "" {
+		gwNamespace = mattermost.Spec.HTTPRoute.GatewayRef.Namespace
+	}
+
+	parentRef := map[string]interface{}{
+		"group":     gwGroup,
+		"kind":      "Gateway",
+		"name":      mattermost.Spec.HTTPRoute.GatewayRef.Name,
+		"namespace": gwNamespace,
+	}
+	if mattermost.Spec.HTTPRoute.GatewayRef.SectionName != "" {
+		parentRef["sectionName"] = mattermost.Spec.HTTPRoute.GatewayRef.SectionName
+	}
+
+	hostNames := mattermost.GetHTTPRouteHostNames()
+	hostnames := make([]interface{}, 0, len(hostNames))
+	for _, h := range hostNames {
+		hostnames = append(hostnames, h)
+	}
+
+	weight := int64(100)
+	rule := map[string]interface{}{
+		"matches": []interface{}{
+			map[string]interface{}{
+				"path": map[string]interface{}{
+					"type":  "PathPrefix",
+					"value": "/",
+				},
+			},
+		},
+		"backendRefs": []interface{}{
+			map[string]interface{}{
+				"group":  "",
+				"kind":   "Service",
+				"name":   mattermost.Name,
+				"port":   int64(8065),
+				"weight": weight,
+			},
+		},
+		"timeouts": map[string]interface{}{
+			"request":        requestTimeout,
+			"backendRequest": backendTimeout,
+		},
+	}
+
+	annotations := sanitizeIngressAnnotations(mattermost.GetHTTPRouteAnnotations(), logger)
+
+	labels := mattermost.MattermostLabels(mattermost.Name)
+	labelsIface := make(map[string]interface{}, len(labels))
+	for k, v := range labels {
+		labelsIface[k] = v
+	}
+	annotationsIface := make(map[string]interface{}, len(annotations))
+	for k, v := range annotations {
+		annotationsIface[k] = v
+	}
+
+	ownerRefs := MattermostOwnerReference(mattermost)
+	ownerRefsIface := make([]interface{}, 0, len(ownerRefs))
+	for _, ref := range ownerRefs {
+		ownerRefsIface = append(ownerRefsIface, map[string]interface{}{
+			"apiVersion":         ref.APIVersion,
+			"kind":               ref.Kind,
+			"name":               ref.Name,
+			"uid":                string(ref.UID),
+			"controller":         ref.Controller != nil && *ref.Controller,
+			"blockOwnerDeletion": ref.BlockOwnerDeletion != nil && *ref.BlockOwnerDeletion,
+		})
+	}
+
+	obj := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "gateway.networking.k8s.io/v1",
+			"kind":       "HTTPRoute",
+			"metadata": map[string]interface{}{
+				"name":            mattermost.Name,
+				"namespace":       mattermost.Namespace,
+				"labels":          labelsIface,
+				"annotations":     annotationsIface,
+				"ownerReferences": ownerRefsIface,
+			},
+			"spec": map[string]interface{}{
+				"hostnames":  hostnames,
+				"parentRefs": []interface{}{parentRef},
+				"rules":      []interface{}{rule},
+			},
+		},
+	}
+	obj.SetGroupVersionKind(httpRouteGVK)
+
+	return obj
 }
 
 func makeIngressRules(hosts []string, mattermost *mmv1beta.Mattermost) []networkingv1.IngressRule {

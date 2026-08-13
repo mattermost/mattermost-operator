@@ -15,8 +15,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -223,6 +226,52 @@ func (r *ResourceHelper) DeleteIngressClass(key types.NamespacedName, reqLogger 
 	err = r.client.Delete(context.TODO(), foundIngressClass)
 	if err != nil {
 		return errors.Wrap(err, "failed to delete ingressClass")
+	}
+
+	return nil
+}
+
+var httpRouteGVK = schema.GroupVersionKind{
+	Group:   "gateway.networking.k8s.io",
+	Version: "v1",
+	Kind:    "HTTPRoute",
+}
+
+func (r *ResourceHelper) CreateHTTPRouteIfNotExists(owner v1.Object, httpRoute *unstructured.Unstructured, reqLogger logr.Logger) error {
+	found := &unstructured.Unstructured{}
+	found.SetGroupVersionKind(httpRouteGVK)
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: httpRoute.GetName(), Namespace: httpRoute.GetNamespace()}, found)
+	if err != nil && k8sErrors.IsNotFound(err) {
+		reqLogger.Info("Creating HTTPRoute", "name", httpRoute.GetName())
+		return r.Create(owner, httpRoute, reqLogger)
+	} else if err != nil {
+		return errors.Wrap(err, "failed to check if HTTPRoute exists")
+	}
+
+	return nil
+}
+
+func (r *ResourceHelper) DeleteHTTPRoute(key types.NamespacedName, reqLogger logr.Logger) error {
+	found := &unstructured.Unstructured{}
+	found.SetGroupVersionKind(httpRouteGVK)
+	err := r.client.Get(context.TODO(), key, found)
+	// A missing Gateway API means there is definitionally no HTTPRoute to remove, so
+	// treat it the same as the resource being absent. This matters because clusters
+	// without the Gateway API CRDs installed are the common case, and this delete runs
+	// on every reconcile of every installation that does not use HTTPRoute: returning
+	// an error here would abort the reconcile before the Deployment is reconciled.
+	// Note the Create path deliberately does not do this - an installation that asks
+	// for an HTTPRoute on a cluster that cannot serve one should fail loudly.
+	if err != nil && (k8sErrors.IsNotFound(err) || meta.IsNoMatchError(err)) {
+		return nil
+	} else if err != nil {
+		return errors.Wrap(err, "failed to check if HTTPRoute exists")
+	}
+
+	reqLogger.Info("Deleting HTTPRoute", "name", found.GetName())
+	err = r.client.Delete(context.TODO(), found)
+	if err != nil {
+		return errors.Wrap(err, "failed to delete HTTPRoute")
 	}
 
 	return nil

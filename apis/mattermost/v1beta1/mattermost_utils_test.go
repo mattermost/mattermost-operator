@@ -352,3 +352,315 @@ func TestMattermost_GetIngressHostNames(t *testing.T) {
 		})
 	}
 }
+
+// validHTTPRoute returns an HTTPRouteSpec that passes SetDefaults validation.
+func validHTTPRoute() *HTTPRouteSpec {
+	return &HTTPRouteSpec{
+		Enabled:    true,
+		Host:       "mm.example.com",
+		GatewayRef: GatewayReference{Name: "shared-gateway"},
+	}
+}
+
+func TestMattermost_SetDefaults_HTTPRoute(t *testing.T) {
+	t.Run("HTTPRoute only, no ingress section, is accepted", func(t *testing.T) {
+		mm := &Mattermost{Spec: MattermostSpec{HTTPRoute: validHTTPRoute()}}
+		require.NoError(t, mm.SetDefaults())
+	})
+
+	t.Run("require host when enabled", func(t *testing.T) {
+		mm := &Mattermost{Spec: MattermostSpec{HTTPRoute: &HTTPRouteSpec{
+			Enabled:    true,
+			GatewayRef: GatewayReference{Name: "shared-gateway"},
+		}}}
+		err := mm.SetDefaults()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "httpRoute.host")
+	})
+
+	t.Run("require gatewayRef.name when enabled", func(t *testing.T) {
+		mm := &Mattermost{Spec: MattermostSpec{HTTPRoute: &HTTPRouteSpec{
+			Enabled: true,
+			Host:    "mm.example.com",
+		}}}
+		err := mm.SetDefaults()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "httpRoute.gatewayRef.name")
+	})
+
+	t.Run("no validation when disabled", func(t *testing.T) {
+		// An operator removing an HTTPRoute must be able to flip enabled to false
+		// without still supplying a host and Gateway reference.
+		mm := &Mattermost{Spec: MattermostSpec{
+			Ingress:   &Ingress{Enabled: false},
+			HTTPRoute: &HTTPRouteSpec{Enabled: false},
+		}}
+		require.NoError(t, mm.SetDefaults())
+	})
+
+	t.Run("ingress still validated when explicitly enabled alongside HTTPRoute", func(t *testing.T) {
+		mm := &Mattermost{Spec: MattermostSpec{
+			Ingress:   &Ingress{Enabled: true},
+			HTTPRoute: validHTTPRoute(),
+		}}
+		err := mm.SetDefaults()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "ingress.host")
+	})
+}
+
+func TestMattermost_IngressEnabled_HTTPRouteInteraction(t *testing.T) {
+	for _, testCase := range []struct {
+		description string
+		mmSpec      MattermostSpec
+		enabled     bool
+	}{
+		{
+			description: "no ingress section and no HTTPRoute keeps legacy default",
+			mmSpec:      MattermostSpec{},
+			enabled:     true,
+		},
+		{
+			description: "HTTPRoute opts out of the implicit ingress default",
+			mmSpec:      MattermostSpec{HTTPRoute: validHTTPRoute()},
+			enabled:     false,
+		},
+		{
+			description: "deprecated IngressName is preserved for side-by-side migration",
+			mmSpec: MattermostSpec{
+				IngressName: "legacy.example.com",
+				HTTPRoute:   validHTTPRoute(),
+			},
+			enabled: true,
+		},
+		{
+			description: "explicit ingress enabled wins over HTTPRoute opt out",
+			mmSpec: MattermostSpec{
+				Ingress:   &Ingress{Enabled: true, Host: "mm.example.com"},
+				HTTPRoute: validHTTPRoute(),
+			},
+			enabled: true,
+		},
+		{
+			description: "explicit ingress disabled stays disabled",
+			mmSpec: MattermostSpec{
+				Ingress:   &Ingress{Enabled: false},
+				HTTPRoute: validHTTPRoute(),
+			},
+			enabled: false,
+		},
+		{
+			description: "disabled HTTPRoute does not opt out of the ingress default",
+			mmSpec: MattermostSpec{
+				IngressName: "legacy.example.com",
+				HTTPRoute:   &HTTPRouteSpec{Enabled: false},
+			},
+			enabled: true,
+		},
+	} {
+		t.Run(testCase.description, func(t *testing.T) {
+			mm := &Mattermost{Spec: testCase.mmSpec}
+			assert.Equal(t, testCase.enabled, mm.IngressEnabled())
+		})
+	}
+}
+
+func TestMattermost_HTTPRouteAccessors(t *testing.T) {
+	t.Run("absent section", func(t *testing.T) {
+		mm := &Mattermost{}
+		assert.False(t, mm.HTTPRouteEnabled())
+		assert.Equal(t, "", mm.GetHTTPRouteHost())
+		assert.Equal(t, []string{}, mm.GetHTTPRouteHostNames())
+		assert.Nil(t, mm.GetHTTPRouteAnnotations())
+	})
+
+	t.Run("present but disabled", func(t *testing.T) {
+		mm := &Mattermost{Spec: MattermostSpec{HTTPRoute: &HTTPRouteSpec{
+			Enabled: false,
+			Host:    "mm.example.com",
+		}}}
+		assert.False(t, mm.HTTPRouteEnabled())
+		// Accessors report configuration regardless of enablement.
+		assert.Equal(t, "mm.example.com", mm.GetHTTPRouteHost())
+	})
+
+	t.Run("enabled with annotations", func(t *testing.T) {
+		mm := &Mattermost{Spec: MattermostSpec{HTTPRoute: &HTTPRouteSpec{
+			Enabled:     true,
+			Host:        "mm.example.com",
+			Annotations: map[string]string{"team": "sre"},
+		}}}
+		assert.True(t, mm.HTTPRouteEnabled())
+		assert.Equal(t, "mm.example.com", mm.GetHTTPRouteHost())
+		assert.Equal(t, map[string]string{"team": "sre"}, mm.GetHTTPRouteAnnotations())
+	})
+}
+
+func TestMattermost_GetHTTPRouteHostNames(t *testing.T) {
+	for _, testCase := range []struct {
+		description   string
+		mmSpec        MattermostSpec
+		expectedHosts []string
+	}{
+		{
+			description:   "no HTTPRoute section",
+			mmSpec:        MattermostSpec{},
+			expectedHosts: []string{},
+		},
+		{
+			description: "no primary host yields no hosts even if extras are set",
+			mmSpec: MattermostSpec{HTTPRoute: &HTTPRouteSpec{
+				Enabled: true,
+				Hosts:   []IngressHost{{HostName: "extra.example.com"}},
+			}},
+			expectedHosts: []string{},
+		},
+		{
+			description: "only primary host",
+			mmSpec: MattermostSpec{HTTPRoute: &HTTPRouteSpec{
+				Enabled: true,
+				Host:    "primary.example.com",
+			}},
+			expectedHosts: []string{"primary.example.com"},
+		},
+		{
+			description: "multiple hosts retain order and skip duplicates",
+			mmSpec: MattermostSpec{HTTPRoute: &HTTPRouteSpec{
+				Enabled: true,
+				Host:    "primary.example.com",
+				Hosts: []IngressHost{
+					{HostName: "b.example.com"},
+					{HostName: "a.example.com"},
+					{HostName: "b.example.com"},
+					{HostName: "primary.example.com"},
+				},
+			}},
+			expectedHosts: []string{"primary.example.com", "b.example.com", "a.example.com"},
+		},
+	} {
+		t.Run(testCase.description, func(t *testing.T) {
+			mm := &Mattermost{Spec: testCase.mmSpec}
+			assert.Equal(t, testCase.expectedHosts, mm.GetHTTPRouteHostNames())
+		})
+	}
+}
+
+func TestMattermost_GetSiteURLHost(t *testing.T) {
+	for _, testCase := range []struct {
+		description  string
+		mmSpec       MattermostSpec
+		expectedHost string
+	}{
+		// The following cases predate HTTPRoute support. Before GetSiteURLHost
+		// existed the deployment always used GetIngressHost(), so these pin that
+		// behavior against regressions.
+		{
+			description:  "legacy IngressName",
+			mmSpec:       MattermostSpec{IngressName: "legacy.example.com"},
+			expectedHost: "legacy.example.com",
+		},
+		{
+			description:  "ingress enabled",
+			mmSpec:       MattermostSpec{Ingress: &Ingress{Enabled: true, Host: "mm.example.com"}},
+			expectedHost: "mm.example.com",
+		},
+		{
+			description: "ALB with no ingress section falls back to legacy host",
+			mmSpec: MattermostSpec{
+				AWSLoadBalancerController: &AWSLoadBalancerController{
+					Enabled: true,
+					Hosts:   []IngressHost{{HostName: "alb.example.com"}},
+				},
+			},
+			expectedHost: "",
+		},
+
+		// HTTPRoute cases.
+		{
+			description:  "HTTPRoute only",
+			mmSpec:       MattermostSpec{HTTPRoute: validHTTPRoute()},
+			expectedHost: "mm.example.com",
+		},
+		{
+			description: "ingress wins over HTTPRoute when both enabled",
+			mmSpec: MattermostSpec{
+				Ingress:   &Ingress{Enabled: true, Host: "ingress.example.com"},
+				HTTPRoute: validHTTPRoute(),
+			},
+			expectedHost: "ingress.example.com",
+		},
+		{
+			description: "HTTPRoute used when ingress explicitly disabled",
+			mmSpec: MattermostSpec{
+				Ingress:   &Ingress{Enabled: false, Host: "ignored.example.com"},
+				HTTPRoute: validHTTPRoute(),
+			},
+			expectedHost: "mm.example.com",
+		},
+		{
+			// Pins the pre-HTTPRoute behavior: the site URL comes from ingress.host
+			// even for ALB installations. Changing this would alter SITEURL, and with
+			// it force a rollout, on existing installations.
+			description: "ALB with ingress disabled still uses the ingress host",
+			mmSpec: MattermostSpec{
+				Ingress: &Ingress{Enabled: false, Host: "mm.example.com"},
+				AWSLoadBalancerController: &AWSLoadBalancerController{
+					Enabled: true,
+					Hosts:   []IngressHost{{HostName: "alb.example.com"}},
+				},
+			},
+			expectedHost: "mm.example.com",
+		},
+	} {
+		t.Run(testCase.description, func(t *testing.T) {
+			mm := &Mattermost{Spec: testCase.mmSpec}
+			assert.Equal(t, testCase.expectedHost, mm.GetSiteURLHost())
+		})
+	}
+}
+
+// TestGetSiteURLHost_IdenticalToLegacyWithoutHTTPRoute proves the invariant that
+// makes swapping GetIngressHost for GetSiteURLHost in the deployment safe: across
+// every combination of the routing fields that existed before HTTPRoute, the two
+// return the same value. If this holds, no existing installation can see its
+// MM_SERVICESETTINGS_SITEURL change, and so none can be forced into a rollout.
+func TestGetSiteURLHost_IdenticalToLegacyWithoutHTTPRoute(t *testing.T) {
+	ingresses := []*Ingress{
+		nil,
+		{Enabled: true, Host: "mm.example.com"},
+		{Enabled: true},
+		{Enabled: false},
+		{Enabled: false, Host: "mm.example.com"},
+	}
+	albs := []*AWSLoadBalancerController{
+		nil,
+		{Enabled: false},
+		{Enabled: true, Hosts: []IngressHost{{HostName: "alb.example.com"}}},
+	}
+	legacyNames := []string{"", "legacy.example.com"}
+	serviceLBs := []bool{false, true}
+
+	combinations := 0
+	for _, ingress := range ingresses {
+		for _, alb := range albs {
+			for _, legacyName := range legacyNames {
+				for _, serviceLB := range serviceLBs {
+					mm := &Mattermost{Spec: MattermostSpec{
+						Ingress:                   ingress,
+						AWSLoadBalancerController: alb,
+						IngressName:               legacyName,
+						UseServiceLoadBalancer:    serviceLB,
+					}}
+
+					require.False(t, mm.HTTPRouteEnabled(), "fixture must not enable HTTPRoute")
+					assert.Equal(t, mm.GetIngressHost(), mm.GetSiteURLHost(),
+						"ingress=%+v alb=%+v ingressName=%q serviceLB=%v",
+						ingress, alb, legacyName, serviceLB)
+					combinations++
+				}
+			}
+		}
+	}
+
+	assert.Equal(t, len(ingresses)*len(albs)*len(legacyNames)*len(serviceLBs), combinations)
+}
