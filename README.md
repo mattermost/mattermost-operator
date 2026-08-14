@@ -132,7 +132,7 @@ Developing and testing local changes to Mattermost Operator is fairly simple. Fo
 
 To spin up an appropriate Kind cluster and deploy dependencies, run:
 ```bash
-make kind-start mysql-minio-operators
+make kind-start mysql-operator
 ```
 
 After Kind cluster is up and running, build Mattermost Operator image, load it to Kind cluster and deploy it. For that, run:
@@ -155,7 +155,7 @@ Mattermost Operator can be run on local machine against remote a Kubernetes clus
 To run Operator locally:
 - Make sure you are connected to a Kubernetes cluster.
 - Install Custom Resources by running: `kubectl apply -f ./config/crd/bases`.
-- Install MinIO and MySQL operators: `make mysql-minio-operators`.
+- Install the MySQL operator: `make mysql-operator`.
 - Make sure Mattermost Operator **is not** running in the cluster or scale it down to 0 replicas to avoid unexpected behaviour.
 - Run Operator binary: `go run .`
 
@@ -218,7 +218,7 @@ This allows the operator to:
    Some Kubernetes resources managed by the operator (such as `IngressClass`) are **cluster-scoped** and cannot be managed with namespace-limited roles.
 
 3. **Cross-Namespace Integrations**  
-   The operator can provision and manage external dependencies — such as **MySQL clusters** or **MinIO instances** — that may reside in different namespaces.  
+   The operator can provision and manage external dependencies — such as **MySQL clusters** — that may reside in different namespaces.  
    Managing these cross-namespace resources requires cluster-level permissions.
 
 4. **Namespace Metadata Access**  

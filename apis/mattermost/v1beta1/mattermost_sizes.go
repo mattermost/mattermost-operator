@@ -43,7 +43,6 @@ func (mm *Mattermost) setDefaultReplicasAndResources() {
 		mm.Spec.Scheduling.Resources = mattermostv1alpha1.DefaultSize.App.Resources
 	}
 
-	mm.Spec.FileStore.SetDefaultReplicasAndResources()
 	mm.Spec.Database.SetDefaultReplicasAndResources()
 }
 
@@ -52,6 +51,5 @@ func (mm *Mattermost) overrideReplicasAndResourcesFromSize(size mattermostv1alph
 
 	mm.Spec.Replicas = utils.NewInt32(size.App.Replicas)
 	mm.Spec.Scheduling.Resources = size.App.Resources
-	mm.Spec.FileStore.OverrideReplicasAndResourcesFromSize(size)
 	mm.Spec.Database.OverrideReplicasAndResourcesFromSize(size)
 }

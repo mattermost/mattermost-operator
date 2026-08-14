@@ -41,10 +41,6 @@ func TestMattermost(t *testing.T) {
 		err = waitForStatefulSet(t, k8sClient, "mysql-operator", "mysql-operator", 1, retryInterval, timeout)
 		require.NoError(t, err)
 	})
-	t.Run("minio operator ready", func(t *testing.T) {
-		err = waitForDeployment(t, k8sTypedClient, "minio-operator", "minio-operator", 1, retryInterval, timeout)
-		require.NoError(t, err)
-	})
 	t.Run("mattermost operator ready", func(t *testing.T) {
 		err = waitForDeployment(t, k8sTypedClient, mmNamespace, "mattermost-operator", 1, retryInterval, timeout)
 		require.NoError(t, err)
@@ -85,7 +81,6 @@ func mattermostScaleTest(t *testing.T, k8sClient client.Client, k8sTypedClient k
 	err := k8sClient.Create(context.TODO(), exampleMattermost)
 	require.NoError(t, err)
 
-	err = waitForStatefulSet(t, k8sClient, mmNamespace, "test-mm-minio", 1, retryInterval, timeout)
 	require.NoError(t, err)
 
 	err = waitForStatefulSet(t, k8sClient, mmNamespace, fmt.Sprintf("%s-mysql", utils.HashWithPrefix("db", "test-mm")), 1, retryInterval, timeout)
@@ -153,7 +148,6 @@ func mattermostUpgradeTest(t *testing.T, k8sClient client.Client, k8sTypedClient
 	err := k8sClient.Create(context.TODO(), exampleMattermost)
 	require.NoError(t, err)
 
-	err = waitForStatefulSet(t, k8sClient, mmNamespace, fmt.Sprintf("%s-minio", testName), 1, retryInterval, timeout)
 	require.NoError(t, err)
 
 	err = waitForStatefulSet(t, k8sClient, mmNamespace, fmt.Sprintf("%s-mysql", utils.HashWithPrefix("db", testName)), 1, retryInterval, timeout)
@@ -235,7 +229,6 @@ func mattermostWithMySQLReplicas(t *testing.T, client client.Client, _ kubernete
 	err := client.Create(context.TODO(), exampleMattermost)
 	require.NoError(t, err)
 
-	err = waitForStatefulSet(t, client, mmNamespace, fmt.Sprintf("%s-minio", testName), 1, retryInterval, timeout)
 	require.NoError(t, err)
 
 	err = waitForStatefulSet(t, client, mmNamespace, fmt.Sprintf("%s-mysql", utils.HashWithPrefix("db", testName)), 2, retryInterval, timeout)
@@ -257,17 +250,15 @@ func testMattermostResources() corev1.ResourceRequirements {
 	}
 }
 
-func testFileStoreConfig(replicas int32) operator.FileStore {
+// testFileStoreConfig returns a local (PVC backed) file store. The e2e suite used
+// operator-managed MinIO, which no longer exists; local keeps the suite free of any
+// external object store dependency. The replicas argument is retained so callers
+// stay unchanged, but a PVC backed file store has no replica count.
+func testFileStoreConfig(_ int32) operator.FileStore {
 	return operator.FileStore{
-		OperatorManaged: &operator.OperatorManagedMinio{
+		Local: &operator.LocalFileStore{
+			Enabled:     true,
 			StorageSize: "1Gi",
-			Replicas:    ptrUtil.NewInt32(replicas),
-			Resources: corev1.ResourceRequirements{
-				Requests: corev1.ResourceList{
-					corev1.ResourceCPU:    resource.MustParse("100m"),
-					corev1.ResourceMemory: resource.MustParse("100Mi"),
-				},
-			},
 		},
 	}
 }

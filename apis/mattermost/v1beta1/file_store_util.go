@@ -4,23 +4,27 @@
 package v1beta1
 
 import (
-	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1"
-	"github.com/mattermost/mattermost-operator/pkg/utils"
+	"github.com/pkg/errors"
 )
 
 // FileStore utils
 
-// SetDefaults sets the missing values in FileStore to the default ones.
-func (fs *FileStore) SetDefaults() {
-	if fs.isAnyExceptOperatorManaged() {
-		return
+// SetDefaults validates the file store configuration.
+//
+// There is deliberately no default. Until Operator v2 an unconfigured file store
+// silently became an in-cluster MinIO provisioned through the MinIO operator, which
+// no longer exists. Picking a different default instead would repoint an existing
+// installation at empty storage while its files stayed in the old MinIO, so this
+// fails and asks for an explicit choice.
+func (fs *FileStore) SetDefaults() error {
+	if fs.IsExternal() || fs.IsExternalVolume() || fs.IsLocal() {
+		return nil
 	}
 
-	fs.ensureDefault()
-	fs.OperatorManaged.SetDefaults()
+	return errors.New("a file store is required: configure one of fileStore.external, fileStore.local or fileStore.externalVolume")
 }
 
-// IsExternal returns true if the MinIO/S3 instance is external.
+// IsExternal returns true if an external S3 compatible file store is configured.
 func (fs *FileStore) IsExternal() bool {
 	return fs.External != nil && fs.External.URL != ""
 }
@@ -34,54 +38,4 @@ func (fs *FileStore) IsExternalVolume() bool {
 // IsLocal returns true if the filestore requested is local (PVC backed).
 func (fs *FileStore) IsLocal() bool {
 	return fs.Local != nil && fs.Local.Enabled
-}
-
-// isAnyExceptOperatorManaged checks if any filestore types are configurated
-// except the operator managed type. This is generally used to see if defaults
-// should be applied.
-func (fs *FileStore) isAnyExceptOperatorManaged() bool {
-	return fs.IsExternal() || fs.IsExternalVolume() || fs.IsLocal()
-}
-
-func (fs *FileStore) ensureDefault() {
-	if fs.OperatorManaged == nil {
-		fs.OperatorManaged = &OperatorManagedMinio{}
-	}
-}
-
-// SetDefaults sets the missing values in OperatorManagedMinio to the default ones.
-func (omm *OperatorManagedMinio) SetDefaults() {
-	if omm.StorageSize == "" {
-		omm.StorageSize = DefaultFilestoreStorageSize
-	}
-}
-
-func (fs *FileStore) SetDefaultReplicasAndResources() {
-	if fs.isAnyExceptOperatorManaged() {
-		return
-	}
-	fs.ensureDefault()
-	fs.OperatorManaged.SetDefaultReplicasAndResources()
-}
-
-func (omm *OperatorManagedMinio) SetDefaultReplicasAndResources() {
-	if omm.Replicas == nil {
-		omm.Replicas = &mattermostv1alpha1.DefaultSize.Minio.Replicas
-	}
-	if omm.Resources.Size() == 0 {
-		omm.Resources = mattermostv1alpha1.DefaultSize.Minio.Resources
-	}
-}
-
-func (fs *FileStore) OverrideReplicasAndResourcesFromSize(size mattermostv1alpha1.ClusterInstallationSize) {
-	if fs.isAnyExceptOperatorManaged() {
-		return
-	}
-	fs.ensureDefault()
-	fs.OperatorManaged.OverrideReplicasAndResourcesFromSize(size)
-}
-
-func (omm *OperatorManagedMinio) OverrideReplicasAndResourcesFromSize(size mattermostv1alpha1.ClusterInstallationSize) {
-	omm.Replicas = utils.NewInt32(size.Minio.Replicas)
-	omm.Resources = size.Minio.Resources
 }

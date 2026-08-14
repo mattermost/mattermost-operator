@@ -9,7 +9,6 @@ require (
 	github.com/mattermost/blubr v0.1.0
 	github.com/mattn/goveralls v0.0.12
 	github.com/mikefarah/yq/v3 v3.0.0-20201202084205-8846255d1c37
-	github.com/minio/minio-operator v0.0.0-20200214142425-158e343f1f19
 	github.com/pborman/uuid v1.2.1
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.9.3

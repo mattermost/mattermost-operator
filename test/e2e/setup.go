@@ -5,7 +5,6 @@ import (
 
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	mysqlv1alpha1 "github.com/mattermost/mattermost-operator/pkg/database/mysql_operator/v1alpha1"
-	v1beta1Minio "github.com/minio/minio-operator/pkg/apis/miniocontroller/v1beta1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -33,11 +32,6 @@ func SetupTest() (TestEnvironment, error) {
 	}
 
 	err = mmv1beta.AddToScheme(scheme.Scheme)
-	if err != nil {
-		return TestEnvironment{}, err
-	}
-
-	err = v1beta1Minio.AddToScheme(scheme.Scheme)
 	if err != nil {
 		return TestEnvironment{}, err
 	}

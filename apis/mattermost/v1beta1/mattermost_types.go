@@ -457,9 +457,6 @@ type FileStore struct {
 	// Defines the configuration of externally managed PVC backed storage.
 	// +optional
 	ExternalVolume *ExternalVolumeFileStore `json:"externalVolume,omitempty"`
-	// Defines the configuration of file store managed by Kubernetes operator.
-	// +optional
-	OperatorManaged *OperatorManagedMinio `json:"operatorManaged,omitempty"`
 	// Defines the configuration of PVC backed storage (local). This is NOT recommended for production environments.
 	// +optional
 	Local *LocalFileStore `json:"local,omitempty"`
@@ -484,25 +481,6 @@ type ExternalFileStore struct {
 type ExternalVolumeFileStore struct {
 	// The name of the matching volume claim for the externally managed volume.
 	VolumeClaimName string `json:"volumeClaimName,omitempty"`
-}
-
-// OperatorManagedMinio defines the configuration of a Minio file store managed by Kubernetes Operator.
-type OperatorManagedMinio struct {
-	// Defines the storage size for Minio. ie 50Gi
-	// +optional
-	// +kubebuilder:validation:Pattern=^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$
-	StorageSize string `json:"storageSize,omitempty"`
-	// Defines the number of Minio replicas.
-	// Supply 1 to run Minio in standalone mode with no redundancy.
-	// Supply 4 or more to run Minio in distributed mode.
-	// Note that it is not possible to upgrade Minio from standalone to distributed mode.
-	// Setting this will override the number of replicas set by 'Size'.
-	// More info: https://docs.min.io/docs/distributed-minio-quickstart-guide.html
-	// +optional
-	Replicas *int32 `json:"replicas,omitempty"`
-	// Defines the resource requests and limits for the Minio pods.
-	// +optional
-	Resources v1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 // LocalFileStore defines the configuration of the local file store that should be used by Mattermost (PVC configuration).

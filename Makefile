@@ -237,8 +237,8 @@ deploy: manifests kustomize ## Deploy controller in the configured Kubernetes cl
 	cd config/manager && $(KUSTOMIZE) edit set image mattermost-operator="mattermost/mattermost-operator:test"
 	$(KUSTOMIZE) build config/default | kubectl apply -n mattermost-operator -f -
 
-mysql-minio-operators: ## Deploys MinIO and MySQL Operators to the active cluster
-	./scripts/install-mysql-minio.sh
+mysql-operator: ## Deploys the MySQL Operator to the active cluster
+	./scripts/install-mysql-operator.sh
 
 manifests: $(CONTROLLER_GEN) ## Runs CRD generator
 	echo "Generating CRDs"

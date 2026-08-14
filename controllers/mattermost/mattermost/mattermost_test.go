@@ -1543,7 +1543,23 @@ func fixedDBAndFileStoreInfo(t *testing.T, mm *mmv1beta.Mattermost) (mattermostA
 	})
 	require.NoError(t, err)
 
-	fsConfig := mattermostApp.NewOperatorManagedFileStoreInfo(mm, "fileStoreSecret", "http://minio:9000")
+	// An external file store is the fixed choice for these tests; operator-managed
+	// MinIO no longer exists and a file store is now mandatory.
+	if mm.Spec.FileStore.External == nil {
+		mm.Spec.FileStore.External = &mmv1beta.ExternalFileStore{
+			URL:    "s3.example.com",
+			Bucket: "test-bucket",
+			Secret: "fileStoreSecret",
+		}
+	}
+
+	fsConfig, err := mattermostApp.NewExternalFileStoreInfo(mm, &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "fileStoreSecret"},
+		Data: map[string][]byte{
+			"accesskey": []byte("access-key"),
+			"secretkey": []byte("secret-key"),
+		},
+	})
 	require.NoError(t, err)
 
 	return dbInfo, fsConfig

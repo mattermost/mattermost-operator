@@ -174,7 +174,6 @@ _Appears in:_
 | --- | --- | --- | --- |
 | `external` _[ExternalFileStore](#externalfilestore)_ | Defines the configuration of an external file store. |  | Optional: \{\} <br /> |
 | `externalVolume` _[ExternalVolumeFileStore](#externalvolumefilestore)_ | Defines the configuration of externally managed PVC backed storage. |  | Optional: \{\} <br /> |
-| `operatorManaged` _[OperatorManagedMinio](#operatormanagedminio)_ | Defines the configuration of file store managed by Kubernetes operator. |  | Optional: \{\} <br /> |
 | `local` _[LocalFileStore](#localfilestore)_ | Defines the configuration of PVC backed storage (local). This is NOT recommended for production environments. |  | Optional: \{\} <br /> |
 
 
@@ -360,23 +359,6 @@ _Appears in:_
 | `backupRestoreSecretName` _string_ | Defines the secret to be used when performing a database restore. |  | Optional: \{\} <br /> |
 | `version` _string_ | Defines the cluster version for the database to use |  | Optional: \{\} <br /> |
 
-
-#### OperatorManagedMinio
-
-
-
-OperatorManagedMinio defines the configuration of a Minio file store managed by Kubernetes Operator.
-
-
-
-_Appears in:_
-- [FileStore](#filestore)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `storageSize` _string_ | Defines the storage size for Minio. ie 50Gi |  | Pattern: `^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$` <br />Optional: \{\} <br /> |
-| `replicas` _integer_ | Defines the number of Minio replicas.<br />Supply 1 to run Minio in standalone mode with no redundancy.<br />Supply 4 or more to run Minio in distributed mode.<br />Note that it is not possible to upgrade Minio from standalone to distributed mode.<br />Setting this will override the number of replicas set by 'Size'.<br />More info: https://docs.min.io/docs/distributed-minio-quickstart-guide.html |  | Optional: \{\} <br /> |
-| `resources` _[ResourceRequirements](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#resourcerequirements-v1-core)_ | Defines the resource requests and limits for the Minio pods. |  | Optional: \{\} <br /> |
 
 
 #### Patch

@@ -26,8 +26,6 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	minioOperator "github.com/minio/minio-operator/pkg/apis/miniocontroller/v1beta1"
-	v1beta1Minio "github.com/minio/minio-operator/pkg/apis/miniocontroller/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -55,6 +53,13 @@ func TestReconcile(t *testing.T) {
 			Image:       "mattermost/mattermost-enterprise-edition",
 			Version:     operatortest.LatestStableMattermostVersion,
 			IngressName: "foo.mattermost.dev",
+			FileStore: mmv1beta.FileStore{
+				External: &mmv1beta.ExternalFileStore{
+					URL:    "s3.example.com",
+					Bucket: "test-bucket",
+					Secret: "file-store-secret",
+				},
+			},
 			ResourcePatch: &mmv1beta.ResourcePatch{
 				Deployment: &mmv1beta.Patch{
 					Patch: exposePortPatch,
@@ -102,7 +107,6 @@ func TestReconcile(t *testing.T) {
 	// cluster resources.
 	mmKey := types.NamespacedName{Name: mmName, Namespace: mmNamespace}
 	mmMysqlKey := types.NamespacedName{Name: utils.HashWithPrefix("db", mmName), Namespace: mmNamespace}
-	mmMinioKey := types.NamespacedName{Name: mmName + "-minio", Namespace: mmNamespace}
 
 	t.Run("observed generation updated", func(t *testing.T) {
 		var fetchedMM mmv1beta.Mattermost
@@ -115,14 +119,6 @@ func TestReconcile(t *testing.T) {
 		t.Run("cluster", func(t *testing.T) {
 			mysql := &mysqlv1alpha1.MysqlCluster{}
 			err = c.Get(context.TODO(), mmMysqlKey, mysql)
-			require.NoError(t, err)
-		})
-	})
-
-	t.Run("minio", func(t *testing.T) {
-		t.Run("instance", func(t *testing.T) {
-			minio := &minioOperator.MinIOInstance{}
-			err = c.Get(context.TODO(), mmMinioKey, minio)
 			require.NoError(t, err)
 		})
 	})
@@ -583,25 +579,31 @@ func requestForCI(mattermost *mmv1beta.Mattermost) reconcile.Request {
 	return reconcile.Request{NamespacedName: types.NamespacedName{Name: mattermost.Name, Namespace: mattermost.Namespace}}
 }
 
+// prepAllDependencyTestResources creates the resources the Operator expects to
+// already exist. Previously that was the Service fronting the operator-managed
+// MinIO; now it is the Secret backing the external file store.
 func prepAllDependencyTestResources(client client.Client, mattermost *mmv1beta.Mattermost) error {
-	minioService := &corev1.Service{
+	if mattermost.Spec.FileStore.External == nil || mattermost.Spec.FileStore.External.Secret == "" {
+		return nil
+	}
+
+	fileStoreSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      mattermost.Name + "-minio-hl-svc",
+			Name:      mattermost.Spec.FileStore.External.Secret,
 			Namespace: mattermost.Namespace,
 		},
-		Spec: corev1.ServiceSpec{
-			Ports:     []corev1.ServicePort{{Port: 9000}},
-			ClusterIP: corev1.ClusterIPNone,
+		Data: map[string][]byte{
+			"accesskey": []byte("access-key"),
+			"secretkey": []byte("secret-key"),
 		},
 	}
 
-	return client.Create(context.TODO(), minioService)
+	return client.Create(context.TODO(), fileStoreSecret)
 }
 
 func prepareSchema(t *testing.T, scheme *runtime.Scheme) *runtime.Scheme {
 	err := mmv1beta.AddToScheme(scheme)
 	require.NoError(t, err)
-	err = v1beta1Minio.AddToScheme(scheme)
 	require.NoError(t, err)
 	err = mysqlv1alpha1.SchemeBuilder.AddToScheme(scheme)
 	require.NoError(t, err)
