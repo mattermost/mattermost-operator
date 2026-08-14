@@ -81,12 +81,6 @@ rules:
       - watch
       - update
   - apiGroups:
-      - mattermost.com
-    resources:
-      - '*'
-    verbs:
-      - '*'
-  - apiGroups:
       - installation.mattermost.com
     resources:
       - '*'

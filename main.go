@@ -9,10 +9,8 @@ import (
 
 	"github.com/go-logr/logr"
 	blubr "github.com/mattermost/blubr"
-	"github.com/mattermost/mattermost-operator/controllers/mattermost/clusterinstallation"
 	"github.com/mattermost/mattermost-operator/controllers/mattermost/mattermost"
 	mysqlv1alpha1 "github.com/mattermost/mattermost-operator/pkg/database/mysql_operator/v1alpha1"
-	"github.com/mattermost/mattermost-operator/pkg/resources"
 	v1beta1Minio "github.com/minio/minio-operator/pkg/apis/miniocontroller/v1beta1"
 	"github.com/sirupsen/logrus"
 	"github.com/vrischmann/envconfig"
@@ -112,18 +110,6 @@ func main() {
 
 	logger.Info("Registering Components")
 
-	if err = (&clusterinstallation.ClusterInstallationReconciler{
-		Client:              mgr.GetClient(),
-		NonCachedAPIReader:  mgr.GetAPIReader(),
-		Log:                 ctrl.Log.WithName("controllers").WithName("ClusterInstallation"),
-		Scheme:              mgr.GetScheme(),
-		MaxReconciling:      config.MaxReconcilingInstallations,
-		RequeueOnLimitDelay: config.RequeueOnLimitDelay,
-		Resources:           resources.NewResourceHelper(mgr.GetClient(), mgr.GetScheme()),
-	}).SetupWithManager(mgr); err != nil {
-		logger.Error(err, "Unable to create controller", "controller", "ClusterInstallation")
-		os.Exit(1)
-	}
 	if err = mattermost.NewMattermostReconciler(
 		mgr,
 		config.MaxReconcilingInstallations,
