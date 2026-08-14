@@ -10,7 +10,6 @@ import (
 	"github.com/go-logr/logr"
 	blubr "github.com/mattermost/blubr"
 	"github.com/mattermost/mattermost-operator/controllers/mattermost/mattermost"
-	mysqlv1alpha1 "github.com/mattermost/mattermost-operator/pkg/database/mysql_operator/v1alpha1"
 	"github.com/sirupsen/logrus"
 	"github.com/vrischmann/envconfig"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
@@ -46,7 +45,6 @@ func init() {
 	utilruntime.Must(mmv1beta.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 
-	utilruntime.Must(mysqlv1alpha1.SchemeBuilder.AddToScheme(scheme))
 }
 
 type Config struct {

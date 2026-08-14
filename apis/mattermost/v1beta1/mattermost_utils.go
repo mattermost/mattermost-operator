@@ -73,7 +73,9 @@ func (mm *Mattermost) SetDefaults() error {
 	if err := mm.Spec.FileStore.SetDefaults(); err != nil {
 		return err
 	}
-	mm.Spec.Database.SetDefaults()
+	if err := mm.Spec.Database.SetDefaults(); err != nil {
+		return err
+	}
 
 	if err := validateVolumes(mm.Spec.Volumes); err != nil {
 		return err

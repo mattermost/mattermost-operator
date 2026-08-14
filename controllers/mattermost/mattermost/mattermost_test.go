@@ -20,7 +20,6 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 
 	blubr "github.com/mattermost/blubr"
-	mattermostmysql "github.com/mattermost/mattermost-operator/pkg/components/mysql"
 	operatortest "github.com/mattermost/mattermost-operator/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -815,6 +814,12 @@ func TestCheckMattermostExternalDBAndFileStore(t *testing.T) {
 	}
 	currentMMStatus := &mmv1beta.MattermostStatus{}
 
+	// An external database is the fixed choice for these tests; operator-managed
+	// MySQL no longer exists and a database is now mandatory.
+	if mm.Spec.Database.External == nil {
+		mm.Spec.Database.External = &mmv1beta.ExternalDatabase{Secret: "dbSecret"}
+	}
+
 	dbInfo, err := mattermostApp.NewExternalDBConfig(mm, corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{Name: "dbSecret"},
 		Data: map[string][]byte{
@@ -957,13 +962,6 @@ func TestCheckMattermostExternalDBAndFileStore(t *testing.T) {
 		assert.Equal(t, original.Spec.Template, found.Spec.Template)
 	})
 
-	t.Run("final check", func(t *testing.T) {
-		t.Run("default database secret should be missing", func(t *testing.T) {
-			dbSecret := &corev1.Secret{}
-			err := reconciler.Client.Get(context.TODO(), types.NamespacedName{Name: mattermostmysql.DefaultDatabaseSecretName(mmName), Namespace: mmNamespace}, dbSecret)
-			require.Error(t, err)
-		})
-	})
 }
 
 func TestCheckMattermostExternalVolumeFileStore(t *testing.T) {
@@ -992,13 +990,16 @@ func TestCheckMattermostExternalVolumeFileStore(t *testing.T) {
 	}
 	currentMMStatus := &mmv1beta.MattermostStatus{}
 
-	dbInfo, err := mattermostApp.NewMySQLDBConfig(corev1.Secret{
+	// An external database is the fixed choice for these tests; operator-managed
+	// MySQL no longer exists and a database is now mandatory.
+	if mm.Spec.Database.External == nil {
+		mm.Spec.Database.External = &mmv1beta.ExternalDatabase{Secret: "dbSecret"}
+	}
+
+	dbInfo, err := mattermostApp.NewExternalDBConfig(mm, corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{Name: "dbSecret"},
 		Data: map[string][]byte{
-			"ROOT_PASSWORD": []byte("root-pass"),
-			"USER":          []byte("user"),
-			"PASSWORD":      []byte("pass"),
-			"DATABASE":      []byte("db"),
+			"DB_CONNECTION_STRING": []byte("mysql://user:pass@tcp(mysql:3306)/mattermost"),
 		},
 	})
 	require.NoError(t, err)
@@ -1066,13 +1067,16 @@ func TestCheckMattermostLocalFileStore(t *testing.T) {
 	}
 	currentMMStatus := &mmv1beta.MattermostStatus{}
 
-	dbInfo, err := mattermostApp.NewMySQLDBConfig(corev1.Secret{
+	// An external database is the fixed choice for these tests; operator-managed
+	// MySQL no longer exists and a database is now mandatory.
+	if mm.Spec.Database.External == nil {
+		mm.Spec.Database.External = &mmv1beta.ExternalDatabase{Secret: "dbSecret"}
+	}
+
+	dbInfo, err := mattermostApp.NewExternalDBConfig(mm, corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{Name: "dbSecret"},
 		Data: map[string][]byte{
-			"ROOT_PASSWORD": []byte("root-pass"),
-			"USER":          []byte("user"),
-			"PASSWORD":      []byte("pass"),
-			"DATABASE":      []byte("db"),
+			"DB_CONNECTION_STRING": []byte("mysql://user:pass@tcp(mysql:3306)/mattermost"),
 		},
 	})
 	require.NoError(t, err)
@@ -1532,13 +1536,16 @@ func setupTestDeps(t *testing.T) (logr.Logger, client.Client, *MattermostReconci
 }
 
 func fixedDBAndFileStoreInfo(t *testing.T, mm *mmv1beta.Mattermost) (mattermostApp.DatabaseConfig, mattermostApp.FileStoreConfig) {
-	dbInfo, err := mattermostApp.NewMySQLDBConfig(corev1.Secret{
+	// An external database is the fixed choice for these tests; operator-managed
+	// MySQL no longer exists and a database is now mandatory.
+	if mm.Spec.Database.External == nil {
+		mm.Spec.Database.External = &mmv1beta.ExternalDatabase{Secret: "dbSecret"}
+	}
+
+	dbInfo, err := mattermostApp.NewExternalDBConfig(mm, corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{Name: "dbSecret"},
 		Data: map[string][]byte{
-			"ROOT_PASSWORD": []byte("root-pass"),
-			"USER":          []byte("user"),
-			"PASSWORD":      []byte("pass"),
-			"DATABASE":      []byte("db"),
+			"DB_CONNECTION_STRING": []byte("mysql://user:pass@tcp(mysql:3306)/mattermost"),
 		},
 	})
 	require.NoError(t, err)

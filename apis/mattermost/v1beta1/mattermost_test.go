@@ -76,8 +76,6 @@ func TestMattermost(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, size1000.App.Replicas, *tmm.Spec.Replicas)
 			assert.Equal(t, size1000.App.Resources.String(), tmm.Spec.Scheduling.Resources.String())
-			assert.Equal(t, size1000.Database.Replicas, *tmm.Spec.Database.OperatorManaged.Replicas)
-			assert.Equal(t, size1000.Database.Resources.String(), tmm.Spec.Database.OperatorManaged.Resources.String())
 			assert.Equal(t, "", tmm.Spec.Size)
 		})
 
@@ -93,17 +91,11 @@ func TestMattermost(t *testing.T) {
 			overriddenReplicas := int32(7)
 			tmm.Spec.Replicas = utils.NewInt32(overriddenReplicas)
 			tmm.Spec.Scheduling.Resources = resources
-			tmm.Spec.Database.OperatorManaged = &OperatorManagedDatabase{
-				Resources: resources,
-				Replicas:  utils.NewInt32(overriddenReplicas),
-			}
 
 			err := tmm.SetReplicasAndResourcesFromSize()
 			require.NoError(t, err)
 			assert.Equal(t, size1000.App.Replicas, *tmm.Spec.Replicas)
 			assert.Equal(t, size1000.App.Resources.String(), tmm.Spec.Scheduling.Resources.String())
-			assert.Equal(t, size1000.Database.Replicas, *tmm.Spec.Database.OperatorManaged.Replicas)
-			assert.Equal(t, size1000.Database.Resources.String(), tmm.Spec.Database.OperatorManaged.Resources.String())
 			assert.Equal(t, "", tmm.Spec.Size)
 		})
 
@@ -114,8 +106,6 @@ func TestMattermost(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, mattermostv1alpha1.DefaultSize.App.Replicas, *tmm.Spec.Replicas)
 			assert.Equal(t, mattermostv1alpha1.DefaultSize.App.Resources.String(), tmm.Spec.Scheduling.Resources.String())
-			assert.Equal(t, mattermostv1alpha1.DefaultSize.Database.Replicas, *tmm.Spec.Database.OperatorManaged.Replicas)
-			assert.Equal(t, mattermostv1alpha1.DefaultSize.Database.Resources.String(), tmm.Spec.Database.OperatorManaged.Resources.String())
 			assert.Equal(t, "", tmm.Spec.Size)
 		})
 
@@ -126,8 +116,6 @@ func TestMattermost(t *testing.T) {
 			assert.Error(t, err)
 			assert.Equal(t, mattermostv1alpha1.DefaultSize.App.Replicas, *tmm.Spec.Replicas)
 			assert.Equal(t, mattermostv1alpha1.DefaultSize.App.Resources.String(), tmm.Spec.Scheduling.Resources.String())
-			assert.Equal(t, mattermostv1alpha1.DefaultSize.Database.Replicas, *tmm.Spec.Database.OperatorManaged.Replicas)
-			assert.Equal(t, mattermostv1alpha1.DefaultSize.Database.Resources.String(), tmm.Spec.Database.OperatorManaged.Resources.String())
 			assert.Equal(t, "", tmm.Spec.Size)
 		})
 	})

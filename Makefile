@@ -237,9 +237,6 @@ deploy: manifests kustomize ## Deploy controller in the configured Kubernetes cl
 	cd config/manager && $(KUSTOMIZE) edit set image mattermost-operator="mattermost/mattermost-operator:test"
 	$(KUSTOMIZE) build config/default | kubectl apply -n mattermost-operator -f -
 
-mysql-operator: ## Deploys the MySQL Operator to the active cluster
-	./scripts/install-mysql-operator.sh
-
 manifests: $(CONTROLLER_GEN) ## Runs CRD generator
 	echo "Generating CRDs"
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) paths="./apis/..." output:crd:artifacts:config=config/crd/bases
@@ -255,9 +252,6 @@ vet: ## Run go vet against against all packages.
 
 generate: $(OPENAPI_GEN) $(CONTROLLER_GEN) ## Runs the kubernetes code-generators and openapi
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
-
-	# Revert any modification to the mysql-operator files
-	git checkout pkg/database/mysql_operator/*
 
 	## Grant permissions to execute generation script
 	chmod +x scripts/k8s.io/code-generator/generate-groups.sh

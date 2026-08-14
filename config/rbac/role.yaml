@@ -86,17 +86,3 @@ rules:
       - '*'
     verbs:
       - '*'
-  - apiGroups:
-      - mysql.presslabs.org
-    resources:
-      - mysqlbackups
-      - mysqlclusters
-      - mysqlclusters/status
-    verbs:
-      - get
-      - list
-      - watch
-      - create
-      - update
-      - patch
-      - delete

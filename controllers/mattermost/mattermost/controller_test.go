@@ -5,14 +5,12 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	mysqlv1alpha1 "github.com/mattermost/mattermost-operator/pkg/database/mysql_operator/v1alpha1"
 	"github.com/mattermost/mattermost-operator/pkg/resources"
 	"github.com/sirupsen/logrus"
 
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 
 	blubr "github.com/mattermost/blubr"
-	"github.com/mattermost/mattermost-operator/pkg/components/utils"
 	operatortest "github.com/mattermost/mattermost-operator/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -60,6 +58,9 @@ func TestReconcile(t *testing.T) {
 					Secret: "file-store-secret",
 				},
 			},
+			Database: mmv1beta.Database{
+				External: &mmv1beta.ExternalDatabase{Secret: "db-secret"},
+			},
 			ResourcePatch: &mmv1beta.ResourcePatch{
 				Deployment: &mmv1beta.Patch{
 					Patch: exposePortPatch,
@@ -106,21 +107,12 @@ func TestReconcile(t *testing.T) {
 	// Define the NamespacedName objects that will be used to lookup the
 	// cluster resources.
 	mmKey := types.NamespacedName{Name: mmName, Namespace: mmNamespace}
-	mmMysqlKey := types.NamespacedName{Name: utils.HashWithPrefix("db", mmName), Namespace: mmNamespace}
 
 	t.Run("observed generation updated", func(t *testing.T) {
 		var fetchedMM mmv1beta.Mattermost
 		err = c.Get(context.Background(), mmKey, &fetchedMM)
 		require.NoError(t, err)
 		assert.Equal(t, int64(1), fetchedMM.Status.ObservedGeneration)
-	})
-
-	t.Run("mysql", func(t *testing.T) {
-		t.Run("cluster", func(t *testing.T) {
-			mysql := &mysqlv1alpha1.MysqlCluster{}
-			err = c.Get(context.TODO(), mmMysqlKey, mysql)
-			require.NoError(t, err)
-		})
 	})
 
 	t.Run("mattermost", func(t *testing.T) {
@@ -598,14 +590,30 @@ func prepAllDependencyTestResources(client client.Client, mattermost *mmv1beta.M
 		},
 	}
 
-	return client.Create(context.TODO(), fileStoreSecret)
+	if err := client.Create(context.TODO(), fileStoreSecret); err != nil {
+		return err
+	}
+
+	if mattermost.Spec.Database.External == nil || mattermost.Spec.Database.External.Secret == "" {
+		return nil
+	}
+
+	dbSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      mattermost.Spec.Database.External.Secret,
+			Namespace: mattermost.Namespace,
+		},
+		Data: map[string][]byte{
+			"DB_CONNECTION_STRING": []byte("mysql://user:pass@tcp(mysql:3306)/mattermost"),
+		},
+	}
+
+	return client.Create(context.TODO(), dbSecret)
 }
 
 func prepareSchema(t *testing.T, scheme *runtime.Scheme) *runtime.Scheme {
 	err := mmv1beta.AddToScheme(scheme)
 	require.NoError(t, err)
-	require.NoError(t, err)
-	err = mysqlv1alpha1.SchemeBuilder.AddToScheme(scheme)
 	require.NoError(t, err)
 
 	return scheme

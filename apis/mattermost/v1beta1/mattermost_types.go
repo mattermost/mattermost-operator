@@ -331,9 +331,6 @@ type Database struct {
 	// Defines the configuration of and external database.
 	// +optional
 	External *ExternalDatabase `json:"external,omitempty"`
-	// Defines the configuration of database managed by Kubernetes operator.
-	// +optional
-	OperatorManaged *OperatorManagedDatabase `json:"operatorManaged,omitempty"`
 
 	// DisableReadinessCheck instructs Operator to not add init container responsible for checking DB access.
 	// Can be used to define custom init containers specified in `spec.PodExtensions.InitContainers`.
@@ -407,46 +404,6 @@ type ExternalDatabase struct {
 	//   - Key: DB_CONNECTION_CHECK_URL | Value: The URL used for checking that the database is accessible.
 	//     Omitting this value in the secret will cause Operator to skip adding init container for database check.
 	Secret string `json:"secret,omitempty"`
-}
-
-// OperatorManagedDatabase defines the configuration of a database managed by Kubernetes Operator.
-type OperatorManagedDatabase struct {
-	// Defines the type of database to use for an Operator-Managed database.
-	Type string `json:"type,omitempty"`
-	// Defines the storage size for the database. ie 50Gi
-	// +optional
-	// +kubebuilder:validation:Pattern=^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$
-	StorageSize string `json:"storageSize,omitempty"`
-	// Defines the number of database replicas.
-	// For redundancy use at least 2 replicas.
-	// Setting this will override the number of replicas set by 'Size'.
-	// +optional
-	Replicas *int32 `json:"replicas,omitempty"`
-	// Defines the resource requests and limits for the database pods.
-	// +optional
-	Resources v1.ResourceRequirements `json:"resources,omitempty"`
-	// Defines the AWS S3 bucket where the Database Backup is stored.
-	// The operator will download the file to restore the data.
-	// +optional
-	InitBucketURL string `json:"initBucketURL,omitempty"`
-	// Defines the interval for backups in cron expression format.
-	// +optional
-	BackupSchedule string `json:"backupSchedule,omitempty"`
-	// Defines the object storage url for uploading backups.
-	// +optional
-	BackupURL string `json:"backupURL,omitempty"`
-	// Defines the backup retention policy.
-	// +optional
-	BackupRemoteDeletePolicy string `json:"backupRemoteDeletePolicy,omitempty"`
-	// Defines the secret to be used for uploading/restoring backup.
-	// +optional
-	BackupSecretName string `json:"backupSecretName,omitempty"`
-	// Defines the secret to be used when performing a database restore.
-	// +optional
-	BackupRestoreSecretName string `json:"backupRestoreSecretName,omitempty"`
-	// Defines the cluster version for the database to use
-	// +optional
-	Version string `json:"version,omitempty"`
 }
 
 // FileStore defines the file store configuration for Mattermost.

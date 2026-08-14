@@ -836,7 +836,7 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 			}
 			databaseConfig := tt.database
 			if databaseConfig == nil {
-				databaseConfig = &MySQLDBConfig{}
+				databaseConfig = &ExternalDBConfig{}
 			}
 			fileStoreInfo := tt.fileStore
 			if fileStoreInfo == nil {
@@ -898,18 +898,14 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 			// External db check.
 			expectedInitContainers := 0 // Due to disabling DB setup job we start with 0 init containers
 
-			if externalDB, ok := tt.database.(*ExternalDBConfig); ok {
-				if externalDB.hasDBCheckURL {
-					if externalDB.dbType == database.MySQLDatabase ||
-						externalDB.dbType == database.PostgreSQLDatabase {
-						expectedInitContainers++
-						assertEnvVarExists(t, "MM_SQLSETTINGS_DATASOURCE", mattermostAppContainer.Env)
-					}
+			// Every database is external now that operator-managed MySQL is gone, so
+			// there is no MYSQL_USERNAME/MYSQL_PASSWORD branch any more.
+			if externalDB, ok := tt.database.(*ExternalDBConfig); ok && externalDB.hasDBCheckURL {
+				if externalDB.dbType == database.MySQLDatabase ||
+					externalDB.dbType == database.PostgreSQLDatabase {
+					expectedInitContainers++
+					assertEnvVarExists(t, "MM_SQLSETTINGS_DATASOURCE", mattermostAppContainer.Env)
 				}
-			} else {
-				expectedInitContainers++
-				assertEnvVarExists(t, "MYSQL_USERNAME", mattermostAppContainer.Env)
-				assertEnvVarExists(t, "MYSQL_PASSWORD", mattermostAppContainer.Env)
 			}
 
 			assert.Equal(t, expectedInitContainers, len(deployment.Spec.Template.Spec.InitContainers))
