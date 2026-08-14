@@ -4,7 +4,6 @@
 package v1beta1
 
 import (
-	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1"
 	"github.com/mattermost/mattermost-operator/pkg/utils"
 	"github.com/pkg/errors"
 )
@@ -21,7 +20,7 @@ func (mm *Mattermost) SetReplicasAndResourcesFromSize() error {
 		return nil
 	}
 
-	size, err := mattermostv1alpha1.GetClusterSize(mm.Spec.Size)
+	size, err := GetClusterSize(mm.Spec.Size)
 	if err != nil {
 		err = errors.Wrap(err, "using default")
 		mm.setDefaultReplicasAndResources()
@@ -37,15 +36,15 @@ func (mm *Mattermost) setDefaultReplicasAndResources() {
 	mm.Spec.Size = ""
 
 	if mm.Spec.Replicas == nil {
-		mm.Spec.Replicas = &mattermostv1alpha1.DefaultSize.App.Replicas
+		mm.Spec.Replicas = &DefaultSize.App.Replicas
 	}
 	if mm.Spec.Scheduling.Resources.Size() == 0 {
-		mm.Spec.Scheduling.Resources = mattermostv1alpha1.DefaultSize.App.Resources
+		mm.Spec.Scheduling.Resources = DefaultSize.App.Resources
 	}
 
 }
 
-func (mm *Mattermost) overrideReplicasAndResourcesFromSize(size mattermostv1alpha1.ClusterInstallationSize) {
+func (mm *Mattermost) overrideReplicasAndResourcesFromSize(size Size) {
 	mm.Spec.Size = ""
 
 	mm.Spec.Replicas = utils.NewInt32(size.App.Replicas)

@@ -20,7 +20,6 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	mattermostcomv1alpha1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1"
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	// +kubebuilder:scaffold:imports
 )
@@ -41,7 +40,6 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(mattermostcomv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(mmv1beta.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 

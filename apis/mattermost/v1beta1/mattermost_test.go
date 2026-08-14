@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"testing"
 
-	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1"
 	"github.com/mattermost/mattermost-operator/pkg/utils"
 	appsv1 "k8s.io/api/apps/v1"
 
@@ -67,7 +66,7 @@ func TestMattermost(t *testing.T) {
 			},
 		}
 
-		size1000, err := mattermostv1alpha1.GetClusterSize(mattermostv1alpha1.Size1000String)
+		size1000, err := GetClusterSize(Size1000String)
 		require.NoError(t, err)
 
 		t.Run("should set correctly", func(t *testing.T) {
@@ -104,8 +103,8 @@ func TestMattermost(t *testing.T) {
 			tmm.Spec.Size = ""
 			err := tmm.SetReplicasAndResourcesFromSize()
 			assert.NoError(t, err)
-			assert.Equal(t, mattermostv1alpha1.DefaultSize.App.Replicas, *tmm.Spec.Replicas)
-			assert.Equal(t, mattermostv1alpha1.DefaultSize.App.Resources.String(), tmm.Spec.Scheduling.Resources.String())
+			assert.Equal(t, DefaultSize.App.Replicas, *tmm.Spec.Replicas)
+			assert.Equal(t, DefaultSize.App.Resources.String(), tmm.Spec.Scheduling.Resources.String())
 			assert.Equal(t, "", tmm.Spec.Size)
 		})
 
@@ -114,8 +113,8 @@ func TestMattermost(t *testing.T) {
 			tmm.Spec.Size = "junk"
 			err := tmm.SetReplicasAndResourcesFromSize()
 			assert.Error(t, err)
-			assert.Equal(t, mattermostv1alpha1.DefaultSize.App.Replicas, *tmm.Spec.Replicas)
-			assert.Equal(t, mattermostv1alpha1.DefaultSize.App.Resources.String(), tmm.Spec.Scheduling.Resources.String())
+			assert.Equal(t, DefaultSize.App.Replicas, *tmm.Spec.Replicas)
+			assert.Equal(t, DefaultSize.App.Resources.String(), tmm.Spec.Scheduling.Resources.String())
 			assert.Equal(t, "", tmm.Spec.Size)
 		})
 	})
