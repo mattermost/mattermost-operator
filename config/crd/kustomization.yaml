@@ -3,7 +3,6 @@
 # It should be run by config/default
 resources:
 - bases/mattermost.com_clusterinstallations.yaml
-- bases/mattermost.com_mattermostrestoredbs.yaml
 - bases/installation.mattermost.com_mattermosts.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 

@@ -11,7 +11,6 @@ import (
 	blubr "github.com/mattermost/blubr"
 	"github.com/mattermost/mattermost-operator/controllers/mattermost/clusterinstallation"
 	"github.com/mattermost/mattermost-operator/controllers/mattermost/mattermost"
-	"github.com/mattermost/mattermost-operator/controllers/mattermost/mattermostrestoredb"
 	mysqlv1alpha1 "github.com/mattermost/mattermost-operator/pkg/database/mysql_operator/v1alpha1"
 	"github.com/mattermost/mattermost-operator/pkg/resources"
 	v1beta1Minio "github.com/minio/minio-operator/pkg/apis/miniocontroller/v1beta1"
@@ -123,14 +122,6 @@ func main() {
 		Resources:           resources.NewResourceHelper(mgr.GetClient(), mgr.GetScheme()),
 	}).SetupWithManager(mgr); err != nil {
 		logger.Error(err, "Unable to create controller", "controller", "ClusterInstallation")
-		os.Exit(1)
-	}
-	if err = (&mattermostrestoredb.MattermostRestoreDBReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("MattermostRestoreDB"),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		logger.Error(err, "Unable to create controller", "controller", "MattermostRestoreDB")
 		os.Exit(1)
 	}
 	if err = mattermost.NewMattermostReconciler(
