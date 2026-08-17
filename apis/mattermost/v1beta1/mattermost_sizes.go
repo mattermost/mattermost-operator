@@ -36,10 +36,10 @@ func (mm *Mattermost) setDefaultReplicasAndResources() {
 	mm.Spec.Size = ""
 
 	if mm.Spec.Replicas == nil {
-		mm.Spec.Replicas = &DefaultSize.App.Replicas
+		mm.Spec.Replicas = utils.NewInt32(DefaultSize.App.Replicas)
 	}
 	if mm.Spec.Scheduling.Resources.Size() == 0 {
-		mm.Spec.Scheduling.Resources = DefaultSize.App.Resources
+		mm.Spec.Scheduling.Resources = *DefaultSize.App.Resources.DeepCopy()
 	}
 
 }
@@ -48,5 +48,5 @@ func (mm *Mattermost) overrideReplicasAndResourcesFromSize(size Size) {
 	mm.Spec.Size = ""
 
 	mm.Spec.Replicas = utils.NewInt32(size.App.Replicas)
-	mm.Spec.Scheduling.Resources = size.App.Resources
+	mm.Spec.Scheduling.Resources = *size.App.Resources.DeepCopy()
 }
