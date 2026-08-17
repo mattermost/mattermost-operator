@@ -4,6 +4,8 @@ import (
 	"context"
 	"path/filepath"
 
+	"github.com/pkg/errors"
+
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	"github.com/pkg/errors"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -19,10 +21,11 @@ type TestEnvironment struct {
 }
 
 func SetupTest() (TestEnvironment, error) {
+	// test/crds held the MinIO and MySQL operator CRDs. Both integrations are gone,
+	// so only this repository's own CRDs remain.
 	testEnv := &envtest.Environment{
 		CRDDirectoryPaths: []string{
 			filepath.Join("..", "..", "config", "crd", "bases"),
-			filepath.Join("..", "crds"),
 		},
 		UseExistingCluster: boolPtr(true),
 	}
@@ -75,4 +78,35 @@ func provisionTestPrerequisites(k8sClient client.Client, namespace string) error
 
 func boolPtr(b bool) *bool {
 	return &b
+}
+
+// SetupMattermostPrerequisites creates the database and file store a Mattermost
+// now requires. The Operator used to provision both itself via the MySQL and
+// MinIO operators; since it no longer does, the suite has to supply them.
+//
+// It applies the same fixtures the e2e-external suite uses: a Postgres
+// Deployment plus the db-credentials and file-store-credentials Secrets. The
+// returned function removes them again.
+func SetupMattermostPrerequisites(ctx context.Context, k8sClient client.Client, namespace string) (func(), error) {
+	var cleanups []func()
+
+	cleanupAll := func() {
+		for i := len(cleanups) - 1; i >= 0; i-- {
+			cleanups[i]()
+		}
+	}
+
+	for _, fixture := range []string{
+		filepath.Join("..", "..", "resources", "postgres.yaml"),
+		filepath.Join("..", "..", "resources", "mm-secrets.yaml"),
+	} {
+		cleanup, err := CreateFromFile(ctx, k8sClient, namespace, fixture)
+		if err != nil {
+			cleanupAll()
+			return func() {}, errors.Wrapf(err, "failed to apply %s", fixture)
+		}
+		cleanups = append(cleanups, cleanup)
+	}
+
+	return cleanupAll, nil
 }

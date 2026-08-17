@@ -32,6 +32,12 @@ func (mm *Mattermost) SetReplicasAndResourcesFromSize() error {
 	return nil
 }
 
+// The size presets are package-level values shared by every Mattermost, so both
+// functions below must copy out of them rather than alias them. Taking the address
+// of a preset field, or assigning a ResourceRequirements (whose ResourceLists are
+// maps), would let one resource's replica count or resource requests mutate the
+// preset itself and leak into every Mattermost reconciled afterwards.
+
 func (mm *Mattermost) setDefaultReplicasAndResources() {
 	mm.Spec.Size = ""
 
@@ -41,7 +47,6 @@ func (mm *Mattermost) setDefaultReplicasAndResources() {
 	if mm.Spec.Scheduling.Resources.Size() == 0 {
 		mm.Spec.Scheduling.Resources = *DefaultSize.App.Resources.DeepCopy()
 	}
-
 }
 
 func (mm *Mattermost) overrideReplicasAndResourcesFromSize(size Size) {
