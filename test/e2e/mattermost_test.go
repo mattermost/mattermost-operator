@@ -206,23 +206,27 @@ func testMattermostResources() corev1.ResourceRequirements {
 	}
 }
 
-// testFileStoreConfig returns a local (PVC backed) file store. The e2e suite used
-// operator-managed MinIO, which no longer exists; local keeps the suite free of any
-// external object store dependency. The replicas argument is retained so callers
-// stay unchanged, but a PVC backed file store has no replica count.
+// testFileStoreConfig returns an external file store pointing at the standalone
+// MinIO from resources/minio.yaml, matching what the e2e-external suite uses.
+//
+// A local (PVC backed) file store is not usable here. New local file stores
+// request ReadWriteMany, which the local-path provisioner in a kind cluster
+// cannot satisfy, and even forced to ReadWriteOnce the scale test below runs two
+// replicas, which cannot share a single RWO volume.
 func testFileStoreConfig(_ int32) operator.FileStore {
 	return operator.FileStore{
-		Local: &operator.LocalFileStore{
-			Enabled:     true,
-			StorageSize: "1Gi",
+		External: &operator.ExternalFileStore{
+			URL:    "minio:9000",
+			Bucket: "test-bucket",
+			Secret: "file-store-credentials",
 		},
 	}
 }
 
 func testDatabaseConfig(_ int32) operator.Database {
 	// Operator-managed MySQL no longer exists, so the suite uses an external
-	// database. The secret is provisioned from resources/postgres.yaml, the same
-	// fixture the e2e-external suite applies.
+	// database. Postgres comes from resources/postgres.yaml and the secret from
+	// resources/mm-secrets.yaml, the same fixtures the e2e-external suite applies.
 	return operator.Database{
 		External: &operator.ExternalDatabase{Secret: "db-credentials"},
 	}

@@ -85,8 +85,9 @@ func boolPtr(b bool) *bool {
 // MinIO operators; since it no longer does, the suite has to supply them.
 //
 // It applies the same fixtures the e2e-external suite uses: a Postgres
-// Deployment plus the db-credentials and file-store-credentials Secrets. The
-// returned function removes them again.
+// Deployment, a standalone MinIO acting as an external S3 endpoint, and the
+// db-credentials and file-store-credentials Secrets. The returned function
+// removes them again.
 func SetupMattermostPrerequisites(ctx context.Context, k8sClient client.Client, namespace string) (func(), error) {
 	var cleanups []func()
 
@@ -98,6 +99,7 @@ func SetupMattermostPrerequisites(ctx context.Context, k8sClient client.Client, 
 
 	for _, fixture := range []string{
 		filepath.Join("..", "..", "resources", "postgres.yaml"),
+		filepath.Join("..", "..", "resources", "minio.yaml"),
 		filepath.Join("..", "..", "resources", "mm-secrets.yaml"),
 	} {
 		cleanup, err := CreateFromFile(ctx, k8sClient, namespace, fixture)
