@@ -3,10 +3,15 @@ package e2e
 import (
 	"context"
 	"path/filepath"
+	"time"
 
 	"github.com/pkg/errors"
 
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
+	appsv1 "k8s.io/api/apps/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -85,5 +90,38 @@ func SetupMattermostPrerequisites(ctx context.Context, k8sClient client.Client, 
 		cleanups = append(cleanups, cleanup)
 	}
 
+	// CreateFromFile returns as soon as the objects are created, not once they
+	// serve traffic, so wait for both Deployments before any Mattermost is created.
+	//
+	// This is not merely tidiness. mm-secrets.yaml carries DB_CONNECTION_STRING but
+	// no DB_CONNECTION_CHECK_URL, and the Operator only injects the database
+	// readiness init container when that key is present. Nothing else blocks on the
+	// database, so without this wait the Mattermost pods start against a Postgres
+	// that is not listening and recover only via crash-loop backoff.
+	for _, deployment := range []string{"postgresql", "minio"} {
+		if err := waitForDeploymentAvailable(ctx, k8sClient, namespace, deployment); err != nil {
+			cleanupAll()
+			return func() {}, errors.Wrapf(err, "%s deployment never became available", deployment)
+		}
+	}
+
 	return cleanupAll, nil
+}
+
+// waitForDeploymentAvailable blocks until the named Deployment reports at least
+// one available replica.
+func waitForDeploymentAvailable(ctx context.Context, k8sClient client.Client, namespace, name string) error {
+	return wait.PollUntilContextTimeout(ctx, 5*time.Second, 5*time.Minute, true,
+		func(ctx context.Context) (bool, error) {
+			var deployment appsv1.Deployment
+			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, &deployment)
+			if err != nil {
+				if apierrors.IsNotFound(err) {
+					return false, nil
+				}
+				return false, err
+			}
+
+			return deployment.Status.AvailableReplicas >= 1, nil
+		})
 }
