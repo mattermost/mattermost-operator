@@ -42,7 +42,12 @@ TARGET_OS ?= linux
 TARGET_ARCH ?= amd64
 
 BUNDLE_IMG ?= controller-bundle:$(VERSION) # Default bundle image tag
-CRD_OPTIONS ?= "crd" # Image URL to use all building/pushing image targets
+# Field descriptions are truncated so the generated CRD stays comfortably under
+# the 262144 byte ceiling on metadata.annotations. kubectl apply stores the whole
+# manifest in kubectl.kubernetes.io/last-applied-configuration, and the Mattermost
+# CRD inlines large upstream corev1 types, so it had crept to within 0.5% of that
+# limit. The full field documentation lives in docs/mattermost_v1beta1_crd.md.
+CRD_OPTIONS ?= "crd:maxDescLen=200"
 
 ################################################################################
 
