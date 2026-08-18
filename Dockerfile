@@ -1,8 +1,8 @@
 # Build the mattermost operator
 # NOTE: For production builds, pin these images to digests for supply-chain safety.
-# Example: golang:1.26.5@sha256:<digest>
+# Example: golang:1.26.6@sha256:<digest>
 # See Dockerfile.fips for an example of digest-pinned images.
-ARG BUILD_IMAGE=golang:1.26.5
+ARG BUILD_IMAGE=golang:1.26.6
 ARG BASE_IMAGE=gcr.io/distroless/static:nonroot
 
 FROM ${BUILD_IMAGE} as builder
