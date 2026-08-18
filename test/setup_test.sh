@@ -2,20 +2,13 @@
 
 set -Eeuxo pipefail
 
-# Move the operator container inside Kind container so that the image is
-# available to the docker in docker environment.
-# Copy the image to the cluster to make a bit more fast to start
-docker pull --platform=linux/x86_64 percona:8.0
-docker pull --platform=linux/x86_64 prom/mysqld-exporter:v0.11.0
-
-kind load docker-image percona:8.0
-kind load docker-image prom/mysqld-exporter:v0.11.0
-sleep 10
-
-
-sleep 10
+# The e2e suites now provision Postgres and MinIO themselves from the manifests in
+# resources/, so nothing needs to be pre-pulled here. The percona and
+# mysqld-exporter images this script used to load existed only for the
+# Operator-managed MySQL path, which has been removed.
 
 kubectl get pods --all-namespaces
+
 # Build the operator container image.
 # This would build a container with tag mattermost/mattermost-operator:test,
 # which is used in the e2e test setup below.
