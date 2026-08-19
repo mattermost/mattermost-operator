@@ -676,6 +676,132 @@ spec:
                   - name
                   type: object
                 type: array
+              monitoring:
+                description: |-
+                  Monitoring defines optional Prometheus/Grafana integration resources for
+                  this installation. Each capability is gated by its own flag.
+                properties:
+                  callsMetrics:
+                    description: |-
+                      CallsMetrics configures an additional ServiceMonitor targeting an rtcd
+                      (Calls real-time daemon) Service that the user runs alongside Mattermost.
+                      rtcd is not deployed by this Operator, so the rtcd Service selector must be
+                      supplied here.
+                    properties:
+                      enabled:
+                        description: Enabled determines whether the Operator should
+                          create the rtcd ServiceMonitor.
+                        type: boolean
+                      labels:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          Labels are added to the rtcd ServiceMonitor so the cluster's Prometheus
+                          serviceMonitorSelector can match it. Falls back to the serviceMonitor
+                          labels when empty; set at least one of them or Prometheus will ignore it.
+                        type: object
+                      port:
+                        description: Port is the rtcd metrics port name or number.
+                          Defaults to "8045" when empty.
+                        type: string
+                      rtcdServiceSelector:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          RtcdServiceSelector are the labels identifying the rtcd Service to scrape.
+                          Required when Enabled is true.
+                        type: object
+                    required:
+                    - enabled
+                    type: object
+                  clientMetrics:
+                    description: |-
+                      ClientMetrics controls whether client/RUM and notification performance
+                      metrics are exported on the same /metrics endpoint. These already default
+                      to on in the Mattermost server; this flag makes the choice explicit and
+                      lets an operator turn them off. Requires an Enterprise license to be served.
+                    properties:
+                      enabled:
+                        description: |-
+                          Enabled toggles MM_METRICSSETTINGS_ENABLECLIENTMETRICS and
+                          MM_METRICSSETTINGS_ENABLENOTIFICATIONMETRICS. Leave unset to keep the
+                          Mattermost server defaults (both on); set explicitly to override.
+                        type: boolean
+                    type: object
+                  grafanaDashboard:
+                    description: |-
+                      GrafanaDashboard configures ConfigMaps holding Mattermost's Grafana
+                      dashboards (one ConfigMap per dashboard), labelled for discovery by the
+                      Grafana dashboard sidecar.
+                    properties:
+                      discoveryLabel:
+                        description: |-
+                          DiscoveryLabel is the label key the Grafana dashboard sidecar selects on.
+                          Defaults to "grafana_dashboard" when empty.
+                        type: string
+                      discoveryLabelValue:
+                        description: |-
+                          DiscoveryLabelValue is the label value the sidecar matches.
+                          Defaults to "1" when empty.
+                        type: string
+                      enabled:
+                        description: Enabled determines whether the Operator should
+                          create the dashboard ConfigMaps.
+                        type: boolean
+                    required:
+                    - enabled
+                    type: object
+                  prometheusRule:
+                    description: |-
+                      PrometheusRule configures a Prometheus Operator PrometheusRule holding
+                      Mattermost's alerting/recording rules. Same optional-CRD behaviour as
+                      ServiceMonitor: skipped with a logged warning when the Prometheus Operator
+                      CRDs are absent.
+                    properties:
+                      enabled:
+                        description: Enabled determines whether the Operator should
+                          create the PrometheusRule.
+                        type: boolean
+                      labels:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          Labels are added to the PrometheusRule so the cluster's Prometheus
+                          ruleSelector can be made to match it.
+                        type: object
+                    required:
+                    - enabled
+                    type: object
+                  serviceMonitor:
+                    description: |-
+                      ServiceMonitor configures a Prometheus Operator ServiceMonitor pointed at
+                      the Mattermost metrics endpoint. Requires the Prometheus Operator CRDs to
+                      be installed in the cluster; if they are absent the Operator logs a warning
+                      and skips creation rather than failing.
+                    properties:
+                      enabled:
+                        description: Enabled determines whether the Operator should
+                          create the ServiceMonitor.
+                        type: boolean
+                      interval:
+                        description: |-
+                          Interval at which Prometheus scrapes the metrics endpoint (e.g. "30s").
+                          Defaults to "30s" when empty. Must be a Prometheus duration so an invalid
+                          value is rejected at the Mattermost API rather than later by the
+                          ServiceMonitor CRD.
+                        pattern: ^(0|(([0-9]+)y)?(([0-9]+)w)?(([0-9]+)d)?(([0-9]+)h)?(([0-9]+)m)?(([0-9]+)s)?(([0-9]+)ms)?)$
+                        type: string
+                      labels:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          Labels are added to the ServiceMonitor so the cluster's Prometheus
+                          serviceMonitorSelector can be made to match it.
+                        type: object
+                    required:
+                    - enabled
+                    type: object
+                type: object
               podExtensions:
                 description: |-
                   PodExtensions specify custom extensions for Mattermost pods.

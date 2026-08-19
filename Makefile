@@ -108,6 +108,9 @@ KUSTOMIZE_VER := v4.5.7
 KUSTOMIZE_BIN := kustomize
 KUSTOMIZE := $(TOOLS_BIN_DIR)/$(KUSTOMIZE_BIN)
 
+SETUP_ENVTEST_BIN := setup-envtest
+SETUP_ENVTEST := $(TOOLS_BIN_DIR)/$(SETUP_ENVTEST_BIN)
+
 ## --------------------------------------
 ## Rules
 ## --------------------------------------
@@ -121,6 +124,17 @@ unittest: ## Runs unit tests
 
 e2e-local:
 	./test/e2e_local.sh
+
+# Fast local validation with envtest (a real apiserver+etcd from binaries — no
+# Docker). Covers CRD CEL validation and the monitoring reconcile create/delete
+# lifecycle. Downloads the apiserver binaries on first run.
+ENVTEST_K8S_VERSION ?= 1.31.0
+test-envtest: $(SETUP_ENVTEST)
+	KUBEBUILDER_ASSETS="$$($(SETUP_ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(TOOLS_BIN_DIR)/envtest -p path)" \
+		$(GO) test -tags envtest ./controllers/mattermost/mattermost/... -run 'Monitoring' -v
+
+$(SETUP_ENVTEST): ## Install setup-envtest
+	GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) sigs.k8s.io/controller-runtime/tools/setup-envtest setup-envtest latest
 
 goverall: $(GOVERALLS_GEN) ## Runs goveralls
 	$(GOVERALLS_GEN) -coverprofile=coverage.out -service=circle-ci -repotoken ${COVERALLS_REPO_TOKEN} || true
@@ -226,8 +240,16 @@ manager: generate fmt vet ## Build manager binary
 run: generate fmt vet manifests ## Run against the configured Kubernetes cluster in ~/.kube/config
 	go run ./main.go
 
+# Server-side apply is required because the Mattermost CRD exceeds the 256KB
+# client-side last-applied-configuration annotation limit. We use a stable
+# field manager and do NOT force conflicts, so a genuine conflict with another
+# manager (GitOps/Helm) surfaces as an error instead of being silently clobbered.
+# One-time migration from a prior client-side install: run the same command once
+# with `--force-conflicts` to take over fields owned by kubectl-client-side-apply.
+FIELD_MANAGER ?= mattermost-operator
+
 install: manifests kustomize ## Install CRDs into a cluster
-	$(KUSTOMIZE) build config/crd | kubectl apply -f -
+	$(KUSTOMIZE) build config/crd | kubectl apply --server-side --field-manager=$(FIELD_MANAGER) -f -
 
 uninstall: manifests kustomize ## Uninstall CRDs from a cluster
 	$(KUSTOMIZE) build config/crd | kubectl delete -f -
@@ -235,7 +257,7 @@ uninstall: manifests kustomize ## Uninstall CRDs from a cluster
 deploy: manifests kustomize ## Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 	kubectl create ns mattermost-operator --dry-run -oyaml | kubectl apply -f -
 	cd config/manager && $(KUSTOMIZE) edit set image mattermost-operator="mattermost/mattermost-operator:test"
-	$(KUSTOMIZE) build config/default | kubectl apply -n mattermost-operator -f -
+	$(KUSTOMIZE) build config/default | kubectl apply --server-side --field-manager=$(FIELD_MANAGER) -n mattermost-operator -f -
 
 mysql-minio-operators: ## Deploys MinIO and MySQL Operators to the active cluster
 	./scripts/install-mysql-minio.sh
