@@ -17,15 +17,15 @@ import (
 
 func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
 	return map[string]common.OpenAPIDefinition{
-		"./apis/mattermost/v1alpha1.ClusterInstallation":       schema__apis_mattermost_v1alpha1_ClusterInstallation(ref),
-		"./apis/mattermost/v1alpha1.ClusterInstallationSpec":   schema__apis_mattermost_v1alpha1_ClusterInstallationSpec(ref),
-		"./apis/mattermost/v1alpha1.MattermostRestoreDB":       schema__apis_mattermost_v1alpha1_MattermostRestoreDB(ref),
-		"./apis/mattermost/v1alpha1.MattermostRestoreDBSpec":   schema__apis_mattermost_v1alpha1_MattermostRestoreDBSpec(ref),
-		"./apis/mattermost/v1alpha1.MattermostRestoreDBStatus": schema__apis_mattermost_v1alpha1_MattermostRestoreDBStatus(ref),
+		"github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1.ClusterInstallation":       schema_mattermost_operator_apis_mattermost_v1alpha1_ClusterInstallation(ref),
+		"github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1.ClusterInstallationSpec":   schema_mattermost_operator_apis_mattermost_v1alpha1_ClusterInstallationSpec(ref),
+		"github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1.MattermostRestoreDB":       schema_mattermost_operator_apis_mattermost_v1alpha1_MattermostRestoreDB(ref),
+		"github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1.MattermostRestoreDBSpec":   schema_mattermost_operator_apis_mattermost_v1alpha1_MattermostRestoreDBSpec(ref),
+		"github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1.MattermostRestoreDBStatus": schema_mattermost_operator_apis_mattermost_v1alpha1_MattermostRestoreDBStatus(ref),
 	}
 }
 
-func schema__apis_mattermost_v1alpha1_ClusterInstallation(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_mattermost_operator_apis_mattermost_v1alpha1_ClusterInstallation(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -56,14 +56,14 @@ func schema__apis_mattermost_v1alpha1_ClusterInstallation(ref common.ReferenceCa
 						SchemaProps: spec.SchemaProps{
 							Description: "Specification of the desired behavior of the Mattermost cluster. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status",
 							Default:     map[string]interface{}{},
-							Ref:         ref("./apis/mattermost/v1alpha1.ClusterInstallationSpec"),
+							Ref:         ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1.ClusterInstallationSpec"),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Most recent observed status of the Mattermost cluster. Read-only. Not included when requesting from the apiserver, only from the Mattermost Operator API itself. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status",
 							Default:     map[string]interface{}{},
-							Ref:         ref("./apis/mattermost/v1alpha1.ClusterInstallationStatus"),
+							Ref:         ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1.ClusterInstallationStatus"),
 						},
 					},
 				},
@@ -71,11 +71,11 @@ func schema__apis_mattermost_v1alpha1_ClusterInstallation(ref common.ReferenceCa
 			},
 		},
 		Dependencies: []string{
-			"./apis/mattermost/v1alpha1.ClusterInstallationSpec", "./apis/mattermost/v1alpha1.ClusterInstallationStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			"github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1.ClusterInstallationSpec", "github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1.ClusterInstallationStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
 	}
 }
 
-func schema__apis_mattermost_v1alpha1_ClusterInstallationSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_mattermost_operator_apis_mattermost_v1alpha1_ClusterInstallationSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -157,31 +157,31 @@ func schema__apis_mattermost_v1alpha1_ClusterInstallationSpec(ref common.Referen
 					"minio": {
 						SchemaProps: spec.SchemaProps{
 							Default: map[string]interface{}{},
-							Ref:     ref("./apis/mattermost/v1alpha1.Minio"),
+							Ref:     ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1.Minio"),
 						},
 					},
 					"database": {
 						SchemaProps: spec.SchemaProps{
 							Default: map[string]interface{}{},
-							Ref:     ref("./apis/mattermost/v1alpha1.Database"),
+							Ref:     ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1.Database"),
 						},
 					},
 					"blueGreen": {
 						SchemaProps: spec.SchemaProps{
 							Default: map[string]interface{}{},
-							Ref:     ref("./apis/mattermost/v1alpha1.BlueGreen"),
+							Ref:     ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1.BlueGreen"),
 						},
 					},
 					"canary": {
 						SchemaProps: spec.SchemaProps{
 							Default: map[string]interface{}{},
-							Ref:     ref("./apis/mattermost/v1alpha1.Canary"),
+							Ref:     ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1.Canary"),
 						},
 					},
 					"elasticSearch": {
 						SchemaProps: spec.SchemaProps{
 							Default: map[string]interface{}{},
-							Ref:     ref("./apis/mattermost/v1alpha1.ElasticSearch"),
+							Ref:     ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1.ElasticSearch"),
 						},
 					},
 					"useServiceLoadBalancer": {
@@ -288,11 +288,11 @@ func schema__apis_mattermost_v1alpha1_ClusterInstallationSpec(ref common.Referen
 			},
 		},
 		Dependencies: []string{
-			"./apis/mattermost/v1alpha1.BlueGreen", "./apis/mattermost/v1alpha1.Canary", "./apis/mattermost/v1alpha1.Database", "./apis/mattermost/v1alpha1.ElasticSearch", "./apis/mattermost/v1alpha1.Minio", "k8s.io/api/core/v1.Affinity", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.Probe", "k8s.io/api/core/v1.ResourceRequirements"},
+			"github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1.BlueGreen", "github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1.Canary", "github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1.Database", "github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1.ElasticSearch", "github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1.Minio", "k8s.io/api/core/v1.Affinity", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.Probe", "k8s.io/api/core/v1.ResourceRequirements"},
 	}
 }
 
-func schema__apis_mattermost_v1alpha1_MattermostRestoreDB(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_mattermost_operator_apis_mattermost_v1alpha1_MattermostRestoreDB(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -322,24 +322,24 @@ func schema__apis_mattermost_v1alpha1_MattermostRestoreDB(ref common.ReferenceCa
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Default: map[string]interface{}{},
-							Ref:     ref("./apis/mattermost/v1alpha1.MattermostRestoreDBSpec"),
+							Ref:     ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1.MattermostRestoreDBSpec"),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Default: map[string]interface{}{},
-							Ref:     ref("./apis/mattermost/v1alpha1.MattermostRestoreDBStatus"),
+							Ref:     ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1.MattermostRestoreDBStatus"),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"./apis/mattermost/v1alpha1.MattermostRestoreDBSpec", "./apis/mattermost/v1alpha1.MattermostRestoreDBStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			"github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1.MattermostRestoreDBSpec", "github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1.MattermostRestoreDBStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
 	}
 }
 
-func schema__apis_mattermost_v1alpha1_MattermostRestoreDBSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_mattermost_operator_apis_mattermost_v1alpha1_MattermostRestoreDBSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -394,7 +394,7 @@ func schema__apis_mattermost_v1alpha1_MattermostRestoreDBSpec(ref common.Referen
 	}
 }
 
-func schema__apis_mattermost_v1alpha1_MattermostRestoreDBStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_mattermost_operator_apis_mattermost_v1alpha1_MattermostRestoreDBStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
