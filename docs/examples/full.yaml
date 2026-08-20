@@ -21,3 +21,5 @@ spec:
     password: "" # Password to log into Elasticsearch.
   nodeSelector: {} # See https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector.
   affinity: {} # See https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity.
+  publishNotReadyAddresses: false # Set to false (default) to only route traffic to ready pods. Prevents connection errors during rolling updates and maintenance.
+  podTerminationGracePeriodSeconds: 60 # How long (in seconds) to wait before forcefully terminating pods during shutdown. Increase this (e.g., 60-90) to allow in-flight requests to complete during rolling updates. Default is 30 seconds if not specified.
