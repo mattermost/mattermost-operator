@@ -79,6 +79,11 @@ type MattermostSpec struct {
 
 	// +optional
 	AWSLoadBalancerController *AWSLoadBalancerController `json:"awsLoadBalancerController,omitempty"`
+
+	// HTTPRoute defines configuration for HTTPRoute resource (Gateway API) created by the Operator.
+	// When enabled, an HTTPRoute is created instead of or alongside the Ingress resource.
+	// +optional
+	HTTPRoute *HTTPRouteSpec `json:"httpRoute,omitempty"`
 	// Volumes allows for mounting volumes from various sources into the
 	// Mattermost application pods.
 	// +optional
@@ -218,6 +223,53 @@ type AWSLoadBalancerController struct {
 // IngressHost specifies additional hosts configuration.
 type IngressHost struct {
 	HostName string `json:"hostName,omitempty"`
+}
+
+// HTTPRouteSpec defines configuration for HTTPRoute resource (Gateway API).
+type HTTPRouteSpec struct {
+	// Enabled determines whether the Operator should create HTTPRoute resource or not.
+	// Disabling on an existing installation causes the Operator to remove the HTTPRoute.
+	// +optional
+	Enabled bool `json:"enabled,omitempty"`
+	// Host defines the primary hostname for the HTTPRoute.
+	// +optional
+	Host string `json:"host,omitempty"`
+	// Hosts allows specifying additional hostnames.
+	// +optional
+	Hosts []IngressHost `json:"hosts,omitempty"`
+	// GatewayRef references the Gateway to attach this HTTPRoute to.
+	// Required when HTTPRoute is enabled. This is validated during defaulting
+	// rather than by the CRD schema, so that `httpRoute.enabled: false` stays a
+	// valid way to have the Operator remove the HTTPRoute without having to keep
+	// a Gateway reference around.
+	// +optional
+	GatewayRef GatewayReference `json:"gatewayRef,omitempty"`
+	// Annotations defines annotations to add to the HTTPRoute resource.
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+	// RequestTimeout defines the timeout for requests (e.g. "3600s").
+	// Defaults to "3600s" when not set.
+	// +optional
+	RequestTimeout string `json:"requestTimeout,omitempty"`
+	// BackendRequestTimeout defines the timeout for backend requests (e.g. "3600s").
+	// Defaults to "3600s" when not set.
+	// +optional
+	BackendRequestTimeout string `json:"backendRequestTimeout,omitempty"`
+}
+
+// GatewayReference references a Gateway resource to attach to.
+type GatewayReference struct {
+	// Name of the Gateway.
+	Name string `json:"name"`
+	// Namespace of the Gateway. Defaults to the Mattermost instance namespace when not set.
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
+	// Group of the Gateway resource. Defaults to "gateway.networking.k8s.io".
+	// +optional
+	Group string `json:"group,omitempty"`
+	// SectionName is the name of the section within the Gateway to attach to.
+	// +optional
+	SectionName string `json:"sectionName,omitempty"`
 }
 
 // Scheduling defines the configuration related to scheduling of the Mattermost pods

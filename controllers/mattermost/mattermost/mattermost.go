@@ -18,6 +18,8 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	k8sClient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -59,6 +61,14 @@ func (r *MattermostReconciler) checkMattermost(
 		if err != nil {
 			return reconcileStatus{}, err
 		}
+	}
+
+	// Unlike the Ingress checks above, this runs even in Service load balancer mode.
+	// It has to, because it is responsible for removing an HTTPRoute that mode does
+	// not want; skipping the call would leave one behind indefinitely.
+	err = r.checkMattermostHTTPRoute(mattermost, reqLogger)
+	if err != nil {
+		return reconcileStatus{}, err
 	}
 
 	return r.checkMattermostDeployment(mattermost, dbInfo, fsConfig, status, reqLogger)
@@ -216,6 +226,45 @@ func (r *MattermostReconciler) checkMattermostIngress(mattermost *mmv1beta.Matte
 	return r.Resources.Update(current, desired, reqLogger)
 }
 
+var httpRouteGVK = schema.GroupVersionKind{
+	Group:   "gateway.networking.k8s.io",
+	Version: "v1",
+	Kind:    "HTTPRoute",
+}
+
+func (r *MattermostReconciler) checkMattermostHTTPRoute(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) error {
+	// See checkMattermostIngress: UseServiceLoadBalancer takes precedence over any
+	// L7 routing configuration, and suppressing it means removing the resource, not
+	// merely declining to create one.
+	if mattermost.Spec.UseServiceLoadBalancer && mattermost.HTTPRouteEnabled() {
+		reqLogger.Info("Ignoring HTTPRoute configuration because useServiceLoadBalancer is enabled", "httpRoute", mattermost.Name)
+	}
+
+	if !mattermost.HTTPRouteEnabled() || mattermost.Spec.UseServiceLoadBalancer {
+		err := r.Resources.DeleteHTTPRoute(types.NamespacedName{Namespace: mattermost.Namespace, Name: mattermost.Name}, reqLogger)
+		if err != nil {
+			return errors.Wrap(err, "failed to delete disabled HTTPRoute")
+		}
+		return nil
+	}
+
+	desired := mattermostApp.GenerateHTTPRouteV1Beta(mattermost, reqLogger)
+
+	err := r.Resources.CreateHTTPRouteIfNotExists(mattermost, desired, reqLogger)
+	if err != nil {
+		return err
+	}
+
+	current := &unstructured.Unstructured{}
+	current.SetGroupVersionKind(httpRouteGVK)
+	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: desired.GetName(), Namespace: desired.GetNamespace()}, current)
+	if err != nil {
+		return err
+	}
+
+	return r.Resources.Update(current, desired, reqLogger)
+}
+
 func (r *MattermostReconciler) checkMattermostIngressClass(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) error {
 	desired := mattermostApp.GenerateALBIngressClassV1Beta(mattermost)
 
@@ -263,7 +312,7 @@ func (r *MattermostReconciler) checkMattermostJobServerDeployment(
 		dbConfig,
 		fsConfig,
 		mattermost.Name,
-		mattermost.GetIngressHost(),
+		mattermost.GetSiteURLHost(),
 		mattermost.Name,
 		mattermost.GetImageName(),
 	)
@@ -314,7 +363,7 @@ func (r *MattermostReconciler) checkMattermostDeployment(
 		dbConfig,
 		fsConfig,
 		mattermost.Name,
-		mattermost.GetIngressHost(),
+		mattermost.GetSiteURLHost(),
 		mattermost.Name,
 		mattermost.GetImageName(),
 	)

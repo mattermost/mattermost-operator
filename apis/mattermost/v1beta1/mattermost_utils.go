@@ -60,6 +60,15 @@ func (mm *Mattermost) SetDefaults() error {
 	if !mm.AWSLoadBalancerEnabled() && mm.IngressEnabled() && mm.GetIngressHost() == "" {
 		return errors.New("ingress.host required, but not set")
 	}
+
+	if mm.HTTPRouteEnabled() {
+		if mm.GetHTTPRouteHost() == "" {
+			return errors.New("httpRoute.host is required when HTTPRoute is enabled")
+		}
+		if mm.Spec.HTTPRoute.GatewayRef.Name == "" {
+			return errors.New("httpRoute.gatewayRef.name is required when HTTPRoute is enabled")
+		}
+	}
 	if mm.Spec.Image == "" {
 		mm.Spec.Image = DefaultMattermostImage
 	}
@@ -106,6 +115,17 @@ func validateVolumes(volumes []corev1.Volume) error {
 func (mm *Mattermost) IngressEnabled() bool {
 	if mm.Spec.Ingress != nil {
 		return mm.Spec.Ingress.Enabled
+	}
+	// With no Ingress section the Operator creates an Ingress by default, to
+	// preserve behavior from before the section existed. Enabling HTTPRoute while
+	// no Ingress host is configured anywhere is treated as an explicit opt out of
+	// that default, so Gateway API users don't additionally have to spell out
+	// `ingress.enabled: false` to avoid a hostless Ingress.
+	//
+	// Installations still carrying the deprecated IngressName keep their Ingress,
+	// so an HTTPRoute can be rolled out alongside it before cutting traffic over.
+	if mm.HTTPRouteEnabled() && mm.Spec.IngressName == "" {
+		return false
 	}
 	return true
 }
@@ -198,6 +218,68 @@ func (mm *Mattermost) GetIngressClass() *string {
 		return nil
 	}
 	return mm.Spec.Ingress.IngressClass
+}
+
+// HTTPRouteEnabled determines whether Mattermost HTTPRoute should be created.
+func (mm *Mattermost) HTTPRouteEnabled() bool {
+	if mm.Spec.HTTPRoute != nil {
+		return mm.Spec.HTTPRoute.Enabled
+	}
+	return false
+}
+
+// GetHTTPRouteHost returns the primary hostname for the HTTPRoute.
+func (mm *Mattermost) GetHTTPRouteHost() string {
+	if mm.Spec.HTTPRoute == nil {
+		return ""
+	}
+	return mm.Spec.HTTPRoute.Host
+}
+
+// GetHTTPRouteHostNames returns all HTTPRoute hostnames, deduplicated.
+func (mm *Mattermost) GetHTTPRouteHostNames() []string {
+	if mm.Spec.HTTPRoute == nil || mm.Spec.HTTPRoute.Host == "" {
+		return []string{}
+	}
+
+	hostsSet := map[string]struct{}{mm.Spec.HTTPRoute.Host: {}}
+	hosts := []string{mm.Spec.HTTPRoute.Host}
+
+	for _, host := range mm.Spec.HTTPRoute.Hosts {
+		if _, found := hostsSet[host.HostName]; !found {
+			hosts = append(hosts, host.HostName)
+			hostsSet[host.HostName] = struct{}{}
+		}
+	}
+
+	return hosts
+}
+
+// GetHTTPRouteAnnotations returns HTTPRoute annotations.
+func (mm *Mattermost) GetHTTPRouteAnnotations() map[string]string {
+	if mm.Spec.HTTPRoute == nil {
+		return nil
+	}
+	return mm.Spec.HTTPRoute.Annotations
+}
+
+// GetSiteURLHost returns the hostname to use for MM_SERVICESETTINGS_SITEURL.
+//
+// HTTPRoute is only consulted when it is enabled and the Ingress is not, so for
+// every configuration that predates HTTPRoute support this returns exactly
+// GetIngressHost() - which is what the deployment used before this method existed.
+// Deliberately no AWS Load Balancer branch: reading the host from
+// AWSLoadBalancerController.Hosts would arguably be more correct for ALB
+// installations, but it would silently change the site URL of any that also set
+// ingress.host, so it is left to a separate change.
+func (mm *Mattermost) GetSiteURLHost() string {
+	if mm.IngressEnabled() {
+		return mm.GetIngressHost()
+	}
+	if mm.HTTPRouteEnabled() {
+		return mm.GetHTTPRouteHost()
+	}
+	return mm.GetIngressHost()
 }
 
 func defaultTLSSecret(mm *Mattermost) string {
