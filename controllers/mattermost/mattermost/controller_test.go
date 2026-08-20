@@ -614,7 +614,6 @@ func prepAllDependencyTestResources(client client.Client, mattermost *mmv1beta.M
 func prepareSchema(t *testing.T, scheme *runtime.Scheme) *runtime.Scheme {
 	err := mmv1beta.AddToScheme(scheme)
 	require.NoError(t, err)
-	require.NoError(t, err)
 
 	return scheme
 }
