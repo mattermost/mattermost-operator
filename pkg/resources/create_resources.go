@@ -2,6 +2,7 @@ package resources
 
 import (
 	"context"
+	"fmt"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -190,6 +191,40 @@ func (r *ResourceHelper) CreatePvcIfNotExists(owner v1.Object, pvc *corev1.Persi
 	}
 
 	return nil
+}
+
+// CreateIfNotExists creates desired if no object with the same name/namespace exists.
+// A nil owner creates the resource without a controller reference.
+func (r *ResourceHelper) CreateIfNotExists(owner v1.Object, desired Object, reqLogger logr.Logger) error {
+	found, ok := desired.DeepCopyObject().(Object)
+	if !ok {
+		return errors.Errorf("failed to deep copy %T as a client object", desired)
+	}
+
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: desired.GetName(), Namespace: desired.GetNamespace()}, found)
+	if err == nil {
+		return nil
+	}
+	if !k8sErrors.IsNotFound(err) {
+		return errors.Wrapf(err, "failed to check if %T %s exists", desired, desired.GetName())
+	}
+
+	if owner == nil {
+		return r.CreateUnowned(desired, reqLogger)
+	}
+	reqLogger.Info("Creating resource", "kind", fmt.Sprintf("%T", desired), "name", desired.GetName())
+	return r.Create(owner, desired, reqLogger)
+}
+
+// CreateUnowned creates the resource without setting a controller reference.
+func (r *ResourceHelper) CreateUnowned(desired Object, reqLogger logr.Logger) error {
+	err := defaultAnnotator.SetLastAppliedAnnotation(desired)
+	if err != nil {
+		return errors.Wrap(err, "failed to apply annotation to the resource")
+	}
+
+	reqLogger.Info("Creating resource", "kind", fmt.Sprintf("%T", desired), "name", desired.GetName())
+	return r.client.Create(context.TODO(), desired)
 }
 
 func (r *ResourceHelper) DeleteDeployment(key types.NamespacedName, reqLogger logr.Logger) error {

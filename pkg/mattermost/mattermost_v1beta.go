@@ -542,13 +542,17 @@ func GenerateServiceAccountV1Beta(mattermost *mmv1beta.Mattermost, saName string
 
 // GenerateRoleV1Beta returns the Role for Mattermost
 func GenerateRoleV1Beta(mattermost *mmv1beta.Mattermost, roleName string) *rbacv1.Role {
+	rules := mattermostRolePermissions()
+	if mattermost.AgentsEnabled() {
+		rules = append(rules, agentRolePermissions()...)
+	}
 	return &rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            roleName,
 			Namespace:       mattermost.Namespace,
 			OwnerReferences: MattermostOwnerReference(mattermost),
 		},
-		Rules: mattermostRolePermissions(),
+		Rules: rules,
 	}
 }
 
@@ -559,6 +563,32 @@ func mattermostRolePermissions() []rbacv1.PolicyRule {
 			APIGroups:     []string{"batch"},
 			Resources:     []string{"jobs"},
 			ResourceNames: []string{SetupJobName},
+		},
+	}
+}
+
+// agentRolePermissions grants the Mattermost server pod (the agents plugin runs
+// inside it) the access needed to manage Agent CRs and their externally
+// provisioned Secrets (bot token, LiteLLM virtual key). Granted only when
+// spec.agents.enabled is true. v1beta1 only; Agents do not integrate with
+// legacy ClusterInstallations. The Secret grant is namespace-wide because
+// agent secret names are dynamic and RBAC cannot scope create by resourceName.
+func agentRolePermissions() []rbacv1.PolicyRule {
+	return []rbacv1.PolicyRule{
+		{
+			Verbs:     []string{"get", "list", "watch", "create", "update", "patch", "delete"},
+			APIGroups: []string{"installation.mattermost.com"},
+			Resources: []string{"agents"},
+		},
+		{
+			Verbs:     []string{"get"},
+			APIGroups: []string{"installation.mattermost.com"},
+			Resources: []string{"agents/status"},
+		},
+		{
+			Verbs:     []string{"get", "create", "update", "delete"},
+			APIGroups: []string{""},
+			Resources: []string{"secrets"},
 		},
 	}
 }

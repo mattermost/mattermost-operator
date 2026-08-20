@@ -139,6 +139,11 @@ type MattermostSpec struct {
 	// +optional
 	PodExtensions PodExtensions `json:"podExtensions,omitempty"`
 
+	// Agents configures support for Mattermost AI agents managed by the
+	// mattermost-operator Agent CRD.
+	// +optional
+	Agents *MattermostAgents `json:"agents,omitempty"`
+
 	// ResourcePatch specifies JSON patches that can be applied to resources created by Mattermost Operator.
 	//
 	// WARNING: ResourcePatch is highly experimental and subject to change.
@@ -324,6 +329,39 @@ type PodExtensions struct {
 	// Additional Container Ports injected into pod's main container.
 	// The setting does not override ContainerPorts defined by the Operator.
 	ContainerPorts []v1.ContainerPort `json:"containerPorts,omitempty"`
+}
+
+// MattermostAgents configures Agent CR integration for this installation.
+// +kubebuilder:validation:XValidation:rule="!has(self.llmGateway) || self.enabled",message="agents.llmGateway requires agents.enabled"
+type MattermostAgents struct {
+	// Enabled grants the Mattermost server ServiceAccount the RBAC required
+	// to manage Agent CRs and their externally provisioned Secrets (bot
+	// tokens, LiteLLM virtual keys). Required for the agents plugin to
+	// provision remote agents. Defaults to false.
+	// +optional
+	Enabled bool `json:"enabled,omitempty"`
+
+	// LLMGateway causes the operator to deploy a LiteLLM gateway
+	// (Deployment/Service) in the installation namespace, owned by this
+	// Mattermost CR and shared by its agents. Requires a Secret named
+	// "mm-agent-litellm-db-credentials" with key "connectionString"
+	// containing a PostgreSQL DSN; the operator does not provision this
+	// database. Only honored when Enabled is true.
+	// +optional
+	LLMGateway *AgentsLLMGateway `json:"llmGateway,omitempty"`
+}
+
+// AgentsLLMGateway configures the operator-managed LiteLLM gateway deployment.
+type AgentsLLMGateway struct {
+	// Image is the LiteLLM container image to use.
+	// Defaults to "ghcr.io/berriai/litellm-database:main-v1.82.0-stable".
+	// +optional
+	Image string `json:"image,omitempty"`
+
+	// Resources defines the CPU/memory requests and limits for the LiteLLM pod.
+	// Defaults to requests of 500m/512Mi and limits of 2/2Gi.
+	// +optional
+	Resources v1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 // Database defines the database configuration for Mattermost.

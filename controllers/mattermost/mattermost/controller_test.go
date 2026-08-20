@@ -30,6 +30,7 @@ import (
 	v1beta1Minio "github.com/minio/minio-operator/pkg/apis/miniocontroller/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -372,6 +373,149 @@ func TestReconcile(t *testing.T) {
 		_, err = r.checkExternalFileStore(mm, logger)
 		require.NoError(t, err)
 	})
+}
+
+func TestReconcileLiteLLMGateway(t *testing.T) {
+	// Setup logging for the reconciler so we can see what happened on failure.
+	logSink := blubr.InitLogger(logrus.NewEntry(logrus.New()))
+	logSink = logSink.WithName("test.opr")
+	logger := logr.New(logSink)
+	logf.SetLogger(logger)
+
+	mmName := "gateway-mm"
+	mmNamespace := "default"
+	replicas := int32(1)
+	mm := &mmv1beta.Mattermost{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       mmName,
+			Namespace:  mmNamespace,
+			UID:        types.UID("gateway-test"),
+			Generation: 1,
+		},
+		Spec: mmv1beta.MattermostSpec{
+			Replicas:    &replicas,
+			Image:       "mattermost/mattermost-enterprise-edition",
+			Version:     operatortest.LatestStableMattermostVersion,
+			IngressName: "gateway.mattermost.dev",
+			Agents: &mmv1beta.MattermostAgents{
+				Enabled:    true,
+				LLMGateway: &mmv1beta.AgentsLLMGateway{},
+			},
+		},
+	}
+
+	s := prepareSchema(t, scheme.Scheme)
+	s.AddKnownTypes(mmv1beta.GroupVersion, mm)
+	s.AddKnownTypes(appsv1.SchemeGroupVersion, &appsv1.ReplicaSet{}, &appsv1.Deployment{})
+	c := fake.NewClientBuilder().WithScheme(s).WithStatusSubresource(&mmv1beta.Mattermost{}, &appsv1.ReplicaSet{}, &appsv1.Deployment{}).Build()
+	r := &MattermostReconciler{
+		Client:             c,
+		NonCachedAPIReader: c,
+		Scheme:             s,
+		Log:                logger,
+		MaxReconciling:     5,
+		Resources:          resources.NewResourceHelper(c, s),
+	}
+
+	require.NoError(t, c.Create(context.TODO(), mm))
+	require.NoError(t, prepAllDependencyTestResources(r.Client, mm))
+
+	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: mmName, Namespace: mmNamespace}}
+	mmKey := types.NamespacedName{Name: mmName, Namespace: mmNamespace}
+	gatewayDeploymentKey := types.NamespacedName{Name: mmv1beta.AgentLiteLLMDeploymentName, Namespace: mmNamespace}
+	gatewayServiceKey := types.NamespacedName{Name: mmv1beta.AgentLiteLLMServiceName, Namespace: mmNamespace}
+
+	// First reconcile creates the core server resources; the health check
+	// fails because no pods are running yet.
+	res, err := r.Reconcile(context.Background(), req)
+	require.NoError(t, err)
+	require.Equal(t, reconcile.Result{RequeueAfter: healthCheckRequeueDelay}, res)
+
+	// Make the server healthy: replica set observed with available replicas.
+	replicaSet := &appsv1.ReplicaSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      mmName,
+			Namespace: mmNamespace,
+			Labels:    mm.MattermostLabels(mmName),
+		},
+		Status: appsv1.ReplicaSetStatus{
+			ObservedGeneration: 1,
+			AvailableReplicas:  replicas,
+		},
+	}
+	require.NoError(t, c.Create(context.TODO(), replicaSet))
+
+	var deployment appsv1.Deployment
+	require.NoError(t, c.Get(context.TODO(), mmKey, &deployment))
+	deployment.Status.Replicas = replicas
+	deployment.Status.ObservedGeneration = deployment.Generation
+	require.NoError(t, c.Status().Update(context.TODO(), &deployment))
+
+	t.Run("missing db credentials leave installation Stable with gateway error", func(t *testing.T) {
+		res, err = r.Reconcile(context.Background(), req)
+		require.NoError(t, err, "gateway config failure must not be a hard reconcile error")
+		assert.Equal(t, reconcile.Result{RequeueAfter: healthCheckRequeueDelay}, res)
+
+		var fetched mmv1beta.Mattermost
+		require.NoError(t, c.Get(context.Background(), mmKey, &fetched))
+		assert.Equal(t, mmv1beta.Stable, fetched.Status.State,
+			"installation must reach Stable even with a broken gateway")
+		assert.Contains(t, fetched.Status.Error, mmv1beta.AgentLiteLLMDBCredentialsSecret,
+			"gateway error must be surfaced on status.Error")
+
+		err = c.Get(context.Background(), gatewayDeploymentKey, &appsv1.Deployment{})
+		assert.True(t, k8sErrors.IsNotFound(err), "gateway deployment must not be created without db credentials")
+		err = c.Get(context.Background(), gatewayServiceKey, &corev1.Service{})
+		assert.True(t, k8sErrors.IsNotFound(err), "gateway service must not be created without db credentials")
+	})
+
+	t.Run("gateway created on requeue once the secret is provisioned", func(t *testing.T) {
+		require.NoError(t, c.Create(context.TODO(), newLiteLLMDBCredentialsSecret(mmNamespace)))
+
+		res, err = r.Reconcile(context.Background(), req)
+		require.NoError(t, err)
+		assert.Equal(t, reconcile.Result{}, res)
+
+		require.NoError(t, c.Get(context.Background(), gatewayDeploymentKey, &appsv1.Deployment{}))
+		require.NoError(t, c.Get(context.Background(), gatewayServiceKey, &corev1.Service{}))
+
+		var fetched mmv1beta.Mattermost
+		require.NoError(t, c.Get(context.Background(), mmKey, &fetched))
+		assert.Equal(t, mmv1beta.Stable, fetched.Status.State)
+		assert.Empty(t, fetched.Status.Error, "gateway error must be cleared once reconciled")
+	})
+}
+
+func TestMattermostsForLiteLLMSecret(t *testing.T) {
+	_, fakeClient, reconciler := setupTestDeps(t)
+
+	gatewayMM := newLiteLLMTestMattermost(t)
+	gatewayMM.Name = "with-gateway"
+	gatewayMM.UID = types.UID("uid-gateway")
+	require.NoError(t, fakeClient.Create(context.TODO(), gatewayMM))
+
+	plainMM := newLiteLLMTestMattermost(t)
+	plainMM.Name = "without-gateway"
+	plainMM.UID = types.UID("uid-plain")
+	plainMM.Spec.Agents = nil
+	require.NoError(t, fakeClient.Create(context.TODO(), plainMM))
+
+	dbSecret := newLiteLLMDBCredentialsSecret(gatewayMM.Namespace)
+	requests := reconciler.mattermostsForLiteLLMSecret(context.Background(), dbSecret)
+	require.Len(t, requests, 1)
+	assert.Equal(t, gatewayMM.Name, requests[0].Name)
+
+	masterKeySecret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{
+		Name: mmv1beta.AgentLiteLLMMasterKeySecretName, Namespace: gatewayMM.Namespace,
+	}}
+	requests = reconciler.mattermostsForLiteLLMSecret(context.Background(), masterKeySecret)
+	require.Len(t, requests, 1)
+	assert.Equal(t, gatewayMM.Name, requests[0].Name)
+
+	unrelated := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{
+		Name: "unrelated-secret", Namespace: gatewayMM.Namespace,
+	}}
+	assert.Empty(t, reconciler.mattermostsForLiteLLMSecret(context.Background(), unrelated))
 }
 
 func TestReconcilingLimit(t *testing.T) {

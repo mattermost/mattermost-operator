@@ -1,0 +1,40 @@
+apiVersion: installation.mattermost.com/v1beta1
+kind: Agent
+metadata:
+  name: my-agent
+  namespace: default
+spec:
+  image: registry.example.com/my-agent:latest
+  hooks:
+    - MessageHasBeenPosted
+    - UserHasJoinedChannel
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  egressPolicy: allowWeb
+  mattermostRef:
+    name: my-mattermost
+  # Opts into the LiteLLM gateway managed by the referenced Mattermost
+  # installation. The gateway itself is configured on the Mattermost CR:
+  #
+  #   spec:
+  #     agents:
+  #       enabled: true
+  #       llmGateway:
+  #         image: ghcr.io/berriai/litellm-database:main-v1.82.0-stable  # optional
+  #         resources: {}                                                # optional
+  #
+  # and requires a Secret "mm-agent-litellm-db-credentials" (key
+  # "connectionString") with a PostgreSQL DSN in the same namespace.
+  llmGateway:
+    operatorManaged: {}
+  # With operatorManaged set, the operator injects the gateway credentials
+  # (OPENAI_API_KEY etc.) from the agent's virtual-key Secret; do not override
+  # them here. Use env only for agent-specific settings.
+  env:
+    - name: AGENT_LOG_LEVEL
+      value: "info"

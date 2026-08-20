@@ -11,6 +11,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 const (
@@ -37,6 +38,9 @@ const (
 
 	// ClusterLabel is the label applied across all components
 	ClusterLabel = "installation.mattermost.com/installation"
+
+	// AgentNameLabel is the label applied to resources belonging to a given Agent.
+	AgentNameLabel = "installation.mattermost.com/agent"
 
 	// ClusterResourceLabel is the label applied to a given Mattermost
 	// as well as all other resources created to support it.
@@ -73,11 +77,35 @@ func (mm *Mattermost) SetDefaults() error {
 	mm.Spec.FileStore.SetDefaults()
 	mm.Spec.Database.SetDefaults()
 
+	if mm.Spec.Agents != nil && mm.Spec.Agents.LLMGateway != nil {
+		mm.Spec.Agents.LLMGateway.SetDefaults()
+	}
+
 	if err := validateVolumes(mm.Spec.Volumes); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+// SetDefaults sets missing LiteLLM gateway values to their defaults.
+func (gw *AgentsLLMGateway) SetDefaults() {
+	if gw.Image == "" {
+		gw.Image = AgentLiteLLMDefaultImage
+	}
+
+	// Only default when the user set neither, so a partial spec (e.g. only
+	// Limits) never gets defaults injected that violate Requests <= Limits.
+	if gw.Resources.Requests == nil && gw.Resources.Limits == nil {
+		gw.Resources.Requests = corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("500m"),
+			corev1.ResourceMemory: resource.MustParse("512Mi"),
+		}
+		gw.Resources.Limits = corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("2"),
+			corev1.ResourceMemory: resource.MustParse("2Gi"),
+		}
+	}
 }
 
 // validateVolumes enforces an allowlist of volume sources. Only the following
@@ -100,6 +128,18 @@ func validateVolumes(volumes []corev1.Volume) error {
 		}
 	}
 	return nil
+}
+
+// AgentsEnabled reports whether Agent CR RBAC should be granted to the
+// Mattermost server ServiceAccount.
+func (mm *Mattermost) AgentsEnabled() bool {
+	return mm.Spec.Agents != nil && mm.Spec.Agents.Enabled
+}
+
+// OperatorManagedLLMGatewayEnabled reports whether the operator should deploy
+// the LiteLLM gateway for this installation.
+func (mm *Mattermost) OperatorManagedLLMGatewayEnabled() bool {
+	return mm.AgentsEnabled() && mm.Spec.Agents.LLMGateway != nil
 }
 
 // IngressEnabled determines whether Mattermost Ingress should be created.

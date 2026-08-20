@@ -15,6 +15,10 @@ type FakeMattermostV1beta1 struct {
 	*testing.Fake
 }
 
+func (c *FakeMattermostV1beta1) Agents(namespace string) v1beta1.AgentInterface {
+	return &FakeAgents{c, namespace}
+}
+
 func (c *FakeMattermostV1beta1) Mattermosts(namespace string) v1beta1.MattermostInterface {
 	return &FakeMattermosts{c, namespace}
 }
