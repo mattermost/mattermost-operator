@@ -1266,11 +1266,11 @@ func TestSanitizeIngressAnnotations(t *testing.T) {
 		{
 			name: "mixed safe and dangerous annotations",
 			input: map[string]string{
-				"nginx.ingress.kubernetes.io/proxy-body-size":         "1000M",
-				"nginx.ingress.kubernetes.io/configuration-snippet":   "dangerous",
-				"nginx.ingress.kubernetes.io/ssl-redirect":            "true",
-				"nginx.ingress.kubernetes.io/server-snippet":          "also-dangerous",
-				"safe-key-with-newline":                               "value\ninjected",
+				"nginx.ingress.kubernetes.io/proxy-body-size":       "1000M",
+				"nginx.ingress.kubernetes.io/configuration-snippet": "dangerous",
+				"nginx.ingress.kubernetes.io/ssl-redirect":          "true",
+				"nginx.ingress.kubernetes.io/server-snippet":        "also-dangerous",
+				"safe-key-with-newline":                             "value\ninjected",
 			},
 			expected: map[string]string{
 				"nginx.ingress.kubernetes.io/proxy-body-size": "1000M",
@@ -1333,4 +1333,58 @@ func TestGenerateALBIngress_V1Beta_SnippetAnnotationsFiltered(t *testing.T) {
 	assert.Equal(t, "500M", ingress.Annotations["nginx.ingress.kubernetes.io/proxy-body-size"])
 	assert.NotContains(t, ingress.Annotations, "nginx.ingress.kubernetes.io/configuration-snippet")
 	assert.NotContains(t, ingress.Annotations, "nginx.ingress.kubernetes.io/server-snippet")
+}
+
+func TestClientMetricsDeploymentEnv(t *testing.T) {
+	boolPtr := func(b bool) *bool { return &b }
+
+	// mattermostContainerEnv returns the named env var value from the generated
+	// Mattermost app container (found bool false when the var is absent).
+	mattermostContainerEnv := func(t *testing.T, mm *mmv1beta.Mattermost, name string) (string, bool) {
+		t.Helper()
+		dep := GenerateDeploymentV1Beta(mm, &ExternalDBConfig{}, &ExternalFileStore{}, "", "", "", "image")
+		require.NotNil(t, dep)
+		c := mmv1beta.GetMattermostAppContainer(dep.Spec.Template.Spec.Containers)
+		require.NotNil(t, c)
+		for _, e := range c.Env {
+			if e.Name == name {
+				return e.Value, true
+			}
+		}
+		return "", false
+	}
+
+	withClientMetrics := func(cm *mmv1beta.ClientMetrics) *mmv1beta.Mattermost {
+		return &mmv1beta.Mattermost{Spec: mmv1beta.MattermostSpec{
+			Monitoring: &mmv1beta.Monitoring{ClientMetrics: cm},
+		}}
+	}
+
+	t.Run("nil Enabled emits neither variable (server defaults preserved)", func(t *testing.T) {
+		mm := withClientMetrics(&mmv1beta.ClientMetrics{})
+		_, hasClient := mattermostContainerEnv(t, mm, "MM_METRICSSETTINGS_ENABLECLIENTMETRICS")
+		_, hasNotif := mattermostContainerEnv(t, mm, "MM_METRICSSETTINGS_ENABLENOTIFICATIONMETRICS")
+		assert.False(t, hasClient)
+		assert.False(t, hasNotif)
+	})
+
+	t.Run("explicit true emits both variables as true", func(t *testing.T) {
+		mm := withClientMetrics(&mmv1beta.ClientMetrics{Enabled: boolPtr(true)})
+		v, ok := mattermostContainerEnv(t, mm, "MM_METRICSSETTINGS_ENABLECLIENTMETRICS")
+		require.True(t, ok)
+		assert.Equal(t, "true", v)
+		v, ok = mattermostContainerEnv(t, mm, "MM_METRICSSETTINGS_ENABLENOTIFICATIONMETRICS")
+		require.True(t, ok)
+		assert.Equal(t, "true", v)
+	})
+
+	t.Run("explicit false emits both variables as false", func(t *testing.T) {
+		mm := withClientMetrics(&mmv1beta.ClientMetrics{Enabled: boolPtr(false)})
+		v, ok := mattermostContainerEnv(t, mm, "MM_METRICSSETTINGS_ENABLECLIENTMETRICS")
+		require.True(t, ok)
+		assert.Equal(t, "false", v)
+		v, ok = mattermostContainerEnv(t, mm, "MM_METRICSSETTINGS_ENABLENOTIFICATIONMETRICS")
+		require.True(t, ok)
+		assert.Equal(t, "false", v)
+	})
 }
