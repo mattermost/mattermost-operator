@@ -472,20 +472,6 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 			requiredEnvVals: map[string]string{"MM_FILESETTINGS_AMAZONS3SSL": "true"},
 		},
 		{
-			name: "operator managed file store",
-			spec: mmv1beta.MattermostSpec{},
-			fileStore: &OperatorManagedMinioConfig{
-				fsInfo: FileStoreInfo{
-					secretName: "file-store-secret",
-					bucketName: "file-store-bucket",
-					url:        "minio.local.com",
-					useS3SSL:   false,
-				},
-			},
-			want:            &appsv1.Deployment{},
-			requiredEnvVals: map[string]string{"MM_FILESETTINGS_AMAZONS3SSL": "false"},
-		},
-		{
 			name:      "local file store",
 			spec:      mmv1beta.MattermostSpec{},
 			fileStore: &LocalFileStore{},
@@ -850,11 +836,18 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 			}
 			databaseConfig := tt.database
 			if databaseConfig == nil {
-				databaseConfig = &MySQLDBConfig{}
+				databaseConfig = &ExternalDBConfig{}
 			}
 			fileStoreInfo := tt.fileStore
 			if fileStoreInfo == nil {
-				fileStoreInfo = NewOperatorManagedFileStoreInfo(mattermost, "minio-secret", "http://minio")
+				fileStoreInfo = &ExternalFileStore{
+					fsInfo: FileStoreInfo{
+						secretName: "file-store-secret",
+						bucketName: "file-store-bucket",
+						url:        "s3.example.com",
+						useS3SSL:   true,
+					},
+				}
 			}
 
 			deployment := GenerateDeploymentV1Beta(mattermost, databaseConfig, fileStoreInfo, "", "", "service-account", "")
@@ -905,22 +898,14 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 			// External db check.
 			expectedInitContainers := 0 // Due to disabling DB setup job we start with 0 init containers
 
-			if externalDB, ok := tt.database.(*ExternalDBConfig); ok {
-				if externalDB.hasDBCheckURL {
-					if externalDB.dbType == database.MySQLDatabase ||
-						externalDB.dbType == database.PostgreSQLDatabase {
-						expectedInitContainers++
-						assertEnvVarExists(t, "MM_SQLSETTINGS_DATASOURCE", mattermostAppContainer.Env)
-					}
+			// Every database is external now that operator-managed MySQL is gone, so
+			// there is no MYSQL_USERNAME/MYSQL_PASSWORD branch any more.
+			if externalDB, ok := tt.database.(*ExternalDBConfig); ok && externalDB.hasDBCheckURL {
+				if externalDB.dbType == database.MySQLDatabase ||
+					externalDB.dbType == database.PostgreSQLDatabase {
+					expectedInitContainers++
+					assertEnvVarExists(t, "MM_SQLSETTINGS_DATASOURCE", mattermostAppContainer.Env)
 				}
-			} else {
-				expectedInitContainers++
-				assertEnvVarExists(t, "MYSQL_USERNAME", mattermostAppContainer.Env)
-				assertEnvVarExists(t, "MYSQL_PASSWORD", mattermostAppContainer.Env)
-			}
-
-			if _, ok := fileStoreInfo.(*OperatorManagedMinioConfig); ok {
-				expectedInitContainers += 2
 			}
 
 			assert.Equal(t, expectedInitContainers, len(deployment.Spec.Template.Spec.InitContainers))
@@ -1266,11 +1251,11 @@ func TestSanitizeIngressAnnotations(t *testing.T) {
 		{
 			name: "mixed safe and dangerous annotations",
 			input: map[string]string{
-				"nginx.ingress.kubernetes.io/proxy-body-size":         "1000M",
-				"nginx.ingress.kubernetes.io/configuration-snippet":   "dangerous",
-				"nginx.ingress.kubernetes.io/ssl-redirect":            "true",
-				"nginx.ingress.kubernetes.io/server-snippet":          "also-dangerous",
-				"safe-key-with-newline":                               "value\ninjected",
+				"nginx.ingress.kubernetes.io/proxy-body-size":       "1000M",
+				"nginx.ingress.kubernetes.io/configuration-snippet": "dangerous",
+				"nginx.ingress.kubernetes.io/ssl-redirect":          "true",
+				"nginx.ingress.kubernetes.io/server-snippet":        "also-dangerous",
+				"safe-key-with-newline":                             "value\ninjected",
 			},
 			expected: map[string]string{
 				"nginx.ingress.kubernetes.io/proxy-body-size": "1000M",

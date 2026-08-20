@@ -9,12 +9,7 @@ import (
 
 	"github.com/go-logr/logr"
 	blubr "github.com/mattermost/blubr"
-	"github.com/mattermost/mattermost-operator/controllers/mattermost/clusterinstallation"
 	"github.com/mattermost/mattermost-operator/controllers/mattermost/mattermost"
-	"github.com/mattermost/mattermost-operator/controllers/mattermost/mattermostrestoredb"
-	mysqlv1alpha1 "github.com/mattermost/mattermost-operator/pkg/database/mysql_operator/v1alpha1"
-	"github.com/mattermost/mattermost-operator/pkg/resources"
-	v1beta1Minio "github.com/minio/minio-operator/pkg/apis/miniocontroller/v1beta1"
 	"github.com/sirupsen/logrus"
 	"github.com/vrischmann/envconfig"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
@@ -25,7 +20,6 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	mattermostcomv1alpha1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1"
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	// +kubebuilder:scaffold:imports
 )
@@ -46,12 +40,9 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(mattermostcomv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(mmv1beta.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 
-	utilruntime.Must(v1beta1Minio.AddToScheme(scheme))
-	utilruntime.Must(mysqlv1alpha1.SchemeBuilder.AddToScheme(scheme))
 }
 
 type Config struct {
@@ -113,26 +104,6 @@ func main() {
 
 	logger.Info("Registering Components")
 
-	if err = (&clusterinstallation.ClusterInstallationReconciler{
-		Client:              mgr.GetClient(),
-		NonCachedAPIReader:  mgr.GetAPIReader(),
-		Log:                 ctrl.Log.WithName("controllers").WithName("ClusterInstallation"),
-		Scheme:              mgr.GetScheme(),
-		MaxReconciling:      config.MaxReconcilingInstallations,
-		RequeueOnLimitDelay: config.RequeueOnLimitDelay,
-		Resources:           resources.NewResourceHelper(mgr.GetClient(), mgr.GetScheme()),
-	}).SetupWithManager(mgr); err != nil {
-		logger.Error(err, "Unable to create controller", "controller", "ClusterInstallation")
-		os.Exit(1)
-	}
-	if err = (&mattermostrestoredb.MattermostRestoreDBReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("MattermostRestoreDB"),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		logger.Error(err, "Unable to create controller", "controller", "MattermostRestoreDB")
-		os.Exit(1)
-	}
 	if err = mattermost.NewMattermostReconciler(
 		mgr,
 		config.MaxReconcilingInstallations,

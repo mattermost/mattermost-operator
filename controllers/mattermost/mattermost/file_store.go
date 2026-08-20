@@ -5,9 +5,6 @@ import (
 	"fmt"
 	"slices"
 
-	mattermostMinio "github.com/mattermost/mattermost-operator/pkg/components/minio"
-	minioOperator "github.com/minio/minio-operator/pkg/apis/miniocontroller/v1beta1"
-
 	"github.com/go-logr/logr"
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	mattermostApp "github.com/mattermost/mattermost-operator/pkg/mattermost"
@@ -34,7 +31,9 @@ func (r *MattermostReconciler) checkFileStore(mattermost *mmv1beta.Mattermost, r
 		return r.checkLocalFileStore(mattermost, reqLogger)
 	}
 
-	return r.checkOperatorManagedMinio(mattermost, reqLogger)
+	// SetDefaults rejects a Mattermost with no file store configured, so this is
+	// only reachable if that validation and this dispatch fall out of step.
+	return nil, errors.New("no file store configured: set one of fileStore.external, fileStore.local or fileStore.externalVolume")
 }
 
 func (r *MattermostReconciler) checkExternalFileStore(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) (mattermostApp.FileStoreConfig, error) {
@@ -183,53 +182,4 @@ func (r *MattermostReconciler) accessModesEqual(a, b []corev1.PersistentVolumeAc
 	}
 
 	return true
-}
-
-func (r *MattermostReconciler) checkOperatorManagedMinio(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) (mattermostApp.FileStoreConfig, error) {
-	secret, err := r.checkMattermostMinioSecret(mattermost, reqLogger)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to check Minio secret")
-	}
-
-	err = r.checkMinioInstance(mattermost, reqLogger)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to check Minio instance")
-	}
-
-	url, err := r.Resources.GetMinioService(mattermost.Name, mattermost.Namespace)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get Minio URL")
-	}
-
-	return mattermostApp.NewOperatorManagedFileStoreInfo(mattermost, secret.Name, url), nil
-}
-
-func (r *MattermostReconciler) checkMattermostMinioSecret(mattermost *mmv1beta.Mattermost, logger logr.Logger) (*corev1.Secret, error) {
-	desired := mattermostMinio.SecretV1Beta(mattermost)
-	err := r.Resources.CreateOrUpdateMinioSecret(mattermost, desired, logger)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create or update Minio Secret")
-	}
-	return desired, nil
-}
-
-func (r *MattermostReconciler) checkMinioInstance(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) error {
-	desired := mattermostMinio.InstanceV1Beta(mattermost)
-
-	err := r.Resources.CreateMinioInstanceIfNotExists(mattermost, desired, reqLogger)
-	if err != nil {
-		return err
-	}
-
-	current := &minioOperator.MinIOInstance{}
-	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: desired.Name, Namespace: desired.Namespace}, current)
-	if err != nil {
-		return err
-	}
-
-	// Note:
-	// For some reason, our current minio operator seems to remove labels on
-	// the instance resource when we add them. For that reason, trying to
-	// ensure the labels are correct doesn't work.
-	return r.Resources.Update(current, desired, reqLogger)
 }

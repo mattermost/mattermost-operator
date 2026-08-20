@@ -1,6 +1,0 @@
-apiVersion: mattermost.com/v1alpha1
-kind: ClusterInstallation
-metadata:
-  name: mm-example-anywhere
-spec:
-  ingressName: mattermost.example.com

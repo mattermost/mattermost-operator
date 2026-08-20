@@ -11,7 +11,6 @@ import (
 
 	rbacv1 "k8s.io/api/rbac/v1"
 
-	mattermostv1alpha1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -23,7 +22,14 @@ import (
 
 const (
 	ingressClassAnnotation = "kubernetes.io/ingress.class"
+
+	// SetupJobName is the name of the (currently disabled) database setup job.
+	SetupJobName = "mattermost-db-setup"
+	// WaitForDBSetupContainerName is the init container that waits on that job.
+	WaitForDBSetupContainerName = "init-wait-for-db-setup"
 )
+
+var defaultIngressPathType = networkingv1.PathTypeImplementationSpecific
 
 // sanitizeIngressAnnotations filters out annotations that could allow arbitrary
 // nginx/ingress controller config injection via snippet directives.
@@ -426,7 +432,7 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 
 	containers := []corev1.Container{
 		{
-			Name:                     mattermostv1alpha1.MattermostAppContainerName,
+			Name:                     mmv1beta.MattermostAppContainerName,
 			Image:                    containerImage,
 			ImagePullPolicy:          mattermost.Spec.ImagePullPolicy,
 			TerminationMessagePolicy: corev1.TerminationMessageFallbackToLogsOnError,

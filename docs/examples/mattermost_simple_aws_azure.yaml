@@ -6,3 +6,15 @@ spec:
   ingress:
     enabled: false
   useServiceLoadBalancer: true
+  # A database and a file store are both required. The Operator does not
+  # provision either one; point it at storage you manage.
+  database:
+    external:
+      # Secret with a DB_CONNECTION_STRING key.
+      secret: db-credentials
+  fileStore:
+    external:
+      url: s3.amazonaws.com
+      bucket: my-s3-bucket
+      # Secret with accesskey and secretkey keys.
+      secret: file-store-credentials

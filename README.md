@@ -18,67 +18,27 @@ See the installation instructions at https://docs.mattermost.com/install/install
 
 You can review the full list of CRD configuration options [here](./docs/mattermost_v1beta1_crd.md).
 
-## Migrate to Mattermost Custom Resource
+## Upgrading to Operator v2.0.0
 
-In version `v2.0.0` of the Mattermost Operator, several breaking changes will be introduced. Some of the more significant ones are:
-- The name of the Custom Resource changed from `ClusterInstallation` to `Mattermost`.
-- Support for `BlueGreen` and `Canary` deployments was dropped.
-- Layout of some fields changed.
+Version `v2.0.0` removes several long-deprecated features. Read this before upgrading.
 
-To prepare for the new release all `ClusterInstallation` Custom Resources need to be migrated to `Mattermost`.
-Mattermost Operator in version `v1.12.0` provides a mechanism to make the migration easier.
-To run the migration see [the automatic migration guide](./docs/migration.md).
+**Removed Custom Resources**
+- `ClusterInstallation` (`mattermost.com/v1alpha1`) and its automatic migration to `Mattermost`.
+- `MattermostRestoreDB` (`mattermost.com/v1alpha1`).
 
+**Removed `Mattermost` spec fields**
+- `spec.database.operatorManaged` — the Operator no longer provisions a MySQL cluster.
+- `spec.fileStore.operatorManaged` — the Operator no longer provisions MinIO.
 
-## Restore an existing Mattermost MySQL Database
-To restore an existing Mattermost MySQL Database into a new Mattermost installation using the Mattermost Operator you will need to follow these steps:
+`spec.database.external` and `spec.fileStore.{external,local,externalVolume}` are unchanged, and a database and file store are now **required**. A `Mattermost` that configures neither is rejected rather than silently defaulting.
 
-Use Case: An existing AWS RDS Database
-  - First you need to dump the data using mysqldump
-  - Create an EC2 instance and install MySQL
-  - Restore the dump in this new database
-  - Install `Percona XtraBackup`
-  - Perform the backup using the `Percona XtraBackup`
-    - `xtrabackup --innodb_file_per_table=1 --innodb_flush_log_at_trx_commit=2 --innodb_flush_method=O_DIRECT --innodb_log_files_in_group=2 --log_bin=/var/lib/mysql/mysql-bin --open_files_limit=65535 --innodb_buffer_pool_size=512M --innodb_log_file_size=128M --server-id=100 --backup=1 --slave-info=1 --stream=xbstream --host=127.0.0.1 --user=USER --password=PASSWORD --target-dir=~/xtrabackup_backupfiles/ | gzip - > BACKNAME.gz`
-  - Upload to an AWS S3 bucket
-  - Create a Mattermost Cluster, for example:
-  ```
-  apiVersion: mattermost.com/v1alpha1
-  kind: ClusterInstallation
-  metadata:
-    name: example-clusterinstallation
-  spec:
-    ingressName: example.mattermost-example.dev
-  ```
-  - Create the Restore/Backup secret with the AWS credentials
-  ```
-  apiVersion: v1
-  kind: Secret
-  metadata:
-    name: restore-secret
-  type: Opaque
-  stringData:
-    AWS_ACCESS_KEY_ID: XXXXXXXXXXXX
-    AWS_SECRET_ACCESS_KEY: XXXXXXXXXXXX/XXXXXXXXXXXX
-    AWS_REGION: us-east-1
-    S3_PROVIDER: AWS
-  ```
-  - Create the mattermost restore manifest to deploy
-  ```
-  apiVersion: mattermost.com/v1alpha1
-  kind: MattermostRestoreDB
-  metadata:
-    name: example-mattermostrestoredb
-  spec:
-    initBucketURL: s3://my-sample/my-backup.gz
-    mattermostClusterName: example-clusterinstallation
-    mattermostDBName: mattermostdb
-    mattermostDBPassword: supersecure
-    mattermostDBUser: mmuser
-    restoreSecret: restore-secret
-  ```
+**Action required before upgrading**
 
-If you have an machine running MySQL you just need to perform the `Percona XtraBackup` step
+1. *Still using `ClusterInstallation`?* Upgrade to Operator `v1.24.x` first and let it migrate your resources to `Mattermost` (see [the migration guide](./docs/migration.md)). The migration code does not exist in `v2.0.0`, so upgrading directly leaves those objects unreadable.
+2. *Using `database.operatorManaged`?* Dump the database, load it into one you manage, and set `database.external` to a secret holding its connection string.
+3. *Using `fileStore.operatorManaged`?* Copy the objects out of MinIO into an S3 compatible bucket or a PVC, then set `fileStore.external` or `fileStore.local`.
+
+Nothing in the upgrade deletes an existing `MysqlCluster` or `MinIOInstance`, so your data is not removed — but the Operator stops managing it, and Mattermost will not be pointed at it any more.
 
 ## Developer Flow
 To test the operator locally. We recommend [Kind](https://kind.sigs.k8s.io/), however, you can use Minikube or Minishift as well.
@@ -132,7 +92,7 @@ Developing and testing local changes to Mattermost Operator is fairly simple. Fo
 
 To spin up an appropriate Kind cluster and deploy dependencies, run:
 ```bash
-make kind-start mysql-minio-operators
+make kind-start
 ```
 
 After Kind cluster is up and running, build Mattermost Operator image, load it to Kind cluster and deploy it. For that, run:
@@ -155,7 +115,6 @@ Mattermost Operator can be run on local machine against remote a Kubernetes clus
 To run Operator locally:
 - Make sure you are connected to a Kubernetes cluster.
 - Install Custom Resources by running: `kubectl apply -f ./config/crd/bases`.
-- Install MinIO and MySQL operators: `make mysql-minio-operators`.
 - Make sure Mattermost Operator **is not** running in the cluster or scale it down to 0 replicas to avoid unexpected behaviour.
 - Run Operator binary: `go run .`
 
@@ -218,7 +177,7 @@ This allows the operator to:
    Some Kubernetes resources managed by the operator (such as `IngressClass`) are **cluster-scoped** and cannot be managed with namespace-limited roles.
 
 3. **Cross-Namespace Integrations**  
-   The operator can provision and manage external dependencies — such as **MySQL clusters** or **MinIO instances** — that may reside in different namespaces.  
+   The operator reads Secrets and PersistentVolumeClaims that may reside in other namespaces.  
    Managing these cross-namespace resources requires cluster-level permissions.
 
 4. **Namespace Metadata Access**  

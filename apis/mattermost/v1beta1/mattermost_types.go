@@ -331,9 +331,6 @@ type Database struct {
 	// Defines the configuration of and external database.
 	// +optional
 	External *ExternalDatabase `json:"external,omitempty"`
-	// Defines the configuration of database managed by Kubernetes operator.
-	// +optional
-	OperatorManaged *OperatorManagedDatabase `json:"operatorManaged,omitempty"`
 
 	// DisableReadinessCheck instructs Operator to not add init container responsible for checking DB access.
 	// Can be used to define custom init containers specified in `spec.PodExtensions.InitContainers`.
@@ -409,46 +406,6 @@ type ExternalDatabase struct {
 	Secret string `json:"secret,omitempty"`
 }
 
-// OperatorManagedDatabase defines the configuration of a database managed by Kubernetes Operator.
-type OperatorManagedDatabase struct {
-	// Defines the type of database to use for an Operator-Managed database.
-	Type string `json:"type,omitempty"`
-	// Defines the storage size for the database. ie 50Gi
-	// +optional
-	// +kubebuilder:validation:Pattern=^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$
-	StorageSize string `json:"storageSize,omitempty"`
-	// Defines the number of database replicas.
-	// For redundancy use at least 2 replicas.
-	// Setting this will override the number of replicas set by 'Size'.
-	// +optional
-	Replicas *int32 `json:"replicas,omitempty"`
-	// Defines the resource requests and limits for the database pods.
-	// +optional
-	Resources v1.ResourceRequirements `json:"resources,omitempty"`
-	// Defines the AWS S3 bucket where the Database Backup is stored.
-	// The operator will download the file to restore the data.
-	// +optional
-	InitBucketURL string `json:"initBucketURL,omitempty"`
-	// Defines the interval for backups in cron expression format.
-	// +optional
-	BackupSchedule string `json:"backupSchedule,omitempty"`
-	// Defines the object storage url for uploading backups.
-	// +optional
-	BackupURL string `json:"backupURL,omitempty"`
-	// Defines the backup retention policy.
-	// +optional
-	BackupRemoteDeletePolicy string `json:"backupRemoteDeletePolicy,omitempty"`
-	// Defines the secret to be used for uploading/restoring backup.
-	// +optional
-	BackupSecretName string `json:"backupSecretName,omitempty"`
-	// Defines the secret to be used when performing a database restore.
-	// +optional
-	BackupRestoreSecretName string `json:"backupRestoreSecretName,omitempty"`
-	// Defines the cluster version for the database to use
-	// +optional
-	Version string `json:"version,omitempty"`
-}
-
 // FileStore defines the file store configuration for Mattermost.
 type FileStore struct {
 	// Defines the configuration of an external file store.
@@ -457,9 +414,6 @@ type FileStore struct {
 	// Defines the configuration of externally managed PVC backed storage.
 	// +optional
 	ExternalVolume *ExternalVolumeFileStore `json:"externalVolume,omitempty"`
-	// Defines the configuration of file store managed by Kubernetes operator.
-	// +optional
-	OperatorManaged *OperatorManagedMinio `json:"operatorManaged,omitempty"`
 	// Defines the configuration of PVC backed storage (local). This is NOT recommended for production environments.
 	// +optional
 	Local *LocalFileStore `json:"local,omitempty"`
@@ -484,25 +438,6 @@ type ExternalFileStore struct {
 type ExternalVolumeFileStore struct {
 	// The name of the matching volume claim for the externally managed volume.
 	VolumeClaimName string `json:"volumeClaimName,omitempty"`
-}
-
-// OperatorManagedMinio defines the configuration of a Minio file store managed by Kubernetes Operator.
-type OperatorManagedMinio struct {
-	// Defines the storage size for Minio. ie 50Gi
-	// +optional
-	// +kubebuilder:validation:Pattern=^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$
-	StorageSize string `json:"storageSize,omitempty"`
-	// Defines the number of Minio replicas.
-	// Supply 1 to run Minio in standalone mode with no redundancy.
-	// Supply 4 or more to run Minio in distributed mode.
-	// Note that it is not possible to upgrade Minio from standalone to distributed mode.
-	// Setting this will override the number of replicas set by 'Size'.
-	// More info: https://docs.min.io/docs/distributed-minio-quickstart-guide.html
-	// +optional
-	Replicas *int32 `json:"replicas,omitempty"`
-	// Defines the resource requests and limits for the Minio pods.
-	// +optional
-	Resources v1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 // LocalFileStore defines the configuration of the local file store that should be used by Mattermost (PVC configuration).

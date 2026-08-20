@@ -104,57 +104,6 @@ func (e *LocalFileStore) Volumes(mm *mmv1beta.Mattermost) ([]corev1.Volume, []co
 	return volumes, volumeMounts
 }
 
-type OperatorManagedMinioConfig struct {
-	fsInfo     FileStoreInfo
-	secretName string
-	minioURL   string
-}
-
-func (e *OperatorManagedMinioConfig) EnvVars(_ *mmv1beta.Mattermost) []corev1.EnvVar {
-	return s3EnvVars(&e.fsInfo)
-}
-
-func (e *OperatorManagedMinioConfig) InitContainers(mattermost *mmv1beta.Mattermost) []corev1.Container {
-	initContainers := []corev1.Container{
-		// Create the init container to create the MinIO bucket
-		{
-			Name:            "create-minio-bucket",
-			Image:           "minio/mc:RELEASE.2025-04-16T18-13-26Z",
-			ImagePullPolicy: corev1.PullIfNotPresent,
-			Command: []string{
-				"/bin/sh", "-c",
-				fmt.Sprintf("mc config host add localminio http://%s $(MINIO_ACCESS_KEY) $(MINIO_SECRET_KEY) && mc mb localminio/%s -q -p", e.minioURL, mattermost.Name),
-			},
-			Env: []corev1.EnvVar{
-				{
-					Name:      "MINIO_ACCESS_KEY",
-					ValueFrom: EnvSourceFromSecret(e.secretName, fileStoreSecretAccessKey),
-				},
-				{
-					Name:      "MINIO_SECRET_KEY",
-					ValueFrom: EnvSourceFromSecret(e.secretName, fileStoreSecretSecretKey),
-				},
-			},
-		},
-		// Create the init container to check that MinIO is up and running
-		{
-			Name:            "init-check-minio",
-			Image:           "appropriate/curl:latest",
-			ImagePullPolicy: corev1.PullIfNotPresent,
-			Command: []string{
-				"sh", "-c",
-				fmt.Sprintf("until curl --max-time 5 http://%s/minio/health/ready; do echo waiting for minio; sleep 5; done;", e.minioURL),
-			},
-		},
-	}
-
-	return initContainers
-}
-
-func (e *OperatorManagedMinioConfig) Volumes(_ *mmv1beta.Mattermost) ([]corev1.Volume, []corev1.VolumeMount) {
-	return []corev1.Volume{}, []corev1.VolumeMount{}
-}
-
 func NewExternalFileStoreInfo(mattermost *mmv1beta.Mattermost, secret *corev1.Secret) (FileStoreConfig, error) {
 	if mattermost.Spec.FileStore.External == nil {
 		return nil, errors.New("external file store configuration not provided")
@@ -208,19 +157,6 @@ func NewExternalVolumeFileStoreInfo(mattermost *mmv1beta.Mattermost) (FileStoreC
 	return &ExternalVolumeFileStore{
 		VolumeClaimName: volumeClaimName,
 	}, nil
-}
-
-func NewOperatorManagedFileStoreInfo(mattermost *mmv1beta.Mattermost, secret, minioURL string) FileStoreConfig {
-	return &OperatorManagedMinioConfig{
-		fsInfo: FileStoreInfo{
-			secretName: secret,
-			bucketName: mattermost.Name,
-			url:        minioURL,
-			useS3SSL:   false,
-		},
-		minioURL:   minioURL,
-		secretName: secret,
-	}
 }
 
 func NewLocalFileStoreInfo() FileStoreConfig {

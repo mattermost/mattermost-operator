@@ -4,6 +4,7 @@ import (
 	"context"
 
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
+	"github.com/mattermost/mattermost-operator/test/e2e"
 	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -43,21 +44,21 @@ func SetupTestEnv(k8sClient client.Client, namespace string) (TestEnv, error) {
 	}
 	cleanupFuncs = append(cleanupFuncs, cleanupNamespace)
 
-	cleanupPostgres, err := CreateFromFile(ctx, k8sClient, namespace, "../../resources/postgres.yaml")
+	cleanupPostgres, err := e2e.CreateFromFile(ctx, k8sClient, namespace, "../../resources/postgres.yaml")
 	if err != nil {
 		cleanupFuncs.Cleanup()
 		return TestEnv{}, errors.Wrap(err, "failed to apply Postgres")
 	}
 	cleanupFuncs = append(cleanupFuncs, cleanupPostgres)
 
-	cleanupMinio, err := CreateFromFile(ctx, k8sClient, namespace, "../../resources/minio.yaml")
+	cleanupMinio, err := e2e.CreateFromFile(ctx, k8sClient, namespace, "../../resources/minio.yaml")
 	if err != nil {
 		cleanupFuncs.Cleanup()
 		return TestEnv{}, errors.Wrap(err, "failed to apply Minio")
 	}
 	cleanupFuncs = append(cleanupFuncs, cleanupMinio)
 
-	cleanupSecrets, err := CreateFromFile(ctx, k8sClient, namespace, "../../resources/mm-secrets.yaml")
+	cleanupSecrets, err := e2e.CreateFromFile(ctx, k8sClient, namespace, "../../resources/mm-secrets.yaml")
 	if err != nil {
 		cleanupFuncs.Cleanup()
 		return TestEnv{}, errors.Wrap(err, "failed to apply MM secrets")

@@ -24,7 +24,7 @@ const (
 	DefaultMattermostSize = "5000users"
 	// DefaultMattermostDatabaseType is the default Mattermost database
 	DefaultMattermostDatabaseType = "mysql"
-	// DefaultFilestoreStorageSize is the default Storage size for Minio or Local Storage
+	// DefaultFilestoreStorageSize is the default Storage size for Local Storage
 	DefaultFilestoreStorageSize = "50Gi"
 	// DefaultStorageSize is the default Storage size for the Database
 	DefaultStorageSize = "50Gi"
@@ -70,8 +70,12 @@ func (mm *Mattermost) SetDefaults() error {
 		mm.Spec.ImagePullPolicy = DefaultPullPolicy
 	}
 
-	mm.Spec.FileStore.SetDefaults()
-	mm.Spec.Database.SetDefaults()
+	if err := mm.Spec.FileStore.SetDefaults(); err != nil {
+		return err
+	}
+	if err := mm.Spec.Database.SetDefaults(); err != nil {
+		return err
+	}
 
 	if err := validateVolumes(mm.Spec.Volumes); err != nil {
 		return err
