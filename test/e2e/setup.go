@@ -25,8 +25,6 @@ type TestEnvironment struct {
 }
 
 func SetupTest() (TestEnvironment, error) {
-	// test/crds held the MinIO and MySQL operator CRDs. Both integrations are gone,
-	// so only this repository's own CRDs remain.
 	testEnv := &envtest.Environment{
 		CRDDirectoryPaths: []string{
 			filepath.Join("..", "..", "config", "crd", "bases"),
