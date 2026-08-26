@@ -40,15 +40,17 @@ func TestMattermost(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	cleanupPrereqs, err := SetupMattermostPrerequisites(context.TODO(), k8sClient, mmNamespace)
-	require.NoError(t, err)
-	defer cleanupPrereqs()
-
 	t.Run("mattermost scale test", func(t *testing.T) {
+		cleanupPrereqs, err := SetupMattermostPrerequisites(context.TODO(), k8sClient, mmNamespace)
+		require.NoError(t, err)
+		defer cleanupPrereqs()
 		mattermostScaleTest(t, k8sClient, k8sTypedClient)
 	})
 
 	t.Run("mattermost upgrade test", func(t *testing.T) {
+		cleanupPrereqs, err := SetupMattermostPrerequisites(context.TODO(), k8sClient, mmNamespace)
+		require.NoError(t, err)
+		defer cleanupPrereqs()
 		mattermostUpgradeTest(t, k8sClient, k8sTypedClient)
 	})
 
