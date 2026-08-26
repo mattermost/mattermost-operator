@@ -20,7 +20,7 @@ func (mm *Mattermost) SetReplicasAndResourcesFromSize() error {
 		return nil
 	}
 
-	size, err := GetClusterSize(mm.Spec.Size)
+	size, err := GetMattermostSize(mm.Spec.Size)
 	if err != nil {
 		err = errors.Wrap(err, "using default")
 		mm.setDefaultReplicasAndResources()

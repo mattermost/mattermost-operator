@@ -44,7 +44,7 @@ func mattermostSizeTest(t *testing.T) {
 	instance := e2e.NewMattermostInstance(t, k8sClient, mattermost)
 
 	t.Run("checking mattermost replicas & resources", func(t *testing.T) {
-		clusterSize, err := mmv1beta.GetClusterSize(mmSize)
+		clusterSize, err := mmv1beta.GetMattermostSize(mmSize)
 		require.NoError(t, err)
 
 		t.Log("create and waiting for Mattermost to be stable")
@@ -68,7 +68,7 @@ func mattermostSizeTest(t *testing.T) {
 
 	t.Run("updating scheduling resources in mattermost object", func(t *testing.T) {
 		mmSize := mmv1beta.CloudSize100String
-		clusterSize, err := mmv1beta.GetClusterSize(mmSize)
+		clusterSize, err := mmv1beta.GetMattermostSize(mmSize)
 		require.NoError(t, err)
 
 		t.Logf("updating scheduling resources in mattermost object with %s\n", mmSize)
@@ -84,7 +84,7 @@ func mattermostSizeTest(t *testing.T) {
 
 	t.Run("updating size in mattermost object", func(t *testing.T) {
 		mmSize := mmv1beta.Size100String
-		clusterSize, err := mmv1beta.GetClusterSize(mmSize)
+		clusterSize, err := mmv1beta.GetMattermostSize(mmSize)
 		require.NoError(t, err)
 
 		t.Logf("updating size in mattermost object with %s\n", mmSize)

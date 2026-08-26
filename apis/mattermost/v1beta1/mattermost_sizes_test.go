@@ -50,7 +50,7 @@ func TestSizeDefaultsAreNotShared(t *testing.T) {
 
 // TestExplicitSizeIsNotShared is the same guarantee for the spec.size path.
 //
-// The resource maps are the part that can actually leak here: GetClusterSize
+// The resource maps are the part that can actually leak here: GetMattermostSize
 // returns a Size by value and overrideReplicasAndResourcesFromSize takes one by
 // value, but copying the struct copies the ResourceList map headers, so the maps
 // are still shared with the preset without a DeepCopy.
@@ -61,7 +61,7 @@ func TestSizeDefaultsAreNotShared(t *testing.T) {
 // where setDefaultReplicasAndResources reads the package-level DefaultSize
 // directly and a pointer into it really is shared process-wide.
 func TestExplicitSizeIsNotShared(t *testing.T) {
-	preset, err := GetClusterSize(Size1000String)
+	preset, err := GetMattermostSize(Size1000String)
 	require.NoError(t, err)
 	originalReplicas := preset.App.Replicas
 	originalCPU := preset.App.Resources.Requests.Cpu().String()
@@ -74,7 +74,7 @@ func TestExplicitSizeIsNotShared(t *testing.T) {
 	*mm.Spec.Replicas = originalReplicas + 1
 	mm.Spec.Scheduling.Resources.Requests[corev1.ResourceCPU] = resource.MustParse("888m")
 
-	after, err := GetClusterSize(Size1000String)
+	after, err := GetMattermostSize(Size1000String)
 	require.NoError(t, err)
 	assert.Equal(t, originalReplicas, after.App.Replicas,
 		"mutating a Mattermost's replicas must not change the named size preset")

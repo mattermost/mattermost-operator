@@ -66,7 +66,7 @@ func TestMattermost(t *testing.T) {
 			},
 		}
 
-		size1000, err := GetClusterSize(Size1000String)
+		size1000, err := GetMattermostSize(Size1000String)
 		require.NoError(t, err)
 
 		t.Run("should set correctly", func(t *testing.T) {

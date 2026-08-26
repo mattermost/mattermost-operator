@@ -228,8 +228,8 @@ func (s *Size) CalculateMemoryMilliRequirement() int64 {
 	return s.App.Resources.Requests.Memory().MilliValue() * int64(s.App.Replicas)
 }
 
-// GetClusterSize returns a Size based on the provided size key.
-func GetClusterSize(key string) (Size, error) {
+// GetMattermostSize returns a Size based on the provided size key.
+func GetMattermostSize(key string) (Size, error) {
 	size, ok := validSizes[key]
 	if !ok {
 		return Size{}, errors.New("invalid cluster size")
