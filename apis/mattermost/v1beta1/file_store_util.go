@@ -9,14 +9,9 @@ import (
 
 // FileStore utils
 
-// SetDefaults validates the file store configuration.
-//
-// There is deliberately no default. Until Operator v2 an unconfigured file store
-// silently became an in-cluster MinIO provisioned through the MinIO operator, which
-// no longer exists. Picking a different default instead would repoint an existing
-// installation at empty storage while its files stayed in the old MinIO, so this
-// fails and asks for an explicit choice.
-func (fs *FileStore) SetDefaults() error {
+// IsValid validates the file store configuration.
+// A file store must be explicitly configured; there is no default.
+func (fs *FileStore) IsValid() error {
 	if fs.IsExternal() || fs.IsExternalVolume() || fs.IsLocal() {
 		return nil
 	}

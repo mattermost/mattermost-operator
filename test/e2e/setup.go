@@ -60,11 +60,8 @@ func boolPtr(b bool) *bool {
 	return &b
 }
 
-// SetupMattermostPrerequisites creates the database and file store a Mattermost
-// now requires. The Operator used to provision both itself via the MySQL and
-// MinIO operators; since it no longer does, the suite has to supply them.
-//
-// It applies the same fixtures the e2e-external suite uses: a Postgres
+// SetupMattermostPrerequisites creates the database and file store Mattermost
+// requires. It applies the same fixtures the e2e-external suite uses: a Postgres
 // Deployment, a standalone MinIO acting as an external S3 endpoint, and the
 // db-credentials and file-store-credentials Secrets. The returned function
 // removes them again.

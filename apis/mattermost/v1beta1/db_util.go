@@ -9,13 +9,9 @@ import (
 
 // Database utils
 
-// SetDefaults validates the database configuration.
-//
-// There is deliberately no default. Until Operator v2 an unconfigured database
-// silently became a MySQL cluster provisioned through the presslabs MySQL
-// operator; that integration has been removed, so a database now has to be
-// supplied explicitly.
-func (db *Database) SetDefaults() error {
+// IsValid validates the database configuration.
+// A database must be explicitly configured; there is no default.
+func (db *Database) IsValid() error {
 	if db.IsExternal() {
 		return nil
 	}

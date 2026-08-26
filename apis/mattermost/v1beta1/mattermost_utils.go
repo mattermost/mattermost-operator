@@ -70,11 +70,15 @@ func (mm *Mattermost) SetDefaults() error {
 		mm.Spec.ImagePullPolicy = DefaultPullPolicy
 	}
 
-	if err := mm.Spec.FileStore.SetDefaults(); err != nil {
-		return err
+	var validationErrors []string
+	if err := mm.Spec.FileStore.IsValid(); err != nil {
+		validationErrors = append(validationErrors, err.Error())
 	}
-	if err := mm.Spec.Database.SetDefaults(); err != nil {
-		return err
+	if err := mm.Spec.Database.IsValid(); err != nil {
+		validationErrors = append(validationErrors, err.Error())
+	}
+	if len(validationErrors) > 0 {
+		return errors.New(strings.Join(validationErrors, "; "))
 	}
 
 	if err := validateVolumes(mm.Spec.Volumes); err != nil {

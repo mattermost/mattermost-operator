@@ -12,10 +12,8 @@ import (
 func TestMattermost_SetDefaults(t *testing.T) {
 	mm := &Mattermost{Spec: MattermostSpec{
 		IngressName: "",
-		// A file store is mandatory, so every fixture that expects SetDefaults to
-		// succeed has to configure one.
-		FileStore: FileStore{External: &ExternalFileStore{URL: "s3.example.com"}},
-		Database:  Database{External: &ExternalDatabase{Secret: "db-secret"}},
+		FileStore:   FileStore{External: &ExternalFileStore{URL: "s3.example.com"}},
+		Database:    Database{External: &ExternalDatabase{Secret: "db-secret"}},
 	}}
 
 	t.Run("return error when ingress enabled but host not set", func(t *testing.T) {
@@ -59,16 +57,36 @@ func TestMattermost_SetDefaults(t *testing.T) {
 			require.True(t, mm.Spec.FileStore.IsLocal())
 		})
 		t.Run("empty file store is rejected", func(t *testing.T) {
-			// Before v2 this silently defaulted to an in-cluster MinIO. There is
-			// deliberately no replacement default, because choosing one would point
-			// the installation at empty storage while its files stayed in MinIO.
 			mm := &Mattermost{Spec: MattermostSpec{
-				Ingress: &Ingress{Enabled: false},
+				Ingress:  &Ingress{Enabled: false},
+				Database: Database{External: &ExternalDatabase{Secret: "db-secret"}},
 			}}
 			err := mm.SetDefaults()
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "a file store is required")
 		})
+	})
+
+	t.Run("database validation", func(t *testing.T) {
+		t.Run("file store present but database missing is rejected", func(t *testing.T) {
+			mm := &Mattermost{Spec: MattermostSpec{
+				Ingress:   &Ingress{Enabled: false},
+				FileStore: FileStore{External: &ExternalFileStore{URL: "s3.example.com"}},
+			}}
+			err := mm.SetDefaults()
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "a database is required")
+		})
+	})
+
+	t.Run("both file store and database missing returns a combined error", func(t *testing.T) {
+		mm := &Mattermost{Spec: MattermostSpec{
+			Ingress: &Ingress{Enabled: false},
+		}}
+		err := mm.SetDefaults()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "a file store is required")
+		assert.Contains(t, err.Error(), "a database is required")
 	})
 
 }

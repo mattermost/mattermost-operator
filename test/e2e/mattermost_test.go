@@ -40,8 +40,6 @@ func TestMattermost(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	// A database and a file store are now required and the Operator does not
-	// provision either, so the suite has to create them before any Mattermost.
 	cleanupPrereqs, err := SetupMattermostPrerequisites(context.TODO(), k8sClient, mmNamespace)
 	require.NoError(t, err)
 	defer cleanupPrereqs()
