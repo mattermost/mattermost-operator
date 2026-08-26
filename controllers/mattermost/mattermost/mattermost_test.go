@@ -815,7 +815,7 @@ func TestCheckMattermostExternalDBAndFileStore(t *testing.T) {
 	currentMMStatus := &mmv1beta.MattermostStatus{}
 
 	// An external database is the fixed choice for these tests; operator-managed
-	// MySQL no longer exists and a database is now mandatory.
+	// An external database is required; configure database.external.
 	if mm.Spec.Database.External == nil {
 		mm.Spec.Database.External = &mmv1beta.ExternalDatabase{Secret: "dbSecret"}
 	}
@@ -991,7 +991,7 @@ func TestCheckMattermostExternalVolumeFileStore(t *testing.T) {
 	currentMMStatus := &mmv1beta.MattermostStatus{}
 
 	// An external database is the fixed choice for these tests; operator-managed
-	// MySQL no longer exists and a database is now mandatory.
+	// An external database is required; configure database.external.
 	if mm.Spec.Database.External == nil {
 		mm.Spec.Database.External = &mmv1beta.ExternalDatabase{Secret: "dbSecret"}
 	}
@@ -1068,7 +1068,7 @@ func TestCheckMattermostLocalFileStore(t *testing.T) {
 	currentMMStatus := &mmv1beta.MattermostStatus{}
 
 	// An external database is the fixed choice for these tests; operator-managed
-	// MySQL no longer exists and a database is now mandatory.
+	// An external database is required; configure database.external.
 	if mm.Spec.Database.External == nil {
 		mm.Spec.Database.External = &mmv1beta.ExternalDatabase{Secret: "dbSecret"}
 	}
@@ -1537,7 +1537,7 @@ func setupTestDeps(t *testing.T) (logr.Logger, client.Client, *MattermostReconci
 
 func fixedDBAndFileStoreInfo(t *testing.T, mm *mmv1beta.Mattermost) (mattermostApp.DatabaseConfig, mattermostApp.FileStoreConfig) {
 	// An external database is the fixed choice for these tests; operator-managed
-	// MySQL no longer exists and a database is now mandatory.
+	// An external database is required; configure database.external.
 	if mm.Spec.Database.External == nil {
 		mm.Spec.Database.External = &mmv1beta.ExternalDatabase{Secret: "dbSecret"}
 	}

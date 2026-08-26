@@ -224,8 +224,7 @@ func testFileStoreConfig(_ int32) operator.FileStore {
 }
 
 func testDatabaseConfig(_ int32) operator.Database {
-	// Operator-managed MySQL no longer exists, so the suite uses an external
-	// database. Postgres comes from resources/postgres.yaml and the secret from
+	// Postgres comes from resources/postgres.yaml and the secret from
 	// resources/mm-secrets.yaml, the same fixtures the e2e-external suite applies.
 	return operator.Database{
 		External: &operator.ExternalDatabase{Secret: "db-credentials"},

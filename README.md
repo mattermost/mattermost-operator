@@ -4,7 +4,7 @@
 
 
 ## Summary
-[Mattermost](https://mattermost.com) is an open source platform for secure collaboration across the entire software development lifecycle. It's written in Golang and React and runs as a single Linux binary with MySQL or PostgreSQL.
+[Mattermost](https://mattermost.com) is an open source platform for secure collaboration across the entire software development lifecycle. It's written in Golang and React and runs as a single Linux binary with PostgreSQL (MySQL support is deprecated in Mattermost Server v10+).
 
 This repo contains a Kubernetes Operator for Mattermost to simplify deploying and managing your Mattermost instance.
 
@@ -31,6 +31,8 @@ Version `v2.0.0` removes several long-deprecated features. Read this before upgr
 - `spec.fileStore.operatorManaged` — the Operator no longer provisions MinIO.
 
 `spec.database.external` and `spec.fileStore.{external,local,externalVolume}` are unchanged, and a database and file store are now **required**. A `Mattermost` that configures neither is rejected rather than silently defaulting.
+
+> **Database recommendation:** PostgreSQL is the only supported database going forward. Mattermost Server v10+ deprecates MySQL; new installations should use PostgreSQL. Existing MySQL databases continue to work via `database.external`, but migration to PostgreSQL is strongly recommended.
 
 **Action required before upgrading**
 
