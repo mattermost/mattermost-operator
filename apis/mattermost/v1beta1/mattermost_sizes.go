@@ -42,7 +42,7 @@ func (mm *Mattermost) setDefaultReplicasAndResources() {
 	mm.Spec.Size = ""
 
 	if mm.Spec.Replicas == nil {
-		mm.Spec.Replicas = utils.NewInt32(DefaultSize.App.Replicas)
+		mm.Spec.Replicas = new(DefaultSize.App.Replicas)
 	}
 	if mm.Spec.Scheduling.Resources.Size() == 0 {
 		mm.Spec.Scheduling.Resources = *DefaultSize.App.Resources.DeepCopy()
