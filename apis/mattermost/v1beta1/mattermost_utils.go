@@ -20,21 +20,12 @@ const (
 	DefaultMattermostImage = "mattermost/mattermost-enterprise-edition"
 	// DefaultMattermostVersion is the default Mattermost docker tag
 	DefaultMattermostVersion = "10.8.1"
-	// DefaultMattermostSize is the default number of users
-	DefaultMattermostSize = "5000users"
-	// DefaultMattermostDatabaseType is the default Mattermost database
-	DefaultMattermostDatabaseType = "mysql"
 	// DefaultFilestoreStorageSize is the default Storage size for Local Storage
 	DefaultFilestoreStorageSize = "50Gi"
-	// DefaultStorageSize is the default Storage size for the Database
-	DefaultStorageSize = "50Gi"
 	// DefaultPullPolicy is the default Pull Policy used by Mattermost app container
 	DefaultPullPolicy = corev1.PullIfNotPresent
 	// DefaultLocalFilePath is the default file path used with local (PVC) storage
 	DefaultLocalFilePath = "/mattermost/data"
-	// DefaultDatabaseVersion
-	DefaultDatabaseVersion = "8.0"
-
 	// ClusterLabel is the label applied across all components
 	ClusterLabel = "installation.mattermost.com/installation"
 
