@@ -29,11 +29,11 @@ import (
 	v1beta1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 func TestCheckMattermost(t *testing.T) {
@@ -1599,25 +1599,25 @@ func TestCheckMattermostHTTPRoute(t *testing.T) {
 
 	routeKey := types.NamespacedName{Name: mmName, Namespace: mmNamespace}
 
-	fetchRoute := func(t *testing.T) (*unstructured.Unstructured, error) {
+	fetchRoute := func(t *testing.T) (*gatewayv1.HTTPRoute, error) {
 		t.Helper()
-		found := &unstructured.Unstructured{}
-		found.SetGroupVersionKind(httpRouteGVK)
+		found := &gatewayv1.HTTPRoute{}
 		return found, reconciler.Client.Get(context.TODO(), routeKey, found)
 	}
 
-	requireRoute := func(t *testing.T) *unstructured.Unstructured {
+	requireRoute := func(t *testing.T) *gatewayv1.HTTPRoute {
 		t.Helper()
 		found, err := fetchRoute(t)
 		require.NoError(t, err)
 		return found
 	}
 
-	hostnamesOf := func(t *testing.T, route *unstructured.Unstructured) []string {
+	hostnamesOf := func(t *testing.T, route *gatewayv1.HTTPRoute) []string {
 		t.Helper()
-		hostnames, found, err := unstructured.NestedStringSlice(route.Object, "spec", "hostnames")
-		require.NoError(t, err)
-		require.True(t, found)
+		hostnames := make([]string, 0, len(route.Spec.Hostnames))
+		for _, h := range route.Spec.Hostnames {
+			hostnames = append(hostnames, string(h))
+		}
 		return hostnames
 	}
 
@@ -1625,8 +1625,6 @@ func TestCheckMattermostHTTPRoute(t *testing.T) {
 		require.NoError(t, reconciler.checkMattermostHTTPRoute(mm, logger))
 
 		found := requireRoute(t)
-		assert.Equal(t, "gateway.networking.k8s.io/v1", found.GetAPIVersion())
-		assert.Equal(t, "HTTPRoute", found.GetKind())
 		assert.Equal(t, []string{"mm.example.com"}, hostnamesOf(t, found))
 		require.Len(t, found.GetOwnerReferences(), 1)
 		assert.Equal(t, mmName, found.GetOwnerReferences()[0].Name)
@@ -1646,8 +1644,7 @@ func TestCheckMattermostHTTPRoute(t *testing.T) {
 		original := requireRoute(t)
 
 		modified := original.DeepCopy()
-		require.NoError(t, unstructured.SetNestedStringSlice(
-			modified.Object, []string{"tampered.example.com"}, "spec", "hostnames"))
+		modified.Spec.Hostnames = []gatewayv1.Hostname{"tampered.example.com"}
 		modified.SetLabels(nil)
 		require.NoError(t, reconciler.Client.Update(context.TODO(), modified))
 
@@ -1718,8 +1715,7 @@ func TestUseServiceLoadBalancerSuppressesHTTPRoute(t *testing.T) {
 
 	httpRouteExists := func(t *testing.T) bool {
 		t.Helper()
-		found := &unstructured.Unstructured{}
-		found.SetGroupVersionKind(httpRouteGVK)
+		found := &gatewayv1.HTTPRoute{}
 		err := reconciler.Client.Get(context.TODO(), key, found)
 		if err != nil && k8sErrors.IsNotFound(err) {
 			return false

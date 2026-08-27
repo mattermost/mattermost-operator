@@ -18,10 +18,9 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	k8sClient "sigs.k8s.io/controller-runtime/pkg/client"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 type reconcileStatus struct {
@@ -226,12 +225,6 @@ func (r *MattermostReconciler) checkMattermostIngress(mattermost *mmv1beta.Matte
 	return r.Resources.Update(current, desired, reqLogger)
 }
 
-var httpRouteGVK = schema.GroupVersionKind{
-	Group:   "gateway.networking.k8s.io",
-	Version: "v1",
-	Kind:    "HTTPRoute",
-}
-
 func (r *MattermostReconciler) checkMattermostHTTPRoute(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) error {
 	// See checkMattermostIngress: UseServiceLoadBalancer takes precedence over any
 	// L7 routing configuration, and suppressing it means removing the resource, not
@@ -255,9 +248,8 @@ func (r *MattermostReconciler) checkMattermostHTTPRoute(mattermost *mmv1beta.Mat
 		return err
 	}
 
-	current := &unstructured.Unstructured{}
-	current.SetGroupVersionKind(httpRouteGVK)
-	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: desired.GetName(), Namespace: desired.GetNamespace()}, current)
+	current := &gatewayv1.HTTPRoute{}
+	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: desired.Name, Namespace: desired.Namespace}, current)
 	if err != nil {
 		return err
 	}

@@ -6,39 +6,36 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 func httpRouteScheme(t *testing.T) *runtime.Scheme {
 	t.Helper()
 	s := runtime.NewScheme()
-	s.AddKnownTypeWithName(httpRouteListGVK.GroupVersion().WithKind("HTTPRoute"), &unstructured.Unstructured{})
-	s.AddKnownTypeWithName(httpRouteListGVK, &unstructured.UnstructuredList{})
+	require.NoError(t, gatewayv1.Install(s))
 	return s
 }
 
-func newHTTPRoute(name, namespace string, labels map[string]string, hostnames ...string) *unstructured.Unstructured {
-	hosts := make([]interface{}, 0, len(hostnames))
+func newHTTPRoute(name, namespace string, labels map[string]string, hostnames ...string) *gatewayv1.HTTPRoute {
+	hosts := make([]gatewayv1.Hostname, 0, len(hostnames))
 	for _, h := range hostnames {
-		hosts = append(hosts, h)
+		hosts = append(hosts, gatewayv1.Hostname(h))
 	}
 
-	route := &unstructured.Unstructured{Object: map[string]interface{}{
-		"apiVersion": "gateway.networking.k8s.io/v1",
-		"kind":       "HTTPRoute",
-		"metadata": map[string]interface{}{
-			"name":      name,
-			"namespace": namespace,
+	route := &gatewayv1.HTTPRoute{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Labels:    labels,
 		},
-		"spec": map[string]interface{}{
-			"hostnames": hosts,
+		Spec: gatewayv1.HTTPRouteSpec{
+			Hostnames: hosts,
 		},
-	}}
-	route.SetLabels(labels)
-
+	}
 	return route
 }
 

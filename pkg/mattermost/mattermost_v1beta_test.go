@@ -11,9 +11,8 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1324,20 +1323,17 @@ func TestGenerateHTTPRoute_V1Beta(t *testing.T) {
 		route := GenerateHTTPRouteV1Beta(mattermost, logr.Discard())
 		require.NotNil(t, route)
 
-		assert.Equal(t, httpRouteGVK, route.GroupVersionKind())
-		assert.Equal(t, "gateway.networking.k8s.io/v1", route.GetAPIVersion())
-		assert.Equal(t, "HTTPRoute", route.GetKind())
-		assert.Equal(t, mmName, route.GetName())
-		assert.Equal(t, mmNamespace, route.GetNamespace())
+		assert.Equal(t, mmName, route.Name)
+		assert.Equal(t, mmNamespace, route.Namespace)
 
 		assert.Equal(t, map[string]string{
 			"app": "mattermost",
 			"installation.mattermost.com/installation": mmName,
 			"installation.mattermost.com/resource":     mmName,
-		}, route.GetLabels())
+		}, route.Labels)
 
-		require.Len(t, route.GetOwnerReferences(), 1)
-		owner := route.GetOwnerReferences()[0]
+		require.Len(t, route.OwnerReferences, 1)
+		owner := route.OwnerReferences[0]
 		assert.Equal(t, "installation.mattermost.com/v1beta1", owner.APIVersion)
 		assert.Equal(t, "Mattermost", owner.Kind)
 		assert.Equal(t, mmName, owner.Name)
@@ -1347,47 +1343,41 @@ func TestGenerateHTTPRoute_V1Beta(t *testing.T) {
 		require.NotNil(t, owner.BlockOwnerDeletion)
 		assert.True(t, *owner.BlockOwnerDeletion)
 
-		// Assert the whole spec so that an unexpected or missing field fails here
-		// rather than surfacing as drift against a live Gateway controller.
-		assert.Equal(t, map[string]interface{}{
-			"hostnames": []interface{}{"mm.example.com"},
-			"parentRefs": []interface{}{
-				map[string]interface{}{
-					"group":     "gateway.networking.k8s.io",
-					"kind":      "Gateway",
-					"name":      "shared-gateway",
-					"namespace": mmNamespace,
-				},
-			},
-			"rules": []interface{}{
-				map[string]interface{}{
-					"matches": []interface{}{
-						map[string]interface{}{
-							"path": map[string]interface{}{
-								"type":  "PathPrefix",
-								"value": "/",
-							},
-						},
-					},
-					"backendRefs": []interface{}{
-						map[string]interface{}{
-							"group":  "",
-							"kind":   "Service",
-							"name":   mmName,
-							"port":   int64(8065),
-							"weight": int64(100),
-						},
-					},
-					"timeouts": map[string]interface{}{
-						"request":        "3600s",
-						"backendRequest": "3600s",
-					},
-				},
-			},
-		}, route.Object["spec"])
+		// parentRef
+		require.Len(t, route.Spec.ParentRefs, 1)
+		ref := route.Spec.ParentRefs[0]
+		assert.Equal(t, gatewayv1.Group("gateway.networking.k8s.io"), *ref.Group)
+		assert.Equal(t, gatewayv1.Kind("Gateway"), *ref.Kind)
+		assert.Equal(t, gatewayv1.ObjectName("shared-gateway"), ref.Name)
+		assert.Equal(t, gatewayv1.Namespace(mmNamespace), *ref.Namespace)
+		assert.Nil(t, ref.SectionName)
+
+		// hostnames
+		assert.Equal(t, []gatewayv1.Hostname{"mm.example.com"}, route.Spec.Hostnames)
+
+		// rule
+		require.Len(t, route.Spec.Rules, 1)
+		rule := route.Spec.Rules[0]
+		require.Len(t, rule.Matches, 1)
+		pathPrefix := gatewayv1.PathMatchPathPrefix
+		pathValue := "/"
+		assert.Equal(t, &gatewayv1.HTTPPathMatch{Type: &pathPrefix, Value: &pathValue}, rule.Matches[0].Path)
+		require.Len(t, rule.BackendRefs, 1)
+		svcGroup := gatewayv1.Group("")
+		svcKind := gatewayv1.Kind("Service")
+		svcPort := gatewayv1.PortNumber(8065)
+		weight := int32(100)
+		assert.Equal(t, &svcGroup, rule.BackendRefs[0].Group)
+		assert.Equal(t, &svcKind, rule.BackendRefs[0].Kind)
+		assert.Equal(t, gatewayv1.ObjectName(mmName), rule.BackendRefs[0].Name)
+		assert.Equal(t, &svcPort, rule.BackendRefs[0].Port)
+		assert.Equal(t, &weight, rule.BackendRefs[0].Weight)
+		reqTimeout := gatewayv1.Duration("3600s")
+		assert.Equal(t, &reqTimeout, rule.Timeouts.Request)
+		assert.Equal(t, &reqTimeout, rule.Timeouts.BackendRequest)
 	})
 
-	t.Run("no sectionName key when unset", func(t *testing.T) {
+	t.Run("no sectionName when unset", func(t *testing.T) {
 		mattermost := newMattermost(&mmv1beta.HTTPRouteSpec{
 			Enabled:    true,
 			Host:       "mm.example.com",
@@ -1396,11 +1386,8 @@ func TestGenerateHTTPRoute_V1Beta(t *testing.T) {
 
 		route := GenerateHTTPRouteV1Beta(mattermost, logr.Discard())
 
-		parentRefs, found, err := unstructured.NestedSlice(route.Object, "spec", "parentRefs")
-		require.NoError(t, err)
-		require.True(t, found)
-		require.Len(t, parentRefs, 1)
-		assert.NotContains(t, parentRefs[0].(map[string]interface{}), "sectionName")
+		require.Len(t, route.Spec.ParentRefs, 1)
+		assert.Nil(t, route.Spec.ParentRefs[0].SectionName)
 	})
 
 	t.Run("gatewayRef overrides", func(t *testing.T) {
@@ -1417,17 +1404,13 @@ func TestGenerateHTTPRoute_V1Beta(t *testing.T) {
 
 		route := GenerateHTTPRouteV1Beta(mattermost, logr.Discard())
 
-		parentRefs, _, err := unstructured.NestedSlice(route.Object, "spec", "parentRefs")
-		require.NoError(t, err)
-		assert.Equal(t, []interface{}{
-			map[string]interface{}{
-				"group":       "custom.networking.io",
-				"kind":        "Gateway",
-				"name":        "cilium-gateway",
-				"namespace":   "gateway-system",
-				"sectionName": "https",
-			},
-		}, parentRefs)
+		require.Len(t, route.Spec.ParentRefs, 1)
+		ref := route.Spec.ParentRefs[0]
+		assert.Equal(t, gatewayv1.Group("custom.networking.io"), *ref.Group)
+		assert.Equal(t, gatewayv1.Namespace("gateway-system"), *ref.Namespace)
+		assert.Equal(t, gatewayv1.ObjectName("cilium-gateway"), ref.Name)
+		sectionName := gatewayv1.SectionName("https")
+		assert.Equal(t, &sectionName, ref.SectionName)
 	})
 
 	t.Run("custom timeouts", func(t *testing.T) {
@@ -1441,13 +1424,13 @@ func TestGenerateHTTPRoute_V1Beta(t *testing.T) {
 
 		route := GenerateHTTPRouteV1Beta(mattermost, logr.Discard())
 
-		rules, _, err := unstructured.NestedSlice(route.Object, "spec", "rules")
-		require.NoError(t, err)
-		require.Len(t, rules, 1)
-		assert.Equal(t, map[string]interface{}{
-			"request":        "120s",
-			"backendRequest": "60s",
-		}, rules[0].(map[string]interface{})["timeouts"])
+		require.Len(t, route.Spec.Rules, 1)
+		timeouts := route.Spec.Rules[0].Timeouts
+		require.NotNil(t, timeouts)
+		req := gatewayv1.Duration("120s")
+		backend := gatewayv1.Duration("60s")
+		assert.Equal(t, &req, timeouts.Request)
+		assert.Equal(t, &backend, timeouts.BackendRequest)
 	})
 
 	t.Run("multiple hostnames retain order and skip duplicates", func(t *testing.T) {
@@ -1465,11 +1448,9 @@ func TestGenerateHTTPRoute_V1Beta(t *testing.T) {
 
 		route := GenerateHTTPRouteV1Beta(mattermost, logr.Discard())
 
-		hostnames, _, err := unstructured.NestedSlice(route.Object, "spec", "hostnames")
-		require.NoError(t, err)
-		assert.Equal(t, []interface{}{
+		assert.Equal(t, []gatewayv1.Hostname{
 			"primary.example.com", "b.example.com", "a.example.com",
-		}, hostnames)
+		}, route.Spec.Hostnames)
 	})
 
 	t.Run("annotations are passed through", func(t *testing.T) {
@@ -1481,31 +1462,7 @@ func TestGenerateHTTPRoute_V1Beta(t *testing.T) {
 		})
 
 		route := GenerateHTTPRouteV1Beta(mattermost, logr.Discard())
-		assert.Equal(t, map[string]string{"owner": "sre"}, route.GetAnnotations())
-	})
-
-	t.Run("survives a JSON round trip", func(t *testing.T) {
-		// The object is sent to the API server and stored in the last-applied
-		// annotation as JSON, so every value has to be a legal unstructured type
-		// that survives encode/decode unchanged. A plain int (rather than int64)
-		// or a typed struct nested in the map would fail one of these.
-		mattermost := newMattermost(&mmv1beta.HTTPRouteSpec{
-			Enabled:    true,
-			Host:       "mm.example.com",
-			GatewayRef: mmv1beta.GatewayReference{Name: "shared-gateway"},
-		})
-
-		route := GenerateHTTPRouteV1Beta(mattermost, logr.Discard())
-
-		// DeepCopyJSON panics on any value that is not valid unstructured content.
-		require.NotPanics(t, func() { runtime.DeepCopyJSON(route.Object) })
-
-		raw, err := route.MarshalJSON()
-		require.NoError(t, err)
-
-		decoded := &unstructured.Unstructured{}
-		require.NoError(t, decoded.UnmarshalJSON(raw))
-		assert.Equal(t, route.Object, decoded.Object)
+		assert.Equal(t, map[string]string{"owner": "sre"}, route.Annotations)
 	})
 }
 
@@ -1529,9 +1486,9 @@ func TestGenerateHTTPRoute_V1Beta_SnippetAnnotationsFiltered(t *testing.T) {
 	route := GenerateHTTPRouteV1Beta(mattermost, logr.Discard())
 	require.NotNil(t, route)
 
-	assert.Equal(t, "sre", route.GetAnnotations()["owner"])
-	assert.NotContains(t, route.GetAnnotations(), "nginx.ingress.kubernetes.io/configuration-snippet")
-	assert.NotContains(t, route.GetAnnotations(), "multiline")
+	assert.Equal(t, "sre", route.Annotations["owner"])
+	assert.NotContains(t, route.Annotations, "nginx.ingress.kubernetes.io/configuration-snippet")
+	assert.NotContains(t, route.Annotations, "multiline")
 }
 
 func TestGenerateALBIngress_V1Beta_SnippetAnnotationsFiltered(t *testing.T) {

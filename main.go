@@ -21,6 +21,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -39,10 +40,9 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-
 	utilruntime.Must(mmv1beta.AddToScheme(scheme))
+	utilruntime.Must(gatewayv1.Install(scheme))
 	// +kubebuilder:scaffold:scheme
-
 }
 
 type Config struct {

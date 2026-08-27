@@ -10,12 +10,12 @@ import (
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 // getErrorClient returns a fixed error from Get, delegating everything else to an
@@ -82,12 +82,9 @@ func TestCreateHTTPRouteIfNotExists_MissingGatewayAPIFailsLoudly(t *testing.T) {
 	helper := helperWithGetError(noGatewayAPIError())
 
 	owner := &metav1.ObjectMeta{Name: "mm", Namespace: "default"}
-	route := &unstructured.Unstructured{}
-	route.SetGroupVersionKind(schema.GroupVersionKind{
-		Group: "gateway.networking.k8s.io", Version: "v1", Kind: "HTTPRoute",
-	})
-	route.SetName("mm")
-	route.SetNamespace("default")
+	route := &gatewayv1.HTTPRoute{
+		ObjectMeta: metav1.ObjectMeta{Name: "mm", Namespace: "default"},
+	}
 
 	err := helper.CreateHTTPRouteIfNotExists(owner, route, logr.Discard())
 	require.Error(t, err)
