@@ -392,28 +392,40 @@ func validHTTPRoute() *HTTPRouteSpec {
 	}
 }
 
+// validMMBase returns the minimum FileStore+Database config required by SetDefaults.
+func validMMBase() MattermostSpec {
+	return MattermostSpec{
+		FileStore: FileStore{External: &ExternalFileStore{URL: "s3.example.com"}},
+		Database:  Database{External: &ExternalDatabase{Secret: "db-secret"}},
+	}
+}
+
 func TestMattermost_SetDefaults_HTTPRoute(t *testing.T) {
 	t.Run("HTTPRoute only, no ingress section, is accepted", func(t *testing.T) {
-		mm := &Mattermost{Spec: MattermostSpec{HTTPRoute: validHTTPRoute()}}
+		spec := validMMBase()
+		spec.HTTPRoute = validHTTPRoute()
+		mm := &Mattermost{Spec: spec}
 		require.NoError(t, mm.SetDefaults())
 	})
 
 	t.Run("require host when enabled", func(t *testing.T) {
-		mm := &Mattermost{Spec: MattermostSpec{HTTPRoute: &HTTPRouteSpec{
+		spec := validMMBase()
+		spec.HTTPRoute = &HTTPRouteSpec{
 			Enabled:    true,
 			GatewayRef: GatewayReference{Name: "shared-gateway"},
-		}}}
-		err := mm.SetDefaults()
+		}
+		err := (&Mattermost{Spec: spec}).SetDefaults()
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "httpRoute.host")
 	})
 
 	t.Run("require gatewayRef.name when enabled", func(t *testing.T) {
-		mm := &Mattermost{Spec: MattermostSpec{HTTPRoute: &HTTPRouteSpec{
+		spec := validMMBase()
+		spec.HTTPRoute = &HTTPRouteSpec{
 			Enabled: true,
 			Host:    "mm.example.com",
-		}}}
-		err := mm.SetDefaults()
+		}
+		err := (&Mattermost{Spec: spec}).SetDefaults()
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "httpRoute.gatewayRef.name")
 	})
@@ -421,19 +433,17 @@ func TestMattermost_SetDefaults_HTTPRoute(t *testing.T) {
 	t.Run("no validation when disabled", func(t *testing.T) {
 		// An operator removing an HTTPRoute must be able to flip enabled to false
 		// without still supplying a host and Gateway reference.
-		mm := &Mattermost{Spec: MattermostSpec{
-			Ingress:   &Ingress{Enabled: false},
-			HTTPRoute: &HTTPRouteSpec{Enabled: false},
-		}}
-		require.NoError(t, mm.SetDefaults())
+		spec := validMMBase()
+		spec.Ingress = &Ingress{Enabled: false}
+		spec.HTTPRoute = &HTTPRouteSpec{Enabled: false}
+		require.NoError(t, (&Mattermost{Spec: spec}).SetDefaults())
 	})
 
 	t.Run("ingress still validated when explicitly enabled alongside HTTPRoute", func(t *testing.T) {
-		mm := &Mattermost{Spec: MattermostSpec{
-			Ingress:   &Ingress{Enabled: true},
-			HTTPRoute: validHTTPRoute(),
-		}}
-		err := mm.SetDefaults()
+		spec := validMMBase()
+		spec.Ingress = &Ingress{Enabled: true}
+		spec.HTTPRoute = validHTTPRoute()
+		err := (&Mattermost{Spec: spec}).SetDefaults()
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "ingress.host")
 	})
