@@ -1,5 +1,13 @@
 # Migrating ClusterInstallation to Mattermost
 
+> **This migration must be performed with Operator `v1.24.x` or earlier.**
+>
+> Operator `v2.0.0` removes the `ClusterInstallation` Custom Resource along with
+> the migration code described here. If you still have `ClusterInstallation`
+> resources, complete this migration first and only then upgrade to `v2.0.0`.
+> Upgrading directly leaves those objects unreadable, because the CRD that
+> defines them no longer exists.
+
 As of the new release, the Custom Resource managed by the Mattermost Operator changes from `ClusterInstallation` to `Mattermost`.
 Besides the name change, some new functionality is introduced while other functionality is changed or removed.
 

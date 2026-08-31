@@ -6,3 +6,15 @@ spec:
   ingress:
     enabled: true
     host: mattermost.example.com
+  # A database and a file store are both required. The Operator does not
+  # provision either one; point it at storage you manage.
+  database:
+    external:
+      # Secret with a DB_CONNECTION_STRING key.
+      secret: db-credentials
+  fileStore:
+    # Local (PVC backed) storage keeps this example free of external services.
+    # Use fileStore.external with an S3 compatible bucket for production.
+    local:
+      enabled: true
+      storageSize: 50Gi

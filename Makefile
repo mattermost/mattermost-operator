@@ -42,7 +42,12 @@ TARGET_OS ?= linux
 TARGET_ARCH ?= amd64
 
 BUNDLE_IMG ?= controller-bundle:$(VERSION) # Default bundle image tag
-CRD_OPTIONS ?= "crd" # Image URL to use all building/pushing image targets
+# Field descriptions are truncated so the generated CRD stays comfortably under
+# the 262144 byte ceiling on metadata.annotations. kubectl apply stores the whole
+# manifest in kubectl.kubernetes.io/last-applied-configuration, and the Mattermost
+# CRD inlines large upstream corev1 types, so it had crept to within 0.5% of that
+# limit. The full field documentation lives in docs/mattermost_v1beta1_crd.md.
+CRD_OPTIONS ?= "crd:maxDescLen=200"
 
 ################################################################################
 
@@ -237,9 +242,6 @@ deploy: manifests kustomize ## Deploy controller in the configured Kubernetes cl
 	cd config/manager && $(KUSTOMIZE) edit set image mattermost-operator="mattermost/mattermost-operator:test"
 	$(KUSTOMIZE) build config/default | kubectl apply -n mattermost-operator -f -
 
-mysql-minio-operators: ## Deploys MinIO and MySQL Operators to the active cluster
-	./scripts/install-mysql-minio.sh
-
 manifests: $(CONTROLLER_GEN) ## Runs CRD generator
 	echo "Generating CRDs"
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) paths="./apis/..." output:crd:artifacts:config=config/crd/bases
@@ -256,18 +258,11 @@ vet: ## Run go vet against against all packages.
 generate: $(OPENAPI_GEN) $(CONTROLLER_GEN) ## Runs the kubernetes code-generators and openapi
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
-	# Revert any modification to the mysql-operator files
-	git checkout pkg/database/mysql_operator/*
-
 	## Grant permissions to execute generation script
 	chmod +x scripts/k8s.io/code-generator/generate-groups.sh
 
-	GOROOT=$(GOROOT) $(OPENAPI_GEN) --logtostderr=true -o "" -i ./apis/mattermost/v1alpha1 -O zz_generated.openapi -p ./apis/mattermost/v1alpha1 -h ./hack/boilerplate.go.txt -r "-"
 
 	## Do not generate deepcopy as it is handled by controller-gen
-	scripts/k8s.io/code-generator/generate-groups.sh client github.com/mattermost/mattermost-operator/pkg/client github.com/mattermost/mattermost-operator/apis "mattermost:v1alpha1" --go-header-file ./hack/boilerplate.go.txt
-	scripts/k8s.io/code-generator/generate-groups.sh lister github.com/mattermost/mattermost-operator/pkg/client github.com/mattermost/mattermost-operator/apis "mattermost:v1alpha1" --go-header-file ./hack/boilerplate.go.txt
-	scripts/k8s.io/code-generator/generate-groups.sh informer github.com/mattermost/mattermost-operator/pkg/client github.com/mattermost/mattermost-operator/apis "mattermost:v1alpha1" --go-header-file ./hack/boilerplate.go.txt
 
 	GOROOT=$(GOROOT) $(OPENAPI_GEN) --logtostderr=true -o "" -i ./apis/mattermost/v1beta1 -O zz_generated.openapi -p ./apis/mattermost/v1beta1 -h ./hack/boilerplate.go.txt -r "-"
 

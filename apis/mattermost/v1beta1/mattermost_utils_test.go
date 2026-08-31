@@ -12,6 +12,8 @@ import (
 func TestMattermost_SetDefaults(t *testing.T) {
 	mm := &Mattermost{Spec: MattermostSpec{
 		IngressName: "",
+		FileStore:   FileStore{External: &ExternalFileStore{URL: "s3.example.com"}},
+		Database:    Database{External: &ExternalDatabase{Secret: "db-secret"}},
 	}}
 
 	t.Run("return error when ingress enabled but host not set", func(t *testing.T) {
@@ -23,45 +25,68 @@ func TestMattermost_SetDefaults(t *testing.T) {
 		err := mm.SetDefaults()
 		require.NoError(t, err)
 	})
-	t.Run("minio only set if other filestores types are not", func(t *testing.T) {
+	t.Run("a file store must be configured explicitly", func(t *testing.T) {
 		t.Run("external", func(t *testing.T) {
 			mm := &Mattermost{Spec: MattermostSpec{
 				Ingress:   &Ingress{Enabled: false},
 				FileStore: FileStore{External: &ExternalFileStore{URL: "test"}},
+				Database:  Database{External: &ExternalDatabase{Secret: "db-secret"}},
 			}}
 			err := mm.SetDefaults()
 			require.NoError(t, err)
 			require.True(t, mm.Spec.FileStore.IsExternal())
-			assert.Nil(t, mm.Spec.FileStore.OperatorManaged)
 		})
 		t.Run("externalVolume", func(t *testing.T) {
 			mm := &Mattermost{Spec: MattermostSpec{
 				Ingress:   &Ingress{Enabled: false},
 				FileStore: FileStore{ExternalVolume: &ExternalVolumeFileStore{VolumeClaimName: "test"}},
+				Database:  Database{External: &ExternalDatabase{Secret: "db-secret"}},
 			}}
 			err := mm.SetDefaults()
 			require.NoError(t, err)
 			require.True(t, mm.Spec.FileStore.IsExternalVolume())
-			assert.Nil(t, mm.Spec.FileStore.OperatorManaged)
 		})
 		t.Run("local", func(t *testing.T) {
 			mm := &Mattermost{Spec: MattermostSpec{
 				Ingress:   &Ingress{Enabled: false},
 				FileStore: FileStore{Local: &LocalFileStore{Enabled: true}},
+				Database:  Database{External: &ExternalDatabase{Secret: "db-secret"}},
 			}}
 			err := mm.SetDefaults()
 			require.NoError(t, err)
 			require.True(t, mm.Spec.FileStore.IsLocal())
-			assert.Nil(t, mm.Spec.FileStore.OperatorManaged)
 		})
-		t.Run("filestore empty", func(t *testing.T) {
+		t.Run("empty file store is rejected", func(t *testing.T) {
 			mm := &Mattermost{Spec: MattermostSpec{
-				Ingress: &Ingress{Enabled: false},
+				Ingress:  &Ingress{Enabled: false},
+				Database: Database{External: &ExternalDatabase{Secret: "db-secret"}},
 			}}
 			err := mm.SetDefaults()
-			require.NoError(t, err)
-			assert.NotNil(t, mm.Spec.FileStore.OperatorManaged)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "a file store is required")
 		})
+	})
+
+	t.Run("database validation", func(t *testing.T) {
+		t.Run("file store present but database missing is rejected", func(t *testing.T) {
+			mm := &Mattermost{Spec: MattermostSpec{
+				Ingress:   &Ingress{Enabled: false},
+				FileStore: FileStore{External: &ExternalFileStore{URL: "s3.example.com"}},
+			}}
+			err := mm.SetDefaults()
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "a database is required")
+		})
+	})
+
+	t.Run("both file store and database missing returns a combined error", func(t *testing.T) {
+		mm := &Mattermost{Spec: MattermostSpec{
+			Ingress: &Ingress{Enabled: false},
+		}}
+		err := mm.SetDefaults()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "a file store is required")
+		assert.Contains(t, err.Error(), "a database is required")
 	})
 
 }
@@ -69,7 +94,9 @@ func TestMattermost_SetDefaults(t *testing.T) {
 func TestValidateVolumes(t *testing.T) {
 	baseSpec := func() MattermostSpec {
 		return MattermostSpec{
-			Ingress: &Ingress{Enabled: false},
+			Ingress:   &Ingress{Enabled: false},
+			FileStore: FileStore{External: &ExternalFileStore{URL: "s3.example.com"}},
+			Database:  Database{External: &ExternalDatabase{Secret: "db-secret"}},
 		}
 	}
 
@@ -280,6 +307,9 @@ func TestMattermost_IngressAccessors(t *testing.T) {
 	} {
 		t.Run(testCase.description, func(t *testing.T) {
 			mm := &Mattermost{Spec: testCase.mmSpec}
+			// This table is about Ingress, but SetDefaults now requires a file store.
+			mm.Spec.FileStore = FileStore{External: &ExternalFileStore{URL: "s3.example.com"}}
+			mm.Spec.Database = Database{External: &ExternalDatabase{Secret: "db-secret"}}
 			err := mm.SetDefaults()
 			require.NoError(t, err)
 

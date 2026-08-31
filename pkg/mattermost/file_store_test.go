@@ -16,32 +16,12 @@ func TestFileStore(t *testing.T) {
 		Spec:       mmv1beta.MattermostSpec{},
 	}
 
-	secret := "file-store-secret"
-	minioURL := "http://minio"
-
-	t.Run("operator managed Minio", func(t *testing.T) {
-		mattermost.Spec.FileStore = mmv1beta.FileStore{
-			OperatorManaged: &mmv1beta.OperatorManagedMinio{
-				StorageSize: "10GB",
-				Replicas:    nil,
-				Resources:   corev1.ResourceRequirements{},
-			},
-		}
-
-		config := NewOperatorManagedFileStoreInfo(mattermost, secret, minioURL)
-		fileStore := config.(*OperatorManagedMinioConfig)
-		initContainers := fileStore.InitContainers(mattermost)
-		assert.Equal(t, 2, len(initContainers))
-		assert.Equal(t, secret, fileStore.fsInfo.secretName)
-		assert.Equal(t, minioURL, fileStore.fsInfo.url)
-		assert.Equal(t, "mm-test", fileStore.fsInfo.bucketName)
-		assert.Equal(t, false, fileStore.fsInfo.useS3SSL)
-	})
+	fileStoreURL := "http://s3.example.com"
 
 	t.Run("external file store", func(t *testing.T) {
 		mattermost.Spec.FileStore = mmv1beta.FileStore{
 			External: &mmv1beta.ExternalFileStore{
-				URL:    minioURL,
+				URL:    fileStoreURL,
 				Bucket: "test-bucket",
 				Secret: "external-file-store",
 			},
@@ -61,7 +41,7 @@ func TestFileStore(t *testing.T) {
 		initContainers := fileStore.InitContainers(mattermost)
 		assert.Equal(t, 0, len(initContainers))
 		assert.Equal(t, "external-file-store", fileStore.fsInfo.secretName)
-		assert.Equal(t, minioURL, fileStore.fsInfo.url)
+		assert.Equal(t, fileStoreURL, fileStore.fsInfo.url)
 		assert.Equal(t, "test-bucket", fileStore.fsInfo.bucketName)
 		assert.Equal(t, true, fileStore.fsInfo.useS3SSL)
 	})
@@ -69,7 +49,7 @@ func TestFileStore(t *testing.T) {
 	t.Run("external file store using service account", func(t *testing.T) {
 		mattermost.Spec.FileStore = mmv1beta.FileStore{
 			External: &mmv1beta.ExternalFileStore{
-				URL:               minioURL,
+				URL:               fileStoreURL,
 				Bucket:            "test-bucket",
 				UseServiceAccount: true,
 			},
@@ -81,7 +61,7 @@ func TestFileStore(t *testing.T) {
 		initContainers := fileStore.InitContainers(mattermost)
 		assert.Equal(t, 0, len(initContainers))
 		assert.Equal(t, "", fileStore.fsInfo.secretName)
-		assert.Equal(t, minioURL, fileStore.fsInfo.url)
+		assert.Equal(t, fileStoreURL, fileStore.fsInfo.url)
 		assert.Equal(t, "test-bucket", fileStore.fsInfo.bucketName)
 		assert.Equal(t, true, fileStore.fsInfo.useS3SSL)
 

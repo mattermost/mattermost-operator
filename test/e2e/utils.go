@@ -10,7 +10,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	mmv1beta1 "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
-	mysqlv1alpha1 "github.com/mattermost/mattermost-operator/pkg/database/mysql_operator/v1alpha1"
 
 	appsv1 "k8s.io/api/apps/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -18,27 +17,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
-
-func waitForMySQLStatusReady(t *testing.T, dynclient client.Client, namespace, name string, replicas int, retryInterval, timeout time.Duration) error {
-	mysql := &mysqlv1alpha1.MysqlCluster{}
-	err := wait.Poll(retryInterval, timeout, func() (done bool, err error) {
-		errClient := dynclient.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, mysql)
-		if errClient != nil {
-			return false, errClient
-		}
-
-		if mysql.Status.ReadyNodes == replicas {
-			return true, nil
-		}
-		t.Logf("Waiting for MySQL cluster ReadyNodes: %d\n", mysql.Status.ReadyNodes)
-		return false, nil
-	})
-	if err != nil {
-		return err
-	}
-	t.Logf("All MySQL cluster nodes (%d) are ready!\n", mysql.Status.ReadyNodes)
-	return nil
-}
 
 func WaitForMattermostStable(t *testing.T, k8sClient client.Client, mmKey types.NamespacedName, timeout time.Duration) error {
 	mattermost := &mmv1beta1.Mattermost{}

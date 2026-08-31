@@ -10,7 +10,7 @@ spec:
   image: mattermost/mattermost-enterprise-edition # Docker image for the app servers.
   imagePullPolicy: IfNotPresent                   # Image Pull policy used by Mattermost deployment.
   version: 5.28.0                                 # Docker tag for the image.
-  size: 5000users                                 # Size of the Mattermost installation, typically based on the number of users. This a is write-only field - its value is erased after setting appropriate values of resources. Automatically sets the replica and resource limits for Minio, databases and app servers based on the number provided here. Accepts 100users, 1000users, 5000users, 10000users, or 25000users. Manually setting replicas or resources will override the values set by 'size'.
+  size: 5000users                                 # Size of the Mattermost installation, typically based on the number of users. This is a write-only field - its value is erased after setting appropriate values of resources. Automatically sets the replica and resource limits for the app servers based on the number provided here. Accepts 100users, 1000users, 5000users, 10000users, or 25000users. Manually setting replicas or resources will override the values set by 'size'.
   awsLoadBalancerController:
     enabled: true                                 # If disabled Ingress will not be created by Mattermost Operator.
     hosts: 

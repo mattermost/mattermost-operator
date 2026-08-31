@@ -2,10 +2,8 @@ package e2e
 
 import (
 	"context"
-	"fmt"
 
 	operator "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
-	"github.com/mattermost/mattermost-operator/pkg/components/utils"
 	ptrUtil "github.com/mattermost/mattermost-operator/pkg/utils"
 	operatortest "github.com/mattermost/mattermost-operator/test"
 	appsv1 "k8s.io/api/apps/v1"
@@ -37,30 +35,25 @@ func TestMattermost(t *testing.T) {
 	k8sTypedClient, err := kubernetes.NewForConfig(cfg)
 	require.NoError(t, err)
 
-	t.Run("mysql operator ready", func(t *testing.T) {
-		err = waitForStatefulSet(t, k8sClient, "mysql-operator", "mysql-operator", 1, retryInterval, timeout)
-		require.NoError(t, err)
-	})
-	t.Run("minio operator ready", func(t *testing.T) {
-		err = waitForDeployment(t, k8sTypedClient, "minio-operator", "minio-operator", 1, retryInterval, timeout)
-		require.NoError(t, err)
-	})
 	t.Run("mattermost operator ready", func(t *testing.T) {
 		err = waitForDeployment(t, k8sTypedClient, mmNamespace, "mattermost-operator", 1, retryInterval, timeout)
 		require.NoError(t, err)
 	})
 
 	t.Run("mattermost scale test", func(t *testing.T) {
+		cleanupPrereqs, err := SetupMattermostPrerequisites(context.TODO(), k8sClient, mmNamespace)
+		require.NoError(t, err)
+		defer cleanupPrereqs()
 		mattermostScaleTest(t, k8sClient, k8sTypedClient)
 	})
 
 	t.Run("mattermost upgrade test", func(t *testing.T) {
+		cleanupPrereqs, err := SetupMattermostPrerequisites(context.TODO(), k8sClient, mmNamespace)
+		require.NoError(t, err)
+		defer cleanupPrereqs()
 		mattermostUpgradeTest(t, k8sClient, k8sTypedClient)
 	})
 
-	t.Run("mattermost with mysql replicas", func(t *testing.T) {
-		mattermostWithMySQLReplicas(t, k8sClient, k8sTypedClient)
-	})
 }
 
 func mattermostScaleTest(t *testing.T, k8sClient client.Client, k8sTypedClient kubernetes.Interface) {
@@ -85,10 +78,6 @@ func mattermostScaleTest(t *testing.T, k8sClient client.Client, k8sTypedClient k
 	err := k8sClient.Create(context.TODO(), exampleMattermost)
 	require.NoError(t, err)
 
-	err = waitForStatefulSet(t, k8sClient, mmNamespace, "test-mm-minio", 1, retryInterval, timeout)
-	require.NoError(t, err)
-
-	err = waitForStatefulSet(t, k8sClient, mmNamespace, fmt.Sprintf("%s-mysql", utils.HashWithPrefix("db", "test-mm")), 1, retryInterval, timeout)
 	require.NoError(t, err)
 
 	// wait for test-mm to reach 1 replicas
@@ -153,10 +142,6 @@ func mattermostUpgradeTest(t *testing.T, k8sClient client.Client, k8sTypedClient
 	err := k8sClient.Create(context.TODO(), exampleMattermost)
 	require.NoError(t, err)
 
-	err = waitForStatefulSet(t, k8sClient, mmNamespace, fmt.Sprintf("%s-minio", testName), 1, retryInterval, timeout)
-	require.NoError(t, err)
-
-	err = waitForStatefulSet(t, k8sClient, mmNamespace, fmt.Sprintf("%s-mysql", utils.HashWithPrefix("db", testName)), 1, retryInterval, timeout)
 	require.NoError(t, err)
 
 	// wait for test-mm2 to reach 1 replicas
@@ -212,42 +197,6 @@ func mattermostUpgradeTest(t *testing.T, k8sClient client.Client, k8sTypedClient
 	require.NoError(t, err)
 }
 
-func mattermostWithMySQLReplicas(t *testing.T, client client.Client, _ kubernetes.Interface) {
-	testName := "test-mm3"
-
-	exampleMattermost := &operator.Mattermost{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      testName,
-			Namespace: mmNamespace,
-		},
-		Spec: operator.MattermostSpec{
-			IngressName: "test-example.mattermost.dev",
-			Replicas:    ptrUtil.NewInt32(1),
-			Scheduling: operator.Scheduling{
-				Resources: testMattermostResources(),
-			},
-			FileStore: testFileStoreConfig(1),
-			Database:  testDatabaseConfig(2),
-		},
-	}
-
-	// use Context's create helper to create the object and add a cleanup function for the new object
-	err := client.Create(context.TODO(), exampleMattermost)
-	require.NoError(t, err)
-
-	err = waitForStatefulSet(t, client, mmNamespace, fmt.Sprintf("%s-minio", testName), 1, retryInterval, timeout)
-	require.NoError(t, err)
-
-	err = waitForStatefulSet(t, client, mmNamespace, fmt.Sprintf("%s-mysql", utils.HashWithPrefix("db", testName)), 2, retryInterval, timeout)
-	require.NoError(t, err)
-
-	err = waitForMySQLStatusReady(t, client, mmNamespace, utils.HashWithPrefix("db", testName), 2, retryInterval, timeout)
-	require.NoError(t, err)
-
-	err = client.Delete(context.TODO(), exampleMattermost)
-	require.NoError(t, err)
-}
-
 func testMattermostResources() corev1.ResourceRequirements {
 	return corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
@@ -257,32 +206,27 @@ func testMattermostResources() corev1.ResourceRequirements {
 	}
 }
 
-func testFileStoreConfig(replicas int32) operator.FileStore {
+// testFileStoreConfig returns an external file store pointing at the standalone
+// MinIO from resources/minio.yaml, matching what the e2e-external suite uses.
+//
+// A local (PVC backed) file store is not usable here. New local file stores
+// request ReadWriteMany, which the local-path provisioner in a kind cluster
+// cannot satisfy, and even forced to ReadWriteOnce the scale test below runs two
+// replicas, which cannot share a single RWO volume.
+func testFileStoreConfig(_ int32) operator.FileStore {
 	return operator.FileStore{
-		OperatorManaged: &operator.OperatorManagedMinio{
-			StorageSize: "1Gi",
-			Replicas:    ptrUtil.NewInt32(replicas),
-			Resources: corev1.ResourceRequirements{
-				Requests: corev1.ResourceList{
-					corev1.ResourceCPU:    resource.MustParse("100m"),
-					corev1.ResourceMemory: resource.MustParse("100Mi"),
-				},
-			},
+		External: &operator.ExternalFileStore{
+			URL:    "minio:9000",
+			Bucket: "test-bucket",
+			Secret: "file-store-credentials",
 		},
 	}
 }
 
-func testDatabaseConfig(replicas int32) operator.Database {
+func testDatabaseConfig(_ int32) operator.Database {
+	// Postgres comes from resources/postgres.yaml and the secret from
+	// resources/mm-secrets.yaml, the same fixtures the e2e-external suite applies.
 	return operator.Database{
-		OperatorManaged: &operator.OperatorManagedDatabase{
-			StorageSize: "1Gi",
-			Replicas:    ptrUtil.NewInt32(replicas),
-			Resources: corev1.ResourceRequirements{
-				Requests: corev1.ResourceList{
-					corev1.ResourceCPU:    resource.MustParse("100m"),
-					corev1.ResourceMemory: resource.MustParse("100Mi"),
-				},
-			},
-		},
+		External: &operator.ExternalDatabase{Secret: "db-credentials"},
 	}
 }

@@ -49,7 +49,6 @@ _Appears in:_
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
 | `external` _[ExternalDatabase](#externaldatabase)_ | Defines the configuration of and external database. |  | Optional: \{\} <br /> |
-| `operatorManaged` _[OperatorManagedDatabase](#operatormanageddatabase)_ | Defines the configuration of database managed by Kubernetes operator. |  | Optional: \{\} <br /> |
 | `disableReadinessCheck` _boolean_ | DisableReadinessCheck instructs Operator to not add init container responsible for checking DB access.<br />Can be used to define custom init containers specified in `spec.PodExtensions.InitContainers`. |  | Optional: \{\} <br /> |
 | `readinessCheck` _[DatabaseReadinessCheck](#databasereadinesscheck)_ | ReadinessCheck configures *how* the readiness init container is built.<br />When nil (default), the Operator uses the legacy "external" mode<br />(postgres:13 / appropriate/curl images). Ignored when<br />DisableReadinessCheck is true. Currently only consulted for the<br />external-database path; operator-managed databases always use the<br />legacy probe. |  | Optional: \{\} <br /> |
 
@@ -174,7 +173,6 @@ _Appears in:_
 | --- | --- | --- | --- |
 | `external` _[ExternalFileStore](#externalfilestore)_ | Defines the configuration of an external file store. |  | Optional: \{\} <br /> |
 | `externalVolume` _[ExternalVolumeFileStore](#externalvolumefilestore)_ | Defines the configuration of externally managed PVC backed storage. |  | Optional: \{\} <br /> |
-| `operatorManaged` _[OperatorManagedMinio](#operatormanagedminio)_ | Defines the configuration of file store managed by Kubernetes operator. |  | Optional: \{\} <br /> |
 | `local` _[LocalFileStore](#localfilestore)_ | Defines the configuration of PVC backed storage (local). This is NOT recommended for production environments. |  | Optional: \{\} <br /> |
 
 
@@ -334,49 +332,6 @@ _Appears in:_
 
 
 
-
-#### OperatorManagedDatabase
-
-
-
-OperatorManagedDatabase defines the configuration of a database managed by Kubernetes Operator.
-
-
-
-_Appears in:_
-- [Database](#database)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `type` _string_ | Defines the type of database to use for an Operator-Managed database. |  |  |
-| `storageSize` _string_ | Defines the storage size for the database. ie 50Gi |  | Pattern: `^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$` <br />Optional: \{\} <br /> |
-| `replicas` _integer_ | Defines the number of database replicas.<br />For redundancy use at least 2 replicas.<br />Setting this will override the number of replicas set by 'Size'. |  | Optional: \{\} <br /> |
-| `resources` _[ResourceRequirements](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#resourcerequirements-v1-core)_ | Defines the resource requests and limits for the database pods. |  | Optional: \{\} <br /> |
-| `initBucketURL` _string_ | Defines the AWS S3 bucket where the Database Backup is stored.<br />The operator will download the file to restore the data. |  | Optional: \{\} <br /> |
-| `backupSchedule` _string_ | Defines the interval for backups in cron expression format. |  | Optional: \{\} <br /> |
-| `backupURL` _string_ | Defines the object storage url for uploading backups. |  | Optional: \{\} <br /> |
-| `backupRemoteDeletePolicy` _string_ | Defines the backup retention policy. |  | Optional: \{\} <br /> |
-| `backupSecretName` _string_ | Defines the secret to be used for uploading/restoring backup. |  | Optional: \{\} <br /> |
-| `backupRestoreSecretName` _string_ | Defines the secret to be used when performing a database restore. |  | Optional: \{\} <br /> |
-| `version` _string_ | Defines the cluster version for the database to use |  | Optional: \{\} <br /> |
-
-
-#### OperatorManagedMinio
-
-
-
-OperatorManagedMinio defines the configuration of a Minio file store managed by Kubernetes Operator.
-
-
-
-_Appears in:_
-- [FileStore](#filestore)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `storageSize` _string_ | Defines the storage size for Minio. ie 50Gi |  | Pattern: `^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$` <br />Optional: \{\} <br /> |
-| `replicas` _integer_ | Defines the number of Minio replicas.<br />Supply 1 to run Minio in standalone mode with no redundancy.<br />Supply 4 or more to run Minio in distributed mode.<br />Note that it is not possible to upgrade Minio from standalone to distributed mode.<br />Setting this will override the number of replicas set by 'Size'.<br />More info: https://docs.min.io/docs/distributed-minio-quickstart-guide.html |  | Optional: \{\} <br /> |
-| `resources` _[ResourceRequirements](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#resourcerequirements-v1-core)_ | Defines the resource requests and limits for the Minio pods. |  | Optional: \{\} <br /> |
 
 
 #### Patch
