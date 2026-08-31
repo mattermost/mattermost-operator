@@ -283,9 +283,7 @@ spec:
                     description: |-
                       GatewayRef references the Gateway to attach this HTTPRoute to.
                       Required when HTTPRoute is enabled. This is validated during defaulting
-                      rather than by the CRD schema, so that `httpRoute.enabled: false` stays a
-                      valid way to have the Operator remove the HTTPRoute without having to keep
-                      a Gateway reference around.
+                      rather than by the CRD schema, so that `httpRoute.
                     properties:
                       group:
                         description: Group of the Gateway resource. Defaults to "gateway.networking.k8s.io".
