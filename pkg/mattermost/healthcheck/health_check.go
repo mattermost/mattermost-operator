@@ -14,6 +14,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 type HealthChecker struct {
@@ -180,6 +181,29 @@ func (hc *HealthChecker) CheckIngressLoadBalancer() (string, error) {
 	}
 
 	return ingress.Items[0].Spec.Rules[0].Host, nil
+}
+
+// CheckHTTPRoute reports the primary hostname served by the Mattermost
+// HTTPRoute. It mirrors CheckIngressLoadBalancer: the hostname is taken from the
+// desired spec once the resource is confirmed to exist, rather than from any
+// Gateway address, so no permissions on Gateway resources are required.
+func (hc *HealthChecker) CheckHTTPRoute() (string, error) {
+	routes := &gatewayv1.HTTPRouteList{}
+
+	err := hc.apiReader.List(context.TODO(), routes, hc.listOptions...)
+	if err != nil {
+		return "", errors.Wrap(err, "unable to get HTTPRoute list")
+	}
+	if len(routes.Items) != 1 {
+		return "", fmt.Errorf("expected one HTTPRoute, but found %d", len(routes.Items))
+	}
+
+	hostnames := routes.Items[0].Spec.Hostnames
+	if len(hostnames) == 0 {
+		return "", errors.New("HTTPRoute has no hostnames")
+	}
+
+	return string(hostnames[0]), nil
 }
 
 func isPodReady(pod corev1.Pod) bool {

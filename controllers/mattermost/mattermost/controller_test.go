@@ -23,6 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -614,6 +615,8 @@ func prepAllDependencyTestResources(client client.Client, mattermost *mmv1beta.M
 func prepareSchema(t *testing.T, scheme *runtime.Scheme) *runtime.Scheme {
 	err := mmv1beta.AddToScheme(scheme)
 	require.NoError(t, err)
+
+	require.NoError(t, gatewayv1.Install(scheme))
 
 	return scheme
 }

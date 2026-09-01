@@ -18,6 +18,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 const (
@@ -253,6 +254,98 @@ func GenerateALBIngressV1Beta(mattermost *mmv1beta.Mattermost, logger logr.Logge
 	}
 
 	return ingress
+}
+
+// GenerateHTTPRouteV1Beta returns the HTTPRoute (Gateway API) for the Mattermost app.
+func GenerateHTTPRouteV1Beta(mattermost *mmv1beta.Mattermost, logger logr.Logger) *gatewayv1.HTTPRoute {
+	requestTimeout := gatewayv1.Duration("3600s")
+	if mattermost.Spec.HTTPRoute.RequestTimeout != "" {
+		requestTimeout = gatewayv1.Duration(mattermost.Spec.HTTPRoute.RequestTimeout)
+	}
+	backendTimeout := gatewayv1.Duration("3600s")
+	if mattermost.Spec.HTTPRoute.BackendRequestTimeout != "" {
+		backendTimeout = gatewayv1.Duration(mattermost.Spec.HTTPRoute.BackendRequestTimeout)
+	}
+
+	gwGroup := gatewayv1.Group("gateway.networking.k8s.io")
+	if mattermost.Spec.HTTPRoute.GatewayRef.Group != "" {
+		gwGroup = gatewayv1.Group(mattermost.Spec.HTTPRoute.GatewayRef.Group)
+	}
+
+	gwNamespace := gatewayv1.Namespace(mattermost.Namespace)
+	if mattermost.Spec.HTTPRoute.GatewayRef.Namespace != "" {
+		gwNamespace = gatewayv1.Namespace(mattermost.Spec.HTTPRoute.GatewayRef.Namespace)
+	}
+
+	gwKind := gatewayv1.Kind("Gateway")
+	parentRef := gatewayv1.ParentReference{
+		Group:     &gwGroup,
+		Kind:      &gwKind,
+		Name:      gatewayv1.ObjectName(mattermost.Spec.HTTPRoute.GatewayRef.Name),
+		Namespace: &gwNamespace,
+	}
+	if mattermost.Spec.HTTPRoute.GatewayRef.SectionName != "" {
+		sectionName := gatewayv1.SectionName(mattermost.Spec.HTTPRoute.GatewayRef.SectionName)
+		parentRef.SectionName = &sectionName
+	}
+
+	hostNames := mattermost.GetHTTPRouteHostNames()
+	hostnames := make([]gatewayv1.Hostname, 0, len(hostNames))
+	for _, h := range hostNames {
+		hostnames = append(hostnames, gatewayv1.Hostname(h))
+	}
+
+	svcGroup := gatewayv1.Group("")
+	svcKind := gatewayv1.Kind("Service")
+	svcPort := gatewayv1.PortNumber(8065)
+	weight := int32(100)
+	pathPrefix := gatewayv1.PathMatchPathPrefix
+	pathValue := "/"
+
+	return &gatewayv1.HTTPRoute{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            mattermost.Name,
+			Namespace:       mattermost.Namespace,
+			Labels:          mattermost.MattermostLabels(mattermost.Name),
+			Annotations:     sanitizeIngressAnnotations(mattermost.GetHTTPRouteAnnotations(), logger),
+			OwnerReferences: MattermostOwnerReference(mattermost),
+		},
+		Spec: gatewayv1.HTTPRouteSpec{
+			CommonRouteSpec: gatewayv1.CommonRouteSpec{
+				ParentRefs: []gatewayv1.ParentReference{parentRef},
+			},
+			Hostnames: hostnames,
+			Rules: []gatewayv1.HTTPRouteRule{
+				{
+					Matches: []gatewayv1.HTTPRouteMatch{
+						{
+							Path: &gatewayv1.HTTPPathMatch{
+								Type:  &pathPrefix,
+								Value: &pathValue,
+							},
+						},
+					},
+					BackendRefs: []gatewayv1.HTTPBackendRef{
+						{
+							BackendRef: gatewayv1.BackendRef{
+								BackendObjectReference: gatewayv1.BackendObjectReference{
+									Group: &svcGroup,
+									Kind:  &svcKind,
+									Name:  gatewayv1.ObjectName(mattermost.Name),
+									Port:  &svcPort,
+								},
+								Weight: &weight,
+							},
+						},
+					},
+					Timeouts: &gatewayv1.HTTPRouteTimeouts{
+						Request:        &requestTimeout,
+						BackendRequest: &backendTimeout,
+					},
+				},
+			},
+		},
+	}
 }
 
 func makeIngressRules(hosts []string, mattermost *mmv1beta.Mattermost) []networkingv1.IngressRule {

@@ -15,10 +15,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 const lastAppliedConfig = "mattermost.com/last-applied"
@@ -223,6 +225,41 @@ func (r *ResourceHelper) DeleteIngressClass(key types.NamespacedName, reqLogger 
 	err = r.client.Delete(context.TODO(), foundIngressClass)
 	if err != nil {
 		return errors.Wrap(err, "failed to delete ingressClass")
+	}
+
+	return nil
+}
+
+func (r *ResourceHelper) CreateHTTPRouteIfNotExists(owner v1.Object, httpRoute *gatewayv1.HTTPRoute, reqLogger logr.Logger) error {
+	found := &gatewayv1.HTTPRoute{}
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: httpRoute.Name, Namespace: httpRoute.Namespace}, found)
+	if err != nil && k8sErrors.IsNotFound(err) {
+		reqLogger.Info("Creating HTTPRoute", "name", httpRoute.Name)
+		return r.Create(owner, httpRoute, reqLogger)
+	} else if err != nil {
+		return errors.Wrap(err, "failed to check if HTTPRoute exists")
+	}
+
+	return nil
+}
+
+func (r *ResourceHelper) DeleteHTTPRoute(key types.NamespacedName, reqLogger logr.Logger) error {
+	found := &gatewayv1.HTTPRoute{}
+	err := r.client.Get(context.TODO(), key, found)
+	// A missing Gateway API CRD means there is no HTTPRoute to remove — treat
+	// it the same as the resource being absent. Clusters without the Gateway
+	// API CRDs installed are the common case, and this delete runs on every
+	// reconcile of every installation that does not use HTTPRoute.
+	if err != nil && (k8sErrors.IsNotFound(err) || meta.IsNoMatchError(err)) {
+		return nil
+	} else if err != nil {
+		return errors.Wrap(err, "failed to check if HTTPRoute exists")
+	}
+
+	reqLogger.Info("Deleting HTTPRoute", "name", found.Name)
+	err = r.client.Delete(context.TODO(), found)
+	if err != nil {
+		return errors.Wrap(err, "failed to delete HTTPRoute")
 	}
 
 	return nil
