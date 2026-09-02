@@ -2,6 +2,7 @@ package mattermost
 
 import (
 	"embed"
+	"fmt"
 	"path"
 	"regexp"
 	"sort"
@@ -42,6 +43,19 @@ const (
 
 	// defaultRtcdMetricsPort is the rtcd metrics port (Calls real-time daemon).
 	defaultRtcdMetricsPort = "8045"
+
+	// defaultMimirRulesDiscoveryLabel/Value is what a Mimir ruler-sync sidecar
+	// selects on by default when loading rules ConfigMaps.
+	defaultMimirRulesDiscoveryLabel      = "mimir_rules"
+	defaultMimirRulesDiscoveryLabelValue = "1"
+
+	// mimirRulesConfigMapLabel marks the Mimir rules ConfigMap the Operator owns,
+	// independent of the (configurable) discovery label, so it can be cleaned up.
+	mimirRulesConfigMapLabel = "mattermost.com/mimir-rules"
+
+	// mimirTenantAnnotation carries the target Mimir tenant/org id for a
+	// multi-tenant ruler-sync to load the rules under.
+	mimirTenantAnnotation = "monitoring.grafana.com/mimir-tenant"
 )
 
 // Rule placeholder tokens. Because the Operator generates the PrometheusRule per
@@ -270,6 +284,80 @@ func rulePlaceholders(mattermost *mmv1beta.Mattermost) map[string]string {
 		// metacharacters ("test.mm" must not match "testXmm-...").
 		rulePlaceholderPodSelector: regexp.QuoteMeta(mattermost.Name) + "-[^-]+-[^-]+",
 	}
+}
+
+// GenerateMimirRulesConfigMapV1Beta renders the same per-instance, pod-scoped
+// alerting rules as GeneratePrometheusRuleV1Beta, but as a plain ConfigMap in
+// Prometheus rules format (`groups:`) for a Grafana Mimir ruler. This is the
+// Prometheus-free delivery path: a Mimir ruler-sync (mimirtool or a sidecar)
+// loads the ConfigMap into Mimir, instead of the Prometheus Operator consuming a
+// PrometheusRule CRD. The ServiceMonitor + metrics Service are unchanged — Grafana
+// Alloy scrapes them and remote-writes to Mimir.
+func GenerateMimirRulesConfigMapV1Beta(mattermost *mmv1beta.Mattermost) (*corev1.ConfigMap, error) {
+	// Monitoring is an opt-in add-on; nothing to generate when it is unset.
+	if mattermost.Spec.Monitoring == nil {
+		return nil, nil
+	}
+
+	discoveryLabel := defaultMimirRulesDiscoveryLabel
+	discoveryValue := defaultMimirRulesDiscoveryLabelValue
+	var tenant string
+
+	if mr := mattermost.Spec.Monitoring.MimirRules; mr != nil {
+		if mr.DiscoveryLabel != "" {
+			// The marker label is reserved for cleanup; a discovery label that
+			// collides with it would be silently overwritten below, breaking
+			// ruler-sync. Reject it instead of producing a broken ConfigMap.
+			if mr.DiscoveryLabel == mimirRulesConfigMapLabel {
+				return nil, fmt.Errorf("mimirRules.discoveryLabel must not be the reserved key %q", mimirRulesConfigMapLabel)
+			}
+			discoveryLabel = mr.DiscoveryLabel
+		}
+		if mr.DiscoveryLabelValue != "" {
+			discoveryValue = mr.DiscoveryLabelValue
+		}
+		tenant = mr.Tenant
+	}
+
+	groups, err := loadEmbeddedPrometheusRuleGroups(rulePlaceholders(mattermost))
+	if err != nil {
+		return nil, err
+	}
+
+	// Marshal to Prometheus rules format (a top-level `groups:` doc) — exactly what
+	// a Mimir ruler / mimirtool expects.
+	rulesYAML, err := sigsyaml.Marshal(monitoringv1.PrometheusRuleSpec{Groups: groups})
+	if err != nil {
+		return nil, err
+	}
+
+	labels := mattermost.MattermostLabels(mattermost.Name)
+	// Discovery label the ruler-sync watches for.
+	labels[discoveryLabel] = discoveryValue
+	// Stable marker (independent of the discovery label) for cleanup.
+	labels[mimirRulesConfigMapLabel] = mattermost.Name
+
+	var annotations map[string]string
+	if tenant != "" {
+		annotations = map[string]string{mimirTenantAnnotation: tenant}
+	}
+
+	return &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            mattermost.Name + "-mimir-rules",
+			Namespace:       mattermost.Namespace,
+			Labels:          labels,
+			Annotations:     annotations,
+			OwnerReferences: MattermostOwnerReference(mattermost),
+		},
+		Data: map[string]string{mattermost.Name + "-rules.yaml": string(rulesYAML)},
+	}, nil
+}
+
+// MimirRulesConfigMapSelector returns the label selector identifying the Mimir
+// rules ConfigMap owned by this Mattermost — used for safe (owned-only) cleanup.
+func MimirRulesConfigMapSelector(mattermost *mmv1beta.Mattermost) map[string]string {
+	return map[string]string{mimirRulesConfigMapLabel: mattermost.Name}
 }
 
 // loadEmbeddedPrometheusRuleGroups reads and merges the rule groups from every
