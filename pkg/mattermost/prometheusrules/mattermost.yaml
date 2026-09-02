@@ -1,0 +1,117 @@
+# Mattermost-focused alerting rules, scoped to this installation's pods.
+#
+# The Operator substitutes __NAMESPACE__, __SERVICE__ and __POD_SELECTOR__ per
+# Mattermost CR before creating the PrometheusRule, so every alert here targets
+# this instance by namespace / Service / pod-name — never a static IP or CIDR.
+#
+# Series sources:
+#   - up, mattermost_*   : scraped from the Mattermost /metrics endpoint via the
+#                          ServiceMonitor (carry namespace/service/pod labels).
+#   - kube_*, container_*: kube-state-metrics + cAdvisor (carry namespace/pod).
+#
+# NOTE: the /metrics endpoint is Enterprise-licensed — the `up`/mattermost_*
+# alerts only evaluate when a valid license is installed. Thresholds are a
+# conservative starting point and usually want per-environment tuning.
+groups:
+  - name: mattermost.availability
+    rules:
+      - alert: MattermostServerDown
+        # Metrics target unscrapable for 5m (server down, or metrics disabled /
+        # unlicensed so /metrics on 8067 is not served).
+        # NOTE: `up == 0` only fires while the target still exists. If every pod
+        # is gone there is no `up` series, so this cannot detect a full outage on
+        # its own — pair it with MattermostPodCrashLooping / a kube_deployment
+        # replica alert for that case. We intentionally avoid `absent(up{...})`
+        # here because it would fire permanently in rule-only configurations that
+        # do not enable the ServiceMonitor.
+        expr: up{namespace="__NAMESPACE__", service="__SERVICE__"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Mattermost {{ $labels.namespace }}/{{ $labels.service }} is down"
+          description: "The Mattermost metrics endpoint has been unreachable for more than 5 minutes."
+
+      - alert: MattermostPodCrashLooping
+        # More than 3 container restarts in 5m for this instance's pods.
+        expr: |
+          sum by (namespace, pod) (
+            rate(kube_pod_container_status_restarts_total{namespace="__NAMESPACE__", pod=~"__POD_SELECTOR__"}[5m])
+          ) * 300 > 3
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Mattermost pod {{ $labels.namespace }}/{{ $labels.pod }} is crash-looping"
+          description: "Pod {{ $labels.pod }} has restarted more than 3 times in the last 5 minutes."
+
+  - name: mattermost.resources
+    rules:
+      - alert: MattermostHighCPU
+        # CPU usage > 85% of the container limit for 10m.
+        expr: |
+          sum by (namespace, pod) (
+            rate(container_cpu_usage_seconds_total{namespace="__NAMESPACE__", pod=~"__POD_SELECTOR__", container!="", container!="POD"}[5m])
+          )
+          /
+          sum by (namespace, pod) (
+            kube_pod_container_resource_limits{namespace="__NAMESPACE__", pod=~"__POD_SELECTOR__", resource="cpu"}
+          ) > 0.85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Mattermost pod {{ $labels.namespace }}/{{ $labels.pod }} CPU > 85% of limit"
+          description: "Pod {{ $labels.pod }} has used more than 85% of its CPU limit for 10 minutes."
+
+      - alert: MattermostHighMemory
+        # Working-set memory > 90% of the container limit for 10m.
+        expr: |
+          sum by (namespace, pod) (
+            container_memory_working_set_bytes{namespace="__NAMESPACE__", pod=~"__POD_SELECTOR__", container!="", container!="POD"}
+          )
+          /
+          sum by (namespace, pod) (
+            kube_pod_container_resource_limits{namespace="__NAMESPACE__", pod=~"__POD_SELECTOR__", resource="memory"}
+          ) > 0.90
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Mattermost pod {{ $labels.namespace }}/{{ $labels.pod }} memory > 90% of limit"
+          description: "Pod {{ $labels.pod }} has used more than 90% of its memory limit for 10 minutes."
+
+  - name: mattermost.application
+    rules:
+      - alert: MattermostDBReplicaLag
+        # Read-replica lag over 5s for 5m (mattermost_db_replica_lag_time is seconds).
+        expr: max by (namespace, service) (mattermost_db_replica_lag_time{namespace="__NAMESPACE__", service="__SERVICE__"}) > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Mattermost {{ $labels.namespace }}/{{ $labels.service }} DB replica lag > 5s"
+          description: "A Mattermost read replica has been lagging more than 5 seconds for 5 minutes."
+
+      - alert: MattermostHighHTTPErrorRate
+        # More than 5% of HTTP requests erroring for 5m.
+        expr: |
+          sum by (namespace, service) (rate(mattermost_http_errors_total{namespace="__NAMESPACE__", service="__SERVICE__"}[5m]))
+          /
+          sum by (namespace, service) (rate(mattermost_http_requests_total{namespace="__NAMESPACE__", service="__SERVICE__"}[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Mattermost {{ $labels.namespace }}/{{ $labels.service }} HTTP error rate > 5%"
+          description: "More than 5% of Mattermost HTTP requests have been erroring for 5 minutes."
+
+      - alert: MattermostLoginFailureSpike
+        # Sustained failed-login rate — possible brute force or auth outage.
+        expr: sum by (namespace, service) (rate(mattermost_login_logins_fail_total{namespace="__NAMESPACE__", service="__SERVICE__"}[5m])) > 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Mattermost {{ $labels.namespace }}/{{ $labels.service }} elevated login failures"
+          description: "Mattermost has seen more than 1 failed login per second for 10 minutes."
