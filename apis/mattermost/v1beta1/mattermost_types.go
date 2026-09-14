@@ -151,6 +151,12 @@ type MattermostSpec struct {
 	//
 	// Use at your own risk when no other options are available.
 	ResourcePatch *ResourcePatch `json:"resourcePatch,omitempty"`
+
+	// Plugins defines the desired state of Mattermost plugins managed by the Operator.
+	// The Operator injects a plugin-manager sidecar that installs, upgrades, enables,
+	// and disables plugins via mmctl --local without requiring admin credentials.
+	// +optional
+	Plugins []PluginSpec `json:"plugins,omitempty"`
 }
 
 // ResourcePatch allows defined custom  patches to resources.
@@ -162,6 +168,23 @@ type ResourcePatch struct {
 type Patch struct {
 	Disable bool   `json:"disable,omitempty"`
 	Patch   string `json:"patch,omitempty"`
+}
+
+// PluginSpec defines the desired state of a single Mattermost plugin.
+type PluginSpec struct {
+	// ID is the plugin identifier (e.g. "com.mattermost.calls").
+	ID string `json:"id"`
+	// Version is the desired plugin version (e.g. "0.29.0").
+	// Used for drift detection: the plugin is (re)installed when the installed
+	// version does not match this value.
+	Version string `json:"version"`
+	// URL is the direct download URL for the plugin archive.
+	// When set, the server fetches the plugin from this URL.
+	// When empty, the plugin is installed from the Mattermost marketplace.
+	// +optional
+	URL string `json:"url,omitempty"`
+	// Enabled controls whether the plugin is enabled or disabled.
+	Enabled bool `json:"enabled"`
 }
 
 // TODO:

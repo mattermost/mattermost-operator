@@ -378,6 +378,65 @@ func makeIngressRules(hosts []string, mattermost *mmv1beta.Mattermost) []network
 	return rules
 }
 
+const (
+	pluginManagerContainerName = "plugin-manager"
+	pluginLocalSocketVolume    = "mattermost-local-socket"
+	pluginLocalSocketDir       = "/run/mattermost"
+	pluginLocalSocketPath      = pluginLocalSocketDir + "/mattermost_local.socket"
+	mmctlBin                   = "/mattermost/bin/mmctl"
+)
+
+// pluginManagerScript builds the shell script run by the plugin-manager sidecar.
+// It waits for the mmctl local-mode socket, then for each plugin:
+//   - skips if already installed at the desired version
+//   - installs from URL or marketplace
+//   - enables or disables
+func pluginManagerScript(plugins []mmv1beta.PluginSpec) string {
+	var sb strings.Builder
+
+	sb.WriteString(fmt.Sprintf(
+		"until [ -S %s ]; do echo 'plugin-manager: waiting for socket...'; sleep 2; done; ",
+		pluginLocalSocketPath,
+	))
+	sb.WriteString("echo 'plugin-manager: socket ready, reconciling plugins...'; ")
+
+	for _, p := range plugins {
+		// Install only when the desired version is not already present.
+		sb.WriteString(fmt.Sprintf(
+			"if ! %s --local plugin list 2>/dev/null | grep -q '%s.*%s'; then ",
+			mmctlBin, p.ID, p.Version,
+		))
+		if p.URL != "" {
+			sb.WriteString(fmt.Sprintf("%s --local plugin install-url --force %q; ", mmctlBin, p.URL))
+		} else {
+			sb.WriteString(fmt.Sprintf("%s --local marketplace install %q; ", mmctlBin, p.ID))
+		}
+		sb.WriteString("fi; ")
+
+		if p.Enabled {
+			sb.WriteString(fmt.Sprintf("%s --local plugin enable %q || true; ", mmctlBin, p.ID))
+		} else {
+			sb.WriteString(fmt.Sprintf("%s --local plugin disable %q || true; ", mmctlBin, p.ID))
+		}
+	}
+
+	sb.WriteString("echo 'plugin-manager: reconciliation complete'; exec sleep infinity")
+	return sb.String()
+}
+
+// generatePluginManagerSidecar returns the sidecar container that manages plugin lifecycle.
+func generatePluginManagerSidecar(mattermost *mmv1beta.Mattermost, containerImage string) corev1.Container {
+	return corev1.Container{
+		Name:            pluginManagerContainerName,
+		Image:           containerImage,
+		ImagePullPolicy: mattermost.Spec.ImagePullPolicy,
+		Command:         []string{"/bin/sh", "-c", pluginManagerScript(mattermost.Spec.Plugins)},
+		VolumeMounts: []corev1.VolumeMount{
+			{Name: pluginLocalSocketVolume, MountPath: pluginLocalSocketDir},
+		},
+	}
+}
+
 // GenerateDeploymentV1Beta returns the deployment for Mattermost app.
 func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig, fileStore FileStoreConfig, deploymentName, ingressHost, serviceAccountName, containerImage string) *appsv1.Deployment {
 	// DB
@@ -403,6 +462,20 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 			ContainerPort: 8067,
 			Name:          "metrics",
 		},
+	}
+
+	// Plugin manager: shared socket volume so the sidecar can reach mmctl --local.
+	if len(mattermost.Spec.Plugins) > 0 {
+		volumes = append(volumes, corev1.Volume{
+			Name: pluginLocalSocketVolume,
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		})
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      pluginLocalSocketVolume,
+			MountPath: pluginLocalSocketDir,
+		})
 	}
 
 	// Extensions
@@ -440,6 +513,14 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 		Name:  "MM_FILESETTINGS_MAXFILESIZE",
 		Value: bodySize,
 	})
+
+	// Plugin manager: enable local mode so the sidecar can connect via socket.
+	if len(mattermost.Spec.Plugins) > 0 {
+		envVarGeneral = append(envVarGeneral,
+			corev1.EnvVar{Name: "MM_SERVICESETTINGS_ENABLELOCALMODE", Value: "true"},
+			corev1.EnvVar{Name: "MM_SERVICESETTINGS_LOCALMODESOCKETLOCATION", Value: pluginLocalSocketPath},
+		)
+	}
 
 	// Apply optional job server settings
 	if mattermost.Spec.JobServer != nil && mattermost.Spec.JobServer.DedicatedJobServer {
@@ -543,6 +624,11 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 	// Final container extensions
 	if mattermost.Spec.PodExtensions.SidecarContainers != nil {
 		containers = append(containers, mattermost.Spec.PodExtensions.SidecarContainers...)
+	}
+
+	// Plugin manager sidecar
+	if len(mattermost.Spec.Plugins) > 0 {
+		containers = append(containers, generatePluginManagerSidecar(mattermost, containerImage))
 	}
 
 	return &appsv1.Deployment{
