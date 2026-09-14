@@ -2,6 +2,7 @@ package mattermost
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/go-logr/logr"
@@ -1133,6 +1134,98 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 
 		assertEnvVarEqual(t, "MM_SERVICESETTINGS_SITEURL", "https://my-mattermost.com", mattermostAppContainer.Env)
 	})
+
+	t.Run("plugin manager", func(t *testing.T) {
+		dbConfig := &ExternalDBConfig{dbType: database.PostgreSQLDatabase}
+
+		pluginWithURL := mmv1beta.PluginSpec{
+			ID:      "com.mattermost.calls",
+			Version: "0.29.0",
+			URL:     "https://github.com/mattermost/mattermost-plugin-calls/releases/download/v0.29.0/com.mattermost.calls-0.29.0.tar.gz",
+			Enabled: true,
+		}
+		pluginMarketplace := mmv1beta.PluginSpec{
+			ID:      "com.mattermost.jira",
+			Version: "3.2.6",
+			Enabled: false,
+		}
+
+		t.Run("no plugins - no sidecar or local mode env", func(t *testing.T) {
+			mm := &mmv1beta.Mattermost{Spec: mmv1beta.MattermostSpec{}}
+			deployment := GenerateDeploymentV1Beta(mm, dbConfig, &ExternalFileStore{}, "", "", "", "image:latest")
+
+			appContainer := mmv1beta.GetMattermostAppContainer(deployment.Spec.Template.Spec.Containers)
+			require.NotNil(t, appContainer)
+
+			assert.Equal(t, 1, len(deployment.Spec.Template.Spec.Containers), "expected no sidecar when plugins is empty")
+			assertEnvVarNotPresent(t, "MM_SERVICESETTINGS_ENABLELOCALMODE", appContainer.Env)
+			assertVolumeNotPresent(t, pluginLocalSocketVolume, deployment.Spec.Template.Spec.Volumes)
+		})
+
+		t.Run("with plugins - sidecar injected", func(t *testing.T) {
+			mm := &mmv1beta.Mattermost{
+				Spec: mmv1beta.MattermostSpec{
+					Plugins: []mmv1beta.PluginSpec{pluginWithURL, pluginMarketplace},
+				},
+			}
+			deployment := GenerateDeploymentV1Beta(mm, dbConfig, &ExternalFileStore{}, "", "", "", "image:latest")
+
+			// Two containers: mattermost + plugin-manager
+			require.Equal(t, 2, len(deployment.Spec.Template.Spec.Containers))
+
+			// Sidecar uses same image
+			sidecar := deployment.Spec.Template.Spec.Containers[1]
+			assert.Equal(t, pluginManagerContainerName, sidecar.Name)
+			assert.Equal(t, "image:latest", sidecar.Image)
+
+			// Sidecar mounts socket volume
+			require.Len(t, sidecar.VolumeMounts, 1)
+			assert.Equal(t, pluginLocalSocketVolume, sidecar.VolumeMounts[0].Name)
+			assert.Equal(t, pluginLocalSocketDir, sidecar.VolumeMounts[0].MountPath)
+
+			// Main container also mounts socket volume
+			appContainer := mmv1beta.GetMattermostAppContainer(deployment.Spec.Template.Spec.Containers)
+			require.NotNil(t, appContainer)
+			assertVolumeMountPresent(t, pluginLocalSocketVolume, appContainer.VolumeMounts)
+
+			// Server env vars enable local mode at the correct path
+			assertEnvVarEqual(t, "MM_SERVICESETTINGS_ENABLELOCALMODE", "true", appContainer.Env)
+			assertEnvVarEqual(t, "MM_SERVICESETTINGS_LOCALMODESOCKETLOCATION", pluginLocalSocketPath, appContainer.Env)
+
+			// Socket volume exists in the pod spec
+			assertVolumePresent(t, pluginLocalSocketVolume, deployment.Spec.Template.Spec.Volumes)
+		})
+
+		t.Run("script - URL plugin install and enable", func(t *testing.T) {
+			script := pluginManagerScript([]mmv1beta.PluginSpec{pluginWithURL})
+			assert.Contains(t, script, pluginWithURL.ID)
+			assert.Contains(t, script, pluginWithURL.Version)
+			assert.Contains(t, script, pluginWithURL.URL)
+			assert.Contains(t, script, "install-url --force")
+			assert.Contains(t, script, "plugin enable")
+			assert.NotContains(t, script, "plugin disable")
+		})
+
+		t.Run("script - marketplace plugin install and disable", func(t *testing.T) {
+			script := pluginManagerScript([]mmv1beta.PluginSpec{pluginMarketplace})
+			assert.Contains(t, script, pluginMarketplace.ID)
+			assert.Contains(t, script, pluginMarketplace.Version)
+			assert.Contains(t, script, "marketplace install")
+			assert.NotContains(t, script, "install-url")
+			assert.Contains(t, script, "plugin disable")
+			assert.NotContains(t, script, "plugin enable")
+		})
+
+		t.Run("script - waits for socket before acting", func(t *testing.T) {
+			script := pluginManagerScript([]mmv1beta.PluginSpec{pluginWithURL})
+			socketIdx := assert.Contains(t, script, pluginLocalSocketPath)
+			installIdx := assert.Contains(t, script, "install-url")
+			// socket wait must appear before install command
+			_ = socketIdx
+			_ = installIdx
+			assert.Less(t, indexOf(script, pluginLocalSocketPath), indexOf(script, "install-url"))
+		})
+	})
 }
 
 func TestGenerateRBACResources_V1Beta(t *testing.T) {
@@ -1184,14 +1277,58 @@ func fixVolumeMount() corev1.VolumeMount {
 }
 
 func assertEnvVarEqual(t *testing.T, name, val string, env []corev1.EnvVar) {
+	t.Helper()
 	for _, e := range env {
 		if e.Name == name {
 			assert.Equal(t, e.Value, val)
 			return
 		}
 	}
-
 	assert.Fail(t, fmt.Sprintf("failed to find env var %s", name))
+}
+
+func assertEnvVarNotPresent(t *testing.T, name string, env []corev1.EnvVar) {
+	t.Helper()
+	for _, e := range env {
+		if e.Name == name {
+			assert.Fail(t, fmt.Sprintf("env var %s should not be present", name))
+			return
+		}
+	}
+}
+
+func assertVolumePresent(t *testing.T, name string, volumes []corev1.Volume) {
+	t.Helper()
+	for _, v := range volumes {
+		if v.Name == name {
+			return
+		}
+	}
+	assert.Fail(t, fmt.Sprintf("volume %s not found", name))
+}
+
+func assertVolumeNotPresent(t *testing.T, name string, volumes []corev1.Volume) {
+	t.Helper()
+	for _, v := range volumes {
+		if v.Name == name {
+			assert.Fail(t, fmt.Sprintf("volume %s should not be present", name))
+			return
+		}
+	}
+}
+
+func assertVolumeMountPresent(t *testing.T, name string, mounts []corev1.VolumeMount) {
+	t.Helper()
+	for _, m := range mounts {
+		if m.Name == name {
+			return
+		}
+	}
+	assert.Fail(t, fmt.Sprintf("volume mount %s not found", name))
+}
+
+func indexOf(s, substr string) int {
+	return strings.Index(s, substr)
 }
 
 func TestSanitizeIngressAnnotations(t *testing.T) {
