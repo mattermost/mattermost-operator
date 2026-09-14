@@ -153,8 +153,6 @@ type MattermostSpec struct {
 	ResourcePatch *ResourcePatch `json:"resourcePatch,omitempty"`
 
 	// Plugins defines the desired state of Mattermost plugins managed by the Operator.
-	// The Operator injects a plugin-manager sidecar that installs, upgrades, enables,
-	// and disables plugins via mmctl --local without requiring admin credentials.
 	// +optional
 	Plugins []PluginSpec `json:"plugins,omitempty"`
 }
