@@ -1204,6 +1204,10 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 			assert.Contains(t, script, "install-url --force")
 			assert.Contains(t, script, "plugin enable")
 			assert.NotContains(t, script, "plugin disable")
+			// drift detection must use fixed-string grep to avoid regex metacharacter issues
+			// and to anchor on "<id>: " so "calls" doesn't match "calls-recorder"
+			assert.Contains(t, script, "grep -F '"+pluginWithURL.ID+": '")
+			assert.Contains(t, script, "grep -qF 'Version: "+pluginWithURL.Version+"'")
 		})
 
 		t.Run("script - marketplace plugin install and disable", func(t *testing.T) {
@@ -1214,6 +1218,8 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 			assert.NotContains(t, script, "install-url")
 			assert.Contains(t, script, "plugin disable")
 			assert.NotContains(t, script, "plugin enable")
+			assert.Contains(t, script, "grep -F '"+pluginMarketplace.ID+": '")
+			assert.Contains(t, script, "grep -qF 'Version: "+pluginMarketplace.Version+"'")
 		})
 
 		t.Run("script - waits for socket before acting", func(t *testing.T) {

@@ -402,8 +402,10 @@ func pluginManagerScript(plugins []mmv1beta.PluginSpec) string {
 
 	for _, p := range plugins {
 		// Install only when the desired version is not already present.
+		// Two chained fixed-string greps avoid regex metacharacter issues (dots in IDs/versions)
+		// and prevent substring false-matches (e.g. "calls" matching "calls-recorder").
 		sb.WriteString(fmt.Sprintf(
-			"if ! %s --local plugin list 2>/dev/null | grep -q '%s.*%s'; then ",
+			"if ! %s --local plugin list 2>/dev/null | grep -F '%s: ' | grep -qF 'Version: %s'; then ",
 			mmctlBin, p.ID, p.Version,
 		))
 		if p.URL != "" {
