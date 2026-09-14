@@ -555,6 +555,38 @@ spec:
                   - name
                   type: object
                 type: array
+              plugins:
+                description: Plugins defines the desired state of Mattermost plugins
+                  managed by the Operator.
+                items:
+                  description: PluginSpec defines the desired state of a single Mattermost
+                    plugin.
+                  properties:
+                    enabled:
+                      description: Enabled controls whether the plugin is enabled
+                        or disabled.
+                      type: boolean
+                    id:
+                      description: ID is the plugin identifier (e.g. "com.mattermost.calls").
+                      type: string
+                    url:
+                      description: |-
+                        URL is the direct download URL for the plugin archive.
+                        When set, the server fetches the plugin from this URL.
+                        When empty, the plugin is installed from the Mattermost marketplace.
+                      type: string
+                    version:
+                      description: |-
+                        Version is the desired plugin version (e.g. "0.29.0").
+                        Used for drift detection: the plugin is (re)installed when the installed
+                        version does not match this value.
+                      type: string
+                  required:
+                  - enabled
+                  - id
+                  - version
+                  type: object
+                type: array
               podExtensions:
                 description: |-
                   PodExtensions specify custom extensions for Mattermost pods.
