@@ -169,7 +169,7 @@ type Patch struct {
 }
 
 // PluginSpec defines the desired state of a single Mattermost plugin.
-// +k8s:openapi-gen=false
+// +k8s:openapi-gen=true
 type PluginSpec struct {
 	// ID is the plugin identifier (e.g. "com.mattermost.calls").
 	ID string `json:"id"`

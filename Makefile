@@ -264,7 +264,16 @@ generate: $(OPENAPI_GEN) $(CONTROLLER_GEN) ## Runs the kubernetes code-generator
 
 	## Do not generate deepcopy as it is handled by controller-gen
 
-	GOROOT=$(GOROOT) $(OPENAPI_GEN) --logtostderr=true -o "" -i ./apis/mattermost/v1beta1 -O zz_generated.openapi -p ./apis/mattermost/v1beta1 -h ./hack/boilerplate.go.txt -r "-"
+	## openapi-gen resolves import paths via GOPATH/src, so the repo must appear at
+	## github.com/mattermost/mattermost-operator regardless of local checkout location.
+	mkdir -p /tmp/mm-openapi-gen/src/github.com/mattermost
+	ln -sfn $(CURDIR) /tmp/mm-openapi-gen/src/github.com/mattermost/mattermost-operator
+	GOPATH=/tmp/mm-openapi-gen GOROOT=$(GOROOT) $(OPENAPI_GEN) --logtostderr=true \
+		-o /tmp/mm-openapi-gen/src \
+		-i github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1 \
+		-O zz_generated.openapi \
+		-p github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1 \
+		-h ./hack/boilerplate.go.txt -r "-"
 
 	scripts/k8s.io/code-generator/generate-groups.sh client github.com/mattermost/mattermost-operator/pkg/client/v1beta1 github.com/mattermost/mattermost-operator/apis "mattermost:v1beta1" --go-header-file ./hack/boilerplate.go.txt
 	scripts/k8s.io/code-generator/generate-groups.sh lister github.com/mattermost/mattermost-operator/pkg/client/v1beta1 github.com/mattermost/mattermost-operator/apis "mattermost:v1beta1" --go-header-file ./hack/boilerplate.go.txt
