@@ -3,6 +3,16 @@
 # This manifest is prepared for development and testing purposes and should not be used in production environment.
 
 ---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: minio
+  labels:
+    app: minio
+data:
+  MINIO_ROOT_USER: bXktYWNjZXNzLWtleQ==
+  MINIO_ROOT_PASSWORD: bXlYWFh4eHgvc2VjcmV0WFhYWHh4eC9rZXlYWHh4eA==
+---
 kind: Deployment
 apiVersion: apps/v1
 metadata:
@@ -44,7 +54,6 @@ spec:
         - name: s3-data
           emptyDir: {}
 ---
-
 apiVersion: v1
 kind: Service
 metadata:
@@ -59,13 +68,3 @@ spec:
       port: 9001
   selector:
     app: minio
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: minio
-  labels:
-    app: minio
-data:
-  MINIO_ROOT_USER: bXktYWNjZXNzLWtleQ==
-  MINIO_ROOT_PASSWORD: bXlYWFh4eHgvc2VjcmV0WFhYWHh4eC9rZXlYWHh4eA==
