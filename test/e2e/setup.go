@@ -104,9 +104,12 @@ func SetupMattermostPrerequisites(ctx context.Context, k8sClient client.Client, 
 }
 
 // waitForDeploymentAvailable blocks until the named Deployment reports at least
-// one available replica.
+// one available replica. The 15-minute ceiling exists because image layer
+// unpacking inside a nested kind-on-Docker environment can take considerably
+// longer than a bare-metal pull; 15 minutes gives enough headroom without
+// blowing the overall 50-minute test budget.
 func waitForDeploymentAvailable(ctx context.Context, k8sClient client.Client, namespace, name string) error {
-	return wait.PollUntilContextTimeout(ctx, 5*time.Second, 5*time.Minute, true,
+	return wait.PollUntilContextTimeout(ctx, 5*time.Second, 15*time.Minute, true,
 		func(ctx context.Context) (bool, error) {
 			var deployment appsv1.Deployment
 			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, &deployment)
