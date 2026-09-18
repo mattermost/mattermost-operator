@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"context"
 	"os"
+	"time"
 
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 	"github.com/pkg/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -55,8 +58,21 @@ func CreateFromFile(ctx context.Context, k8sClient client.Client, namespace, pat
 	}
 
 	cleanup := func() {
+		ctx := context.Background()
 		for _, obj := range objects {
-			_ = k8sClient.Delete(context.Background(), obj)
+			_ = k8sClient.Delete(ctx, obj)
+		}
+		// Wait for all objects to be fully gone so the next test can recreate them.
+		for _, obj := range objects {
+			key := client.ObjectKeyFromObject(obj)
+			_ = wait.PollUntilContextTimeout(ctx, 2*time.Second, 2*time.Minute, true,
+				func(ctx context.Context) (bool, error) {
+					err := k8sClient.Get(ctx, key, obj)
+					if apierrors.IsNotFound(err) {
+						return true, nil
+					}
+					return false, nil
+				})
 		}
 	}
 
