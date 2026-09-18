@@ -19,6 +19,9 @@ ENV GOFIPS=1
 ENV GOEXPERIMENT=systemcrypto
 RUN make _build-fips-internal TARGET_OS=$TARGETOS TARGET_ARCH=$TARGETARCH
 
+# plugin-manager does not use crypto so it does not need FIPS settings
+RUN CGO_ENABLED=0 GOFIPS=0 GOEXPERIMENT= go build -a -installsuffix cgo -o build/_output/bin/plugin-manager ./cmd/plugin-manager
+
 FROM ${BASE_IMAGE}
 
 LABEL name="Mattermost Operator (FIPS)" \
@@ -36,6 +39,7 @@ LABEL name="Mattermost Operator (FIPS)" \
 WORKDIR /
 COPY --from=builder /workspace/licenses .
 COPY --from=builder /workspace/build/_output/bin/mattermost-operator .
+COPY --from=builder /workspace/build/_output/bin/plugin-manager /manager/plugin-manager
 
 USER 65532
 
