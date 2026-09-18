@@ -1,6 +1,7 @@
 package mattermost
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -379,68 +380,69 @@ func makeIngressRules(hosts []string, mattermost *mmv1beta.Mattermost) []network
 }
 
 const (
-	pluginManagerContainerName = "plugin-manager"
-	pluginLocalSocketVolume    = "mattermost-local-socket"
-	pluginLocalSocketDir       = "/run/mattermost"
-	pluginLocalSocketPath      = pluginLocalSocketDir + "/mattermost_local.socket"
-	mmctlBin                   = "/mattermost/bin/mmctl"
+	pluginManagerContainerName     = "plugin-manager"
+	pluginManagerInitContainerName = "inject-plugin-manager"
+	pluginLocalSocketVolume        = "mattermost-local-socket"
+	pluginLocalSocketDir           = "/run/mattermost"
+	pluginLocalSocketPath          = pluginLocalSocketDir + "/mattermost_local.socket"
+	pluginManagerBinVolume         = "plugin-manager-bin"
+	pluginManagerBinDir            = "/injected"
+	pluginManagerBinPath           = pluginManagerBinDir + "/plugin-manager"
+	pluginManagerSrcPath           = "/manager/plugin-manager"
+	mmctlBin                       = "/mattermost/bin/mmctl"
 )
 
-// pluginManagerScript builds the shell script run by the plugin-manager sidecar.
-// It waits for the mmctl local-mode socket, then for each plugin:
-//   - skips if already installed at the desired version
-//   - installs from URL or marketplace
-//   - enables or disables
-func pluginManagerScript(plugins []mmv1beta.PluginSpec) string {
-	var sb strings.Builder
-
-	sb.WriteString(fmt.Sprintf(
-		"until [ -S %s ]; do echo 'plugin-manager: waiting for socket...'; sleep 2; done; ",
-		pluginLocalSocketPath,
-	))
-	sb.WriteString("echo 'plugin-manager: socket ready, reconciling plugins...'; ")
-
-	for _, p := range plugins {
-		// Install only when the desired version is not already present.
-		// Two chained fixed-string greps avoid regex metacharacter issues (dots in IDs/versions)
-		// and prevent substring false-matches (e.g. "calls" matching "calls-recorder").
-		sb.WriteString(fmt.Sprintf(
-			"if ! %s --local plugin list 2>/dev/null | grep -F '%s: ' | grep -qF 'Version: %s'; then ",
-			mmctlBin, p.ID, p.Version,
-		))
-		if p.URL != "" {
-			sb.WriteString(fmt.Sprintf("%s --local plugin install-url --force %q; ", mmctlBin, p.URL))
-		} else {
-			sb.WriteString(fmt.Sprintf("%s --local marketplace install %q; ", mmctlBin, p.ID))
-		}
-		sb.WriteString("fi; ")
-
-		if p.Enabled {
-			sb.WriteString(fmt.Sprintf("%s --local plugin enable %q || true; ", mmctlBin, p.ID))
-		} else {
-			sb.WriteString(fmt.Sprintf("%s --local plugin disable %q || true; ", mmctlBin, p.ID))
-		}
+// pluginManagerArgs returns the command arguments for the plugin-manager binary.
+func pluginManagerArgs(plugins []mmv1beta.PluginSpec) ([]string, error) {
+	data, err := json.Marshal(plugins)
+	if err != nil {
+		return nil, err
 	}
-
-	sb.WriteString("echo 'plugin-manager: reconciliation complete'; exec sleep infinity")
-	return sb.String()
+	return []string{
+		"run",
+		"--socket", pluginLocalSocketPath,
+		"--mmctl", mmctlBin,
+		"--plugins", string(data),
+	}, nil
 }
 
-// generatePluginManagerSidecar returns the sidecar container that manages plugin lifecycle.
-func generatePluginManagerSidecar(mattermost *mmv1beta.Mattermost, containerImage string) corev1.Container {
+// generatePluginManagerInitContainer returns an init container that copies the
+// plugin-manager binary from the operator image into a shared emptyDir volume.
+// This lets the sidecar use the Mattermost image (which has the correct mmctl
+// version) without requiring a shell in that image.
+func generatePluginManagerInitContainer(operatorImage string) corev1.Container {
 	return corev1.Container{
-		Name:            pluginManagerContainerName,
-		Image:           containerImage,
-		ImagePullPolicy: mattermost.Spec.ImagePullPolicy,
-		Command:         []string{"/bin/sh", "-c", pluginManagerScript(mattermost.Spec.Plugins)},
+		Name:    pluginManagerInitContainerName,
+		Image:   operatorImage,
+		Command: []string{pluginManagerSrcPath, "copy-self", pluginManagerBinPath},
 		VolumeMounts: []corev1.VolumeMount{
-			{Name: pluginLocalSocketVolume, MountPath: pluginLocalSocketDir},
+			{Name: pluginManagerBinVolume, MountPath: pluginManagerBinDir},
 		},
 	}
 }
 
+// generatePluginManagerSidecar returns the sidecar container that manages plugin
+// lifecycle. It runs inside the Mattermost image (so mmctl is always the right
+// version) and executes the plugin-manager binary injected by the init container.
+func generatePluginManagerSidecar(mattermost *mmv1beta.Mattermost, containerImage string) (corev1.Container, error) {
+	args, err := pluginManagerArgs(mattermost.Spec.Plugins)
+	if err != nil {
+		return corev1.Container{}, err
+	}
+	return corev1.Container{
+		Name:            pluginManagerContainerName,
+		Image:           containerImage,
+		ImagePullPolicy: mattermost.Spec.ImagePullPolicy,
+		Command:         append([]string{pluginManagerBinPath}, args...),
+		VolumeMounts: []corev1.VolumeMount{
+			{Name: pluginLocalSocketVolume, MountPath: pluginLocalSocketDir},
+			{Name: pluginManagerBinVolume, MountPath: pluginManagerBinDir},
+		},
+	}, nil
+}
+
 // GenerateDeploymentV1Beta returns the deployment for Mattermost app.
-func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig, fileStore FileStoreConfig, deploymentName, ingressHost, serviceAccountName, containerImage string) *appsv1.Deployment {
+func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig, fileStore FileStoreConfig, deploymentName, ingressHost, serviceAccountName, containerImage, operatorImage string) *appsv1.Deployment {
 	// DB
 	envVarDB := db.EnvVars(mattermost)
 	initContainers := db.InitContainers(mattermost)
@@ -466,18 +468,26 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 		},
 	}
 
-	// Plugin manager: shared socket volume so the sidecar can reach mmctl --local.
+	// Plugin manager: shared volumes so the sidecar can reach mmctl --local and
+	// receive the injected plugin-manager binary.
 	if len(mattermost.Spec.Plugins) > 0 {
-		volumes = append(volumes, corev1.Volume{
-			Name: pluginLocalSocketVolume,
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{},
+		volumes = append(volumes,
+			corev1.Volume{
+				Name:         pluginLocalSocketVolume,
+				VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
 			},
-		})
+			corev1.Volume{
+				Name:         pluginManagerBinVolume,
+				VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
+			},
+		)
 		volumeMounts = append(volumeMounts, corev1.VolumeMount{
 			Name:      pluginLocalSocketVolume,
 			MountPath: pluginLocalSocketDir,
 		})
+		if operatorImage != "" {
+			initContainers = append(initContainers, generatePluginManagerInitContainer(operatorImage))
+		}
 	}
 
 	// Extensions
@@ -629,8 +639,10 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 	}
 
 	// Plugin manager sidecar
-	if len(mattermost.Spec.Plugins) > 0 {
-		containers = append(containers, generatePluginManagerSidecar(mattermost, containerImage))
+	if len(mattermost.Spec.Plugins) > 0 && operatorImage != "" {
+		if sidecar, err := generatePluginManagerSidecar(mattermost, containerImage); err == nil {
+			containers = append(containers, sidecar)
+		}
 	}
 
 	return &appsv1.Deployment{
@@ -671,7 +683,7 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 }
 
 // GenerateJobServerDeploymentV1Beta returns the deployment for Mattermost app dedicated job server.
-func GenerateJobServerDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig, fileStore FileStoreConfig, deploymentName, ingressHost, serviceAccountName, containerImage string) *appsv1.Deployment {
+func GenerateJobServerDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig, fileStore FileStoreConfig, deploymentName, ingressHost, serviceAccountName, containerImage, operatorImage string) *appsv1.Deployment {
 	deployment := GenerateDeploymentV1Beta(
 		mattermost,
 		db,
@@ -680,6 +692,7 @@ func GenerateJobServerDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db Datab
 		mattermost.GetIngressHost(),
 		mattermost.Name,
 		mattermost.GetImageName(),
+		operatorImage,
 	)
 
 	// Apply metadata overrides for dedicated job server configuration.

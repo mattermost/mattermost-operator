@@ -134,6 +134,10 @@ build: ## Build the mattermost-operator
 	@echo Building Mattermost-operator
 	GO111MODULE=on GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) CGO_ENABLED=0 $(GO) build $(GOFLAGS) -gcflags all=-trimpath=$(GOPATH) -asmflags all=-trimpath=$(GOPATH) -a -installsuffix cgo -o build/_output/bin/mattermost-operator $(GO_LINKER_FLAGS) ./main.go
 
+build-plugin-manager: ## Build the plugin-manager sidecar binary
+	@echo Building plugin-manager
+	GO111MODULE=on GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) CGO_ENABLED=0 $(GO) build $(GOFLAGS) -a -installsuffix cgo -o build/_output/bin/plugin-manager ./cmd/plugin-manager
+
 .PHONY: buildx-image
 buildx-image:  ## Builds and pushes the docker image for mattermost-operator
 	@echo Building Mattermost-operator Docker Image

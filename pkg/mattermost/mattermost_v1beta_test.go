@@ -373,7 +373,7 @@ func TestGenerateJobServerDeployment_V1Beta(t *testing.T) {
 		},
 	}
 
-	jobServerdeployment := GenerateJobServerDeploymentV1Beta(mattermost, databaseConfig, fileStoreInfo, mattermost.Name, "", "service-account", "")
+	jobServerdeployment := GenerateJobServerDeploymentV1Beta(mattermost, databaseConfig, fileStoreInfo, mattermost.Name, "", "service-account", "", "")
 	require.NotNil(t, jobServerdeployment)
 
 	assert.Equal(t, "test-jobserver", jobServerdeployment.Name)
@@ -387,7 +387,7 @@ func TestGenerateJobServerDeployment_V1Beta(t *testing.T) {
 	assert.Nil(t, jobServerdeployment.Spec.Template.Spec.Containers[0].LivenessProbe)
 
 	mattermost.Spec.PodTemplate.Command = []string{"mattermost", "custom-command"}
-	jobServerdeployment = GenerateJobServerDeploymentV1Beta(mattermost, databaseConfig, fileStoreInfo, mattermost.Name, "", "service-account", "")
+	jobServerdeployment = GenerateJobServerDeploymentV1Beta(mattermost, databaseConfig, fileStoreInfo, mattermost.Name, "", "service-account", "", "")
 	require.NotNil(t, jobServerdeployment)
 	assert.Equal(t, []string{"mattermost", "jobserver"}, jobServerdeployment.Spec.Template.Spec.Containers[0].Command)
 }
@@ -853,7 +853,7 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 				}
 			}
 
-			deployment := GenerateDeploymentV1Beta(mattermost, databaseConfig, fileStoreInfo, "", "", "service-account", "")
+			deployment := GenerateDeploymentV1Beta(mattermost, databaseConfig, fileStoreInfo, "", "", "service-account", "", "")
 			require.NotNil(t, deployment)
 
 			assert.Equal(t, "service-account", deployment.Spec.Template.Spec.ServiceAccountName)
@@ -1072,7 +1072,7 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 				mattermost := &mmv1beta.Mattermost{
 					Spec: testCase.mmSpec,
 				}
-				deployment := GenerateDeploymentV1Beta(mattermost, testCase.dbConfig, &ExternalFileStore{}, "", "", "", "image")
+				deployment := GenerateDeploymentV1Beta(mattermost, testCase.dbConfig, &ExternalFileStore{}, "", "", "", "image", "")
 				assert.Equal(t, testCase.expectedInitContainers, deployment.Spec.Template.Spec.InitContainers)
 			})
 		}
@@ -1113,7 +1113,7 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 				mattermost := &mmv1beta.Mattermost{
 					Spec: testCase.mmSpec,
 				}
-				deployment := GenerateDeploymentV1Beta(mattermost, dbConfig, &ExternalFileStore{}, "", "", "", "image")
+				deployment := GenerateDeploymentV1Beta(mattermost, dbConfig, &ExternalFileStore{}, "", "", "", "image", "")
 				require.Equal(t, len(testCase.expectedSidecarContainers), len(deployment.Spec.Template.Spec.Containers)-1)
 				if testCase.mmSpec.PodExtensions.SidecarContainers != nil {
 					assert.Equal(t, testCase.expectedSidecarContainers, deployment.Spec.Template.Spec.Containers[1:])
@@ -1129,7 +1129,7 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 		dbCfg := &ExternalDBConfig{dbType: database.PostgreSQLDatabase, hasDBCheckURL: true}
 		fileStoreCfg := &ExternalFileStore{}
 
-		deployment := GenerateDeploymentV1Beta(mattermost, dbCfg, fileStoreCfg, "", "my-mattermost.com", "", "")
+		deployment := GenerateDeploymentV1Beta(mattermost, dbCfg, fileStoreCfg, "", "my-mattermost.com", "", "", "")
 		mattermostAppContainer := mmv1beta.GetMattermostAppContainer(deployment.Spec.Template.Spec.Containers)
 
 		assertEnvVarEqual(t, "MM_SERVICESETTINGS_SITEURL", "https://my-mattermost.com", mattermostAppContainer.Env)
@@ -1152,7 +1152,7 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 
 		t.Run("no plugins - no sidecar or local mode env", func(t *testing.T) {
 			mm := &mmv1beta.Mattermost{Spec: mmv1beta.MattermostSpec{}}
-			deployment := GenerateDeploymentV1Beta(mm, dbConfig, &ExternalFileStore{}, "", "", "", "image:latest")
+			deployment := GenerateDeploymentV1Beta(mm, dbConfig, &ExternalFileStore{}, "", "", "", "image:latest", "operator:latest")
 
 			appContainer := mmv1beta.GetMattermostAppContainer(deployment.Spec.Template.Spec.Containers)
 			require.NotNil(t, appContainer)
@@ -1168,20 +1168,20 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 					Plugins: []mmv1beta.PluginSpec{pluginWithURL, pluginMarketplace},
 				},
 			}
-			deployment := GenerateDeploymentV1Beta(mm, dbConfig, &ExternalFileStore{}, "", "", "", "image:latest")
+			deployment := GenerateDeploymentV1Beta(mm, dbConfig, &ExternalFileStore{}, "", "", "", "image:latest", "operator:latest")
 
 			// Two containers: mattermost + plugin-manager
 			require.Equal(t, 2, len(deployment.Spec.Template.Spec.Containers))
 
-			// Sidecar uses same image
+			// Sidecar uses Mattermost image (to get the correct mmctl version)
 			sidecar := deployment.Spec.Template.Spec.Containers[1]
 			assert.Equal(t, pluginManagerContainerName, sidecar.Name)
 			assert.Equal(t, "image:latest", sidecar.Image)
 
-			// Sidecar mounts socket volume
-			require.Len(t, sidecar.VolumeMounts, 1)
+			// Sidecar mounts socket volume and injected-bin volume
+			require.Len(t, sidecar.VolumeMounts, 2)
 			assert.Equal(t, pluginLocalSocketVolume, sidecar.VolumeMounts[0].Name)
-			assert.Equal(t, pluginLocalSocketDir, sidecar.VolumeMounts[0].MountPath)
+			assert.Equal(t, pluginManagerBinVolume, sidecar.VolumeMounts[1].Name)
 
 			// Main container also mounts socket volume
 			appContainer := mmv1beta.GetMattermostAppContainer(deployment.Spec.Template.Spec.Containers)
@@ -1192,44 +1192,47 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 			assertEnvVarEqual(t, "MM_SERVICESETTINGS_ENABLELOCALMODE", "true", appContainer.Env)
 			assertEnvVarEqual(t, "MM_SERVICESETTINGS_LOCALMODESOCKETLOCATION", pluginLocalSocketPath, appContainer.Env)
 
-			// Socket volume exists in the pod spec
+			// Both volumes exist in the pod spec
 			assertVolumePresent(t, pluginLocalSocketVolume, deployment.Spec.Template.Spec.Volumes)
+			assertVolumePresent(t, pluginManagerBinVolume, deployment.Spec.Template.Spec.Volumes)
+
+			// inject-plugin-manager init container uses operator image
+			initContainers := deployment.Spec.Template.Spec.InitContainers
+			var injectInit *corev1.Container
+			for i := range initContainers {
+				if initContainers[i].Name == pluginManagerInitContainerName {
+					injectInit = &initContainers[i]
+					break
+				}
+			}
+			require.NotNil(t, injectInit, "expected inject-plugin-manager init container")
+			assert.Equal(t, "operator:latest", injectInit.Image)
+			assert.Equal(t, []string{pluginManagerSrcPath, "copy-self", pluginManagerBinPath}, injectInit.Command)
 		})
 
-		t.Run("script - URL plugin install and enable", func(t *testing.T) {
-			script := pluginManagerScript([]mmv1beta.PluginSpec{pluginWithURL})
-			assert.Contains(t, script, pluginWithURL.ID)
-			assert.Contains(t, script, pluginWithURL.Version)
-			assert.Contains(t, script, pluginWithURL.URL)
-			assert.Contains(t, script, "install-url --force")
-			assert.Contains(t, script, "plugin enable")
-			assert.NotContains(t, script, "plugin disable")
-			// drift detection must use fixed-string grep to avoid regex metacharacter issues
-			// and to anchor on "<id>: " so "calls" doesn't match "calls-recorder"
-			assert.Contains(t, script, "grep -F '"+pluginWithURL.ID+": '")
-			assert.Contains(t, script, "grep -qF 'Version: "+pluginWithURL.Version+"'")
+		t.Run("args - URL plugin install and enable", func(t *testing.T) {
+			args, err := pluginManagerArgs([]mmv1beta.PluginSpec{pluginWithURL})
+			require.NoError(t, err)
+			joined := strings.Join(args, " ")
+			assert.Contains(t, joined, pluginWithURL.ID)
+			assert.Contains(t, joined, pluginWithURL.Version)
+			assert.Contains(t, joined, pluginWithURL.URL)
 		})
 
-		t.Run("script - marketplace plugin install and disable", func(t *testing.T) {
-			script := pluginManagerScript([]mmv1beta.PluginSpec{pluginMarketplace})
-			assert.Contains(t, script, pluginMarketplace.ID)
-			assert.Contains(t, script, pluginMarketplace.Version)
-			assert.Contains(t, script, "marketplace install")
-			assert.NotContains(t, script, "install-url")
-			assert.Contains(t, script, "plugin disable")
-			assert.NotContains(t, script, "plugin enable")
-			assert.Contains(t, script, "grep -F '"+pluginMarketplace.ID+": '")
-			assert.Contains(t, script, "grep -qF 'Version: "+pluginMarketplace.Version+"'")
+		t.Run("args - marketplace plugin install and disable", func(t *testing.T) {
+			args, err := pluginManagerArgs([]mmv1beta.PluginSpec{pluginMarketplace})
+			require.NoError(t, err)
+			joined := strings.Join(args, " ")
+			assert.Contains(t, joined, pluginMarketplace.ID)
+			assert.Contains(t, joined, pluginMarketplace.Version)
 		})
 
-		t.Run("script - waits for socket before acting", func(t *testing.T) {
-			script := pluginManagerScript([]mmv1beta.PluginSpec{pluginWithURL})
-			socketIdx := assert.Contains(t, script, pluginLocalSocketPath)
-			installIdx := assert.Contains(t, script, "install-url")
-			// socket wait must appear before install command
-			_ = socketIdx
-			_ = installIdx
-			assert.Less(t, indexOf(script, pluginLocalSocketPath), indexOf(script, "install-url"))
+		t.Run("args - socket and mmctl paths present", func(t *testing.T) {
+			args, err := pluginManagerArgs([]mmv1beta.PluginSpec{pluginWithURL})
+			require.NoError(t, err)
+			joined := strings.Join(args, " ")
+			assert.Contains(t, joined, pluginLocalSocketPath)
+			assert.Contains(t, joined, mmctlBin)
 		})
 	})
 }

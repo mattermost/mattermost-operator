@@ -16,8 +16,8 @@ COPY . .
 RUN mkdir -p licenses
 COPY LICENSE /workspace/licenses
 
-# Build
-RUN make build TARGET_OS=$TARGETOS TARGET_ARCH=$TARGETARCH
+# Build operator and plugin-manager
+RUN make build build-plugin-manager TARGET_OS=$TARGETOS TARGET_ARCH=$TARGETARCH
 
 FROM ${BASE_IMAGE}
 
@@ -36,6 +36,7 @@ LABEL name="Mattermost Operator" \
 WORKDIR /
 COPY --from=builder /workspace/licenses .
 COPY --from=builder /workspace/build/_output/bin/mattermost-operator .
+COPY --from=builder /workspace/build/_output/bin/plugin-manager /manager/plugin-manager
 
 USER nonroot:nonroot
 
