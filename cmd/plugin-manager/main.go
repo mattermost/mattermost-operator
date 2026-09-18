@@ -13,7 +13,9 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -85,6 +87,14 @@ func copySelf(dest string) error {
 	return nil
 }
 
+func mmctlCmd(mmctlBin, socketPath string, args ...string) *exec.Cmd {
+	cmd := exec.Command(mmctlBin, args...)
+	cmd.Env = append(os.Environ(), "MM_SERVICESETTINGS_LOCALMODESOCKETLOCATION="+socketPath)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd
+}
+
 func runManager(socketPath, mmctlBin string, plugins []PluginSpec) {
 	for {
 		if _, err := os.Stat(socketPath); err == nil {
@@ -95,7 +105,7 @@ func runManager(socketPath, mmctlBin string, plugins []PluginSpec) {
 	}
 	log.Println("plugin-manager: socket ready, reconciling plugins...")
 
-	out, _ := exec.Command(mmctlBin, "--local", "plugin", "list").Output()
+	out, _ := mmctlCmd(mmctlBin, socketPath, "--local", "plugin", "list").Output()
 	installed := string(out)
 
 	for _, p := range plugins {
@@ -105,30 +115,28 @@ func runManager(socketPath, mmctlBin string, plugins []PluginSpec) {
 		if needsInstall {
 			var cmd *exec.Cmd
 			if p.URL != "" {
-				cmd = exec.Command(mmctlBin, "--local", "plugin", "install-url", "--force", p.URL)
+				cmd = mmctlCmd(mmctlBin, socketPath, "--local", "plugin", "install-url", "--force", p.URL)
 			} else {
-				cmd = exec.Command(mmctlBin, "--local", "marketplace", "install", p.ID)
+				cmd = mmctlCmd(mmctlBin, socketPath, "--local", "marketplace", "install", p.ID)
 			}
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
 			if err := cmd.Run(); err != nil {
 				log.Printf("plugin-manager: failed to install %s: %v", p.ID, err)
 			}
 		}
 
 		action := "enable"
-		enableCmd := exec.Command(mmctlBin, "--local", "plugin", "enable", p.ID)
+		enableCmd := mmctlCmd(mmctlBin, socketPath, "--local", "plugin", "enable", p.ID)
 		if !p.Enabled {
 			action = "disable"
-			enableCmd = exec.Command(mmctlBin, "--local", "plugin", "disable", p.ID)
+			enableCmd = mmctlCmd(mmctlBin, socketPath, "--local", "plugin", "disable", p.ID)
 		}
-		enableCmd.Stdout = os.Stdout
-		enableCmd.Stderr = os.Stderr
 		if err := enableCmd.Run(); err != nil {
 			log.Printf("plugin-manager: failed to %s %s: %v", action, p.ID, err)
 		}
 	}
 
 	log.Println("plugin-manager: reconciliation complete")
-	select {}
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGTERM, syscall.SIGINT)
+	<-sigs
 }
