@@ -1188,9 +1188,10 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 			require.NotNil(t, appContainer)
 			assertVolumeMountPresent(t, pluginLocalSocketVolume, appContainer.VolumeMounts)
 
-			// Server env vars enable local mode at the correct path
+			// Server env vars enable local mode; socket path uses the mmctl
+			// default (/var/tmp/mattermost_local.socket) so no override is needed.
 			assertEnvVarEqual(t, "MM_SERVICESETTINGS_ENABLELOCALMODE", "true", appContainer.Env)
-			assertEnvVarEqual(t, "MM_SERVICESETTINGS_LOCALMODESOCKETLOCATION", pluginLocalSocketPath, appContainer.Env)
+			assertEnvVarNotPresent(t, "MM_SERVICESETTINGS_LOCALMODESOCKETLOCATION", appContainer.Env)
 
 			// Both volumes exist in the pod spec
 			assertVolumePresent(t, pluginLocalSocketVolume, deployment.Spec.Template.Spec.Volumes)
