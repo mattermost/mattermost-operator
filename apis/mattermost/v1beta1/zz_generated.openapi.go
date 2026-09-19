@@ -19,6 +19,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 	return map[string]common.OpenAPIDefinition{
 		"github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.Mattermost":     schema_mattermost_operator_apis_mattermost_v1beta1_Mattermost(ref),
 		"github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.MattermostSpec": schema_mattermost_operator_apis_mattermost_v1beta1_MattermostSpec(ref),
+		"github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.PluginSpec":     schema_mattermost_operator_apis_mattermost_v1beta1_PluginSpec(ref),
 	}
 }
 
@@ -341,10 +342,69 @@ func schema_mattermost_operator_apis_mattermost_v1beta1_MattermostSpec(ref commo
 							Ref:         ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.ResourcePatch"),
 						},
 					},
+					"plugins": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Plugins defines the desired state of Mattermost plugins managed by the Operator.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.PluginSpec"),
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.AWSLoadBalancerController", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.Database", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.DeploymentTemplate", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.ElasticSearch", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.FileStore", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.HTTPRouteSpec", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.Ingress", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.JobServer", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.PodExtensions", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.PodTemplate", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.Probes", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.ResourcePatch", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.Scheduling", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.UpdateJob", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.LocalObjectReference", "k8s.io/api/core/v1.PodDNSConfig", "k8s.io/api/core/v1.Volume", "k8s.io/api/core/v1.VolumeMount"},
+			"github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.AWSLoadBalancerController", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.Database", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.DeploymentTemplate", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.ElasticSearch", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.FileStore", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.HTTPRouteSpec", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.Ingress", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.JobServer", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.PluginSpec", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.PodExtensions", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.PodTemplate", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.Probes", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.ResourcePatch", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.Scheduling", "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1.UpdateJob", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.LocalObjectReference", "k8s.io/api/core/v1.PodDNSConfig", "k8s.io/api/core/v1.Volume", "k8s.io/api/core/v1.VolumeMount"},
+	}
+}
+
+func schema_mattermost_operator_apis_mattermost_v1beta1_PluginSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PluginSpec defines the desired state of a single Mattermost plugin.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"id": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ID is the plugin identifier (e.g. \"com.mattermost.calls\").",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"version": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Version is the desired plugin version (e.g. \"0.29.0\"). Used for drift detection: the plugin is (re)installed when the installed version does not match this value.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"url": {
+						SchemaProps: spec.SchemaProps{
+							Description: "URL is the direct download URL for the plugin archive. When set, the server fetches the plugin from this URL. When empty, the plugin is installed from the Mattermost marketplace.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"enabled": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Enabled controls whether the plugin is enabled or disabled.",
+							Default:     false,
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"id", "version", "enabled"},
+			},
+		},
 	}
 }

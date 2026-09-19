@@ -307,6 +307,7 @@ func (r *MattermostReconciler) checkMattermostJobServerDeployment(
 		mattermost.GetSiteURLHost(),
 		mattermost.Name,
 		mattermost.GetImageName(),
+		r.OperatorImage,
 	)
 
 	if mattermost.Spec.JobServer == nil || !mattermost.Spec.JobServer.DedicatedJobServer {
@@ -358,6 +359,7 @@ func (r *MattermostReconciler) checkMattermostDeployment(
 		mattermost.GetSiteURLHost(),
 		mattermost.Name,
 		mattermost.GetImageName(),
+		r.OperatorImage,
 	)
 
 	patchedObj, applied, err := mattermost.Spec.ResourcePatch.ApplyToDeployment(desired)

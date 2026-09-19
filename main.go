@@ -104,10 +104,16 @@ func main() {
 
 	logger.Info("Registering Components")
 
+	operatorImage := os.Getenv("OPERATOR_IMAGE")
+	if operatorImage == "" {
+		logger.Info("OPERATOR_IMAGE not set, plugin-manager injection disabled")
+	}
+
 	if err = mattermost.NewMattermostReconciler(
 		mgr,
 		config.MaxReconcilingInstallations,
 		config.RequeueOnLimitDelay,
+		operatorImage,
 	).
 		SetupWithManager(mgr, config.MaxReconcileConcurrency); err != nil {
 		logger.Error(err, "Unable to create controller", "controller", "Mattermost")

@@ -39,10 +39,11 @@ type MattermostReconciler struct {
 	MaxReconciling         int
 	RequeueOnLimitDelay    time.Duration
 	Resources              *resources.ResourceHelper
+	OperatorImage          string
 	reconcilingRateLimiter unstableInstallationsRateLimiter
 }
 
-func NewMattermostReconciler(mgr ctrl.Manager, maxReconciling int, requeueOnLimitDelay time.Duration) *MattermostReconciler {
+func NewMattermostReconciler(mgr ctrl.Manager, maxReconciling int, requeueOnLimitDelay time.Duration, operatorImage string) *MattermostReconciler {
 	return &MattermostReconciler{
 		Client:              mgr.GetClient(),
 		NonCachedAPIReader:  mgr.GetAPIReader(),
@@ -51,6 +52,7 @@ func NewMattermostReconciler(mgr ctrl.Manager, maxReconciling int, requeueOnLimi
 		MaxReconciling:      maxReconciling,
 		RequeueOnLimitDelay: requeueOnLimitDelay,
 		Resources:           resources.NewResourceHelper(mgr.GetClient(), mgr.GetScheme()),
+		OperatorImage:       operatorImage,
 		reconcilingRateLimiter: unstableInstallationsRateLimiter{
 			nonReconcilingBeingProcessed: 0,
 			Mutex:                        sync.Mutex{},
