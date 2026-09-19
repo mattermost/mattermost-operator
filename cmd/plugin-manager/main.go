@@ -87,26 +87,11 @@ func copySelf(dest string) error {
 	return nil
 }
 
-func mmctlCmd(mmctlBin, configPath string, args ...string) *exec.Cmd {
-	allArgs := append([]string{"--config", configPath}, args...)
-	cmd := exec.Command(mmctlBin, allArgs...)
+func mmctlCmd(mmctlBin string, args ...string) *exec.Cmd {
+	cmd := exec.Command(mmctlBin, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd
-}
-
-func writeMMCtlConfig(socketPath string) (string, error) {
-	f, err := os.CreateTemp("", "mmctl-config-*.json")
-	if err != nil {
-		return "", err
-	}
-	defer f.Close()
-	_, err = fmt.Fprintf(f, `{"ServiceSettings":{"LocalModeSocketLocation":%q}}`, socketPath)
-	if err != nil {
-		os.Remove(f.Name())
-		return "", err
-	}
-	return f.Name(), nil
 }
 
 func runManager(socketPath, mmctlBin string, plugins []PluginSpec) {
@@ -119,14 +104,7 @@ func runManager(socketPath, mmctlBin string, plugins []PluginSpec) {
 	}
 	log.Println("plugin-manager: socket ready, reconciling plugins...")
 
-	configPath, err := writeMMCtlConfig(socketPath)
-	if err != nil {
-		log.Printf("plugin-manager: failed to write mmctl config: %v", err)
-		return
-	}
-	defer os.Remove(configPath)
-
-	out, _ := mmctlCmd(mmctlBin, configPath, "--local", "plugin", "list").Output()
+	out, _ := mmctlCmd(mmctlBin, "--local", "plugin", "list").Output()
 	installed := string(out)
 
 	for _, p := range plugins {
@@ -136,9 +114,9 @@ func runManager(socketPath, mmctlBin string, plugins []PluginSpec) {
 		if needsInstall {
 			var cmd *exec.Cmd
 			if p.URL != "" {
-				cmd = mmctlCmd(mmctlBin, configPath, "--local", "plugin", "install-url", "--force", p.URL)
+				cmd = mmctlCmd(mmctlBin, "--local", "plugin", "install-url", "--force", p.URL)
 			} else {
-				cmd = mmctlCmd(mmctlBin, configPath, "--local", "marketplace", "install", p.ID)
+				cmd = mmctlCmd(mmctlBin, "--local", "marketplace", "install", p.ID)
 			}
 			if err := cmd.Run(); err != nil {
 				log.Printf("plugin-manager: failed to install %s: %v", p.ID, err)
@@ -146,10 +124,10 @@ func runManager(socketPath, mmctlBin string, plugins []PluginSpec) {
 		}
 
 		action := "enable"
-		enableCmd := mmctlCmd(mmctlBin, configPath, "--local", "plugin", "enable", p.ID)
+		enableCmd := mmctlCmd(mmctlBin, "--local", "plugin", "enable", p.ID)
 		if !p.Enabled {
 			action = "disable"
-			enableCmd = mmctlCmd(mmctlBin, configPath, "--local", "plugin", "disable", p.ID)
+			enableCmd = mmctlCmd(mmctlBin, "--local", "plugin", "disable", p.ID)
 		}
 		if err := enableCmd.Run(); err != nil {
 			log.Printf("plugin-manager: failed to %s %s: %v", action, p.ID, err)

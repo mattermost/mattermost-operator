@@ -383,7 +383,7 @@ const (
 	pluginManagerContainerName     = "plugin-manager"
 	pluginManagerInitContainerName = "inject-plugin-manager"
 	pluginLocalSocketVolume        = "mattermost-local-socket"
-	pluginLocalSocketDir           = "/run/mattermost"
+	pluginLocalSocketDir           = "/var/tmp"
 	pluginLocalSocketPath          = pluginLocalSocketDir + "/mattermost_local.socket"
 	pluginManagerBinVolume         = "plugin-manager-bin"
 	pluginManagerBinDir            = "/injected"
@@ -530,7 +530,6 @@ func GenerateDeploymentV1Beta(mattermost *mmv1beta.Mattermost, db DatabaseConfig
 	if len(mattermost.Spec.Plugins) > 0 {
 		envVarGeneral = append(envVarGeneral,
 			corev1.EnvVar{Name: "MM_SERVICESETTINGS_ENABLELOCALMODE", Value: "true"},
-			corev1.EnvVar{Name: "MM_SERVICESETTINGS_LOCALMODESOCKETLOCATION", Value: pluginLocalSocketPath},
 		)
 	}
 
