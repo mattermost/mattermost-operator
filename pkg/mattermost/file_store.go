@@ -18,8 +18,9 @@ const (
 
 	// minioClientImage runs the init container that creates the MinIO bucket.
 	// minio/mc can no longer be pulled from Docker Hub. The -dev variant is
-	// used because the container needs a shell.
-	minioClientImage = "cgr.dev/chainguard/minio-client@sha256:578914d4ace20c6915c82a05bd5ad52701eef909def43173b2e98fec859d5d6e"
+	// used because the container needs a shell. The digest is the multi-arch
+	// index, not a single-platform manifest.
+	minioClientImage = "cgr.dev/chainguard/minio-client@sha256:fdb40d819ca51969c86fa76f45a67bb841759daf85d4c6ce9aa86d27f6e47ae9"
 )
 
 type FileStoreInfo struct {
