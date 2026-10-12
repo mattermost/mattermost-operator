@@ -229,11 +229,11 @@ func GenerateDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, dbIn
 		// Create the init container to create the MinIO bucker
 		initContainers = append(initContainers, corev1.Container{
 			Name:            "create-minio-bucket",
-			Image:           "minio/mc:RELEASE.2025-04-16T18-13-26Z",
+			Image:           minioClientImage,
 			ImagePullPolicy: corev1.PullIfNotPresent,
 			Command: []string{
 				"/bin/sh", "-c",
-				fmt.Sprintf("mc config host add localminio http://%s $(MINIO_ACCESS_KEY) $(MINIO_SECRET_KEY) && mc mb localminio/%s -q -p", minioURL, mattermost.Name),
+				fmt.Sprintf("mc alias set localminio http://%s $(MINIO_ACCESS_KEY) $(MINIO_SECRET_KEY) && mc mb localminio/%s -q -p", minioURL, mattermost.Name),
 			},
 			Env: []corev1.EnvVar{
 				{

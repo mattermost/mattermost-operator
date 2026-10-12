@@ -32,6 +32,8 @@ func TestFileStore(t *testing.T) {
 		fileStore := config.(*OperatorManagedMinioConfig)
 		initContainers := fileStore.InitContainers(mattermost)
 		assert.Equal(t, 2, len(initContainers))
+		assert.Equal(t, minioClientImage, initContainers[0].Image)
+		assert.Contains(t, initContainers[0].Command[2], "mc alias set localminio ")
 		assert.Equal(t, secret, fileStore.fsInfo.secretName)
 		assert.Equal(t, minioURL, fileStore.fsInfo.url)
 		assert.Equal(t, "mm-test", fileStore.fsInfo.bucketName)
