@@ -1,0 +1,73 @@
+# Opt-in Prometheus monitoring for a Mattermost installation.
+#
+# Requirements:
+#   - The Prometheus Operator CRDs (ServiceMonitor, PrometheusRule) installed in
+#     the cluster — e.g. via kube-prometheus-stack. If absent, the operator logs
+#     a warning and skips those resources instead of failing.
+#   - An Enterprise license (spec.licenseSecret). The Mattermost /metrics endpoint
+#     (port 8067) is only served under a valid license; without one the scrape
+#     target stays down and the operator emits a MonitoringRequiresEnterpriseLicense
+#     warning event.
+#
+# The `labels` under serviceMonitor / prometheusRule MUST match your cluster
+# Prometheus's serviceMonitorSelector / ruleSelector (for kube-prometheus-stack
+# the common convention is `release: <helm-release-name>`).
+apiVersion: installation.mattermost.com/v1beta1
+kind: Mattermost
+metadata:
+  name: mm-example-monitoring
+spec:
+  ingress:
+    enabled: true
+    host: mattermost.example.com
+  # Enterprise license secret — required for /metrics to be served.
+  licenseSecret: mattermost-license
+
+  monitoring:
+    # Prometheus scrapes the Mattermost /metrics endpoint (8067) via this
+    # ServiceMonitor. Interval and discovery labels are configurable.
+    serviceMonitor:
+      enabled: true
+      interval: "30s"
+      labels:
+        release: kube-prometheus-stack
+
+    # Ships Mattermost-focused alerting rules, pod-scoped to THIS installation
+    # (alerts fire only for this instance's pods, matched by name/label).
+    prometheusRule:
+      enabled: true
+      labels:
+        release: kube-prometheus-stack
+
+    # Ships the Mattermost Grafana dashboards as ConfigMaps (one per dashboard),
+    # labelled for pickup by the Grafana dashboard sidecar. Dashboards are
+    # pod-scoped: pick a namespace + pod (server), not a raw instance IP.
+    grafanaDashboard:
+      enabled: true
+      # discoveryLabel: grafana_dashboard   # override the sidecar label if needed
+      # discoveryLabelValue: "1"
+
+    # Client/RUM + notification performance metrics ride the same /metrics
+    # endpoint and default to on in the server. Omit this block to keep the
+    # server defaults; set enabled: false to explicitly opt out.
+    # Required for the web/mobile/desktop dashboards to have data.
+    clientMetrics:
+      enabled: true
+
+    # Optional: scrape a separately-deployed rtcd (Calls real-time daemon).
+    # rtcd is NOT deployed by this operator — point it at your rtcd Service.
+    # callsMetrics:
+    #   enabled: true
+    #   rtcdServiceSelector:
+    #     app: rtcd
+    #   port: "8045"
+    #   labels:                      # falls back to serviceMonitor.labels if omitted
+    #     release: kube-prometheus-stack
+
+# NOTE: the operator creates a dedicated internal metrics Service (<name>-metrics)
+# that the ServiceMonitor scrapes, so monitoring works in every service mode —
+# including useServiceLoadBalancer, where the app Service exposes only 80/443.
+# Metrics stay internal to the cluster; they are never published via the LB.
+#
+# Disabling a capability (enabled: false) deletes the resources the operator
+# created for it, as long as the `monitoring` block itself remains present.

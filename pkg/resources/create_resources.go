@@ -11,10 +11,12 @@ import (
 
 	objectMatcher "github.com/banzaicloud/k8s-objectmatcher/patch"
 	"github.com/go-logr/logr"
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -121,6 +123,64 @@ func (r *ResourceHelper) CreateServiceIfNotExists(owner v1.Object, service *core
 		return r.Create(owner, service, reqLogger)
 	} else if err != nil {
 		return errors.Wrap(err, "failed to check if service exists")
+	}
+
+	return nil
+}
+
+// CreateServiceMonitorIfNotExists creates a Prometheus Operator ServiceMonitor.
+// The Prometheus Operator CRDs are an optional cluster dependency: if they are
+// not installed the API has no matching kind, which we treat as a logged no-op
+// rather than an error so an opt-in monitoring flag never breaks reconciliation.
+func (r *ResourceHelper) CreateServiceMonitorIfNotExists(owner v1.Object, serviceMonitor *monitoringv1.ServiceMonitor, reqLogger logr.Logger) error {
+	foundServiceMonitor := &monitoringv1.ServiceMonitor{}
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: serviceMonitor.Name, Namespace: serviceMonitor.Namespace}, foundServiceMonitor)
+	if err == nil {
+		return nil
+	}
+
+	if apimeta.IsNoMatchError(err) {
+		reqLogger.Info("Prometheus Operator CRDs not installed; skipping ServiceMonitor", "name", serviceMonitor.Name)
+		return nil
+	}
+	if k8sErrors.IsNotFound(err) {
+		reqLogger.Info("Creating service monitor", "name", serviceMonitor.Name)
+		return r.Create(owner, serviceMonitor, reqLogger)
+	}
+
+	return errors.Wrap(err, "failed to check if service monitor exists")
+}
+
+// CreatePrometheusRuleIfNotExists creates a Prometheus Operator PrometheusRule.
+// Like ServiceMonitor, the Prometheus Operator CRDs are an optional cluster
+// dependency: an absent kind is a logged no-op rather than an error.
+func (r *ResourceHelper) CreatePrometheusRuleIfNotExists(owner v1.Object, prometheusRule *monitoringv1.PrometheusRule, reqLogger logr.Logger) error {
+	foundPrometheusRule := &monitoringv1.PrometheusRule{}
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: prometheusRule.Name, Namespace: prometheusRule.Namespace}, foundPrometheusRule)
+	if err == nil {
+		return nil
+	}
+
+	if apimeta.IsNoMatchError(err) {
+		reqLogger.Info("Prometheus Operator CRDs not installed; skipping PrometheusRule", "name", prometheusRule.Name)
+		return nil
+	}
+	if k8sErrors.IsNotFound(err) {
+		reqLogger.Info("Creating prometheus rule", "name", prometheusRule.Name)
+		return r.Create(owner, prometheusRule, reqLogger)
+	}
+
+	return errors.Wrap(err, "failed to check if prometheus rule exists")
+}
+
+func (r *ResourceHelper) CreateConfigMapIfNotExists(owner v1.Object, configMap *corev1.ConfigMap, reqLogger logr.Logger) error {
+	foundConfigMap := &corev1.ConfigMap{}
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: configMap.Name, Namespace: configMap.Namespace}, foundConfigMap)
+	if err != nil && k8sErrors.IsNotFound(err) {
+		reqLogger.Info("Creating config map", "name", configMap.Name)
+		return r.Create(owner, configMap, reqLogger)
+	} else if err != nil {
+		return errors.Wrap(err, "failed to check if config map exists")
 	}
 
 	return nil
