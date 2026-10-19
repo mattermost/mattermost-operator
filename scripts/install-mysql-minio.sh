@@ -6,7 +6,7 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 # Apply Namespace if already exists
 helm repo add bitpoke https://helm-charts.bitpoke.io
 helm repo update 
-helm install mysql-operator bitpoke/mysql-operator --namespace mysql-operator --create-namespace --set "extraArgs={--mysql-versions-to-image=5.7.26=percona:5.7.35}" --version v0.6.2
+helm install mysql-operator bitpoke/mysql-operator --namespace mysql-operator --create-namespace --set "extraArgs={--mysql-versions-to-image=5.7.26=percona:5.7.35}" --version v0.6.3
 
 ## Create the minio operator
 # Apply Namespace if already exists

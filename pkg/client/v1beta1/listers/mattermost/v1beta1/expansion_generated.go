@@ -5,6 +5,14 @@
 
 package v1beta1
 
+// AgentListerExpansion allows custom methods to be added to
+// AgentLister.
+type AgentListerExpansion interface{}
+
+// AgentNamespaceListerExpansion allows custom methods to be added to
+// AgentNamespaceLister.
+type AgentNamespaceListerExpansion interface{}
+
 // MattermostListerExpansion allows custom methods to be added to
 // MattermostLister.
 type MattermostListerExpansion interface{}

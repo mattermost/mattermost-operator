@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 func TestMattermost_SetDefaults(t *testing.T) {
@@ -351,4 +352,27 @@ func TestMattermost_GetIngressHostNames(t *testing.T) {
 			assert.Equal(t, testCase.expectedHosts, mm.GetIngressHostNames())
 		})
 	}
+}
+
+func TestAgentsLLMGateway_SetDefaults(t *testing.T) {
+	t.Run("defaults requests and limits when both are unset", func(t *testing.T) {
+		gw := &AgentsLLMGateway{}
+		gw.SetDefaults()
+
+		assert.Equal(t, AgentLiteLLMDefaultImage, gw.Image)
+		assert.Equal(t, resource.MustParse("500m"), gw.Resources.Requests[v1.ResourceCPU])
+		assert.Equal(t, resource.MustParse("2"), gw.Resources.Limits[v1.ResourceCPU])
+	})
+
+	t.Run("preserves limits-only configuration", func(t *testing.T) {
+		gw := &AgentsLLMGateway{
+			Resources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
+			},
+		}
+		gw.SetDefaults()
+
+		assert.Nil(t, gw.Resources.Requests, "defaulting requests would violate requests <= limits")
+		assert.Equal(t, resource.MustParse("100m"), gw.Resources.Limits[v1.ResourceCPU])
+	})
 }
