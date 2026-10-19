@@ -67,7 +67,8 @@ func TestGenerateService(t *testing.T) {
 				expectPort(t, service, 8067)
 			}
 
-			assert.True(t, service.Spec.PublishNotReadyAddresses)
+			// Default behavior is now false unless explicitly set
+			assert.False(t, service.Spec.PublishNotReadyAddresses)
 		})
 	}
 }

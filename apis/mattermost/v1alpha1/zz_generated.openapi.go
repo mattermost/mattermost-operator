@@ -276,6 +276,20 @@ func schema_mattermost_operator_apis_mattermost_v1alpha1_ClusterInstallationSpec
 							Format:      "",
 						},
 					},
+					"publishNotReadyAddresses": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PublishNotReadyAddresses controls whether pod endpoints are published before pods are ready. When false (recommended), only ready pods receive traffic. When true, pods receive traffic immediately upon creation. Defaults to false if not specified.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"podTerminationGracePeriodSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PodTerminationGracePeriodSeconds defines how long to wait before forcefully terminating the pod during shutdown. This gives time for the pod to finish processing in-flight requests. If not specified, Kubernetes default of 30 seconds is used.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
 					"migrate": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Migrate specifies that the ClusterInstallation CR should be migrated to the Mattermost CR. CAUTION: Some features like BlueGreen or Canary are not supported with a new Custom Resource therefore migration should be performed with extra caution.",
