@@ -2,8 +2,8 @@
 #
 # Requirements:
 #   - The Prometheus Operator CRDs (ServiceMonitor, PrometheusRule) installed in
-#     the cluster — e.g. via kube-prometheus-stack. If absent, the operator logs
-#     a warning and skips those resources instead of failing.
+#     the cluster — e.g. via kube-prometheus-stack. If they are not installed yet,
+#     the operator logs that and retries. The Mattermost Deployment still reconciles.
 #   - An Enterprise license (spec.licenseSecret). The Mattermost /metrics endpoint
 #     (port 8067) is only served under a valid license; without one the scrape
 #     target stays down and the operator emits a MonitoringRequiresEnterpriseLicense
@@ -50,7 +50,10 @@ spec:
     #   enabled: true
     #   rtcdServiceSelector:
     #     app: rtcd
-    #   port: "8045"
+    #   # Defaults to the Service port named "metrics".
+    #   # A number is the Pod container port, and is only scraped when that
+    #   # containerPort is declared on the rtcd container:
+    #   # port: "8045"
     #   labels:                      # falls back to serviceMonitor.labels if omitted
     #     release: kube-prometheus-stack
 

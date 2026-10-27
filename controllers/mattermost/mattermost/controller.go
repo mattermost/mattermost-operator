@@ -31,6 +31,12 @@ import (
 const healthCheckRequeueDelay = 6 * time.Second
 const resourcesReadyDelay = 10 * time.Second
 
+// monitoringCRDRetryDelay is how long to wait before retrying monitoring
+// resources that were skipped because the Prometheus Operator CRDs are absent.
+// An error return would mark the Mattermost reconcile failed on clusters that
+// enable monitoring and never install those CRDs.
+const monitoringCRDRetryDelay = 2 * time.Minute
+
 // MattermostReconciler reconciles a Mattermost object
 type MattermostReconciler struct {
 	client.Client
@@ -209,6 +215,11 @@ func (r *MattermostReconciler) Reconcile(ctx context.Context, request ctrl.Reque
 	if err != nil {
 		r.updateStatusReconcilingAndLogError(mattermost, status, reqLogger, err)
 		return reconcile.Result{}, err
+	}
+
+	if recStatus.MonitoringPendingCRDs {
+		reqLogger.Info("Monitoring is enabled but the Prometheus Operator CRDs are not installed; retrying", "delay", monitoringCRDRetryDelay)
+		return reconcile.Result{RequeueAfter: monitoringCRDRetryDelay}, nil
 	}
 
 	return reconcile.Result{}, nil

@@ -719,8 +719,9 @@ spec:
                           labels when empty; set at least one of them or Prometheus will ignore it.
                         type: object
                       port:
-                        description: Port is the rtcd metrics port name or number.
-                          Defaults to "8045" when empty.
+                        description: |-
+                          Port is the rtcd Service port name, or a Pod container port number.
+                          Defaults to "metrics". A number matches a declared container port only.
                         type: string
                       rtcdServiceSelector:
                         additionalProperties:

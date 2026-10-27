@@ -24,15 +24,9 @@ import (
 //
 // Every check both creates when its flag is on and deletes when it is off, so
 // turning a capability off cleans up after itself (mirrors the Ingress pattern).
+// A missing monitoring block is treated as disabled: owned resources from a
+// previous reconcile are removed, and nothing new is created.
 func (r *MattermostReconciler) checkMattermostMonitoring(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) error {
-	// Nothing to do — and nothing to clean up — for installations that never
-	// declare a monitoring block. This avoids per-reconcile API calls for the
-	// common case. Cleanup-on-disable still works via the `enabled: false` path,
-	// which keeps the block present.
-	if mattermost.Spec.Monitoring == nil {
-		return nil
-	}
-
 	r.warnMonitoringWithoutLicense(mattermost, reqLogger)
 
 	if err := r.checkMattermostServiceMonitor(mattermost, reqLogger); err != nil {
@@ -172,8 +166,10 @@ func (r *MattermostReconciler) checkMattermostPrometheusRule(mattermost *mmv1bet
 	current := &monitoringv1.PrometheusRule{}
 	err = r.Client.Get(context.TODO(), ruleKey, current)
 	if err != nil {
-		// CRD absent (creation was skipped) or not yet present — nothing to update.
-		if apimeta.IsNoMatchError(err) || k8sErrors.IsNotFound(err) {
+		if apimeta.IsNoMatchError(err) {
+			return resources.ErrPrometheusCRDAbsent
+		}
+		if k8sErrors.IsNotFound(err) {
 			return nil
 		}
 		return errors.Wrap(err, "failed to fetch current prometheus rule")
@@ -217,8 +213,11 @@ func (r *MattermostReconciler) reconcileServiceMonitor(mattermost *mmv1beta.Matt
 	current := &monitoringv1.ServiceMonitor{}
 	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: desired.Name, Namespace: desired.Namespace}, current)
 	if err != nil {
-		// CRD absent (creation was skipped) or not yet present — nothing to update.
-		if apimeta.IsNoMatchError(err) || k8sErrors.IsNotFound(err) {
+		if apimeta.IsNoMatchError(err) {
+			return resources.ErrPrometheusCRDAbsent
+		}
+		// Created in this reconcile and not yet visible, or already removed.
+		if k8sErrors.IsNotFound(err) {
 			return nil
 		}
 		return errors.Wrap(err, "failed to fetch current service monitor")
