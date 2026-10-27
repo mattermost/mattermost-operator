@@ -1045,9 +1045,10 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 					},
 				},
 				dbConfig: &ExternalDBConfig{
-					secretName:    "secret",
-					dbType:        database.PostgreSQLDatabase,
-					hasDBCheckURL: false, // builtin mode doesn't need it
+					secretName:          "secret",
+					connectionStringKey: DefaultExternalDBConnectionStringKey,
+					dbType:              database.PostgreSQLDatabase,
+					hasDBCheckURL:       false, // builtin mode doesn't need it
 				},
 				expectedInitContainers: []corev1.Container{
 					{
@@ -1146,6 +1147,54 @@ func TestGenerateDeployment_V1Beta(t *testing.T) {
 
 		assertEnvVarEqual(t, "MM_SERVICESETTINGS_SITEURL", "https://my-mattermost.com", mattermostAppContainer.Env)
 	})
+}
+
+func TestGenerateDeployment_V1Beta_UnmanagedDatabase(t *testing.T) {
+	mattermost := &mmv1beta.Mattermost{
+		ObjectMeta: metav1.ObjectMeta{Name: "mm", Namespace: "default"},
+		Spec: mmv1beta.MattermostSpec{
+			Database: mmv1beta.Database{Unmanaged: true},
+			MattermostEnv: []corev1.EnvVar{
+				{Name: "MM_SQLSETTINGS_DRIVERNAME", Value: "postgres"},
+				{
+					Name: "MM_SQLSETTINGS_DATASOURCE",
+					ValueFrom: &corev1.EnvVarSource{
+						SecretKeyRef: &corev1.SecretKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{Name: "user-secret"},
+							Key:                  "uri",
+						},
+					},
+				},
+			},
+		},
+	}
+	fileStore := &ExternalFileStore{fsInfo: FileStoreInfo{secretName: "fs", bucketName: "b", url: "s3.example.com"}}
+
+	// checkDatabase returns a no-op UnmanagedDBConfig for unmanaged databases,
+	// which injects neither env vars nor init containers.
+	deployment := GenerateDeploymentV1Beta(mattermost, &UnmanagedDBConfig{}, fileStore, "mm", "", "sa", "")
+	require.NotNil(t, deployment)
+
+	container := mmv1beta.GetMattermostAppContainer(deployment.Spec.Template.Spec.Containers)
+	require.NotNil(t, container)
+
+	// MM_CONFIG must not be injected by the operator in unmanaged mode.
+	assert.Nil(t, findEnvVar(container.Env, "MM_CONFIG"),
+		"operator must not inject MM_CONFIG when database is unmanaged")
+
+	// The user-supplied datasource must survive into the rendered Deployment.
+	ds := findEnvVar(container.Env, "MM_SQLSETTINGS_DATASOURCE")
+	require.NotNil(t, ds)
+	require.NotNil(t, ds.ValueFrom)
+	require.NotNil(t, ds.ValueFrom.SecretKeyRef)
+	assert.Equal(t, "user-secret", ds.ValueFrom.SecretKeyRef.Name)
+	assert.Equal(t, "uri", ds.ValueFrom.SecretKeyRef.Key)
+
+	// No operator-injected DB readiness init container in unmanaged mode.
+	for _, ic := range deployment.Spec.Template.Spec.InitContainers {
+		assert.NotEqual(t, "init-check-database", ic.Name,
+			"operator must not add DB readiness init container when database is unmanaged")
+	}
 }
 
 func TestGenerateRBACResources_V1Beta(t *testing.T) {

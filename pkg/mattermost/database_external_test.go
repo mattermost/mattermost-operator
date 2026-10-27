@@ -280,14 +280,14 @@ func TestNewExternalDBConfig_InvalidCheckURL(t *testing.T) {
 
 func TestGetDBCheckInitContainer_QuotedURL(t *testing.T) {
 	t.Run("mysql container quotes URL variable", func(t *testing.T) {
-		container := getDBCheckInitContainer(&mmv1beta.Mattermost{}, "secret", "mysql", false)
+		container := getDBCheckInitContainer(&mmv1beta.Mattermost{}, &ExternalDBConfig{secretName: "secret", dbType: "mysql", connectionStringKey: "DB_CONNECTION_STRING"})
 		require.NotNil(t, container)
 		// Verify the command uses double-quoted variable to prevent shell injection
 		assert.Contains(t, container.Command[2], `"$DB_CONNECTION_CHECK_URL"`)
 	})
 
 	t.Run("postgres container quotes URL variable", func(t *testing.T) {
-		container := getDBCheckInitContainer(&mmv1beta.Mattermost{}, "secret", "postgres", false)
+		container := getDBCheckInitContainer(&mmv1beta.Mattermost{}, &ExternalDBConfig{secretName: "secret", dbType: "postgres", connectionStringKey: "DB_CONNECTION_STRING"})
 		require.NotNil(t, container)
 		assert.Contains(t, container.Command[2], `"$DB_CONNECTION_CHECK_URL"`)
 	})
@@ -311,7 +311,7 @@ func TestGetDBCheckInitContainer_BuiltinMode(t *testing.T) {
 			Mode: mmv1beta.DatabaseReadinessCheckModeBuiltin,
 		})
 
-		container := getDBCheckInitContainer(mm, "secret", database.PostgreSQLDatabase, false)
+		container := getDBCheckInitContainer(mm, &ExternalDBConfig{secretName: "secret", dbType: database.PostgreSQLDatabase, connectionStringKey: "DB_CONNECTION_STRING"})
 		require.NotNil(t, container)
 
 		assert.Equal(t, "init-check-database", container.Name)
@@ -339,7 +339,7 @@ func TestGetDBCheckInitContainer_BuiltinMode(t *testing.T) {
 			Mode: mmv1beta.DatabaseReadinessCheckModeBuiltin,
 		})
 
-		container := getDBCheckInitContainer(mm, "secret", database.PostgreSQLDatabase, true)
+		container := getDBCheckInitContainer(mm, &ExternalDBConfig{secretName: "secret", dbType: database.PostgreSQLDatabase, hasSeparateDatasourceKey: true, connectionStringKey: "DB_CONNECTION_STRING"})
 		require.NotNil(t, container)
 
 		datasourceEnv := findEnvVar(container.Env, "MM_SQLSETTINGS_DATASOURCE")
@@ -349,13 +349,37 @@ func TestGetDBCheckInitContainer_BuiltinMode(t *testing.T) {
 		assert.Equal(t, "MM_SQLSETTINGS_DATASOURCE", datasourceEnv.ValueFrom.SecretKeyRef.Key)
 	})
 
+	t.Run("builtin mode honors custom connection string key", func(t *testing.T) {
+		mm := makeMattermost(&mmv1beta.DatabaseReadinessCheck{
+			Mode: mmv1beta.DatabaseReadinessCheckModeBuiltin,
+		})
+
+		container := getDBCheckInitContainer(mm, &ExternalDBConfig{secretName: "secret", dbType: database.PostgreSQLDatabase, connectionStringKey: "uri"})
+		require.NotNil(t, container)
+
+		// MM_CONFIG must source from the custom key, not the hardcoded default.
+		mmConfigEnv := findEnvVar(container.Env, "MM_CONFIG")
+		require.NotNil(t, mmConfigEnv)
+		require.NotNil(t, mmConfigEnv.ValueFrom)
+		require.NotNil(t, mmConfigEnv.ValueFrom.SecretKeyRef)
+		assert.Equal(t, "uri", mmConfigEnv.ValueFrom.SecretKeyRef.Key)
+
+		// Without a separate datasource key, MM_SQLSETTINGS_DATASOURCE falls
+		// back to the same custom key (mirrors ExternalDBConfig.EnvVars).
+		datasourceEnv := findEnvVar(container.Env, "MM_SQLSETTINGS_DATASOURCE")
+		require.NotNil(t, datasourceEnv)
+		require.NotNil(t, datasourceEnv.ValueFrom)
+		require.NotNil(t, datasourceEnv.ValueFrom.SecretKeyRef)
+		assert.Equal(t, "uri", datasourceEnv.ValueFrom.SecretKeyRef.Key)
+	})
+
 	t.Run("builtin mode honors custom timeout", func(t *testing.T) {
 		mm := makeMattermost(&mmv1beta.DatabaseReadinessCheck{
 			Mode:    mmv1beta.DatabaseReadinessCheckModeBuiltin,
 			Timeout: &metav1.Duration{Duration: 10 * time.Minute},
 		})
 
-		container := getDBCheckInitContainer(mm, "secret", database.PostgreSQLDatabase, false)
+		container := getDBCheckInitContainer(mm, &ExternalDBConfig{secretName: "secret", dbType: database.PostgreSQLDatabase, connectionStringKey: "DB_CONNECTION_STRING"})
 		require.NotNil(t, container)
 
 		assert.Contains(t, container.Args, "--timeout=10m0s")
@@ -366,7 +390,7 @@ func TestGetDBCheckInitContainer_BuiltinMode(t *testing.T) {
 			Mode: mmv1beta.DatabaseReadinessCheckModeBuiltin,
 		})
 
-		container := getDBCheckInitContainer(mm, "secret", database.MySQLDatabase, false)
+		container := getDBCheckInitContainer(mm, &ExternalDBConfig{secretName: "secret", dbType: database.MySQLDatabase, connectionStringKey: "DB_CONNECTION_STRING"})
 		require.NotNil(t, container)
 
 		// builtin mode is dbType-agnostic: it always uses the Mattermost image,
@@ -383,7 +407,7 @@ func TestGetDBCheckInitContainer_BuiltinMode(t *testing.T) {
 		})
 		mm.Spec.ImagePullPolicy = corev1.PullAlways
 
-		container := getDBCheckInitContainer(mm, "secret", database.PostgreSQLDatabase, false)
+		container := getDBCheckInitContainer(mm, &ExternalDBConfig{secretName: "secret", dbType: database.PostgreSQLDatabase, connectionStringKey: "DB_CONNECTION_STRING"})
 		require.NotNil(t, container)
 
 		assert.Equal(t, corev1.PullAlways, container.ImagePullPolicy)
@@ -395,7 +419,7 @@ func TestGetDBCheckInitContainer_BuiltinMode(t *testing.T) {
 		})
 		mm.Spec.Version = "sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
 
-		container := getDBCheckInitContainer(mm, "secret", database.PostgreSQLDatabase, false)
+		container := getDBCheckInitContainer(mm, &ExternalDBConfig{secretName: "secret", dbType: database.PostgreSQLDatabase, connectionStringKey: "DB_CONNECTION_STRING"})
 		require.NotNil(t, container)
 
 		assert.Equal(
@@ -410,7 +434,7 @@ func TestGetDBCheckInitContainer_BuiltinMode(t *testing.T) {
 			Mode: mmv1beta.DatabaseReadinessCheckModeExternal,
 		})
 
-		container := getDBCheckInitContainer(mm, "secret", database.PostgreSQLDatabase, false)
+		container := getDBCheckInitContainer(mm, &ExternalDBConfig{secretName: "secret", dbType: database.PostgreSQLDatabase, connectionStringKey: "DB_CONNECTION_STRING"})
 		require.NotNil(t, container)
 		assert.Equal(t, "postgres:13", container.Image)
 	})
@@ -418,7 +442,7 @@ func TestGetDBCheckInitContainer_BuiltinMode(t *testing.T) {
 	t.Run("empty readiness check mode falls back to external", func(t *testing.T) {
 		mm := makeMattermost(&mmv1beta.DatabaseReadinessCheck{Mode: ""})
 
-		container := getDBCheckInitContainer(mm, "secret", database.PostgreSQLDatabase, false)
+		container := getDBCheckInitContainer(mm, &ExternalDBConfig{secretName: "secret", dbType: database.PostgreSQLDatabase, connectionStringKey: "DB_CONNECTION_STRING"})
 		require.NotNil(t, container)
 		assert.Equal(t, "postgres:13", container.Image)
 	})
@@ -426,7 +450,7 @@ func TestGetDBCheckInitContainer_BuiltinMode(t *testing.T) {
 	t.Run("nil readiness check falls back to external", func(t *testing.T) {
 		mm := makeMattermost(nil)
 
-		container := getDBCheckInitContainer(mm, "secret", database.PostgreSQLDatabase, false)
+		container := getDBCheckInitContainer(mm, &ExternalDBConfig{secretName: "secret", dbType: database.PostgreSQLDatabase, connectionStringKey: "DB_CONNECTION_STRING"})
 		require.NotNil(t, container)
 		assert.Equal(t, "postgres:13", container.Image)
 	})
@@ -555,3 +579,103 @@ func findEnvVar(envs []corev1.EnvVar, name string) *corev1.EnvVar {
 	}
 	return nil
 }
+
+func TestExternalDBConfig_ConnectionStringKey(t *testing.T) {
+	t.Run("custom key is honored for both MM_CONFIG and MM_SQLSETTINGS_DATASOURCE fallback", func(t *testing.T) {
+		mattermost := &mmv1beta.Mattermost{
+			ObjectMeta: metav1.ObjectMeta{Name: "mm-test"},
+			Spec: mmv1beta.MattermostSpec{
+				Database: mmv1beta.Database{
+					External: &mmv1beta.ExternalDatabase{
+						Secret:              "cnpg-secret",
+						ConnectionStringKey: "uri",
+					},
+				},
+			},
+		}
+		secret := corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: "cnpg-secret"},
+			Data: map[string][]byte{
+				"uri": []byte("postgresql://app:pass@host:5432/app"),
+			},
+		}
+
+		config, err := NewExternalDBConfig(mattermost, secret)
+		require.NoError(t, err)
+		assert.Equal(t, "postgres", config.dbType, "postgresql:// prefix should resolve to postgres type")
+		assert.Equal(t, "uri", config.connectionStringKey)
+
+		envs := config.EnvVars(mattermost)
+		mmConfig := findEnvVar(envs, "MM_CONFIG")
+		require.NotNil(t, mmConfig)
+		assert.Equal(t, "uri", mmConfig.ValueFrom.SecretKeyRef.Key)
+
+		datasource := findEnvVar(envs, "MM_SQLSETTINGS_DATASOURCE")
+		require.NotNil(t, datasource)
+		assert.Equal(t, "uri", datasource.ValueFrom.SecretKeyRef.Key,
+			"when no separate MM_SQLSETTINGS_DATASOURCE is in secret, should fall back to the custom connection string key")
+	})
+
+	t.Run("error message references the configured key", func(t *testing.T) {
+		mattermost := &mmv1beta.Mattermost{
+			ObjectMeta: metav1.ObjectMeta{Name: "mm-test"},
+			Spec: mmv1beta.MattermostSpec{
+				Database: mmv1beta.Database{
+					External: &mmv1beta.ExternalDatabase{
+						Secret:              "secret",
+						ConnectionStringKey: "uri",
+					},
+				},
+			},
+		}
+		secret := corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: "secret"},
+			Data: map[string][]byte{
+				"DB_CONNECTION_STRING": []byte("postgres://my-postgres"),
+			},
+		}
+		_, err := NewExternalDBConfig(mattermost, secret)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), `"uri"`)
+	})
+
+	t.Run("default behavior unchanged when key not set", func(t *testing.T) {
+		mattermost := &mmv1beta.Mattermost{
+			ObjectMeta: metav1.ObjectMeta{Name: "mm-test"},
+			Spec: mmv1beta.MattermostSpec{
+				Database: mmv1beta.Database{
+					External: &mmv1beta.ExternalDatabase{Secret: "secret"},
+				},
+			},
+		}
+		secret := corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Name: "secret"},
+			Data: map[string][]byte{
+				"DB_CONNECTION_STRING": []byte("postgres://my-postgres"),
+			},
+		}
+
+		config, err := NewExternalDBConfig(mattermost, secret)
+		require.NoError(t, err)
+		assert.Equal(t, DefaultExternalDBConnectionStringKey, config.connectionStringKey)
+
+		envs := config.EnvVars(mattermost)
+		mmConfig := findEnvVar(envs, "MM_CONFIG")
+		require.NotNil(t, mmConfig)
+		assert.Equal(t, "DB_CONNECTION_STRING", mmConfig.ValueFrom.SecretKeyRef.Key)
+	})
+}
+
+func TestValidateDBCheckURL_PostgreSQLScheme(t *testing.T) {
+	t.Run("postgresql:// scheme is accepted for postgres db type", func(t *testing.T) {
+		assert.NoError(t,
+			validateDBCheckURL("postgresql://user:pass@my-db:5432/mydb", database.PostgreSQLDatabase),
+			"postgresql:// scheme should be treated equivalently to postgres://")
+	})
+
+	t.Run("postgresql:// scheme is accepted for unknown db type", func(t *testing.T) {
+		assert.NoError(t,
+			validateDBCheckURL("postgresql://user:pass@my-db:5432/mydb", "unknown"))
+	})
+}
+

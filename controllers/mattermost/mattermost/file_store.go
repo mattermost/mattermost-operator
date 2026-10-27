@@ -227,6 +227,10 @@ func (r *MattermostReconciler) checkMinioInstance(mattermost *mmv1beta.Mattermos
 		return err
 	}
 
+	// Keep the image of an existing instance. Moving it to a newer MinIO
+	// release can make the server unable to read its existing data.
+	desired.Spec.Image = current.Spec.Image
+
 	// Note:
 	// For some reason, our current minio operator seems to remove labels on
 	// the instance resource when we add them. For that reason, trying to
