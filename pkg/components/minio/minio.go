@@ -16,6 +16,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// DefaultMinioImage is the MinIO server image set on newly created MinIO
+// instances. The minio-operator default, minio/minio on Docker Hub, can no
+// longer be pulled.
+const DefaultMinioImage = "cgr.dev/chainguard/minio@sha256:bd014394a80898e68c149f2311fdf8d5a2c2f3bb2c33b9327ae6d02b4b065ae1"
+
 // Instance returns the Minio component to deploy
 func Instance(mattermost *mattermostv1alpha1.ClusterInstallation) *minioOperator.MinIOInstance {
 	minioName := fmt.Sprintf("%s-minio", mattermost.Name)
@@ -97,6 +102,7 @@ func newMinioInstance(
 			OwnerReferences: ownerRefs,
 		},
 		Spec: minioOperator.MinIOInstanceSpec{
+			Image:       DefaultMinioImage,
 			Replicas:    replicas,
 			Mountpath:   "/export",
 			CredsSecret: &corev1.LocalObjectReference{Name: name},

@@ -12,6 +12,7 @@ import (
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 
 	blubr "github.com/mattermost/blubr"
+	mattermostMinio "github.com/mattermost/mattermost-operator/pkg/components/minio"
 	"github.com/mattermost/mattermost-operator/pkg/components/utils"
 	operatortest "github.com/mattermost/mattermost-operator/test"
 	"github.com/stretchr/testify/assert"
@@ -124,6 +125,27 @@ func TestReconcile(t *testing.T) {
 			minio := &minioOperator.MinIOInstance{}
 			err = c.Get(context.TODO(), mmMinioKey, minio)
 			require.NoError(t, err)
+			assert.Equal(t, mattermostMinio.DefaultMinioImage, minio.Spec.Image)
+		})
+		t.Run("existing instance keeps its image", func(t *testing.T) {
+			minio := &minioOperator.MinIOInstance{}
+			err = c.Get(context.TODO(), mmMinioKey, minio)
+			require.NoError(t, err)
+			minio.Spec.Image = "minio/minio:RELEASE.2020-01-03T19-12-21Z"
+			err = c.Update(context.TODO(), minio)
+			require.NoError(t, err)
+
+			fetched := &mmv1beta.Mattermost{}
+			err = c.Get(context.TODO(), mmKey, fetched)
+			require.NoError(t, err)
+			err = fetched.SetDefaults()
+			require.NoError(t, err)
+			err = r.checkMinioInstance(fetched, logger)
+			require.NoError(t, err)
+
+			err = c.Get(context.TODO(), mmMinioKey, minio)
+			require.NoError(t, err)
+			assert.Equal(t, "minio/minio:RELEASE.2020-01-03T19-12-21Z", minio.Spec.Image)
 		})
 	})
 

@@ -9,6 +9,9 @@ import (
 
 // SetDefaults sets the missing values in Database to the default ones.
 func (db *Database) SetDefaults() {
+	if db.IsUnmanaged() {
+		return
+	}
 	if db.IsExternal() {
 		return
 	}
@@ -20,6 +23,11 @@ func (db *Database) SetDefaults() {
 // IsExternal returns true if the Database is set to external.
 func (db *Database) IsExternal() bool {
 	return db.External != nil && db.External.Secret != ""
+}
+
+// IsUnmanaged returns true if the operator should not manage the database at all.
+func (db *Database) IsUnmanaged() bool {
+	return db != nil && db.Unmanaged
 }
 
 func (db *Database) ensureDefault() {
@@ -42,7 +50,7 @@ func (omd *OperatorManagedDatabase) SetDefaults() {
 }
 
 func (db *Database) SetDefaultReplicasAndResources() {
-	if db.IsExternal() {
+	if db.IsUnmanaged() || db.IsExternal() {
 		return
 	}
 	db.ensureDefault()
@@ -59,7 +67,7 @@ func (omd *OperatorManagedDatabase) SetDefaultReplicasAndResources() {
 }
 
 func (db *Database) OverrideReplicasAndResourcesFromSize(size mattermostv1alpha1.ClusterInstallationSize) {
-	if db.IsExternal() {
+	if db.IsUnmanaged() || db.IsExternal() {
 		return
 	}
 	db.ensureDefault()
