@@ -48,8 +48,10 @@ const (
 	// including useServiceLoadBalancer, where the app Service drops port 8067.
 	metricsServiceLabel = "mattermost.com/scrape-metrics"
 
-	// defaultRtcdMetricsPort is the rtcd metrics port (Calls real-time daemon).
-	defaultRtcdMetricsPort = "8045"
+	// defaultRtcdServicePort is the Service port name used when callsMetrics.port
+	// is empty. A named port is matched against the Service. A numeric targetPort
+	// is matched against a declared Pod container port, which rtcd Pods often omit.
+	defaultRtcdServicePort = metricsPortName
 
 	// defaultDashboardDiscoveryLabel/Value is what the Grafana dashboard sidecar
 	// selects on by default (kiwigrid/k8s-sidecar convention).
@@ -206,10 +208,11 @@ func GenerateRtcdServiceMonitorV1Beta(mattermost *mmv1beta.Mattermost) *monitori
 		Path:     metricsPath,
 		Interval: monitoringv1.Duration(interval),
 	}
-	// Accept either a numeric port (targetPort) or a named Service port.
+	// A name selects the Service port. A number selects the Pod container port,
+	// which Prometheus Operator ignores unless the container declares it.
 	port := cm.Port
 	if port == "" {
-		port = defaultRtcdMetricsPort
+		port = defaultRtcdServicePort
 	}
 	if n, err := strconv.Atoi(port); err == nil {
 		tp := intstr.FromInt(n)
@@ -386,9 +389,13 @@ func rulePlaceholders(mattermost *mmv1beta.Mattermost) map[string]string {
 		// label matches are fully anchored, so "<name>-[^-]+-[^-]+" matches only
 		// this instance's pods — not a differently-named install that happens to
 		// share this name as a prefix (e.g. "mm" must not match "mm-test").
-		// QuoteMeta the name: Mattermost names may contain dots, which are regex
-		// metacharacters ("test.mm" must not match "testXmm-...").
-		rulePlaceholderPodSelector: regexp.QuoteMeta(mattermost.Name) + "-[^-]+-[^-]+",
+		// QuoteMeta escapes regex metacharacters ("test.mm" must not match
+		// "testXmm-..."). The rules embed this inside a PromQL double-quoted
+		// string in a YAML literal block, so backslashes are not unescaped by
+		// YAML. PromQL still treats `\.` as an illegal escape. Two backslashes
+		// survive into the expression, and PromQL reduces them to one for the
+		// regex engine.
+		rulePlaceholderPodSelector: strings.ReplaceAll(regexp.QuoteMeta(mattermost.Name), `\`, `\\`) + "-[^-]+-[^-]+",
 	}
 }
 
