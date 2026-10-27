@@ -29,7 +29,7 @@
       "collapsed": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "hwSeAIRSk"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "h": 1,
@@ -43,7 +43,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "hwSeAIRSk"
+            "uid": "${datasource}"
           },
           "refId": "A"
         }
@@ -441,7 +441,7 @@
       "collapsed": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "hwSeAIRSk"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "h": 1,
@@ -455,7 +455,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "hwSeAIRSk"
+            "uid": "${datasource}"
           },
           "refId": "A"
         }
@@ -2102,7 +2102,7 @@
       "collapsed": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "hwSeAIRSk"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "h": 1,
@@ -2116,7 +2116,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "hwSeAIRSk"
+            "uid": "${datasource}"
           },
           "refId": "A"
         }
@@ -2435,7 +2435,7 @@
       "collapsed": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "hwSeAIRSk"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "h": 1,
@@ -2449,7 +2449,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "hwSeAIRSk"
+            "uid": "${datasource}"
           },
           "refId": "A"
         }
@@ -2566,7 +2566,7 @@
       "collapsed": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "hwSeAIRSk"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "h": 1,
@@ -2580,7 +2580,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "hwSeAIRSk"
+            "uid": "${datasource}"
           },
           "refId": "A"
         }

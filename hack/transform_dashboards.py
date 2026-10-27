@@ -29,7 +29,7 @@ from pathlib import Path
 
 # UIDs that point at a Prometheus datasource in the upstream exports. All are
 # collapsed onto one templated datasource variable.
-PROM_DS_TOKENS = ("${DS_PROMETHEUS}", "${DS_PROMETHEUS_PROD}", "${DS_MATTERMOST}")
+PROM_DS_TOKENS = ("${DS_PROMETHEUS}", "${DS_PROMETHEUS_PROD}", "${DS_MATTERMOST}", "hwSeAIRSk")
 # The Grafana built-in expression datasource has a fixed UID.
 EXPR_DS_TOKEN = "${DS_EXPRESSION}"
 EXPR_DS_UID = "__expr__"
