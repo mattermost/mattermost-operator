@@ -24,6 +24,10 @@ import (
 
 type reconcileStatus struct {
 	ResourcesReady bool
+	// MonitoringPendingCRDs is set when monitoring is enabled but the Prometheus
+	// Operator CRDs are not installed. The Mattermost workload still reconciles;
+	// the controller retries so the scrape objects appear once the CRDs do.
+	MonitoringPendingCRDs bool
 }
 
 func (r *MattermostReconciler) checkMattermost(
@@ -61,7 +65,25 @@ func (r *MattermostReconciler) checkMattermost(
 		}
 	}
 
-	return r.checkMattermostDeployment(mattermost, dbInfo, fsConfig, status, reqLogger)
+	recStatus, err := r.checkMattermostDeployment(mattermost, dbInfo, fsConfig, status, reqLogger)
+	if err != nil {
+		return recStatus, err
+	}
+
+	// Monitoring is an opt-in add-on, so reconcile it after the core workload: a
+	// recoverable monitoring error (e.g. a name collision) must not block the
+	// Mattermost Deployment from converging/upgrading. The error still surfaces on
+	// the result so the reconcile is requeued.
+	if err := r.checkMattermostMonitoring(mattermost, reqLogger); err != nil {
+		if errors.Is(err, resources.ErrPrometheusCRDAbsent) {
+			recStatus.MonitoringPendingCRDs = true
+			reqLogger.Info("Prometheus Operator CRDs are not installed; monitoring resources will be created on a later reconcile")
+		} else {
+			return recStatus, err
+		}
+	}
+
+	return recStatus, nil
 }
 
 func (r *MattermostReconciler) checkLicence(mattermost *mmv1beta.Mattermost) error {
