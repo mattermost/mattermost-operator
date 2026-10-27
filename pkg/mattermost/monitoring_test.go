@@ -99,9 +99,10 @@ func TestPrometheusRulePodSelectorEscapesDottedName(t *testing.T) {
 			exprs += rule.Expr.String() + "\n"
 		}
 	}
-	// The dot must be escaped so "test.mm" cannot match "testXmm-...".
-	assert.Contains(t, exprs, `pod=~"test\.mm-`)
-	assert.NotContains(t, exprs, `pod=~"test.mm-`)
+	// The stored expression must contain two backslashes. PromQL reduces `\\.`
+	// to a literal dot. A single backslash is an invalid PromQL escape.
+	assert.Contains(t, exprs, "pod=~\"test\\\\.mm-")
+	assert.NotContains(t, exprs, "pod=~\"test\\.mm-")
 }
 
 func TestGenerateMetricsServiceV1Beta(t *testing.T) {
@@ -140,7 +141,7 @@ func TestGenerateRtcdServiceMonitorV1Beta(t *testing.T) {
 		assert.Nil(t, GenerateRtcdServiceMonitorV1Beta(mm))
 	})
 
-	t.Run("numeric port becomes targetPort and defaults to 8045", func(t *testing.T) {
+	t.Run("empty port uses the Service port name metrics", func(t *testing.T) {
 		mm := newMattermostWithMonitoring(&mmv1beta.Monitoring{
 			CallsMetrics: &mmv1beta.CallsMetrics{
 				Enabled:             true,
@@ -153,9 +154,25 @@ func TestGenerateRtcdServiceMonitorV1Beta(t *testing.T) {
 		assert.Equal(t, "test-mm-rtcd", sm.Name)
 		assert.Equal(t, map[string]string{"app": "rtcd"}, sm.Spec.Selector.MatchLabels)
 		require.Len(t, sm.Spec.Endpoints, 1)
+		assert.Equal(t, metricsPortName, sm.Spec.Endpoints[0].Port)
+		assert.Nil(t, sm.Spec.Endpoints[0].TargetPort)
+		assert.Equal(t, metricsPath, sm.Spec.Endpoints[0].Path)
+	})
+
+	t.Run("numeric port becomes targetPort", func(t *testing.T) {
+		mm := newMattermostWithMonitoring(&mmv1beta.Monitoring{
+			CallsMetrics: &mmv1beta.CallsMetrics{
+				Enabled:             true,
+				RtcdServiceSelector: map[string]string{"app": "rtcd"},
+				Port:                "8045",
+			},
+		})
+
+		sm := GenerateRtcdServiceMonitorV1Beta(mm)
+		require.NotNil(t, sm)
 		require.NotNil(t, sm.Spec.Endpoints[0].TargetPort)
 		assert.Equal(t, int32(8045), sm.Spec.Endpoints[0].TargetPort.IntVal)
-		assert.Equal(t, metricsPath, sm.Spec.Endpoints[0].Path)
+		assert.Empty(t, sm.Spec.Endpoints[0].Port)
 	})
 
 	t.Run("named port becomes Port", func(t *testing.T) {

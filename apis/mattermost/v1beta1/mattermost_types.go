@@ -246,7 +246,8 @@ type CallsMetrics struct {
 	// +optional
 	RtcdServiceSelector map[string]string `json:"rtcdServiceSelector,omitempty"`
 
-	// Port is the rtcd metrics port name or number. Defaults to "8045" when empty.
+	// Port is the rtcd Service port name, or a Pod container port number.
+	// Defaults to "metrics". A number matches a declared container port only.
 	// +optional
 	Port string `json:"port,omitempty"`
 

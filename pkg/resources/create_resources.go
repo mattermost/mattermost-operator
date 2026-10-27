@@ -25,6 +25,11 @@ import (
 
 const lastAppliedConfig = "mattermost.com/last-applied"
 
+// ErrPrometheusCRDAbsent is returned when a monitoring resource cannot be
+// created because the Prometheus Operator CRDs are not installed. Installing
+// those CRDs does not reconcile the Mattermost object, so the caller retries.
+var ErrPrometheusCRDAbsent = errors.New("prometheus operator CRDs are not installed")
+
 var defaultAnnotator = objectMatcher.NewAnnotator(lastAppliedConfig)
 
 // Object combines the interfaces that all Kubernetes objects must implement.
@@ -129,9 +134,10 @@ func (r *ResourceHelper) CreateServiceIfNotExists(owner v1.Object, service *core
 }
 
 // CreateServiceMonitorIfNotExists creates a Prometheus Operator ServiceMonitor.
-// The Prometheus Operator CRDs are an optional cluster dependency: if they are
-// not installed the API has no matching kind, which we treat as a logged no-op
-// rather than an error so an opt-in monitoring flag never breaks reconciliation.
+// The Prometheus Operator CRDs are an optional cluster dependency. If they are
+// not installed the API has no matching kind and this returns
+// ErrPrometheusCRDAbsent so the caller can retry without failing the Mattermost
+// workload reconcile.
 func (r *ResourceHelper) CreateServiceMonitorIfNotExists(owner v1.Object, serviceMonitor *monitoringv1.ServiceMonitor, reqLogger logr.Logger) error {
 	foundServiceMonitor := &monitoringv1.ServiceMonitor{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: serviceMonitor.Name, Namespace: serviceMonitor.Namespace}, foundServiceMonitor)
@@ -140,8 +146,8 @@ func (r *ResourceHelper) CreateServiceMonitorIfNotExists(owner v1.Object, servic
 	}
 
 	if apimeta.IsNoMatchError(err) {
-		reqLogger.Info("Prometheus Operator CRDs not installed; skipping ServiceMonitor", "name", serviceMonitor.Name)
-		return nil
+		reqLogger.Info("Prometheus Operator CRDs not installed; will retry ServiceMonitor", "name", serviceMonitor.Name)
+		return ErrPrometheusCRDAbsent
 	}
 	if k8sErrors.IsNotFound(err) {
 		reqLogger.Info("Creating service monitor", "name", serviceMonitor.Name)
@@ -152,8 +158,8 @@ func (r *ResourceHelper) CreateServiceMonitorIfNotExists(owner v1.Object, servic
 }
 
 // CreatePrometheusRuleIfNotExists creates a Prometheus Operator PrometheusRule.
-// Like ServiceMonitor, the Prometheus Operator CRDs are an optional cluster
-// dependency: an absent kind is a logged no-op rather than an error.
+// Like ServiceMonitor, an absent Prometheus Operator CRD returns
+// ErrPrometheusCRDAbsent so the caller retries later.
 func (r *ResourceHelper) CreatePrometheusRuleIfNotExists(owner v1.Object, prometheusRule *monitoringv1.PrometheusRule, reqLogger logr.Logger) error {
 	foundPrometheusRule := &monitoringv1.PrometheusRule{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: prometheusRule.Name, Namespace: prometheusRule.Namespace}, foundPrometheusRule)
@@ -162,8 +168,8 @@ func (r *ResourceHelper) CreatePrometheusRuleIfNotExists(owner v1.Object, promet
 	}
 
 	if apimeta.IsNoMatchError(err) {
-		reqLogger.Info("Prometheus Operator CRDs not installed; skipping PrometheusRule", "name", prometheusRule.Name)
-		return nil
+		reqLogger.Info("Prometheus Operator CRDs not installed; will retry PrometheusRule", "name", prometheusRule.Name)
+		return ErrPrometheusCRDAbsent
 	}
 	if k8sErrors.IsNotFound(err) {
 		reqLogger.Info("Creating prometheus rule", "name", prometheusRule.Name)
