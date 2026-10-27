@@ -185,6 +185,14 @@ type Monitoring struct {
 	// +optional
 	PrometheusRule *PrometheusRule `json:"prometheusRule,omitempty"`
 
+	// MimirRules is the Prometheus-free alternative to PrometheusRule: it ships
+	// the same alerting rules as a plain ConfigMap in Prometheus rules format
+	// (`groups:`), for loading into a Grafana Mimir ruler (e.g. by mimirtool or a
+	// ruler-sync sidecar) instead of the Prometheus Operator. Use this when the
+	// cluster runs Grafana Alloy + Mimir rather than Prometheus.
+	// +optional
+	MimirRules *MimirRules `json:"mimirRules,omitempty"`
+
 	// ClientMetrics controls whether client/RUM and notification performance
 	// metrics are exported on the same /metrics endpoint. These already default
 	// to on in the Mattermost server; this flag makes the choice explicit and
@@ -217,6 +225,33 @@ type ServiceMonitor struct {
 	// serviceMonitorSelector can be made to match it.
 	// +optional
 	Labels map[string]string `json:"labels,omitempty"`
+}
+
+// MimirRules gates and configures the Mimir-ruler alerting ConfigMap.
+//
+// The rule content is identical to PrometheusRule (same per-instance, pod-scoped
+// expressions); only the delivery differs — a ConfigMap a Mimir ruler-sync picks
+// up, rather than a Prometheus Operator CRD. The ServiceMonitor, metrics Service,
+// and dashboards are unchanged and backend-neutral (Grafana Alloy scrapes the
+// ServiceMonitor and remote-writes to Mimir).
+type MimirRules struct {
+	// Enabled determines whether the Operator should create the rules ConfigMap.
+	Enabled bool `json:"enabled"`
+
+	// DiscoveryLabel is the label key a Mimir ruler-sync sidecar selects on.
+	// Defaults to "mimir_rules" when empty.
+	// +optional
+	DiscoveryLabel string `json:"discoveryLabel,omitempty"`
+
+	// DiscoveryLabelValue is the label value the ruler-sync matches.
+	// Defaults to "1" when empty.
+	// +optional
+	DiscoveryLabelValue string `json:"discoveryLabelValue,omitempty"`
+
+	// Tenant, when set, is written as an annotation so a multi-tenant Mimir
+	// ruler-sync can load the rules under the right tenant/org id.
+	// +optional
+	Tenant string `json:"tenant,omitempty"`
 }
 
 // ClientMetrics gates client/RUM and notification performance metrics.

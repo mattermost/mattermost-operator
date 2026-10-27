@@ -80,6 +80,25 @@ func TestGeneratorsNilMonitoring(t *testing.T) {
 	pr, err := GeneratePrometheusRuleV1Beta(mm)
 	require.NoError(t, err)
 	assert.Nil(t, pr)
+
+	cm, err := GenerateMimirRulesConfigMapV1Beta(mm)
+	require.NoError(t, err)
+	assert.Nil(t, cm)
+}
+
+func TestMimirRulesRejectsReservedDiscoveryLabel(t *testing.T) {
+	// A discovery label equal to the reserved marker key would be overwritten
+	// during label assembly, so the generator must reject it up front.
+	mm := newMattermostWithMonitoring(&mmv1beta.Monitoring{
+		MimirRules: &mmv1beta.MimirRules{
+			Enabled:        true,
+			DiscoveryLabel: mimirRulesConfigMapLabel,
+		},
+	})
+
+	cm, err := GenerateMimirRulesConfigMapV1Beta(mm)
+	require.Error(t, err)
+	assert.Nil(t, cm)
 }
 
 func TestPrometheusRulePodSelectorEscapesDottedName(t *testing.T) {
@@ -102,6 +121,53 @@ func TestPrometheusRulePodSelectorEscapesDottedName(t *testing.T) {
 	// The dot must be escaped so "test.mm" cannot match "testXmm-...".
 	assert.Contains(t, exprs, `pod=~"test\.mm-`)
 	assert.NotContains(t, exprs, `pod=~"test.mm-`)
+}
+
+func TestGenerateMimirRulesConfigMapV1Beta(t *testing.T) {
+	t.Run("renders pod-scoped rules as a ConfigMap with discovery + marker labels", func(t *testing.T) {
+		mm := newMattermostWithMonitoring(&mmv1beta.Monitoring{
+			MimirRules: &mmv1beta.MimirRules{Enabled: true},
+		})
+
+		cm, err := GenerateMimirRulesConfigMapV1Beta(mm)
+		require.NoError(t, err)
+		require.NotNil(t, cm)
+
+		assert.Equal(t, "test-mm-mimir-rules", cm.Name)
+		assert.Equal(t, "mattermost", cm.Namespace)
+		require.Len(t, cm.OwnerReferences, 1)
+		assert.Equal(t, defaultMimirRulesDiscoveryLabelValue, cm.Labels[defaultMimirRulesDiscoveryLabel])
+		assert.Equal(t, "test-mm", cm.Labels[mimirRulesConfigMapLabel])
+
+		// Data is Prometheus rules format, pod-scoped (placeholders substituted).
+		require.Len(t, cm.Data, 1)
+		rules := cm.Data["test-mm-rules.yaml"]
+		require.NotEmpty(t, rules)
+		assert.Contains(t, rules, "groups:")
+		assert.Contains(t, rules, "MattermostServerDown")
+		assert.Contains(t, rules, `service="test-mm-metrics"`)
+		assert.NotContains(t, rules, "__", "placeholder token left unsubstituted")
+	})
+
+	t.Run("honors custom discovery label and tenant annotation", func(t *testing.T) {
+		mm := newMattermostWithMonitoring(&mmv1beta.Monitoring{
+			MimirRules: &mmv1beta.MimirRules{
+				Enabled:             true,
+				DiscoveryLabel:      "loki_mimir_rules",
+				DiscoveryLabelValue: "yes",
+				Tenant:              "team-a",
+			},
+		})
+
+		cm, err := GenerateMimirRulesConfigMapV1Beta(mm)
+		require.NoError(t, err)
+		require.NotNil(t, cm)
+
+		assert.Equal(t, "yes", cm.Labels["loki_mimir_rules"])
+		_, hasDefault := cm.Labels[defaultMimirRulesDiscoveryLabel]
+		assert.False(t, hasDefault)
+		assert.Equal(t, "team-a", cm.Annotations[mimirTenantAnnotation])
+	})
 }
 
 func TestGenerateMetricsServiceV1Beta(t *testing.T) {
@@ -240,8 +306,6 @@ func TestGeneratePrometheusRuleV1Beta(t *testing.T) {
 				if rule.Alert == "MattermostServerDown" {
 					sawServerDown = true
 					assert.Contains(t, expr, `namespace="mattermost"`)
-					// Matches the dedicated metrics Service name (what the
-					// Prometheus Operator sets as the `service` target label).
 					assert.Contains(t, expr, `service="test-mm-metrics"`)
 				}
 			}

@@ -1,0 +1,46 @@
+# Prometheus-free monitoring: Grafana Alloy + Mimir (no Prometheus server).
+#
+# What differs from the Prometheus setup (docs/examples/mattermost_monitoring.yaml):
+#   - Alert rules ship as a ConfigMap for a Mimir ruler-sync (spec.monitoring.mimirRules)
+#     instead of a Prometheus Operator PrometheusRule CRD.
+#   - Everything else is IDENTICAL and backend-neutral: the ServiceMonitor and the
+#     dedicated metrics Service are consumed by Grafana Alloy (its
+#     prometheus.operator.servicemonitors component), which remote-writes to Mimir.
+#
+# Cluster prerequisites (on your side, not the operator's):
+#   - The Prometheus Operator CRDs installed (CRDs only — no Prometheus server) so
+#     Alloy can discover the ServiceMonitor.
+#   - Grafana Alloy scraping (incl. kube-state-metrics + cAdvisor, which the
+#     resource alerts — CPU/mem/crash-loop — depend on).
+#   - A Mimir ruler-sync (mimirtool job or a sidecar) that loads rules ConfigMaps
+#     labelled `mimir_rules: "1"` into Mimir.
+#   - An Enterprise license (spec.licenseSecret) for the /metrics endpoint.
+apiVersion: installation.mattermost.com/v1beta1
+kind: Mattermost
+metadata:
+  name: mm-example-mimir
+spec:
+  ingress:
+    enabled: true
+    host: mattermost.example.com
+  licenseSecret: mattermost-license
+
+  monitoring:
+    # Scraped by Grafana Alloy (not Prometheus) — same ServiceMonitor either way.
+    serviceMonitor:
+      enabled: true
+      interval: "30s"
+
+    # Prometheus-free rule delivery: a ConfigMap a Mimir ruler-sync loads.
+    mimirRules:
+      enabled: true
+      # discoveryLabel: mimir_rules       # what your ruler-sync selects on (default)
+      # discoveryLabelValue: "1"
+      tenant: mattermost                   # Mimir tenant/org id (optional annotation)
+
+    # Client/RUM + notification metrics ride the same /metrics endpoint.
+    clientMetrics:
+      enabled: true
+
+# Note: do NOT also enable prometheusRule here unless a PrometheusRule consumer
+# exists in the cluster — mimirRules is the Prometheus-free alternative.
