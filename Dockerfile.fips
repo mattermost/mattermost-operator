@@ -1,6 +1,6 @@
 # Build the mattermost operator (FIPS version)
-ARG BUILD_IMAGE=cgr.dev/mattermost.com/go-msft-fips:1.26.6@sha256:d23154c44bec0d0e83811287192ae29286afd2d583d611a2aa9e32993e5d01ae
-ARG BASE_IMAGE=cgr.dev/mattermost.com/glibc-openssl-fips:16.1.0@sha256:30d633a6b0a663763461a18da1f499a2c6a47f1c87c9d9d062753b8ef9e510b4
+ARG BUILD_IMAGE=cgr.dev/mattermost.com/go-openssl-fips:1.27.3.1@sha256:51de9973d748afc82fb0140b9ec65d576ed8840f70300e9ea24535919933773f
+ARG BASE_IMAGE=cgr.dev/mattermost.com/glibc-openssl-fips:16.2.0@sha256:55467e459871dbc200cb303491dd2524d06e5a13e0c098b6a4c49c1b96501b5d
 
 FROM ${BUILD_IMAGE} as builder
 
