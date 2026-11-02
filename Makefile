@@ -243,6 +243,7 @@ mysql-minio-operators: ## Deploys MinIO and MySQL Operators to the active cluste
 manifests: $(CONTROLLER_GEN) ## Runs CRD generator
 	echo "Generating CRDs"
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) paths="./apis/..." output:crd:artifacts:config=config/crd/bases
+	$(GO) run ./hack/trim-crd-descriptions config/crd/bases/*.yaml
 
 fmt: ## Run go fmt against code
 	go fmt ./...
