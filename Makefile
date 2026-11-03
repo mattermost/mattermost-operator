@@ -15,8 +15,8 @@ BUILD_IMAGE = golang:$(GOLANG_VERSION)
 BASE_IMAGE = gcr.io/distroless/static:nonroot
 
 ## FIPS Docker Build Versions
-BUILD_IMAGE_FIPS = cgr.dev/mattermost.com/go-msft-fips:1.26.6@sha256:d23154c44bec0d0e83811287192ae29286afd2d583d611a2aa9e32993e5d01ae
-BASE_IMAGE_FIPS = cgr.dev/mattermost.com/glibc-openssl-fips:16.1.0@sha256:30d633a6b0a663763461a18da1f499a2c6a47f1c87c9d9d062753b8ef9e510b4
+BUILD_IMAGE_FIPS = cgr.dev/mattermost.com/go-openssl-fips:1.27.3.1@sha256:51de9973d748afc82fb0140b9ec65d576ed8840f70300e9ea24535919933773f
+BASE_IMAGE_FIPS = cgr.dev/mattermost.com/glibc-openssl-fips:16.2.0@sha256:55467e459871dbc200cb303491dd2524d06e5a13e0c098b6a4c49c1b96501b5d
 
 ################################################################################
 
@@ -81,10 +81,10 @@ KIND_CONFIG_FILE ?= kind-config-amd64.yaml
 TOOLS_BIN_DIR := $(abspath bin)
 
 SHADOW_BIN := shadow
-SHADOW_VER := v0.33.0
+SHADOW_VER := v0.52.0
 SHADOW_GEN := $(TOOLS_BIN_DIR)/$(SHADOW_BIN)
 
-OPENAPI_VER := release-1.22
+OPENAPI_VER := $(shell go list -m -f '{{.Version}}' k8s.io/kube-openapi)
 OPENAPI_BIN := openapi-gen
 OPENAPI_GEN := $(TOOLS_BIN_DIR)/$(OPENAPI_BIN)
 
@@ -100,11 +100,11 @@ YQ_VER := master
 YQ_BIN := yq
 YQ_GEN := $(TOOLS_BIN_DIR)/$(YQ_BIN)
 
-CONTROLLER_GEN_VER := v0.16.5
+CONTROLLER_GEN_VER := v0.23.0
 CONTROLLER_GEN_BIN := controller-gen
 CONTROLLER_GEN := $(TOOLS_BIN_DIR)/$(CONTROLLER_GEN_BIN)
 
-KUSTOMIZE_VER := v4.5.7
+KUSTOMIZE_VER := v5.8.3
 KUSTOMIZE_BIN := kustomize
 KUSTOMIZE := $(TOOLS_BIN_DIR)/$(KUSTOMIZE_BIN)
 
@@ -150,7 +150,15 @@ push-image: ## Push the docker image using base docker (for local development)
 _build-fips-internal: ## Internal FIPS build target (used by Dockerfile.fips and build-fips)
 	@echo "Building Mattermost-operator (FIPS)"
 	@mkdir -p build/_output/bin
-	GO111MODULE=on GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) CGO_ENABLED=1 $(GO) build -tags=requirefips $(GOFLAGS) -gcflags all=-trimpath=$(GOPATH) -asmflags all=-trimpath=$(GOPATH) -a -o build/_output/bin/mattermost-operator $(GO_LINKER_FLAGS) ./main.go
+	GO111MODULE=on GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) CGO_ENABLED=1 GOFIPS140=certified $(GO) build -tags=requirefips $(GOFLAGS) -gcflags all=-trimpath=$(GOPATH) -asmflags all=-trimpath=$(GOPATH) -a -o build/_output/bin/mattermost-operator $(GO_LINKER_FLAGS) ./main.go
+	$(MAKE) _verify-fips FIPS_BIN=build/_output/bin/mattermost-operator
+
+# Each check is its own recipe line so that any failing check fails the build.
+_verify-fips: ## Internal check that a binary uses the certified FIPS module and OpenSSL
+	$(GO) version -m $(FIPS_BIN) | grep -qxE "[[:space:]]*build[[:space:]]+GOFIPS140=$$(cat "$$($(GO) env GOROOT)/lib/fips140/certified.txt")" || (echo "ERROR: not built against the certified GOFIPS140 module" && exit 1)
+	$(GO) version -m $(FIPS_BIN) | grep -E "build[[:space:]]+DefaultGODEBUG=" | grep -qE "(^|[=,])fips140=on(,|$$)" || (echo "ERROR: missing DefaultGODEBUG fips140=on" && exit 1)
+	$(GO) tool nm $(FIPS_BIN) | grep -qE "func_go_openssl_OpenSSL_version|_mkcgo_OpenSSL_version" || (echo "ERROR: missing OpenSSL integration" && exit 1)
+	@echo "FIPS verification passed"
 
 .PHONY: build-fips
 build-fips: ## Build the mattermost-operator with FIPS-compliant settings using containerized build
@@ -161,7 +169,6 @@ build-fips: ## Build the mattermost-operator with FIPS-compliant settings using 
 		-e TARGET_ARCH=$(TARGET_ARCH) \
 		-e CGO_ENABLED=1 \
 		-e GOFIPS=1 \
-		-e GOEXPERIMENT=systemcrypto \
 		-e HOST_UID=$(shell id -u) \
 		-e HOST_GID=$(shell id -g) \
 		$(BUILD_IMAGE_FIPS) \
@@ -243,6 +250,7 @@ mysql-minio-operators: ## Deploys MinIO and MySQL Operators to the active cluste
 manifests: $(CONTROLLER_GEN) ## Runs CRD generator
 	echo "Generating CRDs"
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) paths="./apis/..." output:crd:artifacts:config=config/crd/bases
+	$(GO) run ./hack/trim-crd-descriptions config/crd/bases/*.yaml
 
 fmt: ## Run go fmt against code
 	go fmt ./...
@@ -262,14 +270,14 @@ generate: $(OPENAPI_GEN) $(CONTROLLER_GEN) ## Runs the kubernetes code-generator
 	## Grant permissions to execute generation script
 	chmod +x scripts/k8s.io/code-generator/generate-groups.sh
 
-	GOROOT=$(GOROOT) $(OPENAPI_GEN) --logtostderr=true -o "" -i ./apis/mattermost/v1alpha1 -O zz_generated.openapi -p ./apis/mattermost/v1alpha1 -h ./hack/boilerplate.go.txt -r "-"
+	GOROOT=$(GOROOT) $(OPENAPI_GEN) --logtostderr=true --output-dir ./apis/mattermost/v1alpha1 --output-pkg github.com/mattermost/mattermost-operator/apis/mattermost/v1alpha1 --output-file zz_generated.openapi.go --go-header-file ./hack/boilerplate.go.txt -r "-" ./apis/mattermost/v1alpha1
 
 	## Do not generate deepcopy as it is handled by controller-gen
 	scripts/k8s.io/code-generator/generate-groups.sh client github.com/mattermost/mattermost-operator/pkg/client github.com/mattermost/mattermost-operator/apis "mattermost:v1alpha1" --go-header-file ./hack/boilerplate.go.txt
 	scripts/k8s.io/code-generator/generate-groups.sh lister github.com/mattermost/mattermost-operator/pkg/client github.com/mattermost/mattermost-operator/apis "mattermost:v1alpha1" --go-header-file ./hack/boilerplate.go.txt
 	scripts/k8s.io/code-generator/generate-groups.sh informer github.com/mattermost/mattermost-operator/pkg/client github.com/mattermost/mattermost-operator/apis "mattermost:v1alpha1" --go-header-file ./hack/boilerplate.go.txt
 
-	GOROOT=$(GOROOT) $(OPENAPI_GEN) --logtostderr=true -o "" -i ./apis/mattermost/v1beta1 -O zz_generated.openapi -p ./apis/mattermost/v1beta1 -h ./hack/boilerplate.go.txt -r "-"
+	GOROOT=$(GOROOT) $(OPENAPI_GEN) --logtostderr=true --output-dir ./apis/mattermost/v1beta1 --output-pkg github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1 --output-file zz_generated.openapi.go --go-header-file ./hack/boilerplate.go.txt -r "-" ./apis/mattermost/v1beta1
 
 	scripts/k8s.io/code-generator/generate-groups.sh client github.com/mattermost/mattermost-operator/pkg/client/v1beta1 github.com/mattermost/mattermost-operator/apis "mattermost:v1beta1" --go-header-file ./hack/boilerplate.go.txt
 	scripts/k8s.io/code-generator/generate-groups.sh lister github.com/mattermost/mattermost-operator/pkg/client/v1beta1 github.com/mattermost/mattermost-operator/apis "mattermost:v1beta1" --go-header-file ./hack/boilerplate.go.txt
@@ -320,7 +328,7 @@ $(CONTROLLER_GEN): ## Build controller-gen
 	GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) sigs.k8s.io/controller-tools/cmd/controller-gen $(CONTROLLER_GEN_BIN) $(CONTROLLER_GEN_VER)
 
 $(KUSTOMIZE): ## Build kustomize
-	GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) sigs.k8s.io/kustomize/kustomize/v4 $(KUSTOMIZE_BIN) $(KUSTOMIZE_VER)
+	GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) sigs.k8s.io/kustomize/kustomize/v5 $(KUSTOMIZE_BIN) $(KUSTOMIZE_VER)
 
 
 .PHONY: check-modules
