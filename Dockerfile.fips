@@ -16,7 +16,6 @@ COPY LICENSE /workspace/licenses
 # Build with FIPS-compliant settings
 ENV CGO_ENABLED=1
 ENV GOFIPS=1
-ENV GOEXPERIMENT=systemcrypto
 RUN make _build-fips-internal TARGET_OS=$TARGETOS TARGET_ARCH=$TARGETARCH
 
 FROM ${BASE_IMAGE}

@@ -151,6 +151,14 @@ _build-fips-internal: ## Internal FIPS build target (used by Dockerfile.fips and
 	@echo "Building Mattermost-operator (FIPS)"
 	@mkdir -p build/_output/bin
 	GO111MODULE=on GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) CGO_ENABLED=1 GOFIPS140=certified $(GO) build -tags=requirefips $(GOFLAGS) -gcflags all=-trimpath=$(GOPATH) -asmflags all=-trimpath=$(GOPATH) -a -o build/_output/bin/mattermost-operator $(GO_LINKER_FLAGS) ./main.go
+	$(MAKE) _verify-fips FIPS_BIN=build/_output/bin/mattermost-operator
+
+# Each check is its own recipe line so that any failing check fails the build.
+_verify-fips: ## Internal check that a binary uses the certified FIPS module and OpenSSL
+	$(GO) version -m $(FIPS_BIN) | grep -qxE "[[:space:]]*build[[:space:]]+GOFIPS140=$$(cat "$$($(GO) env GOROOT)/lib/fips140/certified.txt")" || (echo "ERROR: not built against the certified GOFIPS140 module" && exit 1)
+	$(GO) version -m $(FIPS_BIN) | grep -E "build[[:space:]]+DefaultGODEBUG=" | grep -qE "(^|[=,])fips140=on(,|$$)" || (echo "ERROR: missing DefaultGODEBUG fips140=on" && exit 1)
+	$(GO) tool nm $(FIPS_BIN) | grep -qE "func_go_openssl_OpenSSL_version|_mkcgo_OpenSSL_version" || (echo "ERROR: missing OpenSSL integration" && exit 1)
+	@echo "FIPS verification passed"
 
 .PHONY: build-fips
 build-fips: ## Build the mattermost-operator with FIPS-compliant settings using containerized build
@@ -161,7 +169,6 @@ build-fips: ## Build the mattermost-operator with FIPS-compliant settings using 
 		-e TARGET_ARCH=$(TARGET_ARCH) \
 		-e CGO_ENABLED=1 \
 		-e GOFIPS=1 \
-		-e GOEXPERIMENT=systemcrypto \
 		-e HOST_UID=$(shell id -u) \
 		-e HOST_GID=$(shell id -g) \
 		$(BUILD_IMAGE_FIPS) \
