@@ -4,7 +4,7 @@ go 1.26.6
 
 require (
 	github.com/banzaicloud/k8s-objectmatcher v1.8.0
-	github.com/evanphx/json-patch v5.6.0+incompatible
+	github.com/evanphx/json-patch/v5 v5.9.11
 	github.com/go-logr/logr v1.4.3
 	github.com/mattermost/blubr v0.1.0
 	github.com/mattn/goveralls v0.0.12
@@ -31,7 +31,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
-	github.com/evanphx/json-patch/v5 v5.9.11 // indirect
+	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
 	github.com/fatih/color v1.9.0 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
