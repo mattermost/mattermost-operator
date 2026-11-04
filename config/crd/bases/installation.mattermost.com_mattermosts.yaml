@@ -765,6 +765,61 @@ spec:
                           Labels are added to the PrometheusRule so the cluster's Prometheus
                           ruleSelector can be made to match it.
                         type: object
+                      thresholds:
+                        description: Thresholds overrides the size-sensitive numbers
+                          in the shipped rules.
+                        properties:
+                          cpuLimitPercent:
+                            description: |-
+                              CPULimitPercent is the percent of the mattermost container CPU limit that
+                              MattermostHighCPU compares against. Default 85.
+                            maximum: 100
+                            minimum: 0
+                            type: integer
+                          dbReplicaLagSeconds:
+                            description: |-
+                              DBReplicaLagSeconds is how many seconds of read-replica lag
+                              MattermostDBReplicaLag tolerates. Default 5. A writer-only database has
+                              no lag series, so this number does not apply there.
+                            minimum: 0
+                            type: integer
+                          httpErrorPercent:
+                            description: |-
+                              HTTPErrorPercent is the percent of HTTP requests that must be errors
+                              before MattermostHighHTTPErrorRate fires. Default 5.
+                            maximum: 100
+                            minimum: 0
+                            type: integer
+                          httpMinRequestsPerSecond:
+                            description: |-
+                              HTTPMinRequestsPerSecond is the request-rate floor for
+                              MattermostHighHTTPErrorRate. The error ratio is ignored below this rate,
+                              so one failed request on a quiet server does not page. Default 1.
+                              Set 0 to page on any positive request rate once the error percent is exceeded.
+                            minimum: 0
+                            type: integer
+                          loginFailurePercent:
+                            description: |-
+                              LoginFailurePercent is failed logins as a percent of failed plus successful
+                              logins. MattermostLoginFailureSpike also requires LoginMinFailures.
+                              Default 50.
+                            maximum: 100
+                            minimum: 0
+                            type: integer
+                          loginMinFailures:
+                            description: |-
+                              LoginMinFailures is how many failed logins must occur in 15 minutes
+                              before MattermostLoginFailureSpike can fire. Default 20.
+                            minimum: 0
+                            type: integer
+                          memoryLimitPercent:
+                            description: |-
+                              MemoryLimitPercent is the percent of the mattermost container memory limit
+                              that MattermostHighMemory compares against. Default 90.
+                            maximum: 100
+                            minimum: 0
+                            type: integer
+                        type: object
                     required:
                     - enabled
                     type: object

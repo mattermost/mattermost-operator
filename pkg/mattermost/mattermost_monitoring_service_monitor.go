@@ -1,28 +1,18 @@
 package mattermost
 
 import (
-	"embed"
-	"path"
-	"regexp"
-	"sort"
 	"strconv"
-	"strings"
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	sigsyaml "sigs.k8s.io/yaml"
 
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
 )
 
-// prometheusRuleFS embeds the Prometheus alerting/recording rules shipped with
-// the Operator. Drop additional *.yaml files (each a `groups:` document) into
-// the prometheusrules/ directory and their groups are merged automatically.
-//
-//go:embed prometheusrules/*.yaml
-var prometheusRuleFS embed.FS
+// ServiceMonitor generation. The metrics Service this scrapes is created here
+// too; there is no YAML template for either object.
 
 const (
 	// metricsPortName matches the Mattermost Service port exposing /metrics (8067).
@@ -44,19 +34,6 @@ const (
 	// is empty. A named port is matched against the Service. A numeric targetPort
 	// is matched against a declared Pod container port, which rtcd Pods often omit.
 	defaultRtcdServicePort = metricsPortName
-)
-
-// Rule placeholder tokens. Because the Operator generates the PrometheusRule per
-// Mattermost CR, we substitute these in the embedded rules so alert expressions
-// scope to this instance's pods by name/label — never by static IP/CIDR.
-const (
-	rulePlaceholderNamespace = "__NAMESPACE__"
-	// rulePlaceholderService matches the metrics Service (== CR name), used to
-	// scope the ServiceMonitor-labelled series (up, mattermost_*).
-	rulePlaceholderService = "__SERVICE__"
-	// rulePlaceholderPodSelector is a regex matching this instance's pods, used to
-	// scope kube-state-metrics / cAdvisor series that carry a `pod` label.
-	rulePlaceholderPodSelector = "__POD_SELECTOR__"
 )
 
 // GenerateMetricsServiceV1Beta builds a dedicated, internal (headless ClusterIP)
@@ -217,108 +194,4 @@ func GenerateRtcdServiceMonitorV1Beta(mattermost *mmv1beta.Mattermost) *monitori
 			Endpoints: []monitoringv1.Endpoint{endpoint},
 		},
 	}
-}
-
-// GeneratePrometheusRuleV1Beta builds a Prometheus Operator PrometheusRule from
-// the embedded alerting/recording rules. It is created in the Mattermost
-// namespace; the cluster's Prometheus reaches in to load it via its ruleSelector
-// (Prometheus -> Mattermost). Rule expressions are scoped to this instance's
-// pods via placeholder substitution — see rulePlaceholders.
-func GeneratePrometheusRuleV1Beta(mattermost *mmv1beta.Mattermost) (*monitoringv1.PrometheusRule, error) {
-	if mattermost.Spec.Monitoring == nil {
-		return nil, nil
-	}
-
-	groups, err := loadEmbeddedPrometheusRuleGroups(rulePlaceholders(mattermost))
-	if err != nil {
-		return nil, err
-	}
-
-	labels := mattermost.MattermostLabels(mattermost.Name)
-	if pr := mattermost.Spec.Monitoring.PrometheusRule; pr != nil {
-		// Extra labels let the operator's PrometheusRule match a customer's
-		// Prometheus ruleSelector.
-		for k, v := range pr.Labels {
-			labels[k] = v
-		}
-	}
-
-	return &monitoringv1.PrometheusRule{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            mattermost.Name + "-rules",
-			Namespace:       mattermost.Namespace,
-			Labels:          labels,
-			OwnerReferences: MattermostOwnerReference(mattermost),
-		},
-		Spec: monitoringv1.PrometheusRuleSpec{
-			Groups: groups,
-		},
-	}, nil
-}
-
-// rulePlaceholders maps the embedded-rule tokens to this instance's identity so
-// the shipped alerts fire only for this Mattermost's pods, not every workload in
-// the cluster. The pod selector is the Deployment's pod-name prefix ("<name>-.*").
-func rulePlaceholders(mattermost *mmv1beta.Mattermost) map[string]string {
-	return map[string]string{
-		rulePlaceholderNamespace: mattermost.Namespace,
-		// The ServiceMonitor scrapes the dedicated <name>-metrics Service, so the
-		// Prometheus Operator sets the `service` target label to that Service name.
-		rulePlaceholderService: metricsServiceName(mattermost.Name),
-		// Deployment pods are "<name>-<replicaset-hash>-<pod-suffix>". Prometheus
-		// label matches are fully anchored, so "<name>-[^-]+-[^-]+" matches only
-		// this instance's pods — not a differently-named install that happens to
-		// share this name as a prefix (e.g. "mm" must not match "mm-test").
-		// QuoteMeta escapes regex metacharacters ("test.mm" must not match
-		// "testXmm-..."). The rules embed this inside a PromQL double-quoted
-		// string in a YAML literal block, so backslashes are not unescaped by
-		// YAML. PromQL still treats `\.` as an illegal escape. Two backslashes
-		// survive into the expression, and PromQL reduces them to one for the
-		// regex engine.
-		rulePlaceholderPodSelector: strings.ReplaceAll(regexp.QuoteMeta(mattermost.Name), `\`, `\\`) + "-[^-]+-[^-]+",
-	}
-}
-
-// loadEmbeddedPrometheusRuleGroups reads and merges the rule groups from every
-// embedded rules file (deterministic order for stable diffs), substituting the
-// per-instance placeholders before parsing.
-func loadEmbeddedPrometheusRuleGroups(replacements map[string]string) ([]monitoringv1.RuleGroup, error) {
-	entries, err := prometheusRuleFS.ReadDir("prometheusrules")
-	if err != nil {
-		return nil, err
-	}
-
-	names := make([]string, 0, len(entries))
-	for _, e := range entries {
-		if !e.IsDir() {
-			names = append(names, e.Name())
-		}
-	}
-	sort.Strings(names)
-
-	replacer := newPlaceholderReplacer(replacements)
-
-	var groups []monitoringv1.RuleGroup
-	for _, name := range names {
-		content, readErr := prometheusRuleFS.ReadFile(path.Join("prometheusrules", name))
-		if readErr != nil {
-			return nil, readErr
-		}
-
-		var spec monitoringv1.PrometheusRuleSpec
-		if unmarshalErr := sigsyaml.Unmarshal([]byte(replacer.Replace(string(content))), &spec); unmarshalErr != nil {
-			return nil, unmarshalErr
-		}
-		groups = append(groups, spec.Groups...)
-	}
-	return groups, nil
-}
-
-// newPlaceholderReplacer builds a strings.Replacer from the token->value map.
-func newPlaceholderReplacer(replacements map[string]string) *strings.Replacer {
-	pairs := make([]string, 0, len(replacements)*2)
-	for k, v := range replacements {
-		pairs = append(pairs, k, v)
-	}
-	return strings.NewReplacer(pairs...)
 }

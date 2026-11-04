@@ -38,6 +38,15 @@ spec:
       enabled: true
       labels:
         release: kube-prometheus-stack
+      # Optional. Unset fields keep the defaults shown here. Ratios are percents.
+      # thresholds:
+      #   httpErrorPercent: 5
+      #   httpMinRequestsPerSecond: 1   # ignore the error percent below this rate
+      #   loginFailurePercent: 50       # failed / (failed + successful)
+      #   loginMinFailures: 20          # failures required in 15 minutes
+      #   cpuLimitPercent: 85
+      #   memoryLimitPercent: 90
+      #   dbReplicaLagSeconds: 5
 
     # Client/RUM + notification performance metrics ride the same /metrics
     # endpoint and default to on in the server. Set enabled: false to opt out.

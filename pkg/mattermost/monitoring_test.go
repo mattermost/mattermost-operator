@@ -254,11 +254,11 @@ func TestGeneratePrometheusRuleV1Beta(t *testing.T) {
 			for _, rule := range g.Rules {
 				expr := rule.Expr.String()
 				assert.NotContains(t, expr, "__", "placeholder token left unsubstituted: %s", expr)
+				assert.NotContains(t, rule.Annotations["summary"], "__")
+				assert.NotContains(t, rule.Annotations["description"], "__")
 				if rule.Alert == "MattermostServerDown" {
 					sawServerDown = true
 					assert.Contains(t, expr, `namespace="mattermost"`)
-					// Matches the dedicated metrics Service name (what the
-					// Prometheus Operator sets as the `service` target label).
 					assert.Contains(t, expr, `service="test-mm-metrics"`)
 				}
 			}
@@ -279,5 +279,46 @@ func TestGeneratePrometheusRuleV1Beta(t *testing.T) {
 		require.NotNil(t, pr)
 
 		assert.Equal(t, "alert-rules", pr.Labels["role"])
+	})
+
+	t.Run("thresholds replace the shipped defaults", func(t *testing.T) {
+		httpPercent := 20
+		httpMinRPS := 4
+		loginPercent := 80
+		loginMin := 100
+		cpu := 70
+		memory := 95
+		lag := 30
+		mm := newMattermostWithMonitoring(&mmv1beta.Monitoring{
+			PrometheusRule: &mmv1beta.PrometheusRule{
+				Enabled: true,
+				Thresholds: &mmv1beta.PrometheusRuleThresholds{
+					HTTPErrorPercent:         &httpPercent,
+					HTTPMinRequestsPerSecond: &httpMinRPS,
+					LoginFailurePercent:      &loginPercent,
+					LoginMinFailures:         &loginMin,
+					CPULimitPercent:          &cpu,
+					MemoryLimitPercent:       &memory,
+					DBReplicaLagSeconds:      &lag,
+				},
+			},
+		})
+
+		pr, err := GeneratePrometheusRuleV1Beta(mm)
+		require.NoError(t, err)
+
+		saw := map[string]string{}
+		for _, g := range pr.Spec.Groups {
+			for _, rule := range g.Rules {
+				saw[rule.Alert] = rule.Expr.String()
+			}
+		}
+		assert.Contains(t, saw["MattermostHighHTTPErrorRate"], "> 0.2")
+		assert.Contains(t, saw["MattermostHighHTTPErrorRate"], "> 4")
+		assert.Contains(t, saw["MattermostLoginFailureSpike"], "> 0.8")
+		assert.Contains(t, saw["MattermostLoginFailureSpike"], "> 100")
+		assert.Contains(t, saw["MattermostHighCPU"], "> 0.7")
+		assert.Contains(t, saw["MattermostHighMemory"], "> 0.95")
+		assert.Contains(t, saw["MattermostDBReplicaLag"], "> 30")
 	})
 }

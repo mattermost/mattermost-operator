@@ -1,0 +1,237 @@
+# Mattermost alerting rules, scoped to this installation's pods.
+#
+# Loaded by both deliveries. There is no separate Mimir template.
+#   - PrometheusRule: pkg/mattermost/mattermost_monitoring_prometheus_rules.go
+#   - Mimir ConfigMap: pkg/mattermost/mattermost_monitoring_mimir_rules.go
+#
+# The Operator substitutes __NAMESPACE__, __SERVICE__ and __POD_SELECTOR__ per
+# Mattermost CR, so every alert here targets this instance by namespace /
+# Service / pod-name — never a static IP or CIDR.
+#
+# Series sources:
+#   - up, mattermost_*   : scraped from the Mattermost /metrics endpoint via the
+#                          ServiceMonitor (carry namespace/service/pod labels).
+#   - kube_*, container_*: kube-state-metrics + cAdvisor (carry namespace/pod).
+#
+# NOTE: the /metrics endpoint is Enterprise-licensed — the `up`/mattermost_*
+# alerts only evaluate when a valid license is installed. Thresholds are a
+# conservative starting point and usually want per-environment tuning.
+groups:
+  - name: mattermost.availability
+    rules:
+      - alert: MattermostServerDown
+        # Metrics target unscrapable for 5m (server down, or metrics disabled /
+        # unlicensed so /metrics on 8067 is not served).
+        # NOTE: `up == 0` only fires while the target still exists. If every pod
+        # is gone there is no `up` series, so this cannot detect a full outage on
+        # its own — pair it with MattermostPodCrashLooping / a kube_deployment
+        # replica alert for that case. We intentionally avoid `absent(up{...})`
+        # here because it would fire permanently in rule-only configurations that
+        # do not enable the ServiceMonitor.
+        expr: up{namespace="__NAMESPACE__", service="__SERVICE__"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Mattermost {{ $labels.namespace }}/{{ $labels.service }} is down"
+          description: "The Mattermost metrics endpoint has been unreachable for more than 5 minutes."
+
+      - alert: MattermostPodCrashLooping
+        # More than 3 container restarts in 5m for this instance's pods.
+        expr: |
+          sum by (namespace, pod) (
+            rate(kube_pod_container_status_restarts_total{namespace="__NAMESPACE__", pod=~"__POD_SELECTOR__"}[5m])
+          ) * 300 > 3
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Mattermost pod {{ $labels.namespace }}/{{ $labels.pod }} is crash-looping"
+          description: "Pod {{ $labels.pod }} has restarted more than 3 times in the last 5 minutes."
+
+  - name: mattermost.resources
+    rules:
+      - alert: MattermostHighCPU
+        # CPU of the mattermost container > 85% of its limit. A zero or absent
+        # limit is dropped (`> 0`) so the division does not become +Inf.
+        # MattermostCPULimitMissing covers the install that set no limit.
+        expr: |
+          sum by (namespace, pod) (
+            rate(container_cpu_usage_seconds_total{namespace="__NAMESPACE__", pod=~"__POD_SELECTOR__", container="mattermost"}[5m])
+          )
+          /
+          sum by (namespace, pod) (
+            kube_pod_container_resource_limits{namespace="__NAMESPACE__", pod=~"__POD_SELECTOR__", container="mattermost", resource="cpu"} > 0
+          ) > __CPU_LIMIT_RATIO__
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Mattermost pod {{ $labels.namespace }}/{{ $labels.pod }} CPU > __CPU_LIMIT_PERCENT__% of limit"
+          description: "The mattermost container in pod {{ $labels.pod }} has used more than __CPU_LIMIT_PERCENT__% of its CPU limit for 10 minutes."
+
+      - alert: MattermostCPULimitMissing
+        # The percentage alert above is empty when the container has no CPU
+        # limit. kube-state-metrics omits the series entirely in that case.
+        expr: |
+          count by (namespace, pod) (
+            rate(container_cpu_usage_seconds_total{namespace="__NAMESPACE__", pod=~"__POD_SELECTOR__", container="mattermost"}[5m])
+          )
+          unless
+          count by (namespace, pod) (
+            kube_pod_container_resource_limits{namespace="__NAMESPACE__", pod=~"__POD_SELECTOR__", container="mattermost", resource="cpu"} > 0
+          )
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Mattermost pod {{ $labels.namespace }}/{{ $labels.pod }} has no CPU limit"
+          description: "Pod {{ $labels.pod }} is running the mattermost container without a CPU limit, so MattermostHighCPU cannot fire."
+
+      - alert: MattermostHighMemory
+        # Working set of the mattermost container > 90% of its limit.
+        expr: |
+          sum by (namespace, pod) (
+            container_memory_working_set_bytes{namespace="__NAMESPACE__", pod=~"__POD_SELECTOR__", container="mattermost"}
+          )
+          /
+          sum by (namespace, pod) (
+            kube_pod_container_resource_limits{namespace="__NAMESPACE__", pod=~"__POD_SELECTOR__", container="mattermost", resource="memory"} > 0
+          ) > __MEMORY_LIMIT_RATIO__
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Mattermost pod {{ $labels.namespace }}/{{ $labels.pod }} memory > __MEMORY_LIMIT_PERCENT__% of limit"
+          description: "The mattermost container in pod {{ $labels.pod }} has used more than __MEMORY_LIMIT_PERCENT__% of its memory limit for 10 minutes."
+
+      - alert: MattermostMemoryLimitMissing
+        expr: |
+          count by (namespace, pod) (
+            container_memory_working_set_bytes{namespace="__NAMESPACE__", pod=~"__POD_SELECTOR__", container="mattermost"}
+          )
+          unless
+          count by (namespace, pod) (
+            kube_pod_container_resource_limits{namespace="__NAMESPACE__", pod=~"__POD_SELECTOR__", container="mattermost", resource="memory"} > 0
+          )
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Mattermost pod {{ $labels.namespace }}/{{ $labels.pod }} has no memory limit"
+          description: "Pod {{ $labels.pod }} is running the mattermost container without a memory limit, so MattermostHighMemory cannot fire."
+
+  - name: mattermost.application
+    rules:
+      - alert: MattermostDBReplicaLag
+        # Read-replica lag over 5s for 5m (mattermost_db_replica_lag_time is seconds).
+        # No series when SqlSettings has no replica lag query, so a writer-only
+        # database (RDS, Azure Postgres, or a single in-cluster primary) does not fire.
+        expr: max by (namespace, service) (mattermost_db_replica_lag_time{namespace="__NAMESPACE__", service="__SERVICE__"}) > __DB_REPLICA_LAG_SECONDS__
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Mattermost {{ $labels.namespace }}/{{ $labels.service }} DB replica lag > __DB_REPLICA_LAG_SECONDS__s"
+          description: "A Mattermost read replica has been lagging more than __DB_REPLICA_LAG_SECONDS__ seconds for 5 minutes."
+
+      - alert: MattermostDBWriterPoolEmpty
+        # Open connections in the Go pool pointed at SqlSettings.DataSource.
+        # That writer is RDS, Azure Postgres, or an in-cluster primary; a missing
+        # reader does not change this gauge. Default ConnMaxIdleTime is 5m, so
+        # a quiet process can sit at 0 until the next query. 10m is past that
+        # idle timeout: a live server (jobs, websockets) should have opened one.
+        expr: |
+          mattermost_db_master_connections_total{namespace="__NAMESPACE__", service="__SERVICE__"} == 0
+          and on (namespace, pod)
+          up{namespace="__NAMESPACE__", service="__SERVICE__"} == 1
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Mattermost {{ $labels.namespace }}/{{ $labels.pod }} has no connections to its database writer"
+          description: "The process is up but its database pool to the configured writer has been empty for 10 minutes."
+
+      - alert: MattermostHighHTTPErrorRate
+        # More than 5% of HTTP requests erroring, and more than 1 request/s.
+        # The floor stops one error out of one request from paging.
+        expr: |
+          (
+            sum by (namespace, service) (rate(mattermost_http_errors_total{namespace="__NAMESPACE__", service="__SERVICE__"}[5m]))
+            /
+            sum by (namespace, service) (rate(mattermost_http_requests_total{namespace="__NAMESPACE__", service="__SERVICE__"}[5m]))
+          ) > __HTTP_ERROR_RATIO__
+          and
+          sum by (namespace, service) (rate(mattermost_http_requests_total{namespace="__NAMESPACE__", service="__SERVICE__"}[5m])) > __HTTP_MIN_RPS__
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Mattermost {{ $labels.namespace }}/{{ $labels.service }} HTTP error rate > __HTTP_ERROR_PERCENT__%"
+          description: "More than __HTTP_ERROR_PERCENT__% of Mattermost HTTP requests have been erroring for 5 minutes, above __HTTP_MIN_RPS__ requests/s."
+
+      - alert: MattermostLoginFailureSpike
+        # Failed logins / (failed + successful). logins_total counts successes only.
+        # Half of attempts failing, and at least 20 failures in 15m: a slow
+        # password spray pages, a large server with a partial IdP blip does not.
+        expr: |
+          (
+            sum by (namespace, service) (rate(mattermost_login_logins_fail_total{namespace="__NAMESPACE__", service="__SERVICE__"}[15m]))
+            /
+            sum by (namespace, service) (
+              rate(mattermost_login_logins_fail_total{namespace="__NAMESPACE__", service="__SERVICE__"}[15m])
+              +
+              rate(mattermost_login_logins_total{namespace="__NAMESPACE__", service="__SERVICE__"}[15m])
+            )
+          ) > __LOGIN_FAILURE_RATIO__
+          and
+          sum by (namespace, service) (increase(mattermost_login_logins_fail_total{namespace="__NAMESPACE__", service="__SERVICE__"}[15m])) > __LOGIN_MIN_FAILURES__
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Mattermost {{ $labels.namespace }}/{{ $labels.service }} login failures are most attempts"
+          description: "More than __LOGIN_FAILURE_PERCENT__% of login attempts have failed for 10 minutes, with at least __LOGIN_MIN_FAILURES__ failures in 15 minutes."
+
+      - alert: MattermostSearchDown
+        # 1 when Elasticsearch is healthy or not configured, 0 only when it is
+        # configured and unhealthy. A search-less install does not fire.
+        expr: mattermost_search_engine_status{namespace="__NAMESPACE__", service="__SERVICE__"} == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Mattermost {{ $labels.namespace }}/{{ $labels.service }} search engine is down"
+          description: "Elasticsearch is enabled and has been unhealthy for 5 minutes."
+
+      - alert: MattermostClusterUnhealthy
+        # Cluster.HealthScore: 0 is healthy, higher means the node is missing the
+        # gossip timing budget (memberlist awareness). A single-node process has
+        # no cluster and the gauge stays 0, so this does not fire there.
+        expr: mattermost_cluster_cluster_health_score{namespace="__NAMESPACE__", service="__SERVICE__"} > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Mattermost {{ $labels.namespace }}/{{ $labels.pod }} cluster health score is elevated"
+          description: "The gossip health score has been above 0 for 10 minutes. Zero is healthy."
+
+      - alert: MattermostLogsDropped
+        # The process is shedding or stalling log records. A one-off drop does
+        # not hold for 5m.
+        expr: |
+          sum by (namespace, service) (rate(mattermost_logging_logger_dropped_total{namespace="__NAMESPACE__", service="__SERVICE__"}[5m])) > 0
+          or
+          sum by (namespace, service) (rate(mattermost_logging_logger_blocked_total{namespace="__NAMESPACE__", service="__SERVICE__"}[5m])) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Mattermost {{ $labels.namespace }}/{{ $labels.service }} is dropping or blocking logs"
+          description: "Log records have been dropped or blocked for 5 minutes. Later failures may have no log line."
+
+      # No job-failure alert. The server exports mattermost_jobs_active only
+      # (incremented when a job starts, decremented when it finishes). It does
+      # not export a jobs error counter. mattermost_autotranslation_recovery_stuck_found_total
+      # is the translation sweeper, not the job system. jobs_active > 0 pages a
+      # healthy reindex, so it is left off this pack.

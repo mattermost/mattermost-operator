@@ -260,9 +260,9 @@ type CallsMetrics struct {
 
 // PrometheusRule gates and configures the Prometheus Operator PrometheusRule.
 //
-// The shipped rules are an opt-in starting point — alert thresholds encode
-// opinions that often need per-environment tuning, so they default off and the
-// bundled rule set is intentionally conservative.
+// The shipped rules are an opt-in starting point. Thresholds that depend on
+// install size default to values for a real installation and can be overridden
+// here. Leave a field unset to keep that default.
 type PrometheusRule struct {
 	// Enabled determines whether the Operator should create the PrometheusRule.
 	Enabled bool `json:"enabled"`
@@ -271,6 +271,71 @@ type PrometheusRule struct {
 	// ruleSelector can be made to match it.
 	// +optional
 	Labels map[string]string `json:"labels,omitempty"`
+
+	// Thresholds overrides the size-sensitive numbers in the shipped rules.
+	// +optional
+	Thresholds *PrometheusRuleThresholds `json:"thresholds,omitempty"`
+}
+
+// PrometheusRuleThresholds are the numbers in the shipped alerts that change
+// with install size. Unset fields keep the default written in the comment.
+// Ratios are percents because CRDs do not accept floating-point values.
+// prometheusRule and mimirRules each have their own copy, because a Mimir
+// install does not set prometheusRule.
+//
+// Alerts that are on/off signals are not here: search down, cluster health
+// score above zero, a missing CPU or memory limit, an empty writer pool, and
+// dropped logs. Those do not have a useful per-install number.
+type PrometheusRuleThresholds struct {
+	// HTTPErrorPercent is the percent of HTTP requests that must be errors
+	// before MattermostHighHTTPErrorRate fires. Default 5.
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=100
+	// +optional
+	HTTPErrorPercent *int `json:"httpErrorPercent,omitempty"`
+
+	// HTTPMinRequestsPerSecond is the request-rate floor for
+	// MattermostHighHTTPErrorRate. The error ratio is ignored below this rate,
+	// so one failed request on a quiet server does not page. Default 1.
+	// Set 0 to page on any positive request rate once the error percent is exceeded.
+	// +kubebuilder:validation:Minimum=0
+	// +optional
+	HTTPMinRequestsPerSecond *int `json:"httpMinRequestsPerSecond,omitempty"`
+
+	// LoginFailurePercent is failed logins as a percent of failed plus successful
+	// logins. MattermostLoginFailureSpike also requires LoginMinFailures.
+	// Default 50.
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=100
+	// +optional
+	LoginFailurePercent *int `json:"loginFailurePercent,omitempty"`
+
+	// LoginMinFailures is how many failed logins must occur in 15 minutes
+	// before MattermostLoginFailureSpike can fire. Default 20.
+	// +kubebuilder:validation:Minimum=0
+	// +optional
+	LoginMinFailures *int `json:"loginMinFailures,omitempty"`
+
+	// CPULimitPercent is the percent of the mattermost container CPU limit that
+	// MattermostHighCPU compares against. Default 85.
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=100
+	// +optional
+	CPULimitPercent *int `json:"cpuLimitPercent,omitempty"`
+
+	// MemoryLimitPercent is the percent of the mattermost container memory limit
+	// that MattermostHighMemory compares against. Default 90.
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=100
+	// +optional
+	MemoryLimitPercent *int `json:"memoryLimitPercent,omitempty"`
+
+	// DBReplicaLagSeconds is how many seconds of read-replica lag
+	// MattermostDBReplicaLag tolerates. Default 5. A writer-only database has
+	// no lag series, so this number does not apply there.
+	// +kubebuilder:validation:Minimum=0
+	// +optional
+	DBReplicaLagSeconds *int `json:"dbReplicaLagSeconds,omitempty"`
 }
 
 // TODO:
