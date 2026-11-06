@@ -66,6 +66,7 @@ rules:
     resources:
       - ingresses
       - ingressclasses
+      - networkpolicies
     verbs:
       - '*'
   - apiGroups:

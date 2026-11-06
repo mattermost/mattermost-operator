@@ -9,6 +9,8 @@
 Package v1beta1 contains API Schema definitions for the mattermost v1beta1 API group
 
 ### Resource Types
+- [Agent](#agent)
+- [AgentList](#agentlist)
 - [Mattermost](#mattermost)
 - [MattermostList](#mattermostlist)
 
@@ -33,6 +35,137 @@ _Appears in:_
 | `hosts` _[IngressHost](#ingresshost) array_ | Hosts allows specifying additional domain names for Mattermost to use. |  | Optional: \{\} <br /> |
 | `ingressClassName` _string_ | IngressClassName for your ingress |  | Optional: \{\} <br /> |
 | `annotations` _object (keys:string, values:string)_ | Annotations defines annotations passed to the Ingress associated with Mattermost. |  | Optional: \{\} <br /> |
+
+
+#### Agent
+
+
+
+Agent is the Schema for the agents API
+
+
+
+_Appears in:_
+- [AgentList](#agentlist)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `apiVersion` _string_ | `installation.mattermost.com/v1beta1` | | |
+| `kind` _string_ | `Agent` | | |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
+| `spec` _[AgentSpec](#agentspec)_ |  |  |  |
+
+
+#### AgentEgressPolicy
+
+_Underlying type:_ _string_
+
+AgentEgressPolicy controls outbound network access from an agent pod.
+
+
+
+_Appears in:_
+- [AgentSpec](#agentspec)
+
+| Field | Description |
+| --- | --- |
+| `deny` |  |
+| `allowWeb` |  |
+| `allow` |  |
+
+
+#### AgentList
+
+
+
+AgentList contains a list of Agent
+
+
+
+
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `apiVersion` _string_ | `installation.mattermost.com/v1beta1` | | |
+| `kind` _string_ | `AgentList` | | |
+| `metadata` _[ListMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#listmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
+| `items` _[Agent](#agent) array_ |  |  |  |
+
+
+#### AgentMattermostRef
+
+
+
+AgentMattermostRef references a Mattermost CR by name.
+
+
+
+_Appears in:_
+- [AgentSpec](#agentspec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `name` _string_ | Name of the Mattermost CR in the same namespace. |  | MinLength: 1 <br /> |
+
+
+#### AgentSpec
+
+
+
+AgentSpec defines the desired state of Agent
+
+
+
+_Appears in:_
+- [Agent](#agent)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `mattermostRef` _[AgentMattermostRef](#agentmattermostref)_ | MattermostRef is a reference to the Mattermost CR in the same namespace<br />that this agent is associated with. |  |  |
+| `image` _string_ | Image defines the agent container image. |  | MinLength: 1 <br /> |
+| `hooks` _string array_ | Hooks lists the Mattermost plugin hook names this agent subscribes to.<br />Example: ["MessageHasBeenPosted", "UserHasJoinedChannel"] |  | Optional: \{\} <br /> |
+| `resources` _[ResourceRequirements](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#resourcerequirements-v1-core)_ | Resources defines the CPU/memory requests and limits for the agent pod. |  | Optional: \{\} <br /> |
+| `egressPolicy` _[AgentEgressPolicy](#agentegresspolicy)_ | EgressPolicy controls outbound network access from the agent pod.<br />  - "deny" (default): only Mattermost server, DNS, and LiteLLM gateway<br />  - "allowWeb": additionally permits outbound TCP 80/443 to any destination (port-based; domain-level filtering is future work)<br />  - "allow": permits all outbound traffic | deny | Enum: [deny allowWeb allow] <br />Optional: \{\} <br /> |
+| `env` _[EnvVar](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#envvar-v1-core) array_ | Env defines optional environment variables to inject into the agent pod. |  | Optional: \{\} <br /> |
+| `llmGateway` _[LLMGatewayConfig](#llmgatewayconfig)_ | LLMGateway configures the LLM gateway for this agent.<br />When OperatorManaged is set, the agent uses the LiteLLM gateway managed<br />by the referenced Mattermost installation. When External is set, the<br />agent uses an existing LiteLLM instance. |  | Optional: \{\} <br /> |
+| `storage` _[AgentStorageConfig](#agentstorageconfig)_ | Storage configures optional persistent storage for the agent pod.<br />When set, the operator creates a PVC and mounts it into the agent container. |  | Optional: \{\} <br /> |
+
+
+
+
+#### AgentStorageConfig
+
+
+
+AgentStorageConfig defines optional persistent storage for the agent pod.
+
+
+
+_Appears in:_
+- [AgentSpec](#agentspec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `size` _[Quantity](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#quantity-resource-api)_ | Size is the requested PVC storage size (e.g., "1Gi", "500Mi"). |  |  |
+| `storageClassName` _string_ | StorageClassName is the name of the StorageClass to use for the PVC.<br />If omitted, the cluster default StorageClass is used. |  | Optional: \{\} <br /> |
+| `mountPath` _string_ | MountPath is the path inside the container where the volume is mounted.<br />Defaults to "/data". |  | Optional: \{\} <br /> |
+
+
+#### AgentsLLMGateway
+
+
+
+AgentsLLMGateway configures the operator-managed LiteLLM gateway deployment.
+
+
+
+_Appears in:_
+- [MattermostAgents](#mattermostagents)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `image` _string_ | Image is the LiteLLM container image to use.<br />Defaults to "ghcr.io/berriai/litellm-database:main-v1.82.0-stable". |  | Optional: \{\} <br /> |
+| `resources` _[ResourceRequirements](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#resourcerequirements-v1-core)_ | Resources defines the CPU/memory requests and limits for the LiteLLM pod.<br />Defaults to requests of 500m/512Mi and limits of 2/2Gi. |  | Optional: \{\} <br /> |
 
 
 #### Database
@@ -142,6 +275,23 @@ _Appears in:_
 | `useServiceAccount` _boolean_ | Optionally use service account with IAM role to access AWS services, like S3. |  |  |
 
 
+#### ExternalLLMGateway
+
+
+
+ExternalLLMGateway configures the agent to use an externally managed LiteLLM instance.
+
+
+
+_Appears in:_
+- [LLMGatewayConfig](#llmgatewayconfig)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `url` _string_ | URL is the base URL of the external LiteLLM instance.<br />It must be an absolute http:// or https:// URL: the agent NetworkPolicy<br />permits TCP egress to this URL's explicit port, or to port 443 for<br />HTTPS and port 80 for HTTP.<br />Example: "http://litellm.my-namespace.svc.cluster.local:4000" |  | MinLength: 1 <br /> |
+| `virtualKeySecret` _string_ | VirtualKeySecret is the name of the K8s Secret containing the virtual key<br />for this agent. The Secret must have a key "apiKey". |  | MinLength: 1 <br /> |
+
+
 #### ExternalVolumeFileStore
 
 
@@ -232,6 +382,23 @@ _Appears in:_
 | `dedicatedJobServer` _boolean_ | Determines whether to create a dedicated Mattermost server deployment<br />which is configured to run scheduled jobs. This deployment will receive<br />no user traffic and the primary Mattermost deployment will no longer be<br />configured to run jobs. |  | Optional: \{\} <br /> |
 
 
+#### LLMGatewayConfig
+
+
+
+LLMGatewayConfig defines how the agent connects to an LLM gateway.
+
+
+
+_Appears in:_
+- [AgentSpec](#agentspec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `external` _[ExternalLLMGateway](#externalllmgateway)_ | External configures the agent to use an existing LiteLLM instance. |  | Optional: \{\} <br /> |
+| `operatorManaged` _[OperatorManagedGateway](#operatormanagedgateway)_ | OperatorManaged opts this agent into the LiteLLM gateway of the<br />referenced Mattermost installation (spec.agents.llmGateway on the<br />Mattermost CR). The Mattermost agents plugin must create the Secret<br />named "agent-<name>-litellm-key" (key "apiKey") with this agent's<br />virtual key before the agent pod can start. |  | Optional: \{\} <br /> |
+
+
 #### LocalFileStore
 
 
@@ -267,6 +434,23 @@ _Appears in:_
 | `kind` _string_ | `Mattermost` | | |
 | `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.33/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
 | `spec` _[MattermostSpec](#mattermostspec)_ |  |  |  |
+
+
+#### MattermostAgents
+
+
+
+MattermostAgents configures Agent CR integration for this installation.
+
+
+
+_Appears in:_
+- [MattermostSpec](#mattermostspec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `enabled` _boolean_ | Enabled grants the Mattermost server ServiceAccount the RBAC required<br />to manage Agent CRs and their externally provisioned Secrets (bot<br />tokens, LiteLLM virtual keys). Required for the agents plugin to<br />provision remote agents. Defaults to false. |  | Optional: \{\} <br /> |
+| `llmGateway` _[AgentsLLMGateway](#agentsllmgateway)_ | LLMGateway causes the operator to deploy a LiteLLM gateway<br />(Deployment/Service) in the installation namespace, owned by this<br />Mattermost CR and shared by its agents. Requires a Secret named<br />"mm-agent-litellm-db-credentials" with key "connectionString"<br />containing a PostgreSQL DSN; the operator does not provision this<br />database. Only honored when Enabled is true. |  | Optional: \{\} <br /> |
 
 
 #### MattermostList
@@ -330,6 +514,7 @@ _Appears in:_
 | `updateJob` _[UpdateJob](#updatejob)_ | UpdateJob defines configuration for the template for the update job. |  | Optional: \{\} <br /> |
 | `jobServer` _[JobServer](#jobserver)_ | JobServer defines configuration for the Mattermost job server. |  | Optional: \{\} <br /> |
 | `podExtensions` _[PodExtensions](#podextensions)_ | PodExtensions specify custom extensions for Mattermost pods.<br />This can be used for custom readiness checks etc.<br />These settings generally don't need to be changed. |  | Optional: \{\} <br /> |
+| `agents` _[MattermostAgents](#mattermostagents)_ | Agents configures support for Mattermost AI agents managed by the<br />mattermost-operator Agent CRD. |  | Optional: \{\} <br /> |
 | `resourcePatch` _[ResourcePatch](#resourcepatch)_ | ResourcePatch specifies JSON patches that can be applied to resources created by Mattermost Operator.<br />WARNING: ResourcePatch is highly experimental and subject to change.<br />Some patches may be impossible to perform or may impact the stability of Mattermost server.<br />Use at your own risk when no other options are available. |  |  |
 
 
@@ -359,6 +544,22 @@ _Appears in:_
 | `backupSecretName` _string_ | Defines the secret to be used for uploading/restoring backup. |  | Optional: \{\} <br /> |
 | `backupRestoreSecretName` _string_ | Defines the secret to be used when performing a database restore. |  | Optional: \{\} <br /> |
 | `version` _string_ | Defines the cluster version for the database to use |  | Optional: \{\} <br /> |
+
+
+#### OperatorManagedGateway
+
+
+
+OperatorManagedGateway is an empty marker (the `emptyDir: {}` idiom) that
+opts an agent into the installation-level LiteLLM gateway. The gateway
+itself is configured and deployed via spec.agents.llmGateway on the
+referenced Mattermost CR.
+
+
+
+_Appears in:_
+- [LLMGatewayConfig](#llmgatewayconfig)
+
 
 
 #### OperatorManagedMinio
@@ -511,6 +712,7 @@ RunningState is the state of the Mattermost instance
 
 
 _Appears in:_
+- [AgentStatus](#agentstatus)
 - [MattermostStatus](#mattermoststatus)
 
 | Field | Description |

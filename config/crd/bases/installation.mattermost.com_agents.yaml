@@ -1,0 +1,384 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.16.5
+  name: agents.installation.mattermost.com
+spec:
+  group: installation.mattermost.com
+  names:
+    kind: Agent
+    listKind: AgentList
+    plural: agents
+    singular: agent
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - description: State of Agent
+      jsonPath: .status.state
+      name: State
+      type: string
+    - description: Image of Agent
+      jsonPath: .spec.image
+      name: Image
+      type: string
+    - description: HTTP Endpoint
+      jsonPath: .status.endpoint
+      name: Endpoint
+      type: string
+    name: v1beta1
+    schema:
+      openAPIV3Schema:
+        description: Agent is the Schema for the agents API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: AgentSpec defines the desired state of Agent
+            properties:
+              egressPolicy:
+                default: deny
+                description: |-
+                  EgressPolicy controls outbound network access from the agent pod.
+                    - "deny" (default): only Mattermost server, DNS, and LiteLLM gateway
+                    - "allowWeb": additionally permits outbound TCP 80/443 to any destination (port-based; domain-level filtering is future work)
+                    - "allow": permits all outbound traffic
+                enum:
+                - deny
+                - allowWeb
+                - allow
+                type: string
+              env:
+                description: Env defines optional environment variables to inject
+                  into the agent pod.
+                items:
+                  description: EnvVar represents an environment variable present in
+                    a Container.
+                  properties:
+                    name:
+                      description: Name of the environment variable. Must be a C_IDENTIFIER.
+                      type: string
+                    value:
+                      description: |-
+                        Variable references $(VAR_NAME) are expanded
+                        using the previously defined environment variables in the container and
+                        any service environment variables. If a variable cannot be resolved,
+                        the reference in the input string will be unchanged. Double $$ are reduced
+                        to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e.
+                        "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
+                        Escaped references will never be expanded, regardless of whether the variable
+                        exists or not.
+                        Defaults to "".
+                      type: string
+                    valueFrom:
+                      description: Source for the environment variable's value. Cannot
+                        be used if value is not empty.
+                      properties:
+                        configMapKeyRef:
+                          description: Selects a key of a ConfigMap.
+                          properties:
+                            key:
+                              description: The key to select.
+                              type: string
+                            name:
+                              default: ""
+                              description: |-
+                                Name of the referent.
+                                This field is effectively required, but due to backwards compatibility is
+                                allowed to be empty. Instances of this type with an empty value here are
+                                almost certainly wrong.
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                              type: string
+                            optional:
+                              description: Specify whether the ConfigMap or its key
+                                must be defined
+                              type: boolean
+                          required:
+                          - key
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        fieldRef:
+                          description: |-
+                            Selects a field of the pod: supports metadata.name, metadata.namespace, `metadata.labels['<KEY>']`, `metadata.annotations['<KEY>']`,
+                            spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs.
+                          properties:
+                            apiVersion:
+                              description: Version of the schema the FieldPath is
+                                written in terms of, defaults to "v1".
+                              type: string
+                            fieldPath:
+                              description: Path of the field to select in the specified
+                                API version.
+                              type: string
+                          required:
+                          - fieldPath
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        resourceFieldRef:
+                          description: |-
+                            Selects a resource of the container: only resources limits and requests
+                            (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported.
+                          properties:
+                            containerName:
+                              description: 'Container name: required for volumes,
+                                optional for env vars'
+                              type: string
+                            divisor:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              description: Specifies the output format of the exposed
+                                resources, defaults to "1"
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            resource:
+                              description: 'Required: resource to select'
+                              type: string
+                          required:
+                          - resource
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        secretKeyRef:
+                          description: Selects a key of a secret in the pod's namespace
+                          properties:
+                            key:
+                              description: The key of the secret to select from.  Must
+                                be a valid secret key.
+                              type: string
+                            name:
+                              default: ""
+                              description: |-
+                                Name of the referent.
+                                This field is effectively required, but due to backwards compatibility is
+                                allowed to be empty. Instances of this type with an empty value here are
+                                almost certainly wrong.
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                              type: string
+                            optional:
+                              description: Specify whether the Secret or its key must
+                                be defined
+                              type: boolean
+                          required:
+                          - key
+                          type: object
+                          x-kubernetes-map-type: atomic
+                      type: object
+                  required:
+                  - name
+                  type: object
+                type: array
+              hooks:
+                description: |-
+                  Hooks lists the Mattermost plugin hook names this agent subscribes to.
+                  Example: ["MessageHasBeenPosted", "UserHasJoinedChannel"]
+                items:
+                  type: string
+                type: array
+              image:
+                description: Image defines the agent container image.
+                minLength: 1
+                type: string
+              llmGateway:
+                description: |-
+                  LLMGateway configures the LLM gateway for this agent.
+                  When OperatorManaged is set, the agent uses the LiteLLM gateway managed
+                  by the referenced Mattermost installation. When External is set, the
+                  agent uses an existing LiteLLM instance.
+                properties:
+                  external:
+                    description: External configures the agent to use an existing
+                      LiteLLM instance.
+                    properties:
+                      url:
+                        description: |-
+                          URL is the base URL of the external LiteLLM instance.
+                          It must be an absolute http:// or https:// URL: the agent NetworkPolicy
+                          permits TCP egress to this URL's explicit port, or to port 443 for
+                          HTTPS and port 80 for HTTP.
+                          Example: "http://litellm.my-namespace.svc.cluster.local:4000"
+                        minLength: 1
+                        type: string
+                        x-kubernetes-validations:
+                        - message: must be a valid absolute URL with a host and an
+                            http or https scheme
+                          rule: isURL(self) && url(self).getHostname() != '' && url(self).getScheme()
+                            in ['http', 'https']
+                      virtualKeySecret:
+                        description: |-
+                          VirtualKeySecret is the name of the K8s Secret containing the virtual key
+                          for this agent. The Secret must have a key "apiKey".
+                        minLength: 1
+                        type: string
+                    required:
+                    - url
+                    - virtualKeySecret
+                    type: object
+                  operatorManaged:
+                    description: |-
+                      OperatorManaged opts this agent into the LiteLLM gateway of the
+                      referenced Mattermost installation (spec.agents.llmGateway on the
+                      Mattermost CR). The Mattermost agents plugin must create the Secret
+                      named "agent-<name>-litellm-key" (key "apiKey") with this agent's
+                      virtual key before the agent pod can start.
+                    type: object
+                type: object
+                x-kubernetes-validations:
+                - message: exactly one of external or operatorManaged must be set
+                  rule: has(self.external) != has(self.operatorManaged)
+              mattermostRef:
+                description: |-
+                  MattermostRef is a reference to the Mattermost CR in the same namespace
+                  that this agent is associated with.
+                properties:
+                  name:
+                    description: Name of the Mattermost CR in the same namespace.
+                    minLength: 1
+                    type: string
+                required:
+                - name
+                type: object
+              resources:
+                description: Resources defines the CPU/memory requests and limits
+                  for the agent pod.
+                properties:
+                  claims:
+                    description: |-
+                      Claims lists the names of resources, defined in spec.resourceClaims,
+                      that are used by this container.
+
+                      This is an alpha field and requires enabling the
+                      DynamicResourceAllocation feature gate.
+
+                      This field is immutable. It can only be set for containers.
+                    items:
+                      description: ResourceClaim references one entry in PodSpec.ResourceClaims.
+                      properties:
+                        name:
+                          description: |-
+                            Name must match the name of one entry in pod.spec.resourceClaims of
+                            the Pod where this field is used. It makes that resource available
+                            inside a container.
+                          type: string
+                        request:
+                          description: |-
+                            Request is the name chosen for a request in the referenced claim.
+                            If empty, everything from the claim is made available, otherwise
+                            only the result of this request.
+                          type: string
+                      required:
+                      - name
+                      type: object
+                    type: array
+                    x-kubernetes-list-map-keys:
+                    - name
+                    x-kubernetes-list-type: map
+                  limits:
+                    additionalProperties:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                    description: |-
+                      Limits describes the maximum amount of compute resources allowed.
+                      More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                    type: object
+                  requests:
+                    additionalProperties:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                    description: |-
+                      Requests describes the minimum amount of compute resources required.
+                      If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+                      otherwise to an implementation-defined value. Requests cannot exceed Limits.
+                      More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                    type: object
+                type: object
+              storage:
+                description: |-
+                  Storage configures optional persistent storage for the agent pod.
+                  When set, the operator creates a PVC and mounts it into the agent container.
+                properties:
+                  mountPath:
+                    description: |-
+                      MountPath is the path inside the container where the volume is mounted.
+                      Defaults to "/data".
+                    type: string
+                  size:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    description: Size is the requested PVC storage size (e.g., "1Gi",
+                      "500Mi").
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
+                  storageClassName:
+                    description: |-
+                      StorageClassName is the name of the StorageClass to use for the PVC.
+                      If omitted, the cluster default StorageClass is used.
+                    type: string
+                required:
+                - size
+                type: object
+            required:
+            - image
+            - mattermostRef
+            type: object
+          status:
+            description: AgentStatus defines the observed state of Agent
+            properties:
+              endpoint:
+                description: |-
+                  Endpoint is the in-cluster HTTP service endpoint for this agent.
+                  Format: "http://<name>.<namespace>.svc.cluster.local:8080"
+                type: string
+              error:
+                description: Error records the last observed error in the reconciliation
+                  of this Agent.
+                type: string
+              observedGeneration:
+                description: |-
+                  ObservedGeneration is the last observed Generation of the Agent resource
+                  that was acted on.
+                format: int64
+                type: integer
+              readyReplicas:
+                description: ReadyReplicas is the number of ready replicas for the
+                  agent deployment.
+                format: int32
+                type: integer
+              state:
+                description: State is the current running state of the agent.
+                type: string
+            type: object
+        type: object
+        x-kubernetes-validations:
+        - message: agent name must differ from the referenced Mattermost installation
+            name
+          rule: self.metadata.name != self.spec.mattermostRef.name
+        - message: 'agent name must be a valid RFC 1035 DNS label: at most 63 lowercase
+            alphanumeric or ''-'' characters, starting with a letter and ending alphanumeric'
+          rule: self.metadata.name.matches('^[a-z]([-a-z0-9]{0,61}[a-z0-9])?$')
+    served: true
+    storage: true
+    subresources:
+      status: {}

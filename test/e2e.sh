@@ -31,7 +31,7 @@ run_kind() {
     kind version
 
     echo "Download kubectl..."
-    curl -sSLo kubectl https://storage.googleapis.com/kubernetes-release/release/"${K8S_VERSION}"/bin/linux/amd64/kubectl
+    curl -sSLo kubectl https://dl.k8s.io/release/"${K8S_VERSION}"/bin/linux/amd64/kubectl
     chmod +x kubectl
     sudo cp kubectl /usr/local/bin/
     docker cp kubectl test-cont:/usr/local/bin/

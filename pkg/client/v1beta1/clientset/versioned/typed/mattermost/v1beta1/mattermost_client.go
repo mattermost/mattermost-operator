@@ -15,12 +15,17 @@ import (
 
 type MattermostV1beta1Interface interface {
 	RESTClient() rest.Interface
+	AgentsGetter
 	MattermostsGetter
 }
 
 // MattermostV1beta1Client is used to interact with features provided by the mattermost group.
 type MattermostV1beta1Client struct {
 	restClient rest.Interface
+}
+
+func (c *MattermostV1beta1Client) Agents(namespace string) AgentInterface {
+	return newAgents(c, namespace)
 }
 
 func (c *MattermostV1beta1Client) Mattermosts(namespace string) MattermostInterface {

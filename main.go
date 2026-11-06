@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-logr/logr"
 	blubr "github.com/mattermost/blubr"
+	agentcontroller "github.com/mattermost/mattermost-operator/controllers/mattermost/agent"
 	"github.com/mattermost/mattermost-operator/controllers/mattermost/clusterinstallation"
 	"github.com/mattermost/mattermost-operator/controllers/mattermost/mattermost"
 	"github.com/mattermost/mattermost-operator/controllers/mattermost/mattermostrestoredb"
@@ -140,6 +141,11 @@ func main() {
 	).
 		SetupWithManager(mgr, config.MaxReconcileConcurrency); err != nil {
 		logger.Error(err, "Unable to create controller", "controller", "Mattermost")
+		os.Exit(1)
+	}
+
+	if err = agentcontroller.NewAgentReconciler(mgr).SetupWithManager(mgr); err != nil {
+		logger.Error(err, "Unable to create controller", "controller", "Agent")
 		os.Exit(1)
 	}
 

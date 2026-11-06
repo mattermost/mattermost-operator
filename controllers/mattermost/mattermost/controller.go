@@ -22,8 +22,10 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -66,10 +68,43 @@ func (r *MattermostReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrency
 		Owns(&networkingv1.Ingress{}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&batchv1.Job{}).
+		// The LiteLLM db-credentials and master-key Secrets are not owned by
+		// the Mattermost CR (externally provisioned / deliberately retained),
+		// so Owns() never fires for them; watch them explicitly to converge
+		// promptly instead of waiting for the polling backstop.
+		Watches(&corev1.Secret{}, handler.EnqueueRequestsFromMapFunc(r.mattermostsForLiteLLMSecret)).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: maxConcurrency,
 		}).
 		Complete(r)
+}
+
+// mattermostsForLiteLLMSecret maps events on the unowned LiteLLM gateway
+// Secrets (db credentials, master key) to the Mattermost CRs in the same
+// namespace that enable the operator-managed gateway.
+func (r *MattermostReconciler) mattermostsForLiteLLMSecret(ctx context.Context, obj client.Object) []reconcile.Request {
+	name := obj.GetName()
+	if name != mmv1beta.AgentLiteLLMDBCredentialsSecret && name != mmv1beta.AgentLiteLLMMasterKeySecretName {
+		return nil
+	}
+
+	mattermosts := &mmv1beta.MattermostList{}
+	err := r.Client.List(ctx, mattermosts, client.InNamespace(obj.GetNamespace()))
+	if err != nil {
+		r.Log.Error(err, "Failed to list Mattermosts for LiteLLM Secret event", "secret", name)
+		return nil
+	}
+
+	var requests []reconcile.Request
+	for _, mm := range mattermosts.Items {
+		if !mm.OperatorManagedLLMGatewayEnabled() {
+			continue
+		}
+		requests = append(requests, reconcile.Request{
+			NamespacedName: types.NamespacedName{Name: mm.Name, Namespace: mm.Namespace},
+		})
+	}
+	return requests
 }
 
 // Reconcile reads the state of the cluster for a Mattermost object and
@@ -155,6 +190,16 @@ func (r *MattermostReconciler) Reconcile(ctx context.Context, request ctrl.Reque
 		}
 	}
 
+	// The LiteLLM disable-transition cleanup runs before the health gate so a
+	// broken server cannot strand a gateway that should be gone; the gateway
+	// create/update path intentionally runs only after the installation is
+	// Stable (see checkLiteLLM below).
+	err = r.cleanupLiteLLMIfDisabled(ctx, mattermost, reqLogger)
+	if err != nil {
+		r.updateStatusReconcilingAndLogError(mattermost, status, reqLogger, err)
+		return reconcile.Result{}, err
+	}
+
 	dbConfig, err := r.checkDatabase(mattermost, reqLogger)
 	if err != nil {
 		r.updateStatusReconcilingAndLogError(mattermost, status, reqLogger, err)
@@ -196,6 +241,16 @@ func (r *MattermostReconciler) Reconcile(ctx context.Context, request ctrl.Reque
 		}
 		reqLogger.Info("Mattermost instance not healthy", "msg", err.Error())
 		return reconcile.Result{RequeueAfter: healthCheckRequeueDelay}, nil
+	}
+
+	// The gateway create/update path runs only after the health check passes
+	// so a missing/malformed externally-provisioned gateway prerequisite can
+	// never pin the installation out of Stable (which would stall every Agent
+	// gating on it). On gateway failure the installation is still marked
+	// Stable with the error surfaced on status.Error.
+	err = r.checkLiteLLM(ctx, mattermost, reqLogger)
+	if err != nil {
+		return r.handleLiteLLMError(mattermost, status, reqLogger, err)
 	}
 
 	err = r.updateStatus(mattermost, status, reqLogger)
