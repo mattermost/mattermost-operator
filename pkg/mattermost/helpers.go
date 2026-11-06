@@ -49,7 +49,7 @@ func mergeEnvVars(original, new []corev1.EnvVar) []corev1.EnvVar {
 
 func determineMaxBodySize(ingressAnnotations map[string]string, defaultSize string) string {
 	size, ok := ingressAnnotations["nginx.ingress.kubernetes.io/proxy-body-size"]
-	if !ok {
+	if !ok || size == "" {
 		return defaultSize
 	}
 
