@@ -141,7 +141,7 @@ func (r *MattermostReconciler) checkLocalFileStore(mattermost *mmv1beta.Mattermo
 		}
 
 		// Update PVC to ensure we match the current spec (e.g., storage size changes)
-		err = r.Resources.Update(current, pvc, reqLogger)
+		err = r.Resources.Update(mattermost, current, pvc, reqLogger)
 		if err != nil {
 			reqLogger.Error(err, "failed to update PVC for local storage")
 			return nil, err
@@ -235,5 +235,5 @@ func (r *MattermostReconciler) checkMinioInstance(mattermost *mmv1beta.Mattermos
 	// For some reason, our current minio operator seems to remove labels on
 	// the instance resource when we add them. For that reason, trying to
 	// ensure the labels are correct doesn't work.
-	return r.Resources.Update(current, desired, reqLogger)
+	return r.Resources.Update(mattermost, current, desired, reqLogger)
 }
