@@ -22,6 +22,7 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -29,6 +30,12 @@ import (
 
 const healthCheckRequeueDelay = 6 * time.Second
 const resourcesReadyDelay = 10 * time.Second
+
+// monitoringCRDRetryDelay is how long to wait before retrying monitoring
+// resources that were skipped because the Prometheus Operator CRDs are absent.
+// An error return would mark the Mattermost reconcile failed on clusters that
+// enable monitoring and never install those CRDs.
+const monitoringCRDRetryDelay = 2 * time.Minute
 
 // MattermostReconciler reconciles a Mattermost object
 type MattermostReconciler struct {
@@ -39,6 +46,7 @@ type MattermostReconciler struct {
 	MaxReconciling         int
 	RequeueOnLimitDelay    time.Duration
 	Resources              *resources.ResourceHelper
+	Recorder               record.EventRecorder
 	reconcilingRateLimiter unstableInstallationsRateLimiter
 }
 
@@ -51,6 +59,7 @@ func NewMattermostReconciler(mgr ctrl.Manager, maxReconciling int, requeueOnLimi
 		MaxReconciling:      maxReconciling,
 		RequeueOnLimitDelay: requeueOnLimitDelay,
 		Resources:           resources.NewResourceHelper(mgr.GetClient(), mgr.GetScheme()),
+		Recorder:            mgr.GetEventRecorderFor("mattermost-controller"),
 		reconcilingRateLimiter: unstableInstallationsRateLimiter{
 			nonReconcilingBeingProcessed: 0,
 			Mutex:                        sync.Mutex{},
@@ -63,9 +72,13 @@ func (r *MattermostReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrency
 		For(&mmv1beta.Mattermost{}).
 		Owns(&corev1.Service{}).
 		Owns(&corev1.Secret{}).
+		Owns(&corev1.ConfigMap{}).
 		Owns(&networkingv1.Ingress{}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&batchv1.Job{}).
+		// NOTE: ServiceMonitor is intentionally NOT added to Owns(). A watch on a
+		// type whose CRD is absent would fail the manager at startup; the Prometheus
+		// Operator CRDs are an optional dependency. GC still works via owner references.
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: maxConcurrency,
 		}).
@@ -202,6 +215,11 @@ func (r *MattermostReconciler) Reconcile(ctx context.Context, request ctrl.Reque
 	if err != nil {
 		r.updateStatusReconcilingAndLogError(mattermost, status, reqLogger, err)
 		return reconcile.Result{}, err
+	}
+
+	if recStatus.MonitoringPendingCRDs {
+		reqLogger.Info("Monitoring is enabled but the Prometheus Operator CRDs are not installed; retrying", "delay", monitoringCRDRetryDelay)
+		return reconcile.Result{RequeueAfter: monitoringCRDRetryDelay}, nil
 	}
 
 	return reconcile.Result{}, nil
