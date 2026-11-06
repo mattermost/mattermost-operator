@@ -61,7 +61,14 @@ func (r *ResourceHelper) Create(owner v1.Object, desired Object, reqLogger logr.
 	return r.client.Create(context.TODO(), desired)
 }
 
-func (r *ResourceHelper) Update(current, desired Object, reqLogger logr.Logger) error {
+// Update updates the live object with desired. It returns an error when the
+// live object is not owned by owner, so a manipulated object name or namespace
+// cannot redirect the update to a foreign object.
+func (r *ResourceHelper) Update(owner v1.Object, current, desired Object, reqLogger logr.Logger) error {
+	if !isUpdatable(current, owner) {
+		return notOwnedError(current, owner)
+	}
+
 	patchResult, err := objectMatcher.NewPatchMaker(
 		defaultAnnotator,
 		&objectMatcher.K8sStrategicMergePatcher{},
@@ -192,13 +199,18 @@ func (r *ResourceHelper) CreatePvcIfNotExists(owner v1.Object, pvc *corev1.Persi
 	return nil
 }
 
-func (r *ResourceHelper) DeleteDeployment(key types.NamespacedName, reqLogger logr.Logger) error {
+func (r *ResourceHelper) DeleteDeployment(owner v1.Object, key types.NamespacedName, reqLogger logr.Logger) error {
 	foundDeployment := &appsv1.Deployment{}
 	err := r.client.Get(context.TODO(), key, foundDeployment)
 	if err != nil && k8sErrors.IsNotFound(err) {
 		return nil
 	} else if err != nil {
 		return errors.Wrap(err, "failed to check if deployment exists")
+	}
+
+	if !isControlledBy(foundDeployment, owner) {
+		reqLogger.Info("Skipping deletion of deployment not controlled by the owner", "name", foundDeployment.Name, "namespace", foundDeployment.Namespace)
+		return nil
 	}
 
 	reqLogger.Info("Deleting deployment", "name", foundDeployment.Name)
@@ -210,13 +222,18 @@ func (r *ResourceHelper) DeleteDeployment(key types.NamespacedName, reqLogger lo
 	return nil
 }
 
-func (r *ResourceHelper) DeleteIngressClass(key types.NamespacedName, reqLogger logr.Logger) error {
+func (r *ResourceHelper) DeleteIngressClass(owner v1.Object, key types.NamespacedName, reqLogger logr.Logger) error {
 	foundIngressClass := &networkingv1.IngressClass{}
 	err := r.client.Get(context.TODO(), key, foundIngressClass)
 	if err != nil && k8sErrors.IsNotFound(err) {
 		return nil
 	} else if err != nil {
 		return errors.Wrap(err, "failed to check if ingressClass exists")
+	}
+
+	if !isControlledBy(foundIngressClass, owner) {
+		reqLogger.Info("Skipping deletion of ingressClass not controlled by the owner", "name", foundIngressClass.Name, "namespace", foundIngressClass.Namespace)
+		return nil
 	}
 
 	reqLogger.Info("Deleting ingressClass", "name", foundIngressClass.Name)
@@ -228,13 +245,18 @@ func (r *ResourceHelper) DeleteIngressClass(key types.NamespacedName, reqLogger 
 	return nil
 }
 
-func (r *ResourceHelper) DeleteIngress(key types.NamespacedName, reqLogger logr.Logger) error {
+func (r *ResourceHelper) DeleteIngress(owner v1.Object, key types.NamespacedName, reqLogger logr.Logger) error {
 	foundIngress := &networkingv1.Ingress{}
 	err := r.client.Get(context.TODO(), key, foundIngress)
 	if err != nil && k8sErrors.IsNotFound(err) {
 		return nil
 	} else if err != nil {
 		return errors.Wrap(err, "failed to check if ingress exists")
+	}
+
+	if !isControlledBy(foundIngress, owner) {
+		reqLogger.Info("Skipping deletion of ingress not controlled by the owner", "name", foundIngress.Name, "namespace", foundIngress.Namespace)
+		return nil
 	}
 
 	reqLogger.Info("Deleting ingress", "name", foundIngress.Name)
@@ -246,13 +268,18 @@ func (r *ResourceHelper) DeleteIngress(key types.NamespacedName, reqLogger logr.
 	return nil
 }
 
-func (r *ResourceHelper) DeleteService(key types.NamespacedName, reqLogger logr.Logger) error {
+func (r *ResourceHelper) DeleteService(owner v1.Object, key types.NamespacedName, reqLogger logr.Logger) error {
 	foundService := &corev1.Service{}
 	err := r.client.Get(context.TODO(), key, foundService)
 	if err != nil && k8sErrors.IsNotFound(err) {
 		return nil
 	} else if err != nil {
 		return errors.Wrap(err, "failed to check if service exists")
+	}
+
+	if !isControlledBy(foundService, owner) {
+		reqLogger.Info("Skipping deletion of service not controlled by the owner", "name", foundService.Name, "namespace", foundService.Namespace)
+		return nil
 	}
 
 	reqLogger.Info("Deleting service", "name", foundService.Name)

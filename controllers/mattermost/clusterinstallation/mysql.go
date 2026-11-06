@@ -29,7 +29,7 @@ func (r *ClusterInstallationReconciler) checkMySQLCluster(mattermost *mattermost
 		return err
 	}
 
-	return r.Resources.Update(current, desired, reqLogger)
+	return r.Resources.Update(mattermost, current, desired, reqLogger)
 }
 
 func (r *ClusterInstallationReconciler) getOrCreateMySQLSecrets(mattermost *mattermostv1alpha1.ClusterInstallation, reqLogger logr.Logger) (*database.Info, error) {

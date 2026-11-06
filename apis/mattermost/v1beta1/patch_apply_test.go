@@ -702,3 +702,58 @@ func TestValidatePatch_MoveFromForbiddenPath(t *testing.T) {
 
 	require.NoError(t, validateServicePatch(`[{"op":"copy","from":"/spec/selector","path":"/metadata/annotations/x"}]`))
 }
+
+func TestResourcePatch_RejectsIdentityChange(t *testing.T) {
+	owner := []metav1.OwnerReference{{APIVersion: "installation.mattermost.com/v1beta1", Kind: "Mattermost", Name: "mm", UID: "uid"}}
+	newDeployment := func() *appsv1.Deployment {
+		return &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "mm", Namespace: "tenant", OwnerReferences: owner}}
+	}
+	newService := func() *corev1.Service {
+		return &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{Name: "mm", Namespace: "tenant", OwnerReferences: owner},
+			Spec:       corev1.ServiceSpec{Selector: map[string]string{"app": "mm"}},
+		}
+	}
+
+	for _, testCase := range []struct {
+		description string
+		patch       string
+	}{
+		{"name", `[{"op":"replace","path":"/metadata/name","value":"victim"}]`},
+		{"namespace", `[{"op":"replace","path":"/metadata/namespace","value":"kube-system"}]`},
+		{"owner references removed", `[{"op":"remove","path":"/metadata/ownerReferences"}]`},
+		{"owner references replaced", `[{"op":"replace","path":"/metadata/ownerReferences","value":[]}]`},
+		{"metadata replaced", `[{"op":"replace","path":"/metadata","value":{"name":"victim","namespace":"kube-system"}}]`},
+		{"name moved", `[{"op":"add","path":"/metadata/labels","value":{"a":"b"}},{"op":"move","from":"/metadata/labels","path":"/metadata/name"}]`},
+		{"name conditionally changed", `[{"op":"test","path":"/metadata/name","value":"mm"},{"op":"replace","path":"/metadata/name","value":"victim"}]`},
+		{"document replaced", `[{"op":"replace","path":"","value":{"apiVersion":"apps/v1","kind":"Deployment","metadata":{"name":"victim","namespace":"default"}}}]`},
+	} {
+		t.Run("deployment "+testCase.description, func(t *testing.T) {
+			rp := &ResourcePatch{Deployment: &Patch{Patch: testCase.patch}}
+			_, applied, err := rp.ApplyToDeployment(newDeployment())
+			require.Error(t, err)
+			assert.False(t, applied)
+		})
+		t.Run("service "+testCase.description, func(t *testing.T) {
+			rp := &ResourcePatch{Service: &Patch{Patch: strings.ReplaceAll(testCase.patch, `"apiVersion":"apps/v1","kind":"Deployment"`, `"apiVersion":"v1","kind":"Service"`)}}
+			_, applied, err := rp.ApplyToService(newService())
+			require.Error(t, err)
+			assert.False(t, applied)
+		})
+	}
+
+	t.Run("service selector replaced through the document", func(t *testing.T) {
+		rp := &ResourcePatch{Service: &Patch{Patch: `[{"op":"replace","path":"","value":{"apiVersion":"v1","kind":"Service","metadata":{"name":"mm","namespace":"tenant","ownerReferences":[{"apiVersion":"installation.mattermost.com/v1beta1","kind":"Mattermost","name":"mm","uid":"uid"}]},"spec":{"selector":{"app":"other"}}}}]`}}
+		_, applied, err := rp.ApplyToService(newService())
+		require.Error(t, err)
+		assert.False(t, applied)
+	})
+
+	t.Run("labels and annotations remain patchable", func(t *testing.T) {
+		rp := &ResourcePatch{Deployment: &Patch{Patch: `[{"op":"add","path":"/metadata/labels","value":{"a":"b"}}]`}}
+		patched, applied, err := rp.ApplyToDeployment(newDeployment())
+		require.NoError(t, err)
+		assert.True(t, applied)
+		assert.Equal(t, "b", patched.Labels["a"])
+	})
+}
