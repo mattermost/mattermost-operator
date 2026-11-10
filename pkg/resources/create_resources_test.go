@@ -84,15 +84,19 @@ func TestResourceHelper_Delete_Ownership(t *testing.T) {
 	logger := logr.Discard()
 	ownedRefs := controllerRef("installation.mattermost.com/v1beta1", "Mattermost", "mm", "owner-uid")
 	foreignRefs := controllerRef("installation.mattermost.com/v1beta1", "Mattermost", "other", "other-uid")
+	migratedRefs := controllerRef(mmv1alpha1.GroupVersion.String(), "ClusterInstallation", "mm", "ci-uid")
+	otherMigratedRefs := controllerRef(mmv1alpha1.GroupVersion.String(), "ClusterInstallation", "other", "ci-uid")
 
 	t.Run("service", func(t *testing.T) {
-		key := types.NamespacedName{Name: "svc", Namespace: "default"}
+		key := types.NamespacedName{Name: "svc", Namespace: "tenant"}
 		for _, testCase := range []struct {
 			description string
 			refs        []metav1.OwnerReference
 			deleted     bool
 		}{
 			{"owned", ownedRefs, true},
+			{"controlled by same-named ClusterInstallation", migratedRefs, true},
+			{"controlled by other ClusterInstallation", otherMigratedRefs, false},
 			{"foreign", foreignRefs, false},
 			{"unowned", nil, false},
 		} {
@@ -107,14 +111,16 @@ func TestResourceHelper_Delete_Ownership(t *testing.T) {
 	})
 
 	t.Run("deployment", func(t *testing.T) {
-		key := types.NamespacedName{Name: "deploy", Namespace: "default"}
+		key := types.NamespacedName{Name: "deploy", Namespace: "tenant"}
 		for _, testCase := range []struct {
 			description string
 			refs        []metav1.OwnerReference
 			deleted     bool
 		}{
 			{"owned", ownedRefs, true},
+			{"controlled by same-named ClusterInstallation", migratedRefs, true},
 			{"foreign", foreignRefs, false},
+			{"unowned", nil, false},
 		} {
 			t.Run(testCase.description, func(t *testing.T) {
 				obj := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: key.Name, Namespace: key.Namespace, OwnerReferences: testCase.refs}}
@@ -127,14 +133,16 @@ func TestResourceHelper_Delete_Ownership(t *testing.T) {
 	})
 
 	t.Run("ingress", func(t *testing.T) {
-		key := types.NamespacedName{Name: "ing", Namespace: "default"}
+		key := types.NamespacedName{Name: "ing", Namespace: "tenant"}
 		for _, testCase := range []struct {
 			description string
 			refs        []metav1.OwnerReference
 			deleted     bool
 		}{
 			{"owned", ownedRefs, true},
+			{"controlled by same-named ClusterInstallation", migratedRefs, true},
 			{"foreign", foreignRefs, false},
+			{"unowned", nil, false},
 		} {
 			t.Run(testCase.description, func(t *testing.T) {
 				obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: key.Name, Namespace: key.Namespace, OwnerReferences: testCase.refs}}
@@ -154,6 +162,7 @@ func TestResourceHelper_Delete_Ownership(t *testing.T) {
 			deleted     bool
 		}{
 			{"owned", ownedRefs, true},
+			{"controlled by same-named ClusterInstallation", migratedRefs, false},
 			{"foreign shared class", nil, false},
 		} {
 			t.Run(testCase.description, func(t *testing.T) {
@@ -165,4 +174,19 @@ func TestResourceHelper_Delete_Ownership(t *testing.T) {
 			})
 		}
 	})
+}
+
+func TestResourceHelper_Delete_IgnoresMigrationControllerInOtherNamespace(t *testing.T) {
+	owner := newOwner("mm", "tenant", "owner-uid")
+	key := types.NamespacedName{Name: "svc", Namespace: "kube-system"}
+	obj := &corev1.Service{ObjectMeta: metav1.ObjectMeta{
+		Name:            key.Name,
+		Namespace:       key.Namespace,
+		OwnerReferences: controllerRef(mmv1alpha1.GroupVersion.String(), "ClusterInstallation", "mm", "ci-uid"),
+	}}
+	c := fake.NewClientBuilder().WithObjects(obj).Build()
+
+	require.NoError(t, NewResourceHelper(c, scheme.Scheme).DeleteService(owner, key, logr.Discard()))
+
+	require.NoError(t, c.Get(context.TODO(), key, &corev1.Service{}))
 }
