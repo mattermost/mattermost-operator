@@ -1028,7 +1028,22 @@ spec:
                   secret:
                     description: |-
                       Optionally enter the name of an already-existing Secret for connecting to
-                      the database.
+                      the database. This secret should be configured as follows:
+
+                      User-Managed Database
+                        - Key: DB_CONNECTION_STRING | Value: <FULL_DATABASE_CONNECTION_STRING>
+                      Operator-Managed Database
+                        - Key: ROOT_PASSWORD | Value: <ROOT_DATABASE_PASSWORD>
+                        - Key: USER | Value: <USER_NAME>
+                        - Key: PASSWORD | Value: <USER_PASSWORD>
+                        - Key: DATABASE Value: <DATABASE_NAME>
+
+                      Notes:
+                        If you define all secret values for both User-Managed and
+                        Operator-Managed database types, the User-Managed connection string will
+                        take precedence and the Operator-Managed values will be ignored. If the
+                        secret is left blank, the default behavior is to use an Operator-Managed
+                        database with strong randomly-generated database credentials.
                     type: string
                   storageSize:
                     description: Defines the storage size for the database. ie 50Gi
@@ -1367,8 +1382,10 @@ spec:
                 description: Secret that contains the mattermost license
                 type: string
               migrate:
-                description: Migrate specifies that the ClusterInstallation CR should
-                  be migrated to the Mattermost CR.
+                description: |-
+                  Migrate specifies that the ClusterInstallation CR should be migrated to the Mattermost CR.
+                  CAUTION: Some features like BlueGreen or Canary are not supported with a new Custom Resource
+                  therefore migration should be performed with extra caution.
                 type: boolean
               minio:
                 description: Minio defines the configuration of Minio for a ClusterInstallation.
@@ -1386,6 +1403,9 @@ spec:
                       Defines the number of Minio replicas.
                       Supply 1 to run Minio in standalone mode with no redundancy.
                       Supply 4 or more to run Minio in distributed mode.
+                      Note that it is not possible to upgrade Minio from standalone to distributed mode.
+                      Setting this will override the number of replicas set by 'Size'.
+                      More info: https://docs.min.io/docs/distributed-minio-quickstart-guide.html
                     format: int32
                     type: integer
                   resources:
@@ -1457,6 +1477,7 @@ spec:
                 description: |-
                   NodeSelector is a selector which must be true for the pod to fit on a node.
                   Selector which must match a node's labels for the pod to be scheduled on that node.
+                  More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
                 type: object
               readinessProbe:
                 description: Defines the probe to check if the application is ready
@@ -1674,8 +1695,15 @@ spec:
                   type: string
                 type: object
               size:
-                description: Size defines the size of the ClusterInstallation. This
-                  is typically specified in number of users.
+                description: |-
+                  Size defines the size of the ClusterInstallation. This is typically specified in number of users.
+                  This will override replica and resource requests/limits appropriately for the provided number of users.
+                  This is a write-only field - its value is erased after setting appropriate values of resources.
+                  Accepted values are: 100users, 1000users, 5000users, 10000users, 250000users. If replicas and resource
+                  requests/limits are not specified, and Size is not provided the configuration for 5000users will be applied.
+                  Setting 'Replicas', 'Resources', 'Minio.Replicas', 'Minio.Resource', 'Database.Replicas',
+                  or 'Database.Resources' will override the values set by Size.
+                  Setting new Size will override previous values regardless if set by Size or manually.
                 type: string
               useIngressTLS:
                 type: boolean
@@ -1692,7 +1720,8 @@ spec:
             description: |-
               Most recent observed status of the Mattermost cluster. Read-only. Not
               included when requesting from the apiserver, only from the Mattermost
-              Operator API itself.
+              Operator API itself. More info:
+              https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
             properties:
               blueName:
                 description: The name of the blue deployment in BlueGreen
@@ -1937,14 +1966,24 @@ spec:
                       connectionStringKey:
                         description: |-
                           ConnectionStringKey overrides the Secret key used to resolve the database
-                          connection string. Defaults to "DB_CONNECTION_STRING".
+                          connection string. Defaults to "DB_CONNECTION_STRING". Useful when the
+                          referenced Secret is produced by another operator (e.g. cloudnative-pg
+                          exposes the URI under the "uri" key). When set, the Operator will also
+                          fall back to this key for MM_SQLSETTINGS_DATASOURCE when no
+                          MM_SQLSETTINGS_DATASOURCE entry is present in the Secret.
                         maxLength: 253
                         minLength: 1
                         pattern: ^[-._a-zA-Z0-9]+$
                         type: string
                       secret:
-                        description: Secret contains data necessary to connect to
-                          the external database.
+                        description: |-
+                          Secret contains data necessary to connect to the external database.
+                          The Kubernetes Secret should contain:
+                            - Key: DB_CONNECTION_STRING (or the key configured via connectionStringKey) | Value: Full database connection string.
+                          It can also contain optional fields, such as:
+                            - Key: MM_SQLSETTINGS_DATASOURCEREPLICAS | Value: Connection string to read replicas of the database.
+                            - Key: DB_CONNECTION_CHECK_URL | Value: The URL used for checking that the database is accessible.
+                              Omitting this value in the secret will cause Operator to skip adding init container for database check.
                         type: string
                     type: object
                   operatorManaged:
@@ -2052,13 +2091,21 @@ spec:
                     description: |-
                       ReadinessCheck configures *how* the readiness init container is built.
                       When nil (default), the Operator uses the legacy "external" mode
-                      (postgres:13 / appropriate/curl images).
+                      (postgres:13 / appropriate/curl images). Ignored when
+                      DisableReadinessCheck is true. Currently only consulted for the
+                      external-database path; operator-managed databases always use the
+                      legacy probe.
                     properties:
                       mode:
                         description: |-
                           Mode selects the readiness check implementation.
                             "external" (default): use postgres:13 / appropriate/curl images
-                                                  and probe via pg_isready / curl.
+                                                  and probe via pg_isready / curl. Current
+                                                  behavior; will be deprecated in a future
+                                                  release.
+                            "builtin":  reuse the main Mattermost image and run
+                                        `mattermost db ping --timeout=<Timeout>`. Requires
+                                        a Mattermost version that ships `mattermost db ping`.
                         enum:
                         - external
                         - builtin
@@ -2066,7 +2113,9 @@ spec:
                       timeout:
                         description: |-
                           Timeout for the readiness check. When Mode=builtin this value is
-                          passed to `mattermost db ping --timeout`.
+                          passed to `mattermost db ping --timeout`. Ignored when Mode=external
+                          (the legacy `until pg_isready ...; sleep 5; done` loop has no
+                          timeout). Defaults to 5m.
                         pattern: ^([0-9]+(\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$
                         type: string
                     type: object
@@ -2187,8 +2236,9 @@ spec:
                       This is NOT recommended for production environments.
                     properties:
                       accessModes:
-                        description: Defines the access modes for the PVC. If not
-                          specified, defaults to ReadWriteMany for new installations.
+                        description: |-
+                          Defines the access modes for the PVC. If not specified, defaults to ReadWriteMany for new installations.
+                          For backwards compatibility, existing PVCs with ReadWriteOnce will be preserved until explicitly changed.
                         items:
                           type: string
                         type: array
@@ -2213,6 +2263,9 @@ spec:
                           Defines the number of Minio replicas.
                           Supply 1 to run Minio in standalone mode with no redundancy.
                           Supply 4 or more to run Minio in distributed mode.
+                          Note that it is not possible to upgrade Minio from standalone to distributed mode.
+                          Setting this will override the number of replicas set by 'Size'.
+                          More info: https://docs.min.io/docs/distributed-minio-quickstart-guide.html
                         format: int32
                         type: integer
                       resources:
@@ -2357,7 +2410,9 @@ spec:
                   dedicatedJobServer:
                     description: |-
                       Determines whether to create a dedicated Mattermost server deployment
-                      which is configured to run scheduled jobs.
+                      which is configured to run scheduled jobs. This deployment will receive
+                      no user traffic and the primary Mattermost deployment will no longer be
+                      configured to run jobs.
                     type: boolean
                 type: object
               licenseSecret:
@@ -3946,6 +4001,10 @@ spec:
                     description: |-
                       Additional sidecar containers injected into pods.
                       The setting does not override any sidecar containers defined by the Operator.
+                      Note that sidecars are injected as standard pod containers alongside the
+                      Mattermost application server. In the future, this may be migrated to
+                      use the currently-feature-gated init container method introduced in k8s v1.28:
+                      https://kubernetes.io/blog/2023/08/25/native-sidecar-containers/
                     items:
                       description: A single application container that you want to
                         run within a pod.
@@ -5987,8 +6046,13 @@ spec:
                   type: string
                 type: object
               resourcePatch:
-                description: ResourcePatch specifies JSON patches that can be applied
-                  to resources created by Mattermost Operator.
+                description: |-
+                  ResourcePatch specifies JSON patches that can be applied to resources created by Mattermost Operator.
+
+                  WARNING: ResourcePatch is highly experimental and subject to change.
+                  Some patches may be impossible to perform or may impact the stability of Mattermost server.
+
+                  Use at your own risk when no other options are available.
                 properties:
                   deployment:
                     properties:
@@ -6809,6 +6873,7 @@ spec:
                     description: |-
                       NodeSelector is a selector which must be true for the pod to fit on a node.
                       Selector which must match a node's labels for the pod to be scheduled on that node.
+                      More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
                     type: object
                   resources:
                     description: Defines the resource requests and limits for the
@@ -6908,7 +6973,15 @@ spec:
                 description: |-
                   Size defines the size of the Mattermost. This is typically specified in
                   number of users. This will override replica and resource requests/limits
-                  appropriately for the provided number of users.
+                  appropriately for the provided number of users. This is a write-only
+                  field - its value is erased after setting appropriate values of resources.
+                  Accepted values are: 100users, 1000users, 5000users, 10000users,
+                  and 250000users. If replicas and resource requests/limits are not
+                  specified, and Size is not provided the configuration for 5000users will
+                  be applied. Setting 'Replicas', 'Scheduling.Resources', 'FileStore.Replicas',
+                  'FileStore.Resource', 'Database.Replicas', or 'Database.Resources' will
+                  override the values set by Size. Setting new Size will override previous
+                  values regardless if set by Size or manually.
                 type: string
               updateJob:
                 description: UpdateJob defines configuration for the template for
