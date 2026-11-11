@@ -6,6 +6,7 @@ package v1beta1
 import (
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -344,13 +345,26 @@ func TestPatch(t *testing.T) {
 			Patch:   `[{"op":"replace","path":"/spec/type", "value": "NodePort"}]`,
 		}
 
-		obj1 := &corev1.Service{}
+		obj1 := &corev1.Service{Spec: corev1.ServiceSpec{Type: corev1.ServiceTypeClusterIP}}
 		obj2 := &corev1.Service{}
 		gvk := obj1.GroupVersionKind()
 		err := p.applyPatch(obj1, obj2, &gvk)
 		assert.NoError(t, err)
 		assert.NotEqual(t, &obj1, &obj2)
-		assert.NotEqual(t, obj1.Spec.Type, obj2.Spec.Type)
+		assert.Equal(t, corev1.ServiceTypeNodePort, obj2.Spec.Type)
+	})
+
+	t.Run("replace on missing key fails", func(t *testing.T) {
+		p := Patch{
+			Patch: `[{"op":"replace","path":"/spec/type", "value": "NodePort"}]`,
+		}
+
+		obj1 := &corev1.Service{}
+		obj2 := &corev1.Service{}
+		gvk := obj1.GroupVersionKind()
+		err := p.applyPatch(obj1, obj2, &gvk)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "doc is missing key")
 	})
 
 	t.Run("empty patch, replace pointer", func(t *testing.T) {
@@ -365,6 +379,76 @@ func TestPatch(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, obj1.Spec.Type, obj2.Spec.Type)
 		assert.Equal(t, &obj1, &obj2)
+	})
+}
+
+func repeatCopyPatch(from, path string, count int) string {
+	ops := make([]string, count)
+	for i := range ops {
+		ops[i] = fmt.Sprintf(`{"op":"copy","from":%q,"path":%q}`, from, path)
+	}
+	return "[" + strings.Join(ops, ",") + "]"
+}
+
+func TestResourcePatch_CopyAmplificationIsBounded(t *testing.T) {
+	t.Run("deployment", func(t *testing.T) {
+		rp := &ResourcePatch{
+			Deployment: &Patch{
+				Patch: repeatCopyPatch("/spec/template/spec/containers", "/spec/template/spec/containers/-", 25),
+			},
+		}
+		deployment := &appsv1.Deployment{
+			Spec: appsv1.DeploymentSpec{
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{{Name: "mattermost", Image: "mattermost/mattermost-enterprise-edition"}},
+					},
+				},
+			},
+		}
+
+		patched, applied, err := rp.ApplyToDeployment(deployment)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "exceeding the limit")
+		assert.False(t, applied)
+		assert.Nil(t, patched)
+	})
+
+	t.Run("service", func(t *testing.T) {
+		rp := &ResourcePatch{
+			Service: &Patch{
+				Patch: repeatCopyPatch("/spec/ports", "/spec/ports/-", 25),
+			},
+		}
+		service := &corev1.Service{
+			Spec: corev1.ServiceSpec{
+				Ports: []corev1.ServicePort{{Name: "http", Port: 80}},
+			},
+		}
+
+		patched, applied, err := rp.ApplyToService(service)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "exceeding the limit")
+		assert.False(t, applied)
+		assert.Nil(t, patched)
+	})
+
+	t.Run("copy below the limit is applied", func(t *testing.T) {
+		rp := &ResourcePatch{
+			Service: &Patch{
+				Patch: repeatCopyPatch("/spec/ports/0", "/spec/ports/-", 2),
+			},
+		}
+		service := &corev1.Service{
+			Spec: corev1.ServiceSpec{
+				Ports: []corev1.ServicePort{{Name: "http", Port: 80}},
+			},
+		}
+
+		patched, applied, err := rp.ApplyToService(service)
+		require.NoError(t, err)
+		assert.True(t, applied)
+		assert.Len(t, patched.Spec.Ports, 3)
 	})
 }
 
@@ -607,4 +691,14 @@ func loadFile(t *testing.T, path string) string {
 
 func int32Ptr(i int32) *int32 {
 	return &i
+}
+
+func TestValidatePatch_MoveFromForbiddenPath(t *testing.T) {
+	err := validateDeploymentPatch(`[{"op":"move","from":"/spec/template/spec/volumes","path":"/metadata/annotations/x"}]`)
+	require.Error(t, err)
+
+	err = validateServicePatch(`[{"op":"move","from":"/spec/selector","path":"/metadata/annotations/x"}]`)
+	require.Error(t, err)
+
+	require.NoError(t, validateServicePatch(`[{"op":"copy","from":"/spec/selector","path":"/metadata/annotations/x"}]`))
 }
