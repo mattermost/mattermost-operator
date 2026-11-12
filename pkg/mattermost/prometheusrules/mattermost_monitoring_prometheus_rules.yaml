@@ -4,13 +4,20 @@
 #   - PrometheusRule: pkg/mattermost/mattermost_monitoring_prometheus_rules.go
 #   - Mimir ConfigMap: pkg/mattermost/mattermost_monitoring_mimir_rules.go
 #
-# The Operator substitutes __NAMESPACE__, __SERVICE__ and __POD_SELECTOR__ per
-# Mattermost CR, so every alert here targets this instance by namespace /
-# Service / pod-name — never a static IP or CIDR.
+# The Operator substitutes __NAMESPACE__, __INSTALLATION__ and __POD_SELECTOR__
+# per Mattermost CR, so every alert here targets this instance by namespace +
+# installation label / pod-name — never a static IP, CIDR, or Service name.
+#
+# Scraped series are matched on `namespace` AND the installation label. The
+# ServiceMonitor copies the pod label installation.mattermost.com/installation
+# onto each series (podTargetLabels), so the match survives a renamed Service
+# and a scrape that goes through a Service the Operator did not create. CR names
+# are unique per namespace only, so `namespace` must always stay in the matcher.
 #
 # Series sources:
 #   - up, mattermost_*   : scraped from the Mattermost /metrics endpoint via the
-#                          ServiceMonitor (carry namespace/service/pod labels).
+#                          ServiceMonitor (carry namespace/pod and
+#                          installation_mattermost_com_installation labels).
 #   - kube_*, container_*: kube-state-metrics + cAdvisor (carry namespace/pod).
 #
 # NOTE: the /metrics endpoint is Enterprise-licensed — the `up`/mattermost_*
@@ -28,12 +35,12 @@ groups:
         # replica alert for that case. We intentionally avoid `absent(up{...})`
         # here because it would fire permanently in rule-only configurations that
         # do not enable the ServiceMonitor.
-        expr: up{namespace="__NAMESPACE__", service="__SERVICE__"} == 0
+        expr: up{namespace="__NAMESPACE__", installation_mattermost_com_installation="__INSTALLATION__"} == 0
         for: 5m
         labels:
           severity: critical
         annotations:
-          summary: "Mattermost {{ $labels.namespace }}/{{ $labels.service }} is down"
+          summary: "Mattermost {{ $labels.namespace }}/{{ $labels.installation_mattermost_com_installation }} is down"
           description: "The Mattermost metrics endpoint has been unreachable for more than 5 minutes."
 
       - alert: MattermostPodCrashLooping
@@ -127,12 +134,12 @@ groups:
         # Read-replica lag over 5s for 5m (mattermost_db_replica_lag_time is seconds).
         # No series when SqlSettings has no replica lag query, so a writer-only
         # database (RDS, Azure Postgres, or a single in-cluster primary) does not fire.
-        expr: max by (namespace, service) (mattermost_db_replica_lag_time{namespace="__NAMESPACE__", service="__SERVICE__"}) > __DB_REPLICA_LAG_SECONDS__
+        expr: max by (namespace, installation_mattermost_com_installation) (mattermost_db_replica_lag_time{namespace="__NAMESPACE__", installation_mattermost_com_installation="__INSTALLATION__"}) > __DB_REPLICA_LAG_SECONDS__
         for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "Mattermost {{ $labels.namespace }}/{{ $labels.service }} DB replica lag > __DB_REPLICA_LAG_SECONDS__s"
+          summary: "Mattermost {{ $labels.namespace }}/{{ $labels.installation_mattermost_com_installation }} DB replica lag > __DB_REPLICA_LAG_SECONDS__s"
           description: "A Mattermost read replica has been lagging more than __DB_REPLICA_LAG_SECONDS__ seconds for 5 minutes."
 
       - alert: MattermostDBWriterPoolEmpty
@@ -142,9 +149,9 @@ groups:
         # a quiet process can sit at 0 until the next query. 10m is past that
         # idle timeout: a live server (jobs, websockets) should have opened one.
         expr: |
-          mattermost_db_master_connections_total{namespace="__NAMESPACE__", service="__SERVICE__"} == 0
+          mattermost_db_master_connections_total{namespace="__NAMESPACE__", installation_mattermost_com_installation="__INSTALLATION__"} == 0
           and on (namespace, pod)
-          up{namespace="__NAMESPACE__", service="__SERVICE__"} == 1
+          up{namespace="__NAMESPACE__", installation_mattermost_com_installation="__INSTALLATION__"} == 1
         for: 10m
         labels:
           severity: critical
@@ -157,17 +164,17 @@ groups:
         # The floor stops one error out of one request from paging.
         expr: |
           (
-            sum by (namespace, service) (rate(mattermost_http_errors_total{namespace="__NAMESPACE__", service="__SERVICE__"}[5m]))
+            sum by (namespace, installation_mattermost_com_installation) (rate(mattermost_http_errors_total{namespace="__NAMESPACE__", installation_mattermost_com_installation="__INSTALLATION__"}[5m]))
             /
-            sum by (namespace, service) (rate(mattermost_http_requests_total{namespace="__NAMESPACE__", service="__SERVICE__"}[5m]))
+            sum by (namespace, installation_mattermost_com_installation) (rate(mattermost_http_requests_total{namespace="__NAMESPACE__", installation_mattermost_com_installation="__INSTALLATION__"}[5m]))
           ) > __HTTP_ERROR_RATIO__
           and
-          sum by (namespace, service) (rate(mattermost_http_requests_total{namespace="__NAMESPACE__", service="__SERVICE__"}[5m])) > __HTTP_MIN_RPS__
+          sum by (namespace, installation_mattermost_com_installation) (rate(mattermost_http_requests_total{namespace="__NAMESPACE__", installation_mattermost_com_installation="__INSTALLATION__"}[5m])) > __HTTP_MIN_RPS__
         for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "Mattermost {{ $labels.namespace }}/{{ $labels.service }} HTTP error rate > __HTTP_ERROR_PERCENT__%"
+          summary: "Mattermost {{ $labels.namespace }}/{{ $labels.installation_mattermost_com_installation }} HTTP error rate > __HTTP_ERROR_PERCENT__%"
           description: "More than __HTTP_ERROR_PERCENT__% of Mattermost HTTP requests have been erroring for 5 minutes, above __HTTP_MIN_RPS__ requests/s."
 
       - alert: MattermostLoginFailureSpike
@@ -176,39 +183,60 @@ groups:
         # password spray pages, a large server with a partial IdP blip does not.
         expr: |
           (
-            sum by (namespace, service) (rate(mattermost_login_logins_fail_total{namespace="__NAMESPACE__", service="__SERVICE__"}[15m]))
+            sum by (namespace, installation_mattermost_com_installation) (rate(mattermost_login_logins_fail_total{namespace="__NAMESPACE__", installation_mattermost_com_installation="__INSTALLATION__"}[15m]))
             /
-            sum by (namespace, service) (
-              rate(mattermost_login_logins_fail_total{namespace="__NAMESPACE__", service="__SERVICE__"}[15m])
+            sum by (namespace, installation_mattermost_com_installation) (
+              rate(mattermost_login_logins_fail_total{namespace="__NAMESPACE__", installation_mattermost_com_installation="__INSTALLATION__"}[15m])
               +
-              rate(mattermost_login_logins_total{namespace="__NAMESPACE__", service="__SERVICE__"}[15m])
+              rate(mattermost_login_logins_total{namespace="__NAMESPACE__", installation_mattermost_com_installation="__INSTALLATION__"}[15m])
             )
           ) > __LOGIN_FAILURE_RATIO__
           and
-          sum by (namespace, service) (increase(mattermost_login_logins_fail_total{namespace="__NAMESPACE__", service="__SERVICE__"}[15m])) > __LOGIN_MIN_FAILURES__
+          sum by (namespace, installation_mattermost_com_installation) (increase(mattermost_login_logins_fail_total{namespace="__NAMESPACE__", installation_mattermost_com_installation="__INSTALLATION__"}[15m])) > __LOGIN_MIN_FAILURES__
         for: 10m
         labels:
           severity: warning
         annotations:
-          summary: "Mattermost {{ $labels.namespace }}/{{ $labels.service }} login failures are most attempts"
+          summary: "Mattermost {{ $labels.namespace }}/{{ $labels.installation_mattermost_com_installation }} login failures are most attempts"
           description: "More than __LOGIN_FAILURE_PERCENT__% of login attempts have failed for 10 minutes, with at least __LOGIN_MIN_FAILURES__ failures in 15 minutes."
 
-      - alert: MattermostSearchDown
-        # 1 when Elasticsearch is healthy or not configured, 0 only when it is
-        # configured and unhealthy. A search-less install does not fire.
-        expr: mattermost_search_engine_status{namespace="__NAMESPACE__", service="__SERVICE__"} == 0
+      - alert: MattermostWebSocketDrop
+        # Active WebSocket connections fell below half of their level 10 minutes
+        # ago. Summed across pods so a restart (new pod name, old series gone) is
+        # still seen as a drop. Typical causes: pod restart, load balancer idle
+        # timeout, network disruption. `for: 5m` ignores a normal rolling update
+        # once clients reconnect.
+        expr: |
+          sum by (namespace, installation_mattermost_com_installation) (
+            mattermost_http_websockets_total{namespace="__NAMESPACE__", installation_mattermost_com_installation="__INSTALLATION__"}
+          )
+          <
+          0.5 * sum by (namespace, installation_mattermost_com_installation) (
+            mattermost_http_websockets_total{namespace="__NAMESPACE__", installation_mattermost_com_installation="__INSTALLATION__"} offset 10m
+          )
         for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "Mattermost {{ $labels.namespace }}/{{ $labels.service }} search engine is down"
+          summary: "Mattermost {{ $labels.namespace }}/{{ $labels.installation_mattermost_com_installation }} WebSocket connections dropped by more than half"
+          description: "Active WebSocket connections are below half of their level 10 minutes ago. Users are losing real-time updates."
+
+      - alert: MattermostSearchDown
+        # 1 when Elasticsearch is healthy or not configured, 0 only when it is
+        # configured and unhealthy. A search-less install does not fire.
+        expr: mattermost_search_engine_status{namespace="__NAMESPACE__", installation_mattermost_com_installation="__INSTALLATION__"} == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Mattermost {{ $labels.namespace }}/{{ $labels.installation_mattermost_com_installation }} search engine is down"
           description: "Elasticsearch is enabled and has been unhealthy for 5 minutes."
 
       - alert: MattermostClusterUnhealthy
         # Cluster.HealthScore: 0 is healthy, higher means the node is missing the
         # gossip timing budget (memberlist awareness). A single-node process has
         # no cluster and the gauge stays 0, so this does not fire there.
-        expr: mattermost_cluster_cluster_health_score{namespace="__NAMESPACE__", service="__SERVICE__"} > 0
+        expr: mattermost_cluster_cluster_health_score{namespace="__NAMESPACE__", installation_mattermost_com_installation="__INSTALLATION__"} > 0
         for: 10m
         labels:
           severity: warning
@@ -220,14 +248,14 @@ groups:
         # The process is shedding or stalling log records. A one-off drop does
         # not hold for 5m.
         expr: |
-          sum by (namespace, service) (rate(mattermost_logging_logger_dropped_total{namespace="__NAMESPACE__", service="__SERVICE__"}[5m])) > 0
+          sum by (namespace, installation_mattermost_com_installation) (rate(mattermost_logging_logger_dropped_total{namespace="__NAMESPACE__", installation_mattermost_com_installation="__INSTALLATION__"}[5m])) > 0
           or
-          sum by (namespace, service) (rate(mattermost_logging_logger_blocked_total{namespace="__NAMESPACE__", service="__SERVICE__"}[5m])) > 0
+          sum by (namespace, installation_mattermost_com_installation) (rate(mattermost_logging_logger_blocked_total{namespace="__NAMESPACE__", installation_mattermost_com_installation="__INSTALLATION__"}[5m])) > 0
         for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "Mattermost {{ $labels.namespace }}/{{ $labels.service }} is dropping or blocking logs"
+          summary: "Mattermost {{ $labels.namespace }}/{{ $labels.installation_mattermost_com_installation }} is dropping or blocking logs"
           description: "Log records have been dropped or blocked for 5 minutes. Later failures may have no log line."
 
       # No job-failure alert. The server exports mattermost_jobs_active only

@@ -1,6 +1,8 @@
 package mattermost
 
 import (
+	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -46,6 +48,9 @@ func TestGenerateServiceMonitorV1Beta(t *testing.T) {
 		assert.Equal(t, metricsPortName, ep.Port)
 		assert.Equal(t, metricsPath, ep.Path)
 		assert.EqualValues(t, defaultScrapeInterval, ep.Interval)
+
+		// The rules match on this label, so every scraped series must carry it.
+		assert.Equal(t, []string{mmv1beta.ClusterLabel}, sm.Spec.PodTargetLabels)
 	})
 
 	t.Run("honors custom interval and extra labels", func(t *testing.T) {
@@ -259,7 +264,7 @@ func TestGeneratePrometheusRuleV1Beta(t *testing.T) {
 				if rule.Alert == "MattermostServerDown" {
 					sawServerDown = true
 					assert.Contains(t, expr, `namespace="mattermost"`)
-					assert.Contains(t, expr, `service="test-mm-metrics"`)
+					assert.Contains(t, expr, `installation_mattermost_com_installation="test-mm"`)
 				}
 			}
 		}
@@ -321,4 +326,35 @@ func TestGeneratePrometheusRuleV1Beta(t *testing.T) {
 		assert.Contains(t, saw["MattermostHighMemory"], "> 0.95")
 		assert.Contains(t, saw["MattermostDBReplicaLag"], "> 30")
 	})
+}
+
+func TestPrometheusRulesMatchInstallationNotService(t *testing.T) {
+	mm := newMattermostWithMonitoring(&mmv1beta.Monitoring{
+		PrometheusRule: &mmv1beta.PrometheusRule{Enabled: true},
+	})
+	pr, err := GeneratePrometheusRuleV1Beta(mm)
+	require.NoError(t, err)
+
+	selector := regexp.MustCompile(`(\w+)\{([^}]*)\}`)
+	var scraped int
+	var sawWebSocketDrop bool
+	for _, g := range pr.Spec.Groups {
+		for _, rule := range g.Rules {
+			expr := rule.Expr.String()
+			assert.NotContains(t, expr, `service=`, "%s must not match on the Service name", rule.Alert)
+			assert.NotContains(t, expr, "by (namespace, service)", "%s must not group by Service", rule.Alert)
+			sawWebSocketDrop = sawWebSocketDrop || rule.Alert == "MattermostWebSocketDrop"
+
+			for _, m := range selector.FindAllStringSubmatch(expr, -1) {
+				matchers := m[2]
+				assert.Contains(t, matchers, `namespace="mattermost"`, "%s: %s needs a namespace matcher", rule.Alert, m[1])
+				if strings.HasPrefix(m[1], "up") || strings.HasPrefix(m[1], "mattermost_") {
+					scraped++
+					assert.Contains(t, matchers, `installation_mattermost_com_installation="test-mm"`, "%s: %s", rule.Alert, m[1])
+				}
+			}
+		}
+	}
+	assert.NotZero(t, scraped, "expected scraped-series selectors in the shipped rules")
+	assert.True(t, sawWebSocketDrop, "expected MattermostWebSocketDrop alert")
 }
