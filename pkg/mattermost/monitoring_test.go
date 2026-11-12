@@ -328,9 +328,48 @@ func TestGeneratePrometheusRuleV1Beta(t *testing.T) {
 	})
 }
 
+func TestDBReplicaLagAlertIsOptIn(t *testing.T) {
+	alerts := func(t *testing.T, thresholds *mmv1beta.PrometheusRuleThresholds) map[string]bool {
+		t.Helper()
+		mm := newMattermostWithMonitoring(&mmv1beta.Monitoring{
+			PrometheusRule: &mmv1beta.PrometheusRule{Enabled: true, Thresholds: thresholds},
+		})
+		pr, err := GeneratePrometheusRuleV1Beta(mm)
+		require.NoError(t, err)
+		out := map[string]bool{}
+		for _, g := range pr.Spec.Groups {
+			assert.NotEmpty(t, g.Rules, "group %s should not be emitted empty", g.Name)
+			for _, r := range g.Rules {
+				out[r.Alert] = true
+			}
+		}
+		return out
+	}
+
+	lag := 12
+	t.Run("off by default", func(t *testing.T) {
+		for _, thresholds := range []*mmv1beta.PrometheusRuleThresholds{nil, {}} {
+			got := alerts(t, thresholds)
+			assert.False(t, got[alertDBReplicaLag])
+			assert.True(t, got["MattermostDBWriterPoolEmpty"], "writer pool alert must stay on")
+			assert.True(t, got["MattermostServerDown"])
+		}
+	})
+	t.Run("on when the lag threshold is set", func(t *testing.T) {
+		got := alerts(t, &mmv1beta.PrometheusRuleThresholds{DBReplicaLagSeconds: &lag})
+		assert.True(t, got[alertDBReplicaLag])
+	})
+	t.Run("other thresholds do not turn it on", func(t *testing.T) {
+		cpu := 70
+		got := alerts(t, &mmv1beta.PrometheusRuleThresholds{CPULimitPercent: &cpu})
+		assert.False(t, got[alertDBReplicaLag])
+	})
+}
+
 func TestPrometheusRulesMatchInstallationNotService(t *testing.T) {
+	lag := 5
 	mm := newMattermostWithMonitoring(&mmv1beta.Monitoring{
-		PrometheusRule: &mmv1beta.PrometheusRule{Enabled: true},
+		PrometheusRule: &mmv1beta.PrometheusRule{Enabled: true, Thresholds: &mmv1beta.PrometheusRuleThresholds{DBReplicaLagSeconds: &lag}},
 	})
 	pr, err := GeneratePrometheusRuleV1Beta(mm)
 	require.NoError(t, err)

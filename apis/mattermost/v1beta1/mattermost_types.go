@@ -330,9 +330,12 @@ type PrometheusRuleThresholds struct {
 	// +optional
 	MemoryLimitPercent *int `json:"memoryLimitPercent,omitempty"`
 
-	// DBReplicaLagSeconds is how many seconds of read-replica lag
-	// MattermostDBReplicaLag tolerates. Default 5. A writer-only database has
-	// no lag series, so this number does not apply there.
+	// DBReplicaLagSeconds turns on MattermostDBReplicaLag and sets how many
+	// seconds of read-replica lag it tolerates. The alert is off when this is
+	// unset. Set it only if Mattermost reports replica lag, which needs a lag
+	// query for each replica in SqlSettings.ReplicaLagSettings. That setting
+	// cannot be set through an environment variable. A writer-only database
+	// has no lag series, so the alert would never fire.
 	// +kubebuilder:validation:Minimum=0
 	// +optional
 	DBReplicaLagSeconds *int `json:"dbReplicaLagSeconds,omitempty"`
