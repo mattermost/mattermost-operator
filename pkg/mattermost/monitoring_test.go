@@ -397,3 +397,70 @@ func TestPrometheusRulesMatchInstallationNotService(t *testing.T) {
 	assert.NotZero(t, scraped, "expected scraped-series selectors in the shipped rules")
 	assert.True(t, sawWebSocketDrop, "expected MattermostWebSocketDrop alert")
 }
+
+func TestGenerateGrafanaDashboardConfigMapsV1Beta(t *testing.T) {
+	t.Run("one ConfigMap per embedded dashboard, discovery + prune labels, under 1MB", func(t *testing.T) {
+		mm := newMattermostWithMonitoring(&mmv1beta.Monitoring{
+			GrafanaDashboard: &mmv1beta.GrafanaDashboard{Enabled: true},
+		})
+
+		cms, err := GenerateGrafanaDashboardConfigMapsV1Beta(mm)
+		require.NoError(t, err)
+		require.NotEmpty(t, cms)
+
+		for _, cm := range cms {
+			assert.Equal(t, "mattermost", cm.Namespace)
+			require.Len(t, cm.OwnerReferences, 1)
+			assert.Equal(t, defaultDashboardDiscoveryLabelValue, cm.Labels[defaultDashboardDiscoveryLabel])
+			assert.Equal(t, "test-mm", cm.Labels[dashboardConfigMapLabel])
+			require.Len(t, cm.Data, 1)
+			assert.Contains(t, cm.Name, "test-mm-grafana-")
+			var size int
+			for _, v := range cm.Data {
+				size += len(v)
+			}
+			assert.Less(t, size, 1024*1024)
+		}
+	})
+
+	t.Run("honors custom discovery label", func(t *testing.T) {
+		mm := newMattermostWithMonitoring(&mmv1beta.Monitoring{
+			GrafanaDashboard: &mmv1beta.GrafanaDashboard{
+				Enabled:             true,
+				DiscoveryLabel:      "grafana_dashboard_custom",
+				DiscoveryLabelValue: "yes",
+			},
+		})
+
+		cms, err := GenerateGrafanaDashboardConfigMapsV1Beta(mm)
+		require.NoError(t, err)
+		require.NotEmpty(t, cms)
+		assert.Equal(t, "yes", cms[0].Labels["grafana_dashboard_custom"])
+		_, hasDefault := cms[0].Labels[defaultDashboardDiscoveryLabel]
+		assert.False(t, hasDefault)
+	})
+}
+
+func TestGrafanaDashboardNilMonitoring(t *testing.T) {
+	mm := &mmv1beta.Mattermost{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-mm", Namespace: "mattermost"},
+	}
+
+	cms, err := GenerateGrafanaDashboardConfigMapsV1Beta(mm)
+	require.NoError(t, err)
+	assert.Nil(t, cms)
+}
+
+func TestGrafanaDashboardRejectsReservedDiscoveryLabel(t *testing.T) {
+	// Using the operator's ownership-marker key as the sidecar discovery label
+	// must be rejected, not silently mishandled.
+	mm := newMattermostWithMonitoring(&mmv1beta.Monitoring{
+		GrafanaDashboard: &mmv1beta.GrafanaDashboard{
+			Enabled:        true,
+			DiscoveryLabel: dashboardConfigMapLabel,
+		},
+	})
+
+	_, err := GenerateGrafanaDashboardConfigMapsV1Beta(mm)
+	require.Error(t, err)
+}

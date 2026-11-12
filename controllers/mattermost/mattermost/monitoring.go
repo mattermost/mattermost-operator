@@ -23,6 +23,7 @@ import (
 //
 //	mattermost_monitoring_service_monitor.go
 //	mattermost_monitoring_prometheus_rules.go
+//	mattermost_monitoring_grafana_dashboards.go
 //
 // Every check both creates when its flag is on and deletes when it is off, so
 // turning a capability off cleans up after itself (mirrors the Ingress pattern).
@@ -37,7 +38,10 @@ func (r *MattermostReconciler) checkMattermostMonitoring(mattermost *mmv1beta.Ma
 	if err := r.checkMattermostRtcdServiceMonitor(mattermost, reqLogger); err != nil {
 		return err
 	}
-	return r.checkMattermostPrometheusRule(mattermost, reqLogger)
+	if err := r.checkMattermostPrometheusRule(mattermost, reqLogger); err != nil {
+		return err
+	}
+	return r.checkMattermostGrafanaDashboard(mattermost, reqLogger)
 }
 
 // warnMonitoringWithoutLicense surfaces the Enterprise-license requirement. The
