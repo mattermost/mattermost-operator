@@ -7,6 +7,7 @@ import (
 	"github.com/go-logr/logr"
 	mysqlv1alpha1 "github.com/mattermost/mattermost-operator/pkg/database/mysql_operator/v1alpha1"
 	"github.com/mattermost/mattermost-operator/pkg/resources"
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/sirupsen/logrus"
 
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
@@ -626,6 +627,8 @@ func prepareSchema(t *testing.T, scheme *runtime.Scheme) *runtime.Scheme {
 	err = v1beta1Minio.AddToScheme(scheme)
 	require.NoError(t, err)
 	err = mysqlv1alpha1.SchemeBuilder.AddToScheme(scheme)
+	require.NoError(t, err)
+	err = monitoringv1.AddToScheme(scheme)
 	require.NoError(t, err)
 
 	return scheme
