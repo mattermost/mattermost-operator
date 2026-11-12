@@ -13,6 +13,8 @@ import (
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -72,6 +74,22 @@ func (op patchOperation) affectedPaths() []string {
 		return []string{op.Path, op.From}
 	}
 	return []string{op.Path}
+}
+
+// verifyPatchedIdentity checks that a patch did not change the identity of the
+// generated object. The path denylists cannot catch every way to change the
+// identity, for example a replace of /metadata or of the whole document.
+func verifyPatchedIdentity(generated, patched *metav1.ObjectMeta) error {
+	if generated.Name != patched.Name {
+		return errors.New("patch must not change metadata.name")
+	}
+	if generated.Namespace != patched.Namespace {
+		return errors.New("patch must not change metadata.namespace")
+	}
+	if !apiequality.Semantic.DeepEqual(generated.OwnerReferences, patched.OwnerReferences) {
+		return errors.New("patch must not change metadata.ownerReferences")
+	}
+	return nil
 }
 
 // validateDeploymentPatch checks that no patch operations target forbidden paths.
@@ -143,6 +161,10 @@ func (rp *ResourcePatch) ApplyToDeployment(deployment *appsv1.Deployment) (*apps
 		return nil, false, errors.Wrap(err, "failed to apply patch to deployment")
 	}
 
+	if err := verifyPatchedIdentity(&deployment.ObjectMeta, &patched.ObjectMeta); err != nil {
+		return nil, false, errors.Wrap(err, "deployment patch validation failed")
+	}
+
 	return &patched, true, nil
 }
 
@@ -180,6 +202,13 @@ func (rp *ResourcePatch) ApplyToService(service *v1.Service) (*v1.Service, bool,
 	err := rp.Service.applyPatch(service, &patched, &gvk)
 	if err != nil {
 		return nil, false, errors.Wrap(err, "failed to apply patch to service")
+	}
+
+	if err := verifyPatchedIdentity(&service.ObjectMeta, &patched.ObjectMeta); err != nil {
+		return nil, false, errors.Wrap(err, "service patch validation failed")
+	}
+	if !apiequality.Semantic.DeepEqual(service.Spec.Selector, patched.Spec.Selector) {
+		return nil, false, errors.New("service patch validation failed: patch must not change the selector")
 	}
 
 	return &patched, true, nil

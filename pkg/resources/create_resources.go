@@ -61,7 +61,14 @@ func (r *ResourceHelper) Create(owner v1.Object, desired Object, reqLogger logr.
 	return r.client.Create(context.TODO(), desired)
 }
 
-func (r *ResourceHelper) Update(current, desired Object, reqLogger logr.Logger) error {
+// Update updates the live object with desired. It returns an error when the
+// live object is not owned by owner, so a manipulated object name or namespace
+// cannot redirect the update to a foreign object.
+func (r *ResourceHelper) Update(owner v1.Object, current, desired Object, reqLogger logr.Logger) error {
+	if !isUpdatable(current, owner) {
+		return notOwnedError(current, owner)
+	}
+
 	patchResult, err := objectMatcher.NewPatchMaker(
 		defaultAnnotator,
 		&objectMatcher.K8sStrategicMergePatcher{},
@@ -192,73 +199,50 @@ func (r *ResourceHelper) CreatePvcIfNotExists(owner v1.Object, pvc *corev1.Persi
 	return nil
 }
 
-func (r *ResourceHelper) DeleteDeployment(key types.NamespacedName, reqLogger logr.Logger) error {
-	foundDeployment := &appsv1.Deployment{}
-	err := r.client.Get(context.TODO(), key, foundDeployment)
-	if err != nil && k8sErrors.IsNotFound(err) {
-		return nil
-	} else if err != nil {
-		return errors.Wrap(err, "failed to check if deployment exists")
-	}
-
-	reqLogger.Info("Deleting deployment", "name", foundDeployment.Name)
-	err = r.client.Delete(context.TODO(), foundDeployment)
-	if err != nil {
-		return errors.Wrap(err, "failed to delete deployment")
-	}
-
-	return nil
+func (r *ResourceHelper) DeleteDeployment(owner v1.Object, key types.NamespacedName, reqLogger logr.Logger) error {
+	return r.deleteIfAllowed(owner, key, &appsv1.Deployment{}, "deployment", isDeletable, reqLogger)
 }
 
-func (r *ResourceHelper) DeleteIngressClass(key types.NamespacedName, reqLogger logr.Logger) error {
-	foundIngressClass := &networkingv1.IngressClass{}
-	err := r.client.Get(context.TODO(), key, foundIngressClass)
-	if err != nil && k8sErrors.IsNotFound(err) {
-		return nil
-	} else if err != nil {
-		return errors.Wrap(err, "failed to check if ingressClass exists")
-	}
-
-	reqLogger.Info("Deleting ingressClass", "name", foundIngressClass.Name)
-	err = r.client.Delete(context.TODO(), foundIngressClass)
-	if err != nil {
-		return errors.Wrap(err, "failed to delete ingressClass")
-	}
-
-	return nil
+// DeleteIngressClass only deletes classes that owner controls. IngressClass is
+// cluster-scoped, so the migration rule for namespaced objects does not apply.
+func (r *ResourceHelper) DeleteIngressClass(owner v1.Object, key types.NamespacedName, reqLogger logr.Logger) error {
+	return r.deleteIfAllowed(owner, key, &networkingv1.IngressClass{}, "ingressClass", v1.IsControlledBy, reqLogger)
 }
 
-func (r *ResourceHelper) DeleteIngress(key types.NamespacedName, reqLogger logr.Logger) error {
-	foundIngress := &networkingv1.Ingress{}
-	err := r.client.Get(context.TODO(), key, foundIngress)
-	if err != nil && k8sErrors.IsNotFound(err) {
-		return nil
-	} else if err != nil {
-		return errors.Wrap(err, "failed to check if ingress exists")
-	}
-
-	reqLogger.Info("Deleting ingress", "name", foundIngress.Name)
-	err = r.client.Delete(context.TODO(), foundIngress)
-	if err != nil {
-		return errors.Wrap(err, "failed to delete ingress")
-	}
-
-	return nil
+func (r *ResourceHelper) DeleteIngress(owner v1.Object, key types.NamespacedName, reqLogger logr.Logger) error {
+	return r.deleteIfAllowed(owner, key, &networkingv1.Ingress{}, "ingress", isDeletable, reqLogger)
 }
 
-func (r *ResourceHelper) DeleteService(key types.NamespacedName, reqLogger logr.Logger) error {
-	foundService := &corev1.Service{}
-	err := r.client.Get(context.TODO(), key, foundService)
+func (r *ResourceHelper) DeleteService(owner v1.Object, key types.NamespacedName, reqLogger logr.Logger) error {
+	return r.deleteIfAllowed(owner, key, &corev1.Service{}, "service", isDeletable, reqLogger)
+}
+
+// deleteIfAllowed deletes the object at key when it exists and allowed accepts
+// it for owner. It logs and skips any other object.
+func (r *ResourceHelper) deleteIfAllowed(
+	owner v1.Object,
+	key types.NamespacedName,
+	found client.Object,
+	kind string,
+	allowed func(object, owner v1.Object) bool,
+	reqLogger logr.Logger,
+) error {
+	err := r.client.Get(context.TODO(), key, found)
 	if err != nil && k8sErrors.IsNotFound(err) {
 		return nil
 	} else if err != nil {
-		return errors.Wrap(err, "failed to check if service exists")
+		return errors.Wrapf(err, "failed to check if %s exists", kind)
 	}
 
-	reqLogger.Info("Deleting service", "name", foundService.Name)
-	err = r.client.Delete(context.TODO(), foundService)
+	if !allowed(found, owner) {
+		reqLogger.Info("Skipping deletion of "+kind+" not controlled by the owner", "name", found.GetName(), "namespace", found.GetNamespace())
+		return nil
+	}
+
+	reqLogger.Info("Deleting "+kind, "name", found.GetName())
+	err = r.client.Delete(context.TODO(), found)
 	if err != nil {
-		return errors.Wrap(err, "failed to delete service")
+		return errors.Wrapf(err, "failed to delete %s", kind)
 	}
 
 	return nil

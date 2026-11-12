@@ -80,5 +80,5 @@ func (r *ClusterInstallationReconciler) checkMinioInstance(mattermost *mattermos
 	// For some reason, our current minio operator seems to remove labels on
 	// the instance resource when we add them. For that reason, trying to
 	// ensure the labels are correct doesn't work.
-	return r.Resources.Update(current, desired, reqLogger)
+	return r.Resources.Update(mattermost, current, desired, reqLogger)
 }
