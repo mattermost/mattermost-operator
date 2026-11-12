@@ -151,7 +151,8 @@ func TestGenerateMimirRulesConfigMapV1Beta(t *testing.T) {
 		require.NotEmpty(t, rules)
 		assert.Contains(t, rules, "groups:")
 		assert.Contains(t, rules, "MattermostServerDown")
-		assert.Contains(t, rules, `service="test-mm-metrics"`)
+		assert.Contains(t, rules, `installation_mattermost_com_installation="test-mm"`)
+		assert.NotContains(t, rules, `service=`)
 		assert.NotContains(t, rules, "__", "placeholder token left unsubstituted")
 	})
 
