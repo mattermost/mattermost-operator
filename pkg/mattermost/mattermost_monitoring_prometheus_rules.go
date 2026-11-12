@@ -54,6 +54,14 @@ const (
 	rulePlaceholderDBReplicaLagSecs   = "__DB_REPLICA_LAG_SECONDS__"
 )
 
+// alertDBReplicaLag is the one shipped alert that is off unless the CR asks for
+// it. Mattermost only reports replica lag once SqlSettings.ReplicaLagSettings
+// holds a lag query for each replica. That setting is a JSON array in the
+// server config and cannot be set through an MM_SQLSETTINGS_* environment
+// variable, so the Operator cannot see or enable it. Without those queries the
+// metric has no series and the alert can never fire.
+const alertDBReplicaLag = "MattermostDBReplicaLag"
+
 // Defaults for prometheusRule.thresholds and mimirRules.thresholds. These match
 // a real installation; a quiet or very large one should override them on the CR.
 const (
@@ -63,6 +71,8 @@ const (
 	defaultLoginMinFailures    = 20
 	defaultCPULimitPercent     = 85
 	defaultMemoryLimitPercent  = 90
+	// defaultDBReplicaLagSeconds only fills the placeholder. The alert is dropped
+	// unless dbReplicaLagSeconds is set (see disabledAlerts).
 	defaultDBReplicaLagSeconds = 5
 )
 
@@ -76,7 +86,8 @@ func GeneratePrometheusRuleV1Beta(mattermost *mmv1beta.Mattermost) (*monitoringv
 		return nil, nil
 	}
 
-	groups, err := loadEmbeddedPrometheusRuleGroups(rulePlaceholders(mattermost, prometheusRuleThresholds(mattermost)))
+	thresholds := prometheusRuleThresholds(mattermost)
+	groups, err := loadEmbeddedPrometheusRuleGroups(rulePlaceholders(mattermost, thresholds), thresholds)
 	if err != nil {
 		return nil, err
 	}
@@ -172,10 +183,38 @@ func intOr(value *int, fallback int) int {
 	return fallback
 }
 
+// disabledAlerts lists the shipped alerts the CR has not opted into.
+func disabledAlerts(thresholds *mmv1beta.PrometheusRuleThresholds) map[string]bool {
+	disabled := map[string]bool{}
+	if thresholds == nil || thresholds.DBReplicaLagSeconds == nil {
+		disabled[alertDBReplicaLag] = true
+	}
+	return disabled
+}
+
+// dropAlerts removes the named alerts and any group left empty.
+func dropAlerts(groups []monitoringv1.RuleGroup, drop map[string]bool) []monitoringv1.RuleGroup {
+	kept := make([]monitoringv1.RuleGroup, 0, len(groups))
+	for _, group := range groups {
+		rules := make([]monitoringv1.Rule, 0, len(group.Rules))
+		for _, rule := range group.Rules {
+			if !drop[rule.Alert] {
+				rules = append(rules, rule)
+			}
+		}
+		if len(rules) > 0 {
+			group.Rules = rules
+			kept = append(kept, group)
+		}
+	}
+	return kept
+}
+
 // loadEmbeddedPrometheusRuleGroups reads and merges the rule groups from every
 // embedded rules file (deterministic order for stable diffs), substituting the
-// per-instance placeholders before parsing.
-func loadEmbeddedPrometheusRuleGroups(replacements map[string]string) ([]monitoringv1.RuleGroup, error) {
+// per-instance placeholders before parsing. Alerts the CR has not opted into are
+// dropped.
+func loadEmbeddedPrometheusRuleGroups(replacements map[string]string, thresholds *mmv1beta.PrometheusRuleThresholds) ([]monitoringv1.RuleGroup, error) {
 	entries, err := prometheusRuleFS.ReadDir("prometheusrules")
 	if err != nil {
 		return nil, err
@@ -204,7 +243,7 @@ func loadEmbeddedPrometheusRuleGroups(replacements map[string]string) ([]monitor
 		}
 		groups = append(groups, spec.Groups...)
 	}
-	return groups, nil
+	return dropAlerts(groups, disabledAlerts(thresholds)), nil
 }
 
 // newPlaceholderReplacer builds a strings.Replacer from the token->value map.

@@ -131,9 +131,12 @@ groups:
   - name: mattermost.application
     rules:
       - alert: MattermostDBReplicaLag
-        # Read-replica lag over 5s for 5m (mattermost_db_replica_lag_time is seconds).
-        # No series when SqlSettings has no replica lag query, so a writer-only
-        # database (RDS, Azure Postgres, or a single in-cluster primary) does not fire.
+        # Read-replica lag over the threshold for 5m (mattermost_db_replica_lag_time
+        # is seconds). OFF unless the CR sets thresholds.dbReplicaLagSeconds: the
+        # series only exists when SqlSettings.ReplicaLagSettings has a lag query per
+        # replica, a JSON setting the Operator cannot set or read. A writer-only
+        # database (RDS, Azure Postgres, or a single in-cluster primary) never
+        # emits it.
         expr: max by (namespace, installation_mattermost_com_installation) (mattermost_db_replica_lag_time{namespace="__NAMESPACE__", installation_mattermost_com_installation="__INSTALLATION__"}) > __DB_REPLICA_LAG_SECONDS__
         for: 5m
         labels:
