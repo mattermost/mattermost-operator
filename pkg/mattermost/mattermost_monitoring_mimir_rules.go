@@ -70,7 +70,8 @@ func GenerateMimirRulesConfigMapV1Beta(mattermost *mmv1beta.Mattermost) (*corev1
 		tenant = mr.Tenant
 	}
 
-	groups, err := loadEmbeddedPrometheusRuleGroups(rulePlaceholders(mattermost, mimirRuleThresholds(mattermost)))
+	thresholds := mimirRuleThresholds(mattermost)
+	groups, err := loadEmbeddedPrometheusRuleGroups(rulePlaceholders(mattermost, thresholds), thresholds)
 	if err != nil {
 		return nil, err
 	}

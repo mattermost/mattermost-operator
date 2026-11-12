@@ -153,6 +153,7 @@ func TestGenerateMimirRulesConfigMapV1Beta(t *testing.T) {
 		assert.Contains(t, rules, "MattermostServerDown")
 		assert.Contains(t, rules, `installation_mattermost_com_installation="test-mm"`)
 		assert.NotContains(t, rules, `service=`)
+		assert.NotContains(t, rules, alertDBReplicaLag, "replica lag alert is opt-in")
 		assert.NotContains(t, rules, "__", "placeholder token left unsubstituted")
 	})
 
