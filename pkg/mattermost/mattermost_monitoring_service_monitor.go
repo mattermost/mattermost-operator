@@ -120,6 +120,9 @@ func GenerateServiceMonitorV1Beta(mattermost *mmv1beta.Mattermost) *monitoringv1
 			OwnerReferences: MattermostOwnerReference(mattermost),
 		},
 		Spec: monitoringv1.ServiceMonitorSpec{
+			// Put the installation label on every scraped series. The shipped
+			// alert rules match on it together with the namespace.
+			PodTargetLabels: []string{mmv1beta.ClusterLabel},
 			// Select the dedicated metrics Service (unique label).
 			Selector: metav1.LabelSelector{
 				MatchLabels: map[string]string{metricsServiceLabel: mattermost.Name},

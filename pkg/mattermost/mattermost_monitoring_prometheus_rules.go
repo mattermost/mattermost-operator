@@ -32,9 +32,11 @@ var prometheusRuleFS embed.FS
 // scope to this instance's pods by name/label — never by static IP or CIDR.
 const (
 	rulePlaceholderNamespace = "__NAMESPACE__"
-	// rulePlaceholderService matches the metrics Service (== CR name), used to
-	// scope the ServiceMonitor-labelled series (up, mattermost_*).
-	rulePlaceholderService = "__SERVICE__"
+	// rulePlaceholderInstallation is the CR name. The ServiceMonitor copies the
+	// pod label installation.mattermost.com/installation onto scraped series, so
+	// rules match this instead of the Service name. Always paired with the
+	// namespace: CR names are unique per namespace only.
+	rulePlaceholderInstallation = "__INSTALLATION__"
 	// rulePlaceholderPodSelector is a regex matching this instance's pods, used to
 	// scope kube-state-metrics / cAdvisor series that carry a `pod` label.
 	rulePlaceholderPodSelector = "__POD_SELECTOR__"
@@ -123,10 +125,8 @@ func rulePlaceholders(mattermost *mmv1beta.Mattermost, thresholds *mmv1beta.Prom
 	}
 
 	return map[string]string{
-		rulePlaceholderNamespace: mattermost.Namespace,
-		// The ServiceMonitor scrapes the dedicated <name>-metrics Service, so the
-		// Prometheus Operator sets the `service` target label to that Service name.
-		rulePlaceholderService: metricsServiceName(mattermost.Name),
+		rulePlaceholderNamespace:    mattermost.Namespace,
+		rulePlaceholderInstallation: mattermost.Name,
 		// Deployment pods are "<name>-<replicaset-hash>-<pod-suffix>". Prometheus
 		// label matches are fully anchored, so "<name>-[^-]+-[^-]+" matches only
 		// this instance's pods — not a differently-named install that happens to
