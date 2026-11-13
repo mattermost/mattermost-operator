@@ -2727,6 +2727,92 @@ spec:
                           Mattermost server defaults (both on); set explicitly to override.
                         type: boolean
                     type: object
+                  mimirRules:
+                    description: |-
+                      MimirRules is the Prometheus-free alternative to PrometheusRule: it ships
+                      the same alerting rules as a plain ConfigMap in Prometheus rules format
+                      (`groups:`), for loading into a Grafana Mimir ruler (e.g. by mimirtool or a
+                      ruler-sync sidecar) instead of the Prometheus Operator. Use this when the
+                      cluster runs Grafana Alloy + Mimir rather than Prometheus.
+                    properties:
+                      discoveryLabel:
+                        description: |-
+                          DiscoveryLabel is the label key a Mimir ruler-sync sidecar selects on.
+                          Defaults to "mimir_rules" when empty.
+                        type: string
+                      discoveryLabelValue:
+                        description: |-
+                          DiscoveryLabelValue is the label value the ruler-sync matches.
+                          Defaults to "1" when empty.
+                        type: string
+                      enabled:
+                        description: Enabled determines whether the Operator should
+                          create the rules ConfigMap.
+                        type: boolean
+                      tenant:
+                        description: |-
+                          Tenant, when set, is written as an annotation so a multi-tenant Mimir
+                          ruler-sync can load the rules under the right tenant/org id.
+                        type: string
+                      thresholds:
+                        description: |-
+                          Thresholds overrides the size-sensitive numbers in the shipped rules.
+                          A Mimir-only install sets these here. They are not read from prometheusRule.
+                        properties:
+                          cpuLimitPercent:
+                            description: |-
+                              CPULimitPercent is the percent of the mattermost container CPU limit that
+                              MattermostHighCPU compares against. Default 85.
+                            maximum: 100
+                            minimum: 0
+                            type: integer
+                          dbReplicaLagSeconds:
+                            description: |-
+                              DBReplicaLagSeconds is how many seconds of read-replica lag
+                              MattermostDBReplicaLag tolerates. Default 5. A writer-only database has
+                              no lag series, so this number does not apply there.
+                            minimum: 0
+                            type: integer
+                          httpErrorPercent:
+                            description: |-
+                              HTTPErrorPercent is the percent of HTTP requests that must be errors
+                              before MattermostHighHTTPErrorRate fires. Default 5.
+                            maximum: 100
+                            minimum: 0
+                            type: integer
+                          httpMinRequestsPerSecond:
+                            description: |-
+                              HTTPMinRequestsPerSecond is the request-rate floor for
+                              MattermostHighHTTPErrorRate. The error ratio is ignored below this rate,
+                              so one failed request on a quiet server does not page. Default 1.
+                              Set 0 to page on any positive request rate once the error percent is exceeded.
+                            minimum: 0
+                            type: integer
+                          loginFailurePercent:
+                            description: |-
+                              LoginFailurePercent is failed logins as a percent of failed plus successful
+                              logins. MattermostLoginFailureSpike also requires LoginMinFailures.
+                              Default 50.
+                            maximum: 100
+                            minimum: 0
+                            type: integer
+                          loginMinFailures:
+                            description: |-
+                              LoginMinFailures is how many failed logins must occur in 15 minutes
+                              before MattermostLoginFailureSpike can fire. Default 20.
+                            minimum: 0
+                            type: integer
+                          memoryLimitPercent:
+                            description: |-
+                              MemoryLimitPercent is the percent of the mattermost container memory limit
+                              that MattermostHighMemory compares against. Default 90.
+                            maximum: 100
+                            minimum: 0
+                            type: integer
+                        type: object
+                    required:
+                    - enabled
+                    type: object
                   prometheusRule:
                     description: |-
                       PrometheusRule configures a Prometheus Operator PrometheusRule holding
