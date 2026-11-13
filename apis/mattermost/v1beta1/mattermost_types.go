@@ -496,11 +496,13 @@ type ExternalFileStore struct {
 	// Optionally use the Mattermost service account's workload identity instead of
 	// static credentials to access the file store. The service account must be
 	// created manually and annotated with either "eks.amazonaws.com/role-arn"
-	// (AWS IAM Roles for Service Accounts, e.g. S3) or
-	// "azure.workload.identity/client-id" (Azure Workload Identity, e.g. Azure Blob Storage).
+	// (AWS IAM Roles for Service Accounts) or "azure.workload.identity/client-id"
+	// (Azure Workload Identity).
+	// The operator always configures the S3 driver. To use Azure Blob Storage, set
+	// MM_FILESETTINGS_DRIVERNAME=azureblob and the Azure file settings in mattermostEnv.
 	// Azure Workload Identity also requires the pod label
-	// "azure.workload.identity/use: true"; set it in both podTemplate.extraLabels
-	// and updateJob.extraLabels.
+	// azure.workload.identity/use: "true" in both podTemplate.extraLabels and
+	// updateJob.extraLabels.
 	UseServiceAccount bool `json:"useServiceAccount,omitempty"`
 }
 
