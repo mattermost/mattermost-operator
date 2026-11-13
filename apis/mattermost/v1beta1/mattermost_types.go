@@ -493,7 +493,16 @@ type ExternalFileStore struct {
 	// Secret should have two values: "accesskey" and "secretkey".
 	Secret string `json:"secret,omitempty"`
 
-	// Optionally use service account with IAM role to access AWS services, like S3.
+	// Optionally use the Mattermost service account's workload identity instead of
+	// static credentials to access the file store. The service account must be
+	// created manually and annotated with either "eks.amazonaws.com/role-arn"
+	// (AWS IAM Roles for Service Accounts) or "azure.workload.identity/client-id"
+	// (Azure Workload Identity).
+	// The operator always configures the S3 driver. To use Azure Blob Storage, set
+	// MM_FILESETTINGS_DRIVERNAME=azureblob and the Azure file settings in mattermostEnv.
+	// Azure Workload Identity also requires the pod label
+	// azure.workload.identity/use: "true" in both podTemplate.extraLabels and
+	// updateJob.extraLabels.
 	UseServiceAccount bool `json:"useServiceAccount,omitempty"`
 }
 
