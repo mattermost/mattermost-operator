@@ -498,6 +498,9 @@ type ExternalFileStore struct {
 	// created manually and annotated with either "eks.amazonaws.com/role-arn"
 	// (AWS IAM Roles for Service Accounts, e.g. S3) or
 	// "azure.workload.identity/client-id" (Azure Workload Identity, e.g. Azure Blob Storage).
+	// Azure Workload Identity also requires the pod label
+	// "azure.workload.identity/use: true"; set it in both podTemplate.extraLabels
+	// and updateJob.extraLabels.
 	UseServiceAccount bool `json:"useServiceAccount,omitempty"`
 }
 
