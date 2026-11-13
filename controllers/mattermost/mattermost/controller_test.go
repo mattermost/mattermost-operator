@@ -14,6 +14,7 @@ import (
 	blubr "github.com/mattermost/blubr"
 	mattermostMinio "github.com/mattermost/mattermost-operator/pkg/components/minio"
 	"github.com/mattermost/mattermost-operator/pkg/components/utils"
+	mattermostApp "github.com/mattermost/mattermost-operator/pkg/mattermost"
 	operatortest "github.com/mattermost/mattermost-operator/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -376,7 +377,7 @@ func TestReconcile(t *testing.T) {
 		require.NoError(t, err)
 		_, err = r.checkExternalFileStore(mm, logger)
 		require.Error(t, err)
-		require.Equal(t, `service account does not have "eks.amazonaws.com/role-arn" annotation, which is required if fileStore.external.useServiceAccount is true`, err.Error())
+		require.Equal(t, `service account must have one of the "eks.amazonaws.com/role-arn" or "azure.workload.identity/client-id" annotations if fileStore.external.useServiceAccount is true`, err.Error())
 		err = c.Delete(context.TODO(), sa)
 		require.NoError(t, err)
 
@@ -393,6 +394,40 @@ func TestReconcile(t *testing.T) {
 		require.NoError(t, err)
 		_, err = r.checkExternalFileStore(mm, logger)
 		require.NoError(t, err)
+
+		t.Run("azure workload identity", func(t *testing.T) {
+			err = c.Delete(context.TODO(), sa)
+			require.NoError(t, err)
+
+			sa = &corev1.ServiceAccount{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      mmName,
+					Namespace: mmNamespace,
+					Annotations: map[string]string{
+						"azure.workload.identity/client-id": "00000000-0000-0000-0000-000000000000",
+					},
+				},
+			}
+			err = c.Create(context.TODO(), sa)
+			require.NoError(t, err)
+
+			var fsConfig mattermostApp.FileStoreConfig
+			fsConfig, err = r.checkExternalFileStore(mm, logger)
+			require.NoError(t, err)
+			require.NotNil(t, fsConfig)
+
+			require.IsType(t, &mattermostApp.ExternalFileStore{}, fsConfig)
+
+			envs := map[string]corev1.EnvVar{}
+			for _, env := range fsConfig.EnvVars(mm) {
+				envs[env.Name] = env
+			}
+			assert.Equal(t, "test-bucket", envs["MM_FILESETTINGS_AMAZONS3BUCKET"].Value)
+			assert.Equal(t, "http://minio", envs["MM_FILESETTINGS_AMAZONS3ENDPOINT"].Value)
+			// Workload identity is used, so no static credentials are wired in.
+			assert.NotContains(t, envs, "MM_FILESETTINGS_AMAZONS3ACCESSKEYID")
+			assert.NotContains(t, envs, "MM_FILESETTINGS_AMAZONS3SECRETACCESSKEY")
+		})
 	})
 }
 

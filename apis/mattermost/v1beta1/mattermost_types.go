@@ -493,7 +493,11 @@ type ExternalFileStore struct {
 	// Secret should have two values: "accesskey" and "secretkey".
 	Secret string `json:"secret,omitempty"`
 
-	// Optionally use service account with IAM role to access AWS services, like S3.
+	// Optionally use the Mattermost service account's workload identity instead of
+	// static credentials to access the file store. The service account must be
+	// created manually and annotated with either "eks.amazonaws.com/role-arn"
+	// (AWS IAM Roles for Service Accounts, e.g. S3) or
+	// "azure.workload.identity/client-id" (Azure Workload Identity, e.g. Azure Blob Storage).
 	UseServiceAccount bool `json:"useServiceAccount,omitempty"`
 }
 

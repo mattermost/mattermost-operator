@@ -139,7 +139,7 @@ _Appears in:_
 | `url` _string_ | Set to use an external MinIO deployment or S3. |  |  |
 | `bucket` _string_ | Set to the bucket name of your external MinIO or S3. |  |  |
 | `secret` _string_ | Optionally enter the name of already existing secret.<br />Secret should have two values: "accesskey" and "secretkey". |  |  |
-| `useServiceAccount` _boolean_ | Optionally use service account with IAM role to access AWS services, like S3. |  |  |
+| `useServiceAccount` _boolean_ | Optionally use the Mattermost service account's workload identity instead of<br />static credentials to access the file store. The service account must be<br />created manually and annotated with either "eks.amazonaws.com/role-arn"<br />(AWS IAM Roles for Service Accounts, e.g. S3) or<br />"azure.workload.identity/client-id" (Azure Workload Identity, e.g. Azure Blob Storage). |  |  |
 
 
 #### ExternalVolumeFileStore
