@@ -37,6 +37,32 @@ func (r *MattermostReconciler) checkFileStore(mattermost *mmv1beta.Mattermost, r
 	return r.checkOperatorManagedMinio(mattermost, reqLogger)
 }
 
+const (
+	// awsIRSARoleARNAnnotation binds a ServiceAccount to an IAM role (AWS IRSA).
+	awsIRSARoleARNAnnotation = "eks.amazonaws.com/role-arn"
+	// azureWorkloadIdentityClientIDAnnotation binds a ServiceAccount to a
+	// Microsoft Entra application or user-assigned managed identity
+	// (Azure Workload Identity).
+	azureWorkloadIdentityClientIDAnnotation = "azure.workload.identity/client-id"
+)
+
+// workloadIdentityAnnotations lists the ServiceAccount annotations that
+// indicate a cloud workload identity is configured. Any one of them is
+// sufficient when fileStore.external.useServiceAccount is true.
+var workloadIdentityAnnotations = []string{
+	awsIRSARoleARNAnnotation,
+	azureWorkloadIdentityClientIDAnnotation,
+}
+
+func hasWorkloadIdentityAnnotation(sa *corev1.ServiceAccount) bool {
+	for _, annotation := range workloadIdentityAnnotations {
+		if _, ok := sa.Annotations[annotation]; ok {
+			return true
+		}
+	}
+	return false
+}
+
 func (r *MattermostReconciler) checkExternalFileStore(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) (mattermostApp.FileStoreConfig, error) {
 	if mattermost.Spec.FileStore.External.UseServiceAccount {
 		current := &corev1.ServiceAccount{}
@@ -47,8 +73,11 @@ func (r *MattermostReconciler) checkExternalFileStore(mattermost *mmv1beta.Matte
 			return nil, errors.Wrap(err, "failed to check if service account exists")
 		}
 
-		if _, ok := current.Annotations["eks.amazonaws.com/role-arn"]; !ok {
-			return nil, fmt.Errorf(`service account does not have "eks.amazonaws.com/role-arn" annotation, which is required if fileStore.external.useServiceAccount is true`)
+		if !hasWorkloadIdentityAnnotation(current) {
+			return nil, fmt.Errorf(
+				`service account must have one of the %q or %q annotations if fileStore.external.useServiceAccount is true`,
+				awsIRSARoleARNAnnotation, azureWorkloadIdentityClientIDAnnotation,
+			)
 		}
 
 		return mattermostApp.NewExternalFileStoreInfo(mattermost, nil)
