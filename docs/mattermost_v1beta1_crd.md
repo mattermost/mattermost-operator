@@ -138,7 +138,7 @@ _Appears in:_
 | `url` _string_ | Set to use an external MinIO deployment or S3. |  |  |
 | `bucket` _string_ | Set to the bucket name of your external MinIO or S3. |  |  |
 | `secret` _string_ | Optionally enter the name of already existing secret.<br />Secret should have two values: "accesskey" and "secretkey". |  |  |
-| `useServiceAccount` _boolean_ | Optionally use service account with IAM role to access AWS services, like S3. |  |  |
+| `useServiceAccount` _boolean_ | Optionally use the Mattermost service account's workload identity (AWS IRSA or<br />Azure Workload Identity) instead of static credentials to access the file store.<br />The service account must be created manually and annotated with either<br />"eks.amazonaws.com/role-arn" (AWS IAM Roles for Service Accounts) or<br />"azure.workload.identity/client-id" (Azure Workload Identity).<br />The operator always configures the S3 driver. To use Azure Blob Storage, set<br />MM_FILESETTINGS_DRIVERNAME=azureblob and the Azure file settings in mattermostEnv.<br />Azure Workload Identity also requires the pod label<br />azure.workload.identity/use: "true" in both podTemplate.extraLabels and<br />updateJob.extraLabels. |  |  |
 
 
 #### ExternalVolumeFileStore
