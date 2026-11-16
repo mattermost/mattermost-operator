@@ -222,8 +222,9 @@ spec:
                         description: Set to use an external MinIO deployment or S3.
                         type: string
                       useServiceAccount:
-                        description: Optionally use service account with IAM role
-                          to access AWS services, like S3.
+                        description: |-
+                          Optionally use the Mattermost service account's workload identity (AWS IRSA or
+                          Azure Workload Identity) instead of static credentials to access the file store.
                         type: boolean
                     type: object
                   externalVolume:
