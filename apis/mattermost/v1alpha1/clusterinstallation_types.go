@@ -99,6 +99,16 @@ type ClusterInstallationSpec struct {
 	// Specify deployment pull policy.
 	// +optional
 	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
+	// PublishNotReadyAddresses controls whether pod endpoints are published before pods are ready.
+	// When false (recommended), only ready pods receive traffic. When true, pods receive traffic immediately upon creation.
+	// Defaults to false if not specified.
+	// +optional
+	PublishNotReadyAddresses *bool `json:"publishNotReadyAddresses,omitempty"`
+	// PodTerminationGracePeriodSeconds defines how long to wait before forcefully terminating the pod during shutdown.
+	// This gives time for the pod to finish processing in-flight requests.
+	// If not specified, Kubernetes default of 30 seconds is used.
+	// +optional
+	PodTerminationGracePeriodSeconds *int64 `json:"podTerminationGracePeriodSeconds,omitempty"`
 
 	// Migrate specifies that the ClusterInstallation CR should be migrated to the Mattermost CR.
 	// CAUTION: Some features like BlueGreen or Canary are not supported with a new Custom Resource
