@@ -135,3 +135,61 @@ func TestCheckMattermostMonitoringRetriesWhenCRDsAbsent(t *testing.T) {
 	require.ErrorIs(t, err, resources.ErrPrometheusCRDAbsent)
 	require.NoError(t, c.Get(context.TODO(), types.NamespacedName{Name: "mm-metrics", Namespace: "test"}, &corev1.Service{}))
 }
+
+// The Agents ServiceMonitor scrapes through the metrics Service, so that Service
+// must exist while either ServiceMonitor is on, and go away only when both are off.
+func TestCheckMattermostAgentsMonitoringReconcile(t *testing.T) {
+	s := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(s))
+	require.NoError(t, mmv1beta.AddToScheme(s))
+	require.NoError(t, monitoringv1.AddToScheme(s))
+
+	mm := &mmv1beta.Mattermost{
+		ObjectMeta: metav1.ObjectMeta{Name: "mm", Namespace: "test", UID: "test-uid"},
+		Spec: mmv1beta.MattermostSpec{
+			LicenseSecret: "license",
+			Monitoring: &mmv1beta.Monitoring{
+				AgentsMetrics: &mmv1beta.AgentsMetrics{Enabled: true},
+			},
+		},
+	}
+
+	c := fake.NewClientBuilder().WithScheme(s).WithObjects(mm).Build()
+	r := &MattermostReconciler{
+		Client:    c,
+		Scheme:    s,
+		Resources: resources.NewResourceHelper(c, s),
+	}
+	ctx := context.TODO()
+	log := logr.Discard()
+
+	metricsSvc := types.NamespacedName{Name: "mm-metrics", Namespace: "test"}
+	sm := types.NamespacedName{Name: "mm", Namespace: "test"}
+	agentsSM := types.NamespacedName{Name: "mm-agents", Namespace: "test"}
+
+	require.NoError(t, r.checkMattermostMonitoring(mm, log))
+	require.NoError(t, c.Get(ctx, metricsSvc, &corev1.Service{}), "agents alone still needs the metrics Service")
+	require.NoError(t, c.Get(ctx, agentsSM, &monitoringv1.ServiceMonitor{}), "Agents ServiceMonitor should be created")
+	assert.True(t, apierrors.IsNotFound(c.Get(ctx, sm, &monitoringv1.ServiceMonitor{})), "main ServiceMonitor stays off")
+
+	mm.Spec.Monitoring.ServiceMonitor = &mmv1beta.ServiceMonitor{Enabled: true}
+	require.NoError(t, r.checkMattermostMonitoring(mm, log))
+	require.NoError(t, c.Get(ctx, sm, &monitoringv1.ServiceMonitor{}))
+
+	mm.Spec.Monitoring.AgentsMetrics.Enabled = false
+	require.NoError(t, r.checkMattermostMonitoring(mm, log))
+	assert.True(t, apierrors.IsNotFound(c.Get(ctx, agentsSM, &monitoringv1.ServiceMonitor{})), "Agents ServiceMonitor should be deleted")
+	require.NoError(t, c.Get(ctx, metricsSvc, &corev1.Service{}), "metrics Service stays for the main ServiceMonitor")
+	require.NoError(t, c.Get(ctx, sm, &monitoringv1.ServiceMonitor{}))
+
+	mm.Spec.Monitoring.AgentsMetrics.Enabled = true
+	mm.Spec.Monitoring.ServiceMonitor.Enabled = false
+	require.NoError(t, r.checkMattermostMonitoring(mm, log))
+	assert.True(t, apierrors.IsNotFound(c.Get(ctx, sm, &monitoringv1.ServiceMonitor{})), "main ServiceMonitor should be deleted")
+	require.NoError(t, c.Get(ctx, metricsSvc, &corev1.Service{}), "metrics Service stays for the Agents ServiceMonitor")
+
+	mm.Spec.Monitoring = nil
+	require.NoError(t, r.checkMattermostMonitoring(mm, log))
+	assert.True(t, apierrors.IsNotFound(c.Get(ctx, metricsSvc, &corev1.Service{})), "metrics Service should be deleted when both are off")
+	assert.True(t, apierrors.IsNotFound(c.Get(ctx, agentsSM, &monitoringv1.ServiceMonitor{})))
+}

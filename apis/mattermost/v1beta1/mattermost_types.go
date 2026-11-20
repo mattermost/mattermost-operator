@@ -198,6 +198,13 @@ type Monitoring struct {
 	// supplied here.
 	// +optional
 	CallsMetrics *CallsMetrics `json:"callsMetrics,omitempty"`
+
+	// AgentsMetrics configures an additional ServiceMonitor for the Agents
+	// plugin (mattermost-ai), which Mattermost serves at
+	// :8067/plugins/mattermost-ai/metrics. When prometheusRule is also enabled,
+	// the Agents alerts are added to the same PrometheusRule.
+	// +optional
+	AgentsMetrics *AgentsMetrics `json:"agentsMetrics,omitempty"`
 }
 
 // ServiceMonitor gates and configures the Prometheus Operator ServiceMonitor.
@@ -256,6 +263,67 @@ type CallsMetrics struct {
 	// labels when empty; set at least one of them or Prometheus will ignore it.
 	// +optional
 	Labels map[string]string `json:"labels,omitempty"`
+}
+
+// AgentsMetrics gates a ServiceMonitor for the Agents plugin metrics.
+//
+// The plugin reports LLM token counters by agent and team (never by user), its
+// API request and error counts, and MCP tool events. Its series carry
+// job="<name>-agents" and no installation label, so a scrape that fails because
+// the plugin is disabled never trips MattermostServerDown.
+//
+// Do not enable this when the server feature flag AggregatePluginMetrics is on.
+// That flag already adds the plugin metrics to /metrics, and both scrapes would
+// count every token twice.
+type AgentsMetrics struct {
+	// Enabled determines whether the Operator should create the Agents
+	// ServiceMonitor. It also states that the plugin should be running:
+	// MattermostAgentsMetricsDown fires when the scrape fails for 10 minutes.
+	Enabled bool `json:"enabled"`
+
+	// Interval at which Prometheus scrapes the plugin metrics (e.g. "60s").
+	// Falls back to serviceMonitor.interval, then "30s".
+	// +kubebuilder:validation:Pattern=`^(0|(([0-9]+)y)?(([0-9]+)w)?(([0-9]+)d)?(([0-9]+)h)?(([0-9]+)m)?(([0-9]+)s)?(([0-9]+)ms)?)$`
+	// +optional
+	Interval string `json:"interval,omitempty"`
+
+	// Labels are added to the Agents ServiceMonitor so the cluster's Prometheus
+	// serviceMonitorSelector can match it. Falls back to the serviceMonitor
+	// labels when empty.
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// Thresholds turns on the Agents alerts that depend on the install. Each
+	// alert stays off until its field is set.
+	// +optional
+	Thresholds *AgentsMetricsThresholds `json:"thresholds,omitempty"`
+}
+
+// AgentsMetricsThresholds tunes the Agents alerts. Error rates are the percent
+// of plugin API requests over 15 minutes, with at least 20 requests in that
+// window.
+type AgentsMetricsThresholds struct {
+	// ServerErrorPercent sets MattermostAgentsHighServerErrorRate, which fires on
+	// 5xx responses: the plugin or its LLM provider failing. On by default at
+	// 5. Set 0 to turn it off.
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=100
+	// +optional
+	ServerErrorPercent *int `json:"serverErrorPercent,omitempty"`
+
+	// ClientErrorPercent turns on MattermostAgentsHighClientErrorRate, which
+	// fires on 4xx responses. Permission denials, deleted threads and expired
+	// sessions are 4xx, so this is noisy on a healthy install. Off unless set.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=100
+	// +optional
+	ClientErrorPercent *int `json:"clientErrorPercent,omitempty"`
+
+	// TokensPerHour turns on MattermostAgentsTokenUsageHigh: input plus output
+	// tokens one agent may use in an hour before the alert fires.
+	// +kubebuilder:validation:Minimum=1
+	// +optional
+	TokensPerHour *int64 `json:"tokensPerHour,omitempty"`
 }
 
 // PrometheusRule gates and configures the Prometheus Operator PrometheusRule.

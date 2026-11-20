@@ -37,6 +37,9 @@ func (r *MattermostReconciler) checkMattermostMonitoring(mattermost *mmv1beta.Ma
 	if err := r.checkMattermostRtcdServiceMonitor(mattermost, reqLogger); err != nil {
 		return err
 	}
+	if err := r.checkMattermostAgentsServiceMonitor(mattermost, reqLogger); err != nil {
+		return err
+	}
 	return r.checkMattermostPrometheusRule(mattermost, reqLogger)
 }
 
@@ -84,5 +87,6 @@ func (r *MattermostReconciler) deleteOwnedResource(mattermost *mmv1beta.Mattermo
 // are not gated by the Mattermost license.
 func anyMonitoringEnabled(mattermost *mmv1beta.Mattermost) bool {
 	return serviceMonitorEnabled(mattermost) ||
-		prometheusRuleEnabled(mattermost)
+		prometheusRuleEnabled(mattermost) ||
+		agentsMetricsEnabled(mattermost)
 }

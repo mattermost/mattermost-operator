@@ -34,7 +34,18 @@ const (
 	// is empty. A named port is matched against the Service. A numeric targetPort
 	// is matched against a declared Pod container port, which rtcd Pods often omit.
 	defaultRtcdServicePort = metricsPortName
+
+	// agentsMetricsPath is where Mattermost serves the Agents plugin's own
+	// metrics, on the same port as /metrics.
+	agentsMetricsPath = "/plugins/mattermost-ai/metrics"
 )
+
+// AgentsMetricsJob is the job label on every Agents series. The Agents rules
+// match on it, so the copies a server with AggregatePluginMetrics adds to
+// /metrics (job "<name>-metrics") are never counted.
+func AgentsMetricsJob(mattermostName string) string {
+	return mattermostName + "-agents"
+}
 
 // GenerateMetricsServiceV1Beta builds a dedicated, internal (headless ClusterIP)
 // Service exposing only the Mattermost metrics port. The ServiceMonitor targets
@@ -195,6 +206,65 @@ func GenerateRtcdServiceMonitorV1Beta(mattermost *mmv1beta.Mattermost) *monitori
 				MatchLabels: cm.RtcdServiceSelector,
 			},
 			Endpoints: []monitoringv1.Endpoint{endpoint},
+		},
+	}
+}
+
+// GenerateAgentsServiceMonitorV1Beta builds a ServiceMonitor that scrapes the
+// Agents plugin metrics through the dedicated metrics Service. Returns nil
+// unless agentsMetrics is enabled.
+//
+// It sets no podTargetLabels on purpose. MattermostServerDown matches `up` by
+// the installation label, so leaving that label off keeps a failing Agents
+// scrape (plugin disabled, 404) from paging as a server outage.
+func GenerateAgentsServiceMonitorV1Beta(mattermost *mmv1beta.Mattermost) *monitoringv1.ServiceMonitor {
+	if mattermost.Spec.Monitoring == nil {
+		return nil
+	}
+	am := mattermost.Spec.Monitoring.AgentsMetrics
+	if am == nil || !am.Enabled {
+		return nil
+	}
+
+	sm := mattermost.Spec.Monitoring.ServiceMonitor
+	interval := defaultScrapeInterval
+	if am.Interval != "" {
+		interval = am.Interval
+	} else if sm != nil && sm.Interval != "" {
+		interval = sm.Interval
+	}
+
+	labels := mattermost.MattermostLabels(mattermost.Name)
+	discovery := am.Labels
+	if len(discovery) == 0 && sm != nil {
+		discovery = sm.Labels
+	}
+	for k, v := range discovery {
+		labels[k] = v
+	}
+
+	job := AgentsMetricsJob(mattermost.Name)
+	return &monitoringv1.ServiceMonitor{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            AgentsMetricsJob(mattermost.Name),
+			Namespace:       mattermost.Namespace,
+			Labels:          labels,
+			OwnerReferences: MattermostOwnerReference(mattermost),
+		},
+		Spec: monitoringv1.ServiceMonitorSpec{
+			Selector: metav1.LabelSelector{
+				MatchLabels: map[string]string{metricsServiceLabel: mattermost.Name},
+			},
+			Endpoints: []monitoringv1.Endpoint{
+				{
+					Port:     metricsPortName,
+					Path:     agentsMetricsPath,
+					Interval: monitoringv1.Duration(interval),
+					RelabelConfigs: []monitoringv1.RelabelConfig{
+						{TargetLabel: "job", Replacement: &job},
+					},
+				},
+			},
 		},
 	}
 }
