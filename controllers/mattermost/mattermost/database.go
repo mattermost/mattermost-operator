@@ -87,5 +87,5 @@ func (r *MattermostReconciler) checkMySQLCluster(mattermost *mmv1beta.Mattermost
 		return err
 	}
 
-	return r.Resources.Update(current, desired, reqLogger)
+	return r.Resources.Update(mattermost, current, desired, reqLogger)
 }

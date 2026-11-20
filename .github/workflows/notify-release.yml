@@ -3,23 +3,17 @@ on:
   release:
     types: [published]
 
+permissions: {}
+
 jobs:
   notify:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - shell: bash
-        env:
-          GITHUB_CONTEXT: ${{ toJson(github) }}
-        run: |
-          REPO=$(echo $GITHUB_CONTEXT | jq -r '.repository')
-          TAGVERSION=$(echo $GITHUB_CONTEXT | jq -r '.event.release.tag_name')
-          TAGURL=$(echo $GITHUB_CONTEXT | jq -r '.event.release.html_url')
-          BODY=$(echo $GITHUB_CONTEXT | jq -r '.event.release.body' | sed -E ':a;N;$!ba;s/\r{0,1}\n/\\n/g')
-
-          echo "{\"username\":\"Cloud Bot Notify\",\"icon_url\":\"https://www.mattermost.org/wp-content/uploads/2016/04/icon.png\",\"text\":\"# **New Release for $REPO** - Release [$TAGVERSION]($TAGURL)\n $BODY\"}" > mattermost.json
-          cat mattermost.json
-
-      - uses: mattermost/action-mattermost-notify@2.0.0
-        env:
+      - uses: mattermost/action-mattermost-notify@ae31bb6f9e26a54336e79696f108a2c91cf55b4e # v2.1.0
+        with:
           MATTERMOST_WEBHOOK_URL: ${{ secrets.MATTERMOST_WEBHOOK_URL }}
+          MATTERMOST_USERNAME: Cloud Bot Notify
+          MATTERMOST_ICON_URL: https://www.mattermost.org/wp-content/uploads/2016/04/icon.png
+          TEXT: |
+            # **New Release for ${{ github.repository }}** - Release [${{ github.event.release.tag_name }}](${{ github.event.release.html_url }})
+            ${{ github.event.release.body }}
