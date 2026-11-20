@@ -1548,3 +1548,156 @@ func fixedDBAndFileStoreInfo(t *testing.T, mm *mmv1beta.Mattermost) (mattermostA
 
 	return dbInfo, fsConfig
 }
+
+func TestResourcePatchCannotTargetForeignObjects(t *testing.T) {
+	newMM := func(name string) *mmv1beta.Mattermost {
+		return &mmv1beta.Mattermost{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "tenant", UID: types.UID("uid-" + name)},
+			Spec: mmv1beta.MattermostSpec{
+				Image:   "mattermost/mattermost-enterprise-edition",
+				Version: operatortest.LatestStableMattermostVersion,
+			},
+		}
+	}
+	victimService := func() *corev1.Service {
+		return &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{Name: "victim", Namespace: "default"},
+			Spec: corev1.ServiceSpec{
+				Type:     corev1.ServiceTypeClusterIP,
+				Ports:    []corev1.ServicePort{{Name: "dns", Port: 53}},
+				Selector: map[string]string{"app": "victim"},
+			},
+		}
+	}
+
+	t.Run("service overwrite", func(t *testing.T) {
+		logger, c, reconciler := setupTestDeps(t)
+		require.NoError(t, c.Create(context.TODO(), victimService()))
+
+		mm := newMM("service-attack")
+		mm.Spec.ResourcePatch = &mmv1beta.ResourcePatch{Service: &mmv1beta.Patch{
+			Patch: `[{"op":"replace","path":"/metadata/name","value":"victim"},
+				{"op":"replace","path":"/metadata/namespace","value":"default"},
+				{"op":"remove","path":"/metadata/ownerReferences"},
+				{"op":"remove","path":"/spec/clusterIP"}]`,
+		}}
+
+		status := &mmv1beta.MattermostStatus{}
+		require.NoError(t, reconciler.checkMattermostService(mm, status, logger))
+
+		assert.False(t, status.ResourcePatch.ServicePatch.Applied)
+		assert.NotEmpty(t, status.ResourcePatch.ServicePatch.Error)
+
+		victim := &corev1.Service{}
+		require.NoError(t, c.Get(context.TODO(), types.NamespacedName{Name: "victim", Namespace: "default"}, victim))
+		assert.Equal(t, victimService().Spec, victim.Spec)
+		assert.Equal(t, int32(53), victim.Spec.Ports[0].Port)
+	})
+
+	t.Run("service deletion", func(t *testing.T) {
+		logger, c, reconciler := setupTestDeps(t)
+		require.NoError(t, c.Create(context.TODO(), victimService()))
+
+		mm := newMM("service-delete")
+		mm.Spec.UseServiceLoadBalancer = true
+		mm.Spec.ResourcePatch = &mmv1beta.ResourcePatch{Service: &mmv1beta.Patch{
+			Patch: `[{"op":"replace","path":"/metadata/name","value":"victim"},
+				{"op":"replace","path":"/metadata/namespace","value":"default"}]`,
+		}}
+
+		require.NoError(t, reconciler.checkMattermostService(mm, &mmv1beta.MattermostStatus{}, logger))
+
+		require.NoError(t, c.Get(context.TODO(), types.NamespacedName{Name: "victim", Namespace: "default"}, &corev1.Service{}))
+	})
+
+	t.Run("foreign service is not deleted when the type differs", func(t *testing.T) {
+		logger, c, reconciler := setupTestDeps(t)
+
+		mm := newMM("svc")
+		mm.Spec.UseServiceLoadBalancer = true
+		foreign := victimService()
+		foreign.Name = "svc"
+		foreign.Namespace = "tenant"
+		require.NoError(t, c.Create(context.TODO(), foreign))
+
+		err := reconciler.checkMattermostService(mm, &mmv1beta.MattermostStatus{}, logger)
+		require.Error(t, err)
+
+		current := &corev1.Service{}
+		require.NoError(t, c.Get(context.TODO(), types.NamespacedName{Name: "svc", Namespace: "tenant"}, current))
+		assert.Equal(t, corev1.ServiceTypeClusterIP, current.Spec.Type)
+	})
+
+	t.Run("deployment overwrite", func(t *testing.T) {
+		logger, c, reconciler := setupTestDeps(t)
+
+		target := &appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            "target-mm",
+				Namespace:       "mm-target",
+				OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(&mmv1beta.Mattermost{ObjectMeta: metav1.ObjectMeta{Name: "target-mm", UID: "uid-target"}}, mmv1beta.GroupVersion.WithKind("Mattermost"))},
+			},
+			Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "mattermost", Image: "victim:1"}}}}},
+		}
+		require.NoError(t, c.Create(context.TODO(), target))
+
+		mm := newMM("target-mm")
+		mm.Spec.ResourcePatch = &mmv1beta.ResourcePatch{Deployment: &mmv1beta.Patch{
+			Patch: `[{"op":"replace","path":"/metadata/namespace","value":"mm-target"}]`,
+		}}
+		dbInfo, fsConfig := fixedDBAndFileStoreInfo(t, mm)
+
+		status := &mmv1beta.MattermostStatus{}
+		_, err := reconciler.checkMattermostDeployment(mm, dbInfo, fsConfig, status, logger)
+		require.NoError(t, err)
+		assert.False(t, status.ResourcePatch.DeploymentPatch.Applied)
+
+		current := &appsv1.Deployment{}
+		require.NoError(t, c.Get(context.TODO(), types.NamespacedName{Name: "target-mm", Namespace: "mm-target"}, current))
+		assert.Equal(t, "victim:1", current.Spec.Template.Spec.Containers[0].Image)
+	})
+
+	t.Run("job server deployment overwrite", func(t *testing.T) {
+		logger, c, reconciler := setupTestDeps(t)
+
+		victim := &appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{Name: "victim-app", Namespace: "default"},
+			Spec: appsv1.DeploymentSpec{
+				Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "victim-app"}},
+				Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "victim", Image: "victim:1"}}}},
+			},
+		}
+		require.NoError(t, c.Create(context.TODO(), victim))
+
+		mm := newMM("attacker")
+		mm.Spec.JobServer = &mmv1beta.JobServer{DedicatedJobServer: true}
+		mm.Spec.ResourcePatch = &mmv1beta.ResourcePatch{Deployment: &mmv1beta.Patch{
+			Patch: `[{"op":"test","path":"/metadata/name","value":"attacker-jobserver"},
+				{"op":"replace","path":"/metadata/name","value":"victim-app"},
+				{"op":"replace","path":"/metadata/namespace","value":"default"},
+				{"op":"replace","path":"/spec/selector","value":{"matchLabels":{"app":"victim-app"}}},
+				{"op":"replace","path":"/spec/template/metadata/labels","value":{"app":"victim-app"}}]`,
+		}}
+		dbInfo, fsConfig := fixedDBAndFileStoreInfo(t, mm)
+
+		require.NoError(t, reconciler.checkMattermostJobServerDeployment(mm, dbInfo, fsConfig, &mmv1beta.MattermostStatus{}, logger))
+
+		current := &appsv1.Deployment{}
+		require.NoError(t, c.Get(context.TODO(), types.NamespacedName{Name: "victim-app", Namespace: "default"}, current))
+		assert.Equal(t, "victim:1", current.Spec.Template.Spec.Containers[0].Image)
+	})
+
+	t.Run("ingress class deletion", func(t *testing.T) {
+		logger, c, reconciler := setupTestDeps(t)
+
+		shared := &v1beta1.IngressClass{
+			ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
+			Spec:       v1beta1.IngressClassSpec{Controller: "k8s.io/ingress-nginx"},
+		}
+		require.NoError(t, c.Create(context.TODO(), shared))
+
+		require.NoError(t, reconciler.checkMattermostIngressClass(newMM("nginx"), logger))
+
+		require.NoError(t, c.Get(context.TODO(), types.NamespacedName{Name: "nginx"}, &v1beta1.IngressClass{}))
+	})
+}

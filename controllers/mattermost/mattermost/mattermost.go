@@ -124,7 +124,7 @@ func (r *MattermostReconciler) checkMattermostService(
 
 	if current.Spec.Type != desired.Spec.Type && current.Spec.Type != "" {
 		reqLogger.Info("Recreating service due to service type change", "name", current.Name)
-		err := r.Resources.DeleteService(types.NamespacedName{Namespace: current.Namespace, Name: current.Name}, reqLogger)
+		err := r.Resources.DeleteService(mattermost, types.NamespacedName{Namespace: current.Namespace, Name: current.Name}, reqLogger)
 		if err != nil {
 			return errors.Wrap(err, "failed to delete service")
 		}
@@ -135,7 +135,7 @@ func (r *MattermostReconciler) checkMattermostService(
 
 	resources.CopyServiceEmptyAutoAssignedFields(desired, current)
 
-	return r.Resources.Update(current, desired, reqLogger)
+	return r.Resources.Update(mattermost, current, desired, reqLogger)
 }
 
 func (r *MattermostReconciler) checkMattermostRBAC(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) error {
@@ -174,7 +174,7 @@ func (r *MattermostReconciler) checkMattermostSA(mattermost *mmv1beta.Mattermost
 		return err
 	}
 
-	return r.Resources.Update(current, desired, reqLogger)
+	return r.Resources.Update(mattermost, current, desired, reqLogger)
 }
 
 func (r *MattermostReconciler) checkMattermostRole(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) error {
@@ -190,7 +190,7 @@ func (r *MattermostReconciler) checkMattermostRole(mattermost *mmv1beta.Mattermo
 		return err
 	}
 
-	return r.Resources.Update(current, desired, reqLogger)
+	return r.Resources.Update(mattermost, current, desired, reqLogger)
 }
 
 func (r *MattermostReconciler) checkMattermostRoleBinding(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) error {
@@ -206,7 +206,7 @@ func (r *MattermostReconciler) checkMattermostRoleBinding(mattermost *mmv1beta.M
 		return err
 	}
 
-	return r.Resources.Update(current, desired, reqLogger)
+	return r.Resources.Update(mattermost, current, desired, reqLogger)
 }
 
 func (r *MattermostReconciler) checkMattermostIngress(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) error {
@@ -217,7 +217,7 @@ func (r *MattermostReconciler) checkMattermostIngress(mattermost *mmv1beta.Matte
 	}
 
 	if !mattermost.IngressEnabled() && !mattermost.AWSLoadBalancerEnabled() {
-		err := r.Resources.DeleteIngress(types.NamespacedName{Namespace: desired.Namespace, Name: desired.Name}, reqLogger)
+		err := r.Resources.DeleteIngress(mattermost, types.NamespacedName{Namespace: desired.Namespace, Name: desired.Name}, reqLogger)
 		if err != nil {
 			return errors.Wrap(err, "failed to delete disabled ingress")
 		}
@@ -235,14 +235,14 @@ func (r *MattermostReconciler) checkMattermostIngress(mattermost *mmv1beta.Matte
 		return err
 	}
 
-	return r.Resources.Update(current, desired, reqLogger)
+	return r.Resources.Update(mattermost, current, desired, reqLogger)
 }
 
 func (r *MattermostReconciler) checkMattermostIngressClass(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) error {
 	desired := mattermostApp.GenerateALBIngressClassV1Beta(mattermost)
 
 	if !mattermost.AWSLoadBalancerEnabled() || mattermost.Spec.AWSLoadBalancerController.IngressClassName != "" {
-		err := r.Resources.DeleteIngressClass(types.NamespacedName{Namespace: desired.Namespace, Name: desired.Name}, reqLogger)
+		err := r.Resources.DeleteIngressClass(mattermost, types.NamespacedName{Namespace: desired.Namespace, Name: desired.Name}, reqLogger)
 		if err != nil {
 			return errors.Wrap(err, "failed to delete disabled ingressClass")
 		}
@@ -260,7 +260,7 @@ func (r *MattermostReconciler) checkMattermostIngressClass(mattermost *mmv1beta.
 		return err
 	}
 
-	return r.Resources.Update(current, desired, reqLogger)
+	return r.Resources.Update(mattermost, current, desired, reqLogger)
 }
 
 func (r *MattermostReconciler) checkMattermostJobServer(
@@ -292,7 +292,7 @@ func (r *MattermostReconciler) checkMattermostJobServerDeployment(
 
 	if mattermost.Spec.JobServer == nil || !mattermost.Spec.JobServer.DedicatedJobServer {
 		// Ensure any existing dedicated job server deployments are removed.
-		err := r.Resources.DeleteDeployment(types.NamespacedName{Namespace: desired.Namespace, Name: desired.Name}, reqLogger)
+		err := r.Resources.DeleteDeployment(mattermost, types.NamespacedName{Namespace: desired.Namespace, Name: desired.Name}, reqLogger)
 		if err != nil {
 			return errors.Wrap(err, "failed to delete job server deployment")
 		}
@@ -322,7 +322,7 @@ func (r *MattermostReconciler) checkMattermostJobServerDeployment(
 		return errors.Wrap(err, "failed to get mattermost job server deployment")
 	}
 
-	return r.Resources.Update(current, desired, reqLogger)
+	return r.Resources.Update(mattermost, current, desired, reqLogger)
 }
 
 func (r *MattermostReconciler) checkMattermostDeployment(
@@ -438,7 +438,7 @@ func (r *MattermostReconciler) updateMattermostDeployment(
 
 	if sameImage {
 		// Need to update other fields only, update job is not required
-		return recStatus, r.Resources.Update(current, desired, reqLogger)
+		return recStatus, r.Resources.Update(mattermost, current, desired, reqLogger)
 	}
 
 	// Image is not the same
@@ -447,7 +447,7 @@ func (r *MattermostReconciler) updateMattermostDeployment(
 
 	if mattermost.Spec.UpdateJob != nil && mattermost.Spec.UpdateJob.Disabled {
 		reqLogger.Info("Update job is disabled, new image will rollout without being verified")
-		return recStatus, r.Resources.Update(current, desired, reqLogger)
+		return recStatus, r.Resources.Update(mattermost, current, desired, reqLogger)
 	}
 
 	// Run a single-pod job with the new mattermost image
@@ -466,7 +466,7 @@ func (r *MattermostReconciler) updateMattermostDeployment(
 
 	// Job completed successfully
 	if recStatus.ResourcesReady {
-		return recStatus, r.Resources.Update(current, desired, reqLogger)
+		return recStatus, r.Resources.Update(mattermost, current, desired, reqLogger)
 	}
 
 	return recStatus, nil

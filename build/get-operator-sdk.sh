@@ -47,7 +47,8 @@ curl -Lo operator-sdk "$URL"
 curl -Lo operator-sdk.asc "$URL.asc"
 
 # Verify
-gpg --keyserver keyserver.ubuntu.com --recv-key "$(gpg --verify operator-sdk.asc operator-sdk 2>&1 /dev/null | grep RSA | awk '{ print $NF }')"
+KEY_ID="$(gpg --verify operator-sdk.asc operator-sdk 2>&1 /dev/null | grep RSA | awk '{ print $NF }')"
+gpg --keyserver keyserver.ubuntu.com --recv-key "$KEY_ID" || gpg --keyserver hkps://keys.openpgp.org --recv-key "$KEY_ID"
 gpg --verify operator-sdk.asc operator-sdk
 
 chmod +x ./operator-sdk

@@ -49,10 +49,7 @@ func (r *MattermostReconciler) checkMattermostPrometheusRule(mattermost *mmv1bet
 		return errors.Wrap(err, "failed to fetch current prometheus rule")
 	}
 
-	if err := ensureOwnedForUpdate(mattermost, current); err != nil {
-		return err
-	}
-	return r.Resources.Update(current, desired, reqLogger)
+	return r.Resources.Update(mattermost, current, desired, reqLogger)
 }
 
 func prometheusRuleEnabled(mattermost *mmv1beta.Mattermost) bool {

@@ -41,15 +41,15 @@ func (r *ResourceHelper) CreateOrUpdateMinioSecret(owner v1.Object, desired *cor
 	// Validate secret required fields, if not exist recreate.
 	if _, ok := current.Data["accesskey"]; !ok {
 		logger.Info("minio secret does not have an 'accesskey' value, overriding", "name", desired.Name)
-		return r.Update(current, desired, logger)
+		return r.Update(owner, current, desired, logger)
 	}
 	if _, ok := current.Data["secretkey"]; !ok {
 		logger.Info("minio secret does not have an 'secretkey' value, overriding", "name", desired.Name)
-		return r.Update(current, desired, logger)
+		return r.Update(owner, current, desired, logger)
 	}
 	// Preserve data fields
 	desired.Data = current.Data
-	return r.Update(current, desired, logger)
+	return r.Update(owner, current, desired, logger)
 }
 
 func (r *ResourceHelper) createMinioSecret(owner v1.Object, desired *corev1.Secret, logger logr.Logger) error {

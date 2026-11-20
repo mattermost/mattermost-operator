@@ -81,7 +81,7 @@ func (r *ClusterInstallationReconciler) checkMattermostService(mattermost *matte
 
 	resources.CopyServiceEmptyAutoAssignedFields(desired, current)
 
-	return r.Resources.Update(current, desired, reqLogger)
+	return r.Resources.Update(mattermost, current, desired, reqLogger)
 }
 
 func (r *ClusterInstallationReconciler) checkMattermostRBAC(mattermost *mattermostv1alpha1.ClusterInstallation, roleName, saName string, reqLogger logr.Logger) error {
@@ -114,7 +114,7 @@ func (r *ClusterInstallationReconciler) checkMattermostSA(mattermost *mattermost
 		return err
 	}
 
-	return r.Resources.Update(current, desired, reqLogger)
+	return r.Resources.Update(mattermost, current, desired, reqLogger)
 }
 
 func (r *ClusterInstallationReconciler) checkMattermostRole(mattermost *mattermostv1alpha1.ClusterInstallation, roleName string, reqLogger logr.Logger) error {
@@ -130,7 +130,7 @@ func (r *ClusterInstallationReconciler) checkMattermostRole(mattermost *mattermo
 		return err
 	}
 
-	return r.Resources.Update(current, desired, reqLogger)
+	return r.Resources.Update(mattermost, current, desired, reqLogger)
 }
 
 func (r *ClusterInstallationReconciler) checkMattermostRoleBinding(mattermost *mattermostv1alpha1.ClusterInstallation, roleName, saName string, reqLogger logr.Logger) error {
@@ -146,7 +146,7 @@ func (r *ClusterInstallationReconciler) checkMattermostRoleBinding(mattermost *m
 		return err
 	}
 
-	return r.Resources.Update(current, desired, reqLogger)
+	return r.Resources.Update(mattermost, current, desired, reqLogger)
 }
 
 func (r *ClusterInstallationReconciler) checkMattermostIngress(mattermost *mattermostv1alpha1.ClusterInstallation, resourceName, ingressName string, ingressAnnotations map[string]string, reqLogger logr.Logger) error {
@@ -163,7 +163,7 @@ func (r *ClusterInstallationReconciler) checkMattermostIngress(mattermost *matte
 		return err
 	}
 
-	return r.Resources.Update(current, desired, reqLogger)
+	return r.Resources.Update(mattermost, current, desired, reqLogger)
 }
 
 func (r *ClusterInstallationReconciler) checkMattermostDeployment(mattermost *mattermostv1alpha1.ClusterInstallation, resourceName, ingressName, saName, imageName string, reqLogger logr.Logger) error {
@@ -343,7 +343,7 @@ func (r *ClusterInstallationReconciler) updateMattermostDeployment(
 
 	if sameImage {
 		// Need to update other fields only, update job is not required
-		return r.Resources.Update(current, desired, reqLogger)
+		return r.Resources.Update(mattermost, current, desired, reqLogger)
 	}
 
 	// Image is not the same
@@ -365,7 +365,7 @@ func (r *ClusterInstallationReconciler) updateMattermostDeployment(
 
 	// Job completed successfully
 
-	return r.Resources.Update(current, desired, reqLogger)
+	return r.Resources.Update(mattermost, current, desired, reqLogger)
 }
 
 // checkUpdateJob checks whether update job status. In case job is not running it is launched
