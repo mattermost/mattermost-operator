@@ -36,13 +36,18 @@ var agentsRuleFS embed.FS
 const agentsRulesFile = "agentsrules/mattermost_agents_prometheus_rules.yaml"
 
 const (
-	rulePlaceholderAgentsJob            = "__AGENTS_JOB__"
-	rulePlaceholderAgentsHTTPErrorRatio = "__AGENTS_HTTP_ERROR_RATIO__"
-	rulePlaceholderAgentsHTTPErrorPct   = "__AGENTS_HTTP_ERROR_PERCENT__"
-	rulePlaceholderAgentsTokensPerHour  = "__AGENTS_TOKENS_PER_HOUR__"
+	rulePlaceholderAgentsJob              = "__AGENTS_JOB__"
+	rulePlaceholderAgentsServerErrorRatio = "__AGENTS_SERVER_ERROR_RATIO__"
+	rulePlaceholderAgentsServerErrorPct   = "__AGENTS_SERVER_ERROR_PERCENT__"
+	rulePlaceholderAgentsClientErrorRatio = "__AGENTS_CLIENT_ERROR_RATIO__"
+	rulePlaceholderAgentsClientErrorPct   = "__AGENTS_CLIENT_ERROR_PERCENT__"
+	rulePlaceholderAgentsTokensPerHour    = "__AGENTS_TOKENS_PER_HOUR__"
 
-	alertAgentsHighErrorRate  = "MattermostAgentsHighErrorRate"
+	alertAgentsServerErrors   = "MattermostAgentsHighServerErrorRate"
+	alertAgentsClientErrors   = "MattermostAgentsHighClientErrorRate"
 	alertAgentsTokenUsageHigh = "MattermostAgentsTokenUsageHigh"
+
+	defaultAgentsServerErrorPercent = 5
 )
 
 // Rule placeholder tokens. Because the Operator generates the PrometheusRule per
@@ -279,29 +284,37 @@ func newPlaceholderReplacer(replacements map[string]string) *strings.Replacer {
 }
 
 // loadAgentsPrometheusRuleGroups returns the Agents plugin rule groups, or nil
-// unless agentsMetrics is enabled. MattermostAgentsMetricsDown always ships with
-// them; the error-rate and token alerts ship only when their threshold is set.
+// unless agentsMetrics is enabled. MattermostAgentsMetricsDown and the 5xx alert
+// ship by default; serverErrorPercent: 0 drops the 5xx alert. The 4xx and token
+// alerts ship only when their threshold is set.
 func loadAgentsPrometheusRuleGroups(mattermost *mmv1beta.Mattermost) ([]monitoringv1.RuleGroup, error) {
 	am := mattermost.Spec.Monitoring.AgentsMetrics
 	if am == nil || !am.Enabled {
 		return nil, nil
 	}
 
-	errorPercent := 0
+	serverErrorPercent := defaultAgentsServerErrorPercent
+	clientErrorPercent := 0
 	tokensPerHour := int64(0)
 	drop := map[string]bool{
-		alertAgentsHighErrorRate:  true,
+		alertAgentsClientErrors:   true,
 		alertAgentsTokenUsageHigh: true,
 	}
 	if t := am.Thresholds; t != nil {
-		if t.HTTPErrorPercent != nil {
-			errorPercent = *t.HTTPErrorPercent
-			delete(drop, alertAgentsHighErrorRate)
+		if t.ServerErrorPercent != nil {
+			serverErrorPercent = *t.ServerErrorPercent
+		}
+		if t.ClientErrorPercent != nil {
+			clientErrorPercent = *t.ClientErrorPercent
+			delete(drop, alertAgentsClientErrors)
 		}
 		if t.TokensPerHour != nil {
 			tokensPerHour = *t.TokensPerHour
 			delete(drop, alertAgentsTokenUsageHigh)
 		}
+	}
+	if serverErrorPercent == 0 {
+		drop[alertAgentsServerErrors] = true
 	}
 
 	content, err := agentsRuleFS.ReadFile(agentsRulesFile)
@@ -309,11 +322,13 @@ func loadAgentsPrometheusRuleGroups(mattermost *mmv1beta.Mattermost) ([]monitori
 		return nil, err
 	}
 	replacer := newPlaceholderReplacer(map[string]string{
-		rulePlaceholderNamespace:            mattermost.Namespace,
-		rulePlaceholderAgentsJob:            AgentsMetricsJob(mattermost.Name),
-		rulePlaceholderAgentsHTTPErrorRatio: fractionString(errorPercent),
-		rulePlaceholderAgentsHTTPErrorPct:   strconv.Itoa(errorPercent),
-		rulePlaceholderAgentsTokensPerHour:  strconv.FormatInt(tokensPerHour, 10),
+		rulePlaceholderNamespace:              mattermost.Namespace,
+		rulePlaceholderAgentsJob:              AgentsMetricsJob(mattermost.Name),
+		rulePlaceholderAgentsServerErrorRatio: fractionString(serverErrorPercent),
+		rulePlaceholderAgentsServerErrorPct:   strconv.Itoa(serverErrorPercent),
+		rulePlaceholderAgentsClientErrorRatio: fractionString(clientErrorPercent),
+		rulePlaceholderAgentsClientErrorPct:   strconv.Itoa(clientErrorPercent),
+		rulePlaceholderAgentsTokensPerHour:    strconv.FormatInt(tokensPerHour, 10),
 	})
 
 	var spec monitoringv1.PrometheusRuleSpec

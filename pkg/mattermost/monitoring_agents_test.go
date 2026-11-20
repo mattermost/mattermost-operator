@@ -97,35 +97,52 @@ func agentsRuleExprs(t *testing.T, agents *mmv1beta.AgentsMetrics) map[string]st
 }
 
 func TestAgentsAlerts(t *testing.T) {
-	errorPercent := 30
+	clientPercent := 30
+	serverPercent := 10
+	off := 0
 	tokens := int64(500000)
 
 	t.Run("none without agentsMetrics", func(t *testing.T) {
 		for _, agents := range []*mmv1beta.AgentsMetrics{nil, {Enabled: false}} {
 			got := agentsRuleExprs(t, agents)
 			assert.NotContains(t, got, "MattermostAgentsMetricsDown")
+			assert.NotContains(t, got, alertAgentsServerErrors)
 			assert.Contains(t, got, "MattermostServerDown")
 		}
 	})
 
-	t.Run("only MattermostAgentsMetricsDown by default", func(t *testing.T) {
+	t.Run("down and 5xx alerts by default", func(t *testing.T) {
 		for _, thresholds := range []*mmv1beta.AgentsMetricsThresholds{nil, {}} {
 			got := agentsRuleExprs(t, &mmv1beta.AgentsMetrics{Enabled: true, Thresholds: thresholds})
 			assert.Contains(t, got, "MattermostAgentsMetricsDown")
-			assert.NotContains(t, got, alertAgentsHighErrorRate)
+			assert.Contains(t, got[alertAgentsServerErrors], `status_code=~"5.."`)
+			assert.Contains(t, got[alertAgentsServerErrors], "> 0.05")
+			assert.NotContains(t, got, alertAgentsClientErrors)
 			assert.NotContains(t, got, alertAgentsTokenUsageHigh)
 		}
 	})
 
-	t.Run("thresholds turn on their alerts", func(t *testing.T) {
+	t.Run("serverErrorPercent 0 turns the 5xx alert off", func(t *testing.T) {
+		got := agentsRuleExprs(t, &mmv1beta.AgentsMetrics{
+			Enabled:    true,
+			Thresholds: &mmv1beta.AgentsMetricsThresholds{ServerErrorPercent: &off},
+		})
+		assert.NotContains(t, got, alertAgentsServerErrors)
+		assert.Contains(t, got, "MattermostAgentsMetricsDown")
+	})
+
+	t.Run("thresholds tune and turn on their alerts", func(t *testing.T) {
 		got := agentsRuleExprs(t, &mmv1beta.AgentsMetrics{
 			Enabled: true,
 			Thresholds: &mmv1beta.AgentsMetricsThresholds{
-				HTTPErrorPercent: &errorPercent,
-				TokensPerHour:    &tokens,
+				ServerErrorPercent: &serverPercent,
+				ClientErrorPercent: &clientPercent,
+				TokensPerHour:      &tokens,
 			},
 		})
-		assert.Contains(t, got[alertAgentsHighErrorRate], "> 0.3")
+		assert.Contains(t, got[alertAgentsServerErrors], "> 0.1")
+		assert.Contains(t, got[alertAgentsClientErrors], `status_code=~"4.."`)
+		assert.Contains(t, got[alertAgentsClientErrors], "> 0.3")
 		assert.Contains(t, got[alertAgentsTokenUsageHigh], "> 500000")
 	})
 
@@ -133,11 +150,11 @@ func TestAgentsAlerts(t *testing.T) {
 		got := agentsRuleExprs(t, &mmv1beta.AgentsMetrics{
 			Enabled: true,
 			Thresholds: &mmv1beta.AgentsMetricsThresholds{
-				HTTPErrorPercent: &errorPercent,
-				TokensPerHour:    &tokens,
+				ClientErrorPercent: &clientPercent,
+				TokensPerHour:      &tokens,
 			},
 		})
-		for _, alert := range []string{"MattermostAgentsMetricsDown", alertAgentsHighErrorRate, alertAgentsTokenUsageHigh} {
+		for _, alert := range []string{"MattermostAgentsMetricsDown", alertAgentsServerErrors, alertAgentsClientErrors, alertAgentsTokenUsageHigh} {
 			expr := got[alert]
 			require.NotEmpty(t, expr, alert)
 			assert.NotRegexp(t, `__[A-Z_]+__`, expr, "%s has an unsubstituted placeholder", alert)

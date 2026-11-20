@@ -76,11 +76,11 @@ spec:
     #   interval: "60s"              # falls back to serviceMonitor.interval
     #   labels:                      # falls back to serviceMonitor.labels
     #     release: kube-prometheus-stack
-    #   # MattermostAgentsMetricsDown is always on when enabled. These two
-    #   # alerts are added only when their threshold is set:
+    #   # MattermostAgentsMetricsDown and the 5xx alert are on by default.
     #   thresholds:
-    #     httpErrorPercent: 10       # non-2xx plugin responses over 15 minutes
-    #     tokensPerHour: 1000000     # input + output tokens per bot
+    #     serverErrorPercent: 5      # 5xx over 15 minutes; 0 turns it off
+    #     clientErrorPercent: 30     # 4xx over 15 minutes; off unless set
+    #     tokensPerHour: 1000000     # input + output tokens per bot; off unless set
 
 # NOTE: the operator creates a dedicated internal metrics Service (<name>-metrics)
 # that the ServiceMonitor scrapes, so monitoring works in every service mode —

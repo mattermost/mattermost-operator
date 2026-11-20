@@ -22,24 +22,45 @@ groups:
           summary: "Mattermost Agents metrics for {{ $labels.namespace }}/{{ $labels.pod }} are unavailable"
           description: "Prometheus could not scrape /plugins/mattermost-ai/metrics for 10 minutes. The Agents plugin is disabled, not installed, or not responding."
 
-      - alert: MattermostAgentsHighErrorRate
-        # Off unless agentsMetrics.thresholds.httpErrorPercent is set. The plugin
-        # counts every response outside 2xx, including 401 and 404, so the
-        # 20-request floor keeps a quiet install from paging on one bad request.
+      # Error rates use the status_code label on agents_api_time_seconds.
+      # agents_http_errors_total has no labels and lumps 4xx in with 5xx.
+      # Streamed LLM replies return 200 before the provider answers, so a
+      # provider failing mid-stream does not show up as a 5xx.
+      - alert: MattermostAgentsHighServerErrorRate
+        # On by default at 5%. agentsMetrics.thresholds.serverErrorPercent: 0
+        # turns it off.
         expr: |
           (
-            sum by (namespace, job) (increase(agents_http_errors_total{namespace="__NAMESPACE__", job="__AGENTS_JOB__"}[15m]))
+            sum by (namespace, job) (increase(agents_api_time_seconds_count{namespace="__NAMESPACE__", job="__AGENTS_JOB__", status_code=~"5.."}[15m]))
             /
-            sum by (namespace, job) (increase(agents_http_requests_total{namespace="__NAMESPACE__", job="__AGENTS_JOB__"}[15m]))
-          ) > __AGENTS_HTTP_ERROR_RATIO__
+            sum by (namespace, job) (increase(agents_api_time_seconds_count{namespace="__NAMESPACE__", job="__AGENTS_JOB__"}[15m]))
+          ) > __AGENTS_SERVER_ERROR_RATIO__
           and
-          sum by (namespace, job) (increase(agents_http_requests_total{namespace="__NAMESPACE__", job="__AGENTS_JOB__"}[15m])) > 20
+          sum by (namespace, job) (increase(agents_api_time_seconds_count{namespace="__NAMESPACE__", job="__AGENTS_JOB__"}[15m])) > 20
         for: 15m
         labels:
           severity: warning
         annotations:
-          summary: "Mattermost Agents API errors in {{ $labels.namespace }} above __AGENTS_HTTP_ERROR_PERCENT__%"
-          description: "More than __AGENTS_HTTP_ERROR_PERCENT__% of Agents plugin API requests have returned a non-2xx status for 15 minutes."
+          summary: "Mattermost Agents 5xx errors in {{ $labels.namespace }} above __AGENTS_SERVER_ERROR_PERCENT__%"
+          description: "More than __AGENTS_SERVER_ERROR_PERCENT__% of Agents plugin API requests have returned 5xx for 15 minutes. Check the plugin logs and the LLM provider."
+
+      - alert: MattermostAgentsHighClientErrorRate
+        # Off unless agentsMetrics.thresholds.clientErrorPercent is set. A
+        # healthy install returns 401, 403 and 404 routinely.
+        expr: |
+          (
+            sum by (namespace, job) (increase(agents_api_time_seconds_count{namespace="__NAMESPACE__", job="__AGENTS_JOB__", status_code=~"4.."}[15m]))
+            /
+            sum by (namespace, job) (increase(agents_api_time_seconds_count{namespace="__NAMESPACE__", job="__AGENTS_JOB__"}[15m]))
+          ) > __AGENTS_CLIENT_ERROR_RATIO__
+          and
+          sum by (namespace, job) (increase(agents_api_time_seconds_count{namespace="__NAMESPACE__", job="__AGENTS_JOB__"}[15m])) > 20
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Mattermost Agents 4xx errors in {{ $labels.namespace }} above __AGENTS_CLIENT_ERROR_PERCENT__%"
+          description: "More than __AGENTS_CLIENT_ERROR_PERCENT__% of Agents plugin API requests have returned 4xx for 15 minutes. Look for a client or integration sending bad or unauthorized requests."
 
       - alert: MattermostAgentsTokenUsageHigh
         # Off unless agentsMetrics.thresholds.tokensPerHour is set. Input and

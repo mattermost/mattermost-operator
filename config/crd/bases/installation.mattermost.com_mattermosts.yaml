@@ -747,12 +747,19 @@ spec:
                           Thresholds turns on the Agents alerts that depend on the install. Each
                           alert stays off until its field is set.
                         properties:
-                          httpErrorPercent:
+                          clientErrorPercent:
                             description: |-
-                              HTTPErrorPercent turns on MattermostAgentsHighErrorRate: the percent of
-                              plugin API requests that must fail over 15 minutes, with at least 20
-                              requests in that window. The plugin counts every response outside 2xx as
-                              an error, including 401 and 404, so start high.
+                              ClientErrorPercent turns on MattermostAgentsHighClientErrorRate, which
+                              fires on 4xx responses. Permission denials, deleted threads and expired
+                              sessions are 4xx, so this is noisy on a healthy install. Off unless set.
+                            maximum: 100
+                            minimum: 1
+                            type: integer
+                          serverErrorPercent:
+                            description: |-
+                              ServerErrorPercent sets MattermostAgentsHighServerErrorRate, which fires on
+                              5xx responses: the plugin or its LLM provider failing. On by default at
+                              5. Set 0 to turn it off.
                             maximum: 100
                             minimum: 0
                             type: integer

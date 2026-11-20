@@ -299,17 +299,25 @@ type AgentsMetrics struct {
 	Thresholds *AgentsMetricsThresholds `json:"thresholds,omitempty"`
 }
 
-// AgentsMetricsThresholds are the opt-in Agents alerts. Unset means the alert is
-// not shipped.
+// AgentsMetricsThresholds tunes the Agents alerts. Error rates are the percent
+// of plugin API requests over 15 minutes, with at least 20 requests in that
+// window.
 type AgentsMetricsThresholds struct {
-	// HTTPErrorPercent turns on MattermostAgentsHighErrorRate: the percent of
-	// plugin API requests that must fail over 15 minutes, with at least 20
-	// requests in that window. The plugin counts every response outside 2xx as
-	// an error, including 401 and 404, so start high.
+	// ServerErrorPercent sets MattermostAgentsHighServerErrorRate, which fires on
+	// 5xx responses: the plugin or its LLM provider failing. On by default at
+	// 5. Set 0 to turn it off.
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=100
 	// +optional
-	HTTPErrorPercent *int `json:"httpErrorPercent,omitempty"`
+	ServerErrorPercent *int `json:"serverErrorPercent,omitempty"`
+
+	// ClientErrorPercent turns on MattermostAgentsHighClientErrorRate, which
+	// fires on 4xx responses. Permission denials, deleted threads and expired
+	// sessions are 4xx, so this is noisy on a healthy install. Off unless set.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=100
+	// +optional
+	ClientErrorPercent *int `json:"clientErrorPercent,omitempty"`
 
 	// TokensPerHour turns on MattermostAgentsTokenUsageHigh: input plus output
 	// tokens one agent may use in an hour before the alert fires.
