@@ -75,15 +75,11 @@ func (r *MattermostReconciler) reconcileService(mattermost *mmv1beta.Mattermost,
 		return errors.Wrap(err, "failed to fetch current metrics service")
 	}
 
-	if err := ensureOwnedForUpdate(mattermost, current); err != nil {
-		return err
-	}
-
 	// Preserve the API-assigned, immutable clusterIP/clusterIPs (the metrics
 	// Service is headless, so clusterIPs is ["None"]); otherwise the update tries
 	// to clear them and fails on the next reconcile.
 	resources.CopyServiceEmptyAutoAssignedFields(desired, current)
-	return r.Resources.Update(current, desired, reqLogger)
+	return r.Resources.Update(mattermost, current, desired, reqLogger)
 }
 
 // reconcileServiceMonitor creates-or-updates a ServiceMonitor, treating an absent
@@ -106,10 +102,7 @@ func (r *MattermostReconciler) reconcileServiceMonitor(mattermost *mmv1beta.Matt
 		return errors.Wrap(err, "failed to fetch current service monitor")
 	}
 
-	if err := ensureOwnedForUpdate(mattermost, current); err != nil {
-		return err
-	}
-	return r.Resources.Update(current, desired, reqLogger)
+	return r.Resources.Update(mattermost, current, desired, reqLogger)
 }
 
 func serviceMonitorEnabled(mattermost *mmv1beta.Mattermost) bool {

@@ -78,15 +78,6 @@ func (r *MattermostReconciler) deleteOwnedResource(mattermost *mmv1beta.Mattermo
 	return nil
 }
 
-// ensureOwnedForUpdate refuses to overwrite a pre-existing object with the
-// generated name that this Mattermost does not control (a name collision).
-func ensureOwnedForUpdate(mattermost *mmv1beta.Mattermost, obj metav1.Object) error {
-	if !metav1.IsControlledBy(obj, mattermost) {
-		return errors.Errorf("%s/%s already exists and is not owned by this Mattermost; refusing to overwrite", obj.GetNamespace(), obj.GetName())
-	}
-	return nil
-}
-
 // anyMonitoringEnabled reports whether any monitoring capability that depends on
 // the (Enterprise-gated) Mattermost /metrics endpoint is turned on. callsMetrics
 // is intentionally excluded: it targets a separately-deployed rtcd whose metrics
