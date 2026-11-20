@@ -50,11 +50,7 @@ func (r *MattermostReconciler) checkMattermostGrafanaDashboard(mattermost *mmv1b
 			return errors.Wrap(err, "failed to fetch current grafana dashboard config map")
 		}
 
-		if err = ensureOwnedForUpdate(mattermost, current); err != nil {
-			return err
-		}
-
-		if err = r.Resources.Update(current, cm, reqLogger); err != nil {
+		if err = r.Resources.Update(mattermost, current, cm, reqLogger); err != nil {
 			return err
 		}
 	}
