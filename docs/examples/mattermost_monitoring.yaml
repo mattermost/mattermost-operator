@@ -48,6 +48,13 @@ spec:
       #   memoryLimitPercent: 90
       #   dbReplicaLagSeconds: 5
 
+    # Ships the Mattermost Grafana dashboards as ConfigMaps (one per dashboard),
+    # labelled for pickup by the Grafana dashboard sidecar.
+    grafanaDashboard:
+      enabled: true
+      # discoveryLabel: grafana_dashboard   # override the sidecar label if needed
+      # discoveryLabelValue: "1"
+
     # Client/RUM + notification performance metrics ride the same /metrics
     # endpoint and default to on in the server. Set enabled: false to opt out.
     clientMetrics:
