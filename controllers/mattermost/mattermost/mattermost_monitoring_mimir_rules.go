@@ -41,14 +41,7 @@ func (r *MattermostReconciler) checkMattermostMimirRules(mattermost *mmv1beta.Ma
 		return errors.Wrap(err, "failed to fetch current mimir rules config map")
 	}
 
-	// Don't adopt or overwrite a pre-existing ConfigMap that this Mattermost does
-	// not own — a name collision with an unrelated object. ResourceHelper.Update
-	// would otherwise replace its data wholesale.
-	if !metav1.IsControlledBy(current, mattermost) {
-		return errors.Errorf("config map %s/%s already exists and is not owned by this Mattermost; refusing to overwrite", current.Namespace, current.Name)
-	}
-
-	return r.Resources.Update(current, desired, reqLogger)
+	return r.Resources.Update(mattermost, current, desired, reqLogger)
 }
 
 // deleteMimirRulesConfigMaps deletes only the Mimir rules ConfigMaps this
