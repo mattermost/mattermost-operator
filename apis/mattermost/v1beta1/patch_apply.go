@@ -9,16 +9,23 @@ import (
 	"fmt"
 	"strings"
 
-	jsonpatch "github.com/evanphx/json-patch"
+	jsonpatch "github.com/evanphx/json-patch/v5"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	k8sjson "k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/client-go/kubernetes/scheme"
 )
+
+// maxPatchAccumulatedCopySize limits the total number of bytes that `copy`
+// operations may add while a resource patch is applied. The limit is checked
+// during each operation, so an oversized patch fails before the memory is used.
+const maxPatchAccumulatedCopySize int64 = 32 * 1024
 
 // forbiddenDeploymentPatchPrefixes defines path prefixes that are not allowed
 // in JSON patches applied to Deployments. These paths can be used to escalate
@@ -57,6 +64,32 @@ var forbiddenServicePatchPrefixes = []string{
 type patchOperation struct {
 	Op   string `json:"op"`
 	Path string `json:"path"`
+	From string `json:"from"`
+}
+
+// affectedPaths returns the paths an operation writes to or removes from.
+// A `move` removes the value at `from`, so that path is checked as well.
+func (op patchOperation) affectedPaths() []string {
+	if op.Op == "move" && op.From != "" {
+		return []string{op.Path, op.From}
+	}
+	return []string{op.Path}
+}
+
+// verifyPatchedIdentity checks that a patch did not change the identity of the
+// generated object. The path denylists cannot catch every way to change the
+// identity, for example a replace of /metadata or of the whole document.
+func verifyPatchedIdentity(generated, patched *metav1.ObjectMeta) error {
+	if generated.Name != patched.Name {
+		return errors.New("patch must not change metadata.name")
+	}
+	if generated.Namespace != patched.Namespace {
+		return errors.New("patch must not change metadata.namespace")
+	}
+	if !apiequality.Semantic.DeepEqual(generated.OwnerReferences, patched.OwnerReferences) {
+		return errors.New("patch must not change metadata.ownerReferences")
+	}
+	return nil
 }
 
 // validateDeploymentPatch checks that no patch operations target forbidden paths.
@@ -67,14 +100,16 @@ func validateDeploymentPatch(rawPatch string) error {
 	}
 
 	for _, op := range ops {
-		for _, prefix := range forbiddenDeploymentPatchPrefixes {
-			if op.Path == prefix || strings.HasPrefix(op.Path, prefix+"/") {
-				return fmt.Errorf("patch operation %q on forbidden path %q is not allowed", op.Op, op.Path)
+		for _, path := range op.affectedPaths() {
+			for _, prefix := range forbiddenDeploymentPatchPrefixes {
+				if path == prefix || strings.HasPrefix(path, prefix+"/") {
+					return fmt.Errorf("patch operation %q on forbidden path %q is not allowed", op.Op, path)
+				}
 			}
-		}
-		for _, segment := range forbiddenDeploymentPatchContains {
-			if strings.Contains(op.Path, segment) {
-				return fmt.Errorf("patch operation %q on forbidden path %q is not allowed", op.Op, op.Path)
+			for _, segment := range forbiddenDeploymentPatchContains {
+				if strings.Contains(path, segment) {
+					return fmt.Errorf("patch operation %q on forbidden path %q is not allowed", op.Op, path)
+				}
 			}
 		}
 	}
@@ -89,9 +124,11 @@ func validateServicePatch(rawPatch string) error {
 	}
 
 	for _, op := range ops {
-		for _, prefix := range forbiddenServicePatchPrefixes {
-			if op.Path == prefix || strings.HasPrefix(op.Path, prefix+"/") {
-				return fmt.Errorf("patch operation %q on forbidden path %q is not allowed", op.Op, op.Path)
+		for _, path := range op.affectedPaths() {
+			for _, prefix := range forbiddenServicePatchPrefixes {
+				if path == prefix || strings.HasPrefix(path, prefix+"/") {
+					return fmt.Errorf("patch operation %q on forbidden path %q is not allowed", op.Op, path)
+				}
 			}
 		}
 	}
@@ -122,6 +159,10 @@ func (rp *ResourcePatch) ApplyToDeployment(deployment *appsv1.Deployment) (*apps
 	err := rp.Deployment.applyPatch(deployment, &patched, &gvk)
 	if err != nil {
 		return nil, false, errors.Wrap(err, "failed to apply patch to deployment")
+	}
+
+	if err := verifyPatchedIdentity(&deployment.ObjectMeta, &patched.ObjectMeta); err != nil {
+		return nil, false, errors.Wrap(err, "deployment patch validation failed")
 	}
 
 	return &patched, true, nil
@@ -161,6 +202,13 @@ func (rp *ResourcePatch) ApplyToService(service *v1.Service) (*v1.Service, bool,
 	err := rp.Service.applyPatch(service, &patched, &gvk)
 	if err != nil {
 		return nil, false, errors.Wrap(err, "failed to apply patch to service")
+	}
+
+	if err := verifyPatchedIdentity(&service.ObjectMeta, &patched.ObjectMeta); err != nil {
+		return nil, false, errors.Wrap(err, "service patch validation failed")
+	}
+	if !apiequality.Semantic.DeepEqual(service.Spec.Selector, patched.Spec.Selector) {
+		return nil, false, errors.New("service patch validation failed: patch must not change the selector")
 	}
 
 	return &patched, true, nil
@@ -242,7 +290,10 @@ func (p Patch) applyPatches(encodedResource []byte) ([]byte, error) {
 		return nil, errors.Wrapf(err, "failed to encode patch: %s", p.Patch)
 	}
 
-	encodedResource, err = jsonPatch.Apply(encodedResource)
+	options := jsonpatch.NewApplyOptions()
+	options.AccumulatedCopySizeLimit = maxPatchAccumulatedCopySize
+
+	encodedResource, err = jsonPatch.ApplyWithOptions(encodedResource, options)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to apply patch: %s", p.Patch)
 	}
