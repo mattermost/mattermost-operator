@@ -66,6 +66,22 @@ spec:
     #   labels:                      # falls back to serviceMonitor.labels if omitted
     #     release: kube-prometheus-stack
 
+    # Optional: scrape the Agents plugin (mattermost-ai) at
+    # /plugins/mattermost-ai/metrics. Series get job="<name>-agents". Token
+    # counters carry bot_name and team_id (a raw team ID), never the user.
+    # Leave the server's AggregatePluginMetrics off, or these series are
+    # scraped twice under different jobs.
+    # agentsMetrics:
+    #   enabled: true
+    #   interval: "60s"              # falls back to serviceMonitor.interval
+    #   labels:                      # falls back to serviceMonitor.labels
+    #     release: kube-prometheus-stack
+    #   # MattermostAgentsMetricsDown is always on when enabled. These two
+    #   # alerts are added only when their threshold is set:
+    #   thresholds:
+    #     httpErrorPercent: 10       # non-2xx plugin responses over 15 minutes
+    #     tokensPerHour: 1000000     # input + output tokens per bot
+
 # NOTE: the operator creates a dedicated internal metrics Service (<name>-metrics)
 # that the ServiceMonitor scrapes, so monitoring works in every service mode —
 # including useServiceLoadBalancer, where the app Service exposes only 80/443.

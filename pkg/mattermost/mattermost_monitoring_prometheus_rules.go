@@ -27,6 +27,24 @@ import (
 //go:embed prometheusrules/*.yaml
 var prometheusRuleFS embed.FS
 
+// agentsRuleFS holds the Agents plugin rules. They live outside prometheusrules/
+// because they ship only when agentsMetrics is enabled.
+//
+//go:embed agentsrules/mattermost_agents_prometheus_rules.yaml
+var agentsRuleFS embed.FS
+
+const agentsRulesFile = "agentsrules/mattermost_agents_prometheus_rules.yaml"
+
+const (
+	rulePlaceholderAgentsJob            = "__AGENTS_JOB__"
+	rulePlaceholderAgentsHTTPErrorRatio = "__AGENTS_HTTP_ERROR_RATIO__"
+	rulePlaceholderAgentsHTTPErrorPct   = "__AGENTS_HTTP_ERROR_PERCENT__"
+	rulePlaceholderAgentsTokensPerHour  = "__AGENTS_TOKENS_PER_HOUR__"
+
+	alertAgentsHighErrorRate  = "MattermostAgentsHighErrorRate"
+	alertAgentsTokenUsageHigh = "MattermostAgentsTokenUsageHigh"
+)
+
 // Rule placeholder tokens. Because the Operator generates the PrometheusRule per
 // Mattermost CR, we substitute these in the embedded rules so alert expressions
 // scope to this instance's pods by name/label — never by static IP or CIDR.
@@ -91,6 +109,11 @@ func GeneratePrometheusRuleV1Beta(mattermost *mmv1beta.Mattermost) (*monitoringv
 	if err != nil {
 		return nil, err
 	}
+	agentsGroups, err := loadAgentsPrometheusRuleGroups(mattermost)
+	if err != nil {
+		return nil, err
+	}
+	groups = append(groups, agentsGroups...)
 
 	labels := mattermost.MattermostLabels(mattermost.Name)
 	if pr := mattermost.Spec.Monitoring.PrometheusRule; pr != nil {
@@ -253,4 +276,49 @@ func newPlaceholderReplacer(replacements map[string]string) *strings.Replacer {
 		pairs = append(pairs, k, v)
 	}
 	return strings.NewReplacer(pairs...)
+}
+
+// loadAgentsPrometheusRuleGroups returns the Agents plugin rule groups, or nil
+// unless agentsMetrics is enabled. MattermostAgentsMetricsDown always ships with
+// them; the error-rate and token alerts ship only when their threshold is set.
+func loadAgentsPrometheusRuleGroups(mattermost *mmv1beta.Mattermost) ([]monitoringv1.RuleGroup, error) {
+	am := mattermost.Spec.Monitoring.AgentsMetrics
+	if am == nil || !am.Enabled {
+		return nil, nil
+	}
+
+	errorPercent := 0
+	tokensPerHour := int64(0)
+	drop := map[string]bool{
+		alertAgentsHighErrorRate:  true,
+		alertAgentsTokenUsageHigh: true,
+	}
+	if t := am.Thresholds; t != nil {
+		if t.HTTPErrorPercent != nil {
+			errorPercent = *t.HTTPErrorPercent
+			delete(drop, alertAgentsHighErrorRate)
+		}
+		if t.TokensPerHour != nil {
+			tokensPerHour = *t.TokensPerHour
+			delete(drop, alertAgentsTokenUsageHigh)
+		}
+	}
+
+	content, err := agentsRuleFS.ReadFile(agentsRulesFile)
+	if err != nil {
+		return nil, err
+	}
+	replacer := newPlaceholderReplacer(map[string]string{
+		rulePlaceholderNamespace:            mattermost.Namespace,
+		rulePlaceholderAgentsJob:            AgentsMetricsJob(mattermost.Name),
+		rulePlaceholderAgentsHTTPErrorRatio: fractionString(errorPercent),
+		rulePlaceholderAgentsHTTPErrorPct:   strconv.Itoa(errorPercent),
+		rulePlaceholderAgentsTokensPerHour:  strconv.FormatInt(tokensPerHour, 10),
+	})
+
+	var spec monitoringv1.PrometheusRuleSpec
+	if err := sigsyaml.Unmarshal([]byte(replacer.Replace(string(content))), &spec); err != nil {
+		return nil, err
+	}
+	return dropAlerts(spec.Groups, drop), nil
 }

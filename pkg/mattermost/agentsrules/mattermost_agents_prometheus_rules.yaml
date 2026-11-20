@@ -1,0 +1,56 @@
+# Agents plugin (mattermost-ai) alerting rules, added to the PrometheusRule only
+# when spec.monitoring.agentsMetrics.enabled is set.
+#
+# The Operator substitutes __NAMESPACE__ and __AGENTS_JOB__. Every expression
+# matches job="<name>-agents", the label the Agents ServiceMonitor sets. Copies
+# of the same metrics that a server with AggregatePluginMetrics adds to /metrics
+# carry the metrics Service job instead, so they are never counted twice.
+#
+# The plugin labels token counters by bot_name and team_id. It never labels
+# them by user.
+groups:
+  - name: mattermost.agents
+    rules:
+      - alert: MattermostAgentsMetricsDown
+        # agentsMetrics.enabled says the plugin should be running. A 404 means it
+        # is disabled or not installed; a timeout means the plugin is hung.
+        expr: up{namespace="__NAMESPACE__", job="__AGENTS_JOB__"} == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Mattermost Agents metrics for {{ $labels.namespace }}/{{ $labels.pod }} are unavailable"
+          description: "Prometheus could not scrape /plugins/mattermost-ai/metrics for 10 minutes. The Agents plugin is disabled, not installed, or not responding."
+
+      - alert: MattermostAgentsHighErrorRate
+        # Off unless agentsMetrics.thresholds.httpErrorPercent is set. The plugin
+        # counts every response outside 2xx, including 401 and 404, so the
+        # 20-request floor keeps a quiet install from paging on one bad request.
+        expr: |
+          (
+            sum by (namespace, job) (increase(agents_http_errors_total{namespace="__NAMESPACE__", job="__AGENTS_JOB__"}[15m]))
+            /
+            sum by (namespace, job) (increase(agents_http_requests_total{namespace="__NAMESPACE__", job="__AGENTS_JOB__"}[15m]))
+          ) > __AGENTS_HTTP_ERROR_RATIO__
+          and
+          sum by (namespace, job) (increase(agents_http_requests_total{namespace="__NAMESPACE__", job="__AGENTS_JOB__"}[15m])) > 20
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Mattermost Agents API errors in {{ $labels.namespace }} above __AGENTS_HTTP_ERROR_PERCENT__%"
+          description: "More than __AGENTS_HTTP_ERROR_PERCENT__% of Agents plugin API requests have returned a non-2xx status for 15 minutes."
+
+      - alert: MattermostAgentsTokenUsageHigh
+        # Off unless agentsMetrics.thresholds.tokensPerHour is set. Input and
+        # output tokens are summed per agent across pods and teams.
+        expr: |
+          sum by (namespace, job, bot_name) (
+            increase({__name__=~"agents_llm_(input|output)_tokens_total", namespace="__NAMESPACE__", job="__AGENTS_JOB__"}[1h])
+          ) > __AGENTS_TOKENS_PER_HOUR__
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Mattermost agent {{ $labels.bot_name }} in {{ $labels.namespace }} used more than __AGENTS_TOKENS_PER_HOUR__ tokens in an hour"
+          description: "Input plus output tokens for {{ $labels.bot_name }} over the last hour are above __AGENTS_TOKENS_PER_HOUR__."

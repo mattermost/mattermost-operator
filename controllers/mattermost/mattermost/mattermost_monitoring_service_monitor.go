@@ -27,19 +27,36 @@ func (r *MattermostReconciler) checkMattermostServiceMonitor(mattermost *mmv1bet
 	metricsSvcKey := types.NamespacedName{Name: mattermost.Name + "-metrics", Namespace: mattermost.Namespace}
 	smKey := types.NamespacedName{Name: mattermost.Name, Namespace: mattermost.Namespace}
 
-	if !serviceMonitorEnabled(mattermost) {
+	// The Agents ServiceMonitor scrapes through the same metrics Service, so the
+	// Service stays while either ServiceMonitor is enabled.
+	if !serviceMonitorEnabled(mattermost) && !agentsMetricsEnabled(mattermost) {
 		if err := r.deleteOwnedResource(mattermost, smKey, &monitoringv1.ServiceMonitor{}, reqLogger); err != nil {
 			return err
 		}
 		return r.deleteOwnedResource(mattermost, metricsSvcKey, &corev1.Service{}, reqLogger)
 	}
 
-	// The dedicated metrics Service must exist before the ServiceMonitor targets it.
+	// The dedicated metrics Service must exist before a ServiceMonitor targets it.
 	if err := r.reconcileService(mattermost, mattermostApp.GenerateMetricsServiceV1Beta(mattermost), reqLogger); err != nil {
 		return err
 	}
 
+	if !serviceMonitorEnabled(mattermost) {
+		return r.deleteOwnedResource(mattermost, smKey, &monitoringv1.ServiceMonitor{}, reqLogger)
+	}
 	return r.reconcileServiceMonitor(mattermost, mattermostApp.GenerateServiceMonitorV1Beta(mattermost), reqLogger)
+}
+
+// checkMattermostAgentsServiceMonitor reconciles the ServiceMonitor for the
+// Agents plugin metrics. Deleted when agentsMetrics is off. Runs after
+// checkMattermostServiceMonitor, which keeps the metrics Service it targets.
+func (r *MattermostReconciler) checkMattermostAgentsServiceMonitor(mattermost *mmv1beta.Mattermost, reqLogger logr.Logger) error {
+	agentsKey := types.NamespacedName{Name: mattermostApp.AgentsMetricsJob(mattermost.Name), Namespace: mattermost.Namespace}
+
+	if !agentsMetricsEnabled(mattermost) {
+		return r.deleteOwnedResource(mattermost, agentsKey, &monitoringv1.ServiceMonitor{}, reqLogger)
+	}
+	return r.reconcileServiceMonitor(mattermost, mattermostApp.GenerateAgentsServiceMonitorV1Beta(mattermost), reqLogger)
 }
 
 // checkMattermostRtcdServiceMonitor reconciles a ServiceMonitor targeting an rtcd
@@ -109,6 +126,12 @@ func serviceMonitorEnabled(mattermost *mmv1beta.Mattermost) bool {
 	return mattermost.Spec.Monitoring != nil &&
 		mattermost.Spec.Monitoring.ServiceMonitor != nil &&
 		mattermost.Spec.Monitoring.ServiceMonitor.Enabled
+}
+
+func agentsMetricsEnabled(mattermost *mmv1beta.Mattermost) bool {
+	return mattermost.Spec.Monitoring != nil &&
+		mattermost.Spec.Monitoring.AgentsMetrics != nil &&
+		mattermost.Spec.Monitoring.AgentsMetrics.Enabled
 }
 
 func callsMetricsEnabled(mattermost *mmv1beta.Mattermost) bool {
