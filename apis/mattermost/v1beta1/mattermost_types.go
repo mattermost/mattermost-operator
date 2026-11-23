@@ -327,14 +327,15 @@ type PrometheusRule struct {
 // score above zero, a missing CPU or memory limit, an empty writer pool, and
 // dropped logs. Those do not have a useful per-install number.
 type PrometheusRuleThresholds struct {
-	// HTTPErrorPercent is the percent of HTTP requests that must be errors
-	// before MattermostHighHTTPErrorRate fires. Default 5.
+	// HTTPErrorPercent is the percent of API requests that must return 5xx
+	// before MattermostHighHTTPErrorRate fires. 4xx responses do not count.
+	// Default 5.
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=100
 	// +optional
 	HTTPErrorPercent *int `json:"httpErrorPercent,omitempty"`
 
-	// HTTPMinRequestsPerSecond is the request-rate floor for
+	// HTTPMinRequestsPerSecond is the API request-rate floor for
 	// MattermostHighHTTPErrorRate. The error ratio is ignored below this rate,
 	// so one failed request on a quiet server does not page. Default 1.
 	// Set 0 to page on any positive request rate once the error percent is exceeded.
