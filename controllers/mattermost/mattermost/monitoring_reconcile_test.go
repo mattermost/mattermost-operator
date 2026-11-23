@@ -80,18 +80,24 @@ func TestCheckMattermostMonitoringReconcile(t *testing.T) {
 
 	// Removing the block entirely must also clean up owned resources. Setting
 	// enabled: false is not the only way a user turns monitoring off.
+	mimirCM := types.NamespacedName{Name: "mm-mimir-rules", Namespace: "test"}
 	mm.Spec.Monitoring = &mmv1beta.Monitoring{
 		ServiceMonitor: &mmv1beta.ServiceMonitor{Enabled: true},
 		PrometheusRule: &mmv1beta.PrometheusRule{Enabled: true},
+		MimirRules:     &mmv1beta.MimirRules{Enabled: true},
 	}
 	require.NoError(t, r.checkMattermostMonitoring(mm, log))
 	require.NoError(t, c.Get(ctx, metricsSvc, &corev1.Service{}))
+	require.NoError(t, c.Get(ctx, mimirCM, &corev1.ConfigMap{}), "mimir rules ConfigMap should be created")
+	require.NoError(t, r.checkMattermostMonitoring(mm, log))
+	require.NoError(t, c.Get(ctx, mimirCM, &corev1.ConfigMap{}), "mimir rules ConfigMap should survive a second reconcile")
 
 	mm.Spec.Monitoring = nil
 	require.NoError(t, r.checkMattermostMonitoring(mm, log))
 	assert.True(t, apierrors.IsNotFound(c.Get(ctx, metricsSvc, &corev1.Service{})), "metrics Service should be deleted when the block is removed")
 	assert.True(t, apierrors.IsNotFound(c.Get(ctx, sm, &monitoringv1.ServiceMonitor{})), "ServiceMonitor should be deleted when the block is removed")
 	assert.True(t, apierrors.IsNotFound(c.Get(ctx, rule, &monitoringv1.PrometheusRule{})), "PrometheusRule should be deleted when the block is removed")
+	assert.True(t, apierrors.IsNotFound(c.Get(ctx, mimirCM, &corev1.ConfigMap{})), "mimir rules ConfigMap should be deleted when the block is removed")
 }
 
 // The Prometheus Operator CRDs are optional. When they are missing, monitoring
