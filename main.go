@@ -15,6 +15,7 @@ import (
 	mysqlv1alpha1 "github.com/mattermost/mattermost-operator/pkg/database/mysql_operator/v1alpha1"
 	"github.com/mattermost/mattermost-operator/pkg/resources"
 	v1beta1Minio "github.com/minio/minio-operator/pkg/apis/miniocontroller/v1beta1"
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/sirupsen/logrus"
 	"github.com/vrischmann/envconfig"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
@@ -52,6 +53,10 @@ func init() {
 
 	utilruntime.Must(v1beta1Minio.AddToScheme(scheme))
 	utilruntime.Must(mysqlv1alpha1.SchemeBuilder.AddToScheme(scheme))
+
+	// Prometheus Operator types. Registering the scheme is client-side only and
+	// is harmless when the CRDs are not installed in the cluster.
+	utilruntime.Must(monitoringv1.AddToScheme(scheme))
 }
 
 type Config struct {
