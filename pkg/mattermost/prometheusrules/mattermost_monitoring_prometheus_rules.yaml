@@ -163,22 +163,24 @@ groups:
           description: "The process is up but its database pool to the configured writer has been empty for 10 minutes."
 
       - alert: MattermostHighHTTPErrorRate
-        # More than 5% of HTTP requests erroring, and more than 1 request/s.
+        # More than 5% of API requests returning 5xx, and more than 1 request/s.
         # The floor stops one error out of one request from paging.
+        # mattermost_http_errors_total is not used: it counts every AppError,
+        # so expired sessions (401) and missing resources (404) would page.
         expr: |
           (
-            sum by (namespace, installation_mattermost_com_installation) (rate(mattermost_http_errors_total{namespace="__NAMESPACE__", installation_mattermost_com_installation="__INSTALLATION__"}[5m]))
+            sum by (namespace, installation_mattermost_com_installation) (rate(mattermost_api_time_count{namespace="__NAMESPACE__", installation_mattermost_com_installation="__INSTALLATION__", status_code=~"5.."}[5m]))
             /
-            sum by (namespace, installation_mattermost_com_installation) (rate(mattermost_http_requests_total{namespace="__NAMESPACE__", installation_mattermost_com_installation="__INSTALLATION__"}[5m]))
+            sum by (namespace, installation_mattermost_com_installation) (rate(mattermost_api_time_count{namespace="__NAMESPACE__", installation_mattermost_com_installation="__INSTALLATION__"}[5m]))
           ) > __HTTP_ERROR_RATIO__
           and
-          sum by (namespace, installation_mattermost_com_installation) (rate(mattermost_http_requests_total{namespace="__NAMESPACE__", installation_mattermost_com_installation="__INSTALLATION__"}[5m])) > __HTTP_MIN_RPS__
+          sum by (namespace, installation_mattermost_com_installation) (rate(mattermost_api_time_count{namespace="__NAMESPACE__", installation_mattermost_com_installation="__INSTALLATION__"}[5m])) > __HTTP_MIN_RPS__
         for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "Mattermost {{ $labels.namespace }}/{{ $labels.installation_mattermost_com_installation }} HTTP error rate > __HTTP_ERROR_PERCENT__%"
-          description: "More than __HTTP_ERROR_PERCENT__% of Mattermost HTTP requests have been erroring for 5 minutes, above __HTTP_MIN_RPS__ requests/s."
+          summary: "Mattermost {{ $labels.namespace }}/{{ $labels.installation_mattermost_com_installation }} HTTP 5xx rate > __HTTP_ERROR_PERCENT__%"
+          description: "More than __HTTP_ERROR_PERCENT__% of Mattermost API requests have returned 5xx for 5 minutes, above __HTTP_MIN_RPS__ requests/s."
 
       - alert: MattermostLoginFailureSpike
         # Failed logins / (failed + successful). logins_total counts successes only.

@@ -320,6 +320,8 @@ func TestGeneratePrometheusRuleV1Beta(t *testing.T) {
 		}
 		assert.Contains(t, saw["MattermostHighHTTPErrorRate"], "> 0.2")
 		assert.Contains(t, saw["MattermostHighHTTPErrorRate"], "> 4")
+		assert.Contains(t, saw["MattermostHighHTTPErrorRate"], `status_code=~"5.."`)
+		assert.NotContains(t, saw["MattermostHighHTTPErrorRate"], "mattermost_http_errors_total")
 		assert.Contains(t, saw["MattermostLoginFailureSpike"], "> 0.8")
 		assert.Contains(t, saw["MattermostLoginFailureSpike"], "> 100")
 		assert.Contains(t, saw["MattermostHighCPU"], "> 0.7")
