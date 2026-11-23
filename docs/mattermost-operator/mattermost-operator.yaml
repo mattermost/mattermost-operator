@@ -2579,6 +2579,65 @@ spec:
                   Monitoring defines optional Prometheus/Grafana integration resources for
                   this installation. Each capability is gated by its own flag.
                 properties:
+                  agentsMetrics:
+                    description: |-
+                      AgentsMetrics configures an additional ServiceMonitor for the Agents
+                      plugin (mattermost-ai), which Mattermost serves at
+                      :8067/plugins/mattermost-ai/metrics. When prometheusRule is also enabled,
+                      the Agents alerts are added to the same PrometheusRule.
+                    properties:
+                      enabled:
+                        description: |-
+                          Enabled determines whether the Operator should create the Agents
+                          ServiceMonitor. It also states that the plugin should be running:
+                          MattermostAgentsMetricsDown fires when the scrape fails for 10 minutes.
+                        type: boolean
+                      interval:
+                        description: |-
+                          Interval at which Prometheus scrapes the plugin metrics (e.g. "60s").
+                          Falls back to serviceMonitor.interval, then "30s".
+                        pattern: ^(0|(([0-9]+)y)?(([0-9]+)w)?(([0-9]+)d)?(([0-9]+)h)?(([0-9]+)m)?(([0-9]+)s)?(([0-9]+)ms)?)$
+                        type: string
+                      labels:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          Labels are added to the Agents ServiceMonitor so the cluster's Prometheus
+                          serviceMonitorSelector can match it. Falls back to the serviceMonitor
+                          labels when empty.
+                        type: object
+                      thresholds:
+                        description: |-
+                          Thresholds turns on the Agents alerts that depend on the install. Each
+                          alert stays off until its field is set.
+                        properties:
+                          clientErrorPercent:
+                            description: |-
+                              ClientErrorPercent turns on MattermostAgentsHighClientErrorRate, which
+                              fires on 4xx responses. Permission denials, deleted threads and expired
+                              sessions are 4xx, so this is noisy on a healthy install. Off unless set.
+                            maximum: 100
+                            minimum: 1
+                            type: integer
+                          serverErrorPercent:
+                            description: |-
+                              ServerErrorPercent sets MattermostAgentsHighServerErrorRate, which fires on
+                              5xx responses: the plugin or its LLM provider failing. On by default at
+                              5. Set 0 to turn it off.
+                            maximum: 100
+                            minimum: 0
+                            type: integer
+                          tokensPerHour:
+                            description: |-
+                              TokensPerHour turns on MattermostAgentsTokenUsageHigh: input plus output
+                              tokens one agent may use in an hour before the alert fires.
+                            format: int64
+                            minimum: 1
+                            type: integer
+                        type: object
+                    required:
+                    - enabled
+                    type: object
                   callsMetrics:
                     description: |-
                       CallsMetrics configures an additional ServiceMonitor targeting an rtcd
