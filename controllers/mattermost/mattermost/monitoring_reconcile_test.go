@@ -20,6 +20,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	mmv1beta "github.com/mattermost/mattermost-operator/apis/mattermost/v1beta1"
+	mattermostApp "github.com/mattermost/mattermost-operator/pkg/mattermost"
 	"github.com/mattermost/mattermost-operator/pkg/resources"
 )
 
@@ -134,4 +135,51 @@ func TestCheckMattermostMonitoringRetriesWhenCRDsAbsent(t *testing.T) {
 	err := r.checkMattermostMonitoring(mm, logr.Discard())
 	require.ErrorIs(t, err, resources.ErrPrometheusCRDAbsent)
 	require.NoError(t, c.Get(context.TODO(), types.NamespacedName{Name: "mm-metrics", Namespace: "test"}, &corev1.Service{}))
+}
+
+// Dashboard ConfigMaps are created when enabled, and only ConfigMaps this
+// Mattermost owns are removed when the flag is turned off.
+func TestCheckMattermostGrafanaDashboardReconcile(t *testing.T) {
+	s := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(s))
+	require.NoError(t, mmv1beta.AddToScheme(s))
+
+	mm := &mmv1beta.Mattermost{
+		ObjectMeta: metav1.ObjectMeta{Name: "mm", Namespace: "test", UID: "test-uid"},
+		Spec: mmv1beta.MattermostSpec{
+			Monitoring: &mmv1beta.Monitoring{
+				GrafanaDashboard: &mmv1beta.GrafanaDashboard{Enabled: true},
+			},
+		},
+	}
+	foreign := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foreign",
+			Namespace: "test",
+			Labels:    mattermostApp.DashboardConfigMapSelector(mm),
+		},
+	}
+
+	c := fake.NewClientBuilder().WithScheme(s).WithObjects(mm, foreign).Build()
+	r := &MattermostReconciler{Client: c, Scheme: s, Resources: resources.NewResourceHelper(c, s)}
+	log := logr.Discard()
+
+	list := func() []corev1.ConfigMap {
+		cms := &corev1.ConfigMapList{}
+		require.NoError(t, c.List(context.TODO(), cms, client.InNamespace("test"), client.MatchingLabels(mattermostApp.DashboardConfigMapSelector(mm))))
+		return cms.Items
+	}
+
+	require.NoError(t, r.checkMattermostGrafanaDashboard(mm, log))
+	created := len(list()) - 1
+	assert.Positive(t, created, "dashboard ConfigMaps should be created")
+
+	require.NoError(t, r.checkMattermostGrafanaDashboard(mm, log))
+	assert.Len(t, list(), created+1, "a second reconcile is a no-op")
+
+	mm.Spec.Monitoring.GrafanaDashboard.Enabled = false
+	require.NoError(t, r.checkMattermostGrafanaDashboard(mm, log))
+	remaining := list()
+	require.Len(t, remaining, 1, "only the unowned ConfigMap should survive cleanup")
+	assert.Equal(t, "foreign", remaining[0].Name)
 }
